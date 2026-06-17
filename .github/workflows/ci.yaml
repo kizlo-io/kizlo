@@ -1,0 +1,97 @@
+name: CI
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./tooling/gh-actions/setup
+
+      - name: Setup environment for CI
+        shell: bash
+        run: cp .env.example .env
+
+      - name: Build
+        run: pnpm run build
+
+  quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Setup Biome
+        uses: biomejs/setup-biome@v2
+        with:
+          version: latest
+      - name: Run Biome
+        run: biome ci .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./tooling/gh-actions/setup
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./tooling/gh-actions/setup
+
+      - name: Configure wp test stack env
+        shell: bash
+        run: cp tooling/wp/.env.example tooling/wp/.env
+
+      - name: Boot WordPress stack
+        run: pnpm wp:up
+
+      - name: Seed WordPress stack
+        run: pnpm wp:seed
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Print docker logs on failure
+        if: failure()
+        run: docker compose -f tooling/wp/docker-compose.yml logs --tail=200
+
+      - name: Tear down WordPress stack
+        if: always()
+        run: pnpm wp:down

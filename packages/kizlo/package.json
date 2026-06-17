@@ -1,0 +1,144 @@
+{
+	"name": "kizlo",
+	"type": "module",
+	"version": "1.0.0-alpha.18",
+	"description": "A headless WordPress toolkit for TypeScript.",
+	"license": "MIT",
+	"author": "Kizlo",
+	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/kizlo#readme",
+	"bugs": "https://github.com/kizlo-io/kizlo/issues",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kizlo-io/kizlo.git",
+		"directory": "packages/kizlo"
+	},
+	"keywords": [
+		"wordpress",
+		"headless",
+		"rest-api",
+		"woocommerce",
+		"typescript",
+		"orpc"
+	],
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"kizlo": "./dist/cli/index.js"
+	},
+	"exports": {
+		"./package.json": "./package.json",
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		},
+		"./extensions": {
+			"import": {
+				"types": "./dist/extensions.d.ts",
+				"default": "./dist/extensions.js"
+			},
+			"require": {
+				"types": "./dist/extensions.d.cts",
+				"default": "./dist/extensions.cjs"
+			}
+		},
+		"./nextjs": {
+			"import": {
+				"types": "./dist/nextjs.d.ts",
+				"default": "./dist/nextjs.js"
+			},
+			"require": {
+				"types": "./dist/nextjs.d.cts",
+				"default": "./dist/nextjs.cjs"
+			}
+		},
+		"./nextjs/server": {
+			"import": {
+				"types": "./dist/nextjs/server.d.ts",
+				"default": "./dist/nextjs/server.js"
+			},
+			"require": {
+				"types": "./dist/nextjs/server.d.cts",
+				"default": "./dist/nextjs/server.cjs"
+			}
+		},
+		"./*": {
+			"import": {
+				"types": "./dist/*.d.ts",
+				"default": "./dist/*.js"
+			},
+			"require": {
+				"types": "./dist/*.d.cts",
+				"default": "./dist/*.cjs"
+			}
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsdown",
+		"dev": "tsdown --no-clean -w",
+		"clean": "git clean -xdf .cache .turbo dist node_modules",
+		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@clack/prompts": "^1.5.1",
+		"@kizlo/shared": "workspace:*",
+		"@orpc/client": "^1.14.3",
+		"@orpc/contract": "^1.14.3",
+		"@orpc/openapi": "^1.14.3",
+		"@orpc/openapi-client": "^1.14.3",
+		"@orpc/server": "^1.14.3",
+		"@types/js-cookie": "^3.0.6",
+		"chokidar": "^5.0.0",
+		"citty": "^0.1.6",
+		"consola": "^3.2.3",
+		"cookie": "^1.0.2",
+		"jiti": "^2.7.0",
+		"jose": "catalog:",
+		"js-cookie": "^3.0.5",
+		"server-only": "^0.0.1",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@tooling/typescript": "workspace:*",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:react19",
+		"@types/react-dom": "catalog:react19",
+		"mitata": "^1.0.34",
+		"next": "catalog:",
+		"react": "catalog:react19",
+		"react-dom": "catalog:react19",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"peerDependencies": {
+		"next": "^14.0.0 || ^15.0.0 || ^16.0.0",
+		"react": "^18.0.0 || ^19.0.0",
+		"react-dom": "^18.0.0 || ^19.0.0"
+	},
+	"peerDependenciesMeta": {
+		"next": {
+			"optional": true
+		},
+		"react": {
+			"optional": true
+		},
+		"react-dom": {
+			"optional": true
+		}
+	}
+}

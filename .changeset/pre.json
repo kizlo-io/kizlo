@@ -1,0 +1,19 @@
+{
+  "mode": "pre",
+  "tag": "alpha",
+  "initialVersions": {
+    "kizlo": "1.0.0-alpha.4",
+    "@kizlo/shared": "1.0.0-alpha.2",
+    "@kizlo/stripe": "1.0.0-alpha.4",
+    "@kizlo/wordpress": "1.0.0-alpha.3",
+    "@tooling/typescript": "0.0.0",
+    "@kizlo/woocommerce": "1.0.0-alpha.0"
+  },
+  "changesets": [
+    "clear-meteors-take",
+    "large-knives-shake",
+    "lucky-olives-knock",
+    "tame-squids-serve",
+    "thin-rockets-beam"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"extends": "./build.json",
+	"compilerOptions": {
+		"paths": {
+			"kizlo": ["../../packages/kizlo/src/index.ts"],
+			"kizlo/nextjs": ["../../packages/kizlo/src/integrations/nextjs/index.ts"],
+			"kizlo/nextjs/server": ["../../packages/kizlo/src/integrations/nextjs/server.ts"],
+			"@kizlo/cf7": ["../../packages/cf7/src/index.ts"],
+			"@kizlo/shared": ["../../packages/shared/src/index.ts"],
+			"@kizlo/woocommerce": ["../../packages/woocommerce/src/index.ts"],
+			"@kizlo/test": ["../../packages/test/src/index.ts"]
+		}
+	}
+}

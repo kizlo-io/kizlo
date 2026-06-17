@@ -1,0 +1,26 @@
+const WORDMARK = [
+	"██╗  ██╗██╗███████╗██╗      ██████╗ ",
+	"██║ ██╔╝██║╚══███╔╝██║     ██╔═══██╗",
+	"█████╔╝ ██║  ███╔╝ ██║     ██║   ██║",
+	"██╔═██╗ ██║ ███╔╝  ██║     ██║   ██║",
+	"██║  ██╗██║███████╗███████╗╚██████╔╝",
+	"╚═╝  ╚═╝╚═╝╚══════╝╚══════╝ ╚═════╝ ",
+]
+
+const TAGLINE = "Headless WordPress toolkit for TypeScript"
+
+function colorSupported(): boolean {
+	return Boolean(process.stdout.isTTY) && process.env.NO_COLOR === undefined && process.env.TERM !== "dumb"
+}
+
+export function printBanner(version: string): void {
+	const color = colorSupported()
+	const cyan = color ? "\x1b[38;5;44m" : ""
+	const bold = color ? "\x1b[1m" : ""
+	const dim = color ? "\x1b[2m" : ""
+	const reset = color ? "\x1b[0m" : ""
+
+	const art = WORDMARK.map((line) => `${cyan}${line}${reset}`).join("\n")
+	process.stdout.write(`\n${art}\n\n`)
+	process.stdout.write(`${dim}${TAGLINE}${reset}  ${bold}v${version}${reset}\n\n`)
+}

@@ -1,0 +1,60 @@
+{
+	"name": "@kizlo/cf7",
+	"type": "module",
+	"version": "1.0.0-alpha",
+	"description": "Contact Form 7 extension for Kizlo.",
+	"license": "MIT",
+	"author": "Kizlo",
+	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/cf7#readme",
+	"bugs": "https://github.com/kizlo-io/kizlo/issues",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kizlo-io/kizlo.git",
+		"directory": "packages/cf7"
+	},
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		"./package.json": "./package.json",
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsdown",
+		"dev": "tsdown --no-clean -w",
+		"clean": "git clean -xdf .cache .turbo dist node_modules",
+		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@kizlo/shared": "workspace:*",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@tooling/typescript": "workspace:*",
+		"@types/node": "catalog:",
+		"kizlo": "workspace:*",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"peerDependencies": {
+		"kizlo": "^1.0.0-alpha.18"
+	}
+}

@@ -1,0 +1,19 @@
+[
+	{
+		"slug": "hello-world-test",
+		"title": "Hello World Test",
+		"content": "First seeded post.",
+		"comments": [
+			{
+				"author": "customer",
+				"email": "customer@example.com",
+				"content": "Seed comment"
+			}
+		]
+	},
+	{
+		"slug": "second-test-post",
+		"title": "Second Test Post",
+		"content": "Second seeded post."
+	}
+]

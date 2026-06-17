@@ -1,0 +1,6 @@
+{
+	"_repo": "kizlo-io/kizlo-wordpress",
+	"kizlo": { "tag": "kizlo-v1.0.0-beta.3" },
+	"kizlo-woocommerce": { "tag": "kizlo-woocommerce-v1.0.0-beta.2" },
+	"kizlo-cf7": { "tag": "kizlo-cf7-v1.0.0-beta.2" }
+}

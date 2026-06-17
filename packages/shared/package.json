@@ -1,0 +1,65 @@
+{
+	"name": "@kizlo/shared",
+	"type": "module",
+	"version": "1.0.0-alpha.8",
+	"description": "Framework-agnostic shared types and utilities for Kizlo.",
+	"license": "MIT",
+	"author": "Kizlo",
+	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/shared#readme",
+	"bugs": "https://github.com/kizlo-io/kizlo/issues",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kizlo-io/kizlo.git",
+		"directory": "packages/shared"
+	},
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		"./package.json": "./package.json",
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"dev": "tsdown --no-clean -w",
+		"build": "tsdown",
+		"clean": "git clean -xdf .cache .turbo dist node_modules",
+		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@oslojs/crypto": "catalog:",
+		"@standard-schema/spec": "^1.1.0",
+		"itty-time": "^2.0.2",
+		"path-to-regexp": "6.3.0",
+		"qs": "^6.15.1",
+		"standardwebhooks": "^1.0.0",
+		"ua-parser-js": "^2.0.5",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@tooling/typescript": "workspace:*",
+		"@types/js-cookie": "^3.0.6",
+		"@types/node": "catalog:",
+		"@types/qs": "^6.15.0",
+		"html-entities": "^2.6.0",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

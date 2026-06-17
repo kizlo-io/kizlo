@@ -1,0 +1,39 @@
+{
+	"$schema": "https://turborepo.dev/schema.json",
+	"ui": "tui",
+	"tasks": {
+		"topo": {
+			"dependsOn": ["^topo"]
+		},
+		"build": {
+			"dependsOn": ["topo", "^build"],
+			"outputs": [".cache/tsbuildinfo.json", "dist/**"]
+		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
+		"typecheck": {
+			"dependsOn": ["topo"],
+			"outputs": []
+		},
+		"test": {
+			"dependsOn": ["topo"],
+			"outputs": [],
+			"cache": false
+		},
+		"clean": {
+			"cache": false
+		},
+		"//#clean": {
+			"cache": false
+		},
+		"//#check": {},
+		"//#check:fix": {
+			"cache": false
+		}
+	},
+	"globalEnv": ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_DATABASE_ID", "CLOUDFLARE_D1_TOKEN"],
+	"concurrency": "20",
+	"globalPassThroughEnv": ["NODE_ENV", "CI", "VERCEL", "VERCEL_ENV", "VERCEL_URL", "NEXT_RUNTIME", "npm_lifecycle_event"]
+}

@@ -1,0 +1,45 @@
+{
+	"name": "kizlo-turbo",
+	"private": true,
+	"description": "A headless WordPress toolkit for TypeScript — monorepo.",
+	"license": "MIT",
+	"author": "Kizlo",
+	"homepage": "https://github.com/kizlo-io/kizlo#readme",
+	"bugs": "https://github.com/kizlo-io/kizlo/issues",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kizlo-io/kizlo.git"
+	},
+	"engines": {
+		"node": ">=22.14.0",
+		"pnpm": ">=9.6.0"
+	},
+	"packageManager": "pnpm@10.11.1",
+	"scripts": {
+		"build": "turbo run build",
+		"dev": "turbo watch dev --continue",
+		"kill": "taskkill /f /im node.exe",
+		"clean": "git clean -xdf node_modules",
+		"clean:workspaces": "turbo run clean",
+		"lint:ws": "pnpm dlx sherif@latest",
+		"lint:ws:fix": "pnpm dlx sherif@latest --fix",
+		"postinstall": "pnpm lint:ws",
+		"typecheck": "turbo run typecheck",
+		"test": "turbo run test --filter \"./packages/*\"",
+		"test:only": "turbo run test --filter",
+		"test:watch": "vitest",
+		"check": "biome check .",
+		"check:fix": "biome check . --write",
+		"wp:up": "docker compose -f tooling/wp/docker-compose.yml up -d --wait",
+		"wp:seed": "bash tooling/wp/seed.sh",
+		"wp:down": "docker compose -f tooling/wp/docker-compose.yml down",
+		"wp:reset": "docker compose -f tooling/wp/docker-compose.yml down -v && pnpm wp:up && pnpm wp:seed"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.0",
+		"@changesets/cli": "^2.29.7",
+		"@types/bun": "^1.3.0",
+		"turbo": "^2.5.8",
+		"typescript": "catalog:"
+	}
+}
