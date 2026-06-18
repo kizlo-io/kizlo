@@ -1,7 +1,7 @@
 {
 	"name": "@kizlo/cf7",
 	"type": "module",
-	"version": "1.0.0-alpha",
+	"version": "1.0.0-alpha.0",
 	"description": "Contact Form 7 extension for Kizlo.",
 	"license": "MIT",
 	"author": "Kizlo",

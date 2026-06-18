@@ -2,12 +2,13 @@
   "mode": "pre",
   "tag": "alpha",
   "initialVersions": {
-    "kizlo": "1.0.0-alpha.4",
-    "@kizlo/shared": "1.0.0-alpha.2",
-    "@kizlo/stripe": "1.0.0-alpha.4",
-    "@kizlo/wordpress": "1.0.0-alpha.3",
+    "@kizlo/cf7": "1.0.0-alpha.0",
+    "kizlo": "1.0.0-alpha.18",
+    "@kizlo/shared": "1.0.0-alpha.8",
+    "@kizlo/test": "1.0.0-alpha.0",
+    "@kizlo/woocommerce": "1.0.0-alpha.2",
     "@tooling/typescript": "0.0.0",
-    "@kizlo/woocommerce": "1.0.0-alpha.0"
+    "@tooling/wp": "0.0.0"
   },
   "changesets": [
     "clear-meteors-take",
