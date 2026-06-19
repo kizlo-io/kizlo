@@ -1,28 +1,10 @@
 # @kizlo/shared
 
-Framework-agnostic shared types and utilities used across the
-[Kizlo](https://github.com/kizlo-io/kizlo) packages.
+Internal shared types and utilities for [Kizlo](https://github.com/kizlo-io/kizlo).
 
-Has no runtime dependencies on the core or any extension, so it's safe to use
-from both server and client code.
-
-## Install
-
-```bash
-pnpm add @kizlo/shared
-```
-
-## Includes
-
-- **Geo** — `Country`, `Currency`, `CountryCode`, `CurrencyCode` and their
-  constant lists (`COUNTRIES`, `CURRENCIES`, …), plus weight/dimension units.
-- **Address** — `toAddressString` and related helpers.
-- Shared schema, type, and utility primitives used by Kizlo internals.
-
-```ts
-import { COUNTRIES, toAddressString } from "@kizlo/shared"
-```
+> This is an internal package with no stable public API. It is not intended for
+> direct use — install [`kizlo`](https://www.npmjs.com/package/kizlo) instead.
 
 ## License
 
-[MIT](../../LICENSE) © Kizlo
+[MIT](./LICENSE) © Kizlo

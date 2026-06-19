@@ -1,8 +1,13 @@
 {
 	"name": "@kizlo/shared",
-	"type": "module",
 	"version": "1.0.0-alpha.8",
+	"type": "module",
 	"description": "Framework-agnostic shared types and utilities for Kizlo.",
+	"keywords": [
+		"wordpress",
+		"headless",
+		"kizlo"
+	],
 	"license": "MIT",
 	"author": "Kizlo",
 	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/shared#readme",
@@ -11,6 +16,9 @@
 		"type": "git",
 		"url": "git+https://github.com/kizlo-io/kizlo.git",
 		"directory": "packages/shared"
+	},
+	"engines": {
+		"node": ">=22.14.0"
 	},
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",

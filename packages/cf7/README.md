@@ -1,9 +1,36 @@
-# @kizlo/cf7
+<br>
 
-Contact Form 7 extension for [Kizlo](https://github.com/kizlo-io/kizlo).
+<p align="center">
+  <a name="readme-top"></a>
+  <a href="https://kizlo.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://cdn.kizlo.io/logo/icon-light.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://cdn.kizlo.io/logo/icon-dark.svg">
+      <img alt="Kizlo" src="https://cdn.kizlo.io/logo/icon-dark.svg" height="100">
+    </picture>
+  </a>
+</p>
 
-Adds a typed form-submission route backed by the Contact Form 7 REST API, with
-built-in captcha validation.
+<h3 align="center">Contact Form 7 Extension</h3>
+
+<p align="center">
+  Type-safe form submissions using the Contact Form 7 WordPress plugin
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@kizlo/cf7"><img src="https://img.shields.io/npm/v/@kizlo/cf7?style=flat-square&color=333" alt="npm version"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/kizlo-io/kizlo?style=flat-square&color=333" alt="License"></a>
+  <a href="https://www.npmjs.com/package/@kizlo/cf7"><img src="https://img.shields.io/npm/dt/@kizlo/cf7?style=flat-square&color=333" alt="npm downloads"></a>
+</p>
+
+<p align="center">
+  <a href="https://kizlo.io"><strong>Website</strong></a> ·
+  <a href="https://kizlo.io/docs"><strong>Docs</strong></a> ·
+  <a href="https://discord.com/invite/MjAUZamx5g"><strong>Discord</strong></a> ·
+  <a href="https://x.com/kizlo_io"><strong>Twitter</strong></a>
+</p>
+
+---
 
 ## Install
 
@@ -11,40 +38,10 @@ built-in captcha validation.
 pnpm add @kizlo/cf7
 ```
 
-> Requires the [`kizlo`](https://www.npmjs.com/package/kizlo) core package and a
-> WordPress install running the Contact Form 7 plugin.
+## Documentation
 
-## Usage
-
-Register a form by its CF7 id and describe its fields with a schema:
-
-```ts
-import { z } from "zod"
-import { Kizlo } from "kizlo"
-import { contactFormSeven } from "@kizlo/cf7"
-
-const contact = contactFormSeven("contact", {
-  id: 42, // the Contact Form 7 form id
-  fields: z.object({
-    "your-name": z.string(),
-    "your-email": z.email(),
-    "your-message": z.string(),
-  }),
-})
-
-const kizlo = new Kizlo({
-  // ...core config
-  extensions: [contact],
-})
-
-await kizlo.client.contact.submit({
-  "your-name": "Ada",
-  "your-email": "ada@example.com",
-  "your-message": "Hello!",
-  // ...captcha fields
-})
-```
+See the [docs](https://kizlo.io/docs) for setup and usage.
 
 ## License
 
-[MIT](../../LICENSE) © Kizlo
+[MIT](./LICENSE) © Kizlo

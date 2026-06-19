@@ -1,10 +1,36 @@
-# @kizlo/woocommerce
+<br>
 
-WooCommerce extension for [Kizlo](https://github.com/kizlo-io/kizlo).
+<p align="center">
+  <a name="readme-top"></a>
+  <a href="https://kizlo.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://cdn.kizlo.io/logo/icon-light.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://cdn.kizlo.io/logo/icon-dark.svg">
+      <img alt="Kizlo" src="https://cdn.kizlo.io/logo/icon-dark.svg" height="100">
+    </picture>
+  </a>
+</p>
 
-Adds typed `cart`, `checkout`, `products`, and `customers` routes — backed by
-the WooCommerce Store API (`/wc/store/v1/*`) and admin REST API (`/wc/v3/*`) —
-to your Kizlo server.
+<h3 align="center">WooCommerce Extension</h3>
+
+<p align="center">
+  Type-safe storefront using the WooCommerce WordPress plugin
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@kizlo/woocommerce"><img src="https://img.shields.io/npm/v/@kizlo/woocommerce?style=flat-square&color=333" alt="npm version"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/kizlo-io/kizlo?style=flat-square&color=333" alt="License"></a>
+  <a href="https://www.npmjs.com/package/@kizlo/woocommerce"><img src="https://img.shields.io/npm/dt/@kizlo/woocommerce?style=flat-square&color=333" alt="npm downloads"></a>
+</p>
+
+<p align="center">
+  <a href="https://kizlo.io"><strong>Website</strong></a> ·
+  <a href="https://kizlo.io/docs"><strong>Docs</strong></a> ·
+  <a href="https://discord.com/invite/MjAUZamx5g"><strong>Discord</strong></a> ·
+  <a href="https://x.com/kizlo_io"><strong>Twitter</strong></a>
+</p>
+
+---
 
 ## Install
 
@@ -12,33 +38,10 @@ to your Kizlo server.
 pnpm add @kizlo/woocommerce
 ```
 
-> Requires the [`kizlo`](https://www.npmjs.com/package/kizlo) core package and a
-> WordPress install running the WooCommerce plugin.
+## Documentation
 
-## Usage
-
-```ts
-import { Kizlo } from "kizlo"
-import { woocommerce } from "@kizlo/woocommerce"
-
-const kizlo = new Kizlo({
-  // ...core config
-  extensions: [woocommerce()],
-})
-
-const products = await kizlo.client.woocommerce.products.list()
-const cart = await kizlo.client.woocommerce.cart.get()
-```
-
-## Routes
-
-| Route | Description |
-| --- | --- |
-| `cart` | Read and mutate the customer cart. |
-| `checkout` | Process checkout / place orders. |
-| `products` | Browse and query products. |
-| `customers` | Manage customer accounts. |
+See the [docs](https://kizlo.io/docs) for setup and usage.
 
 ## License
 
-[MIT](../../LICENSE) © Kizlo
+[MIT](./LICENSE) © Kizlo

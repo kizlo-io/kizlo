@@ -118,9 +118,6 @@ importers:
       '@orpc/server':
         specifier: ^1.14.3
         version: 1.14.6
-      '@types/js-cookie':
-        specifier: ^3.0.6
-        version: 3.0.6
       chokidar:
         specifier: ^5.0.0
         version: 5.0.0
@@ -139,12 +136,6 @@ importers:
       jose:
         specifier: 'catalog:'
         version: 6.1.0
-      js-cookie:
-        specifier: ^3.0.5
-        version: 3.0.8
-      server-only:
-        specifier: ^0.0.1
-        version: 0.0.1
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -161,9 +152,6 @@ importers:
       '@types/react-dom':
         specifier: catalog:react19
         version: 19.2.3(@types/react@19.2.17)
-      mitata:
-        specifier: ^1.0.34
-        version: 1.0.34
       next:
         specifier: 'catalog:'
         version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -1588,9 +1576,6 @@ packages:
   jose@6.1.0:
     resolution: {integrity: sha512-TTQJyoEoKcC1lscpVDCSsVgYzUDg/0Bt3WE//WiTPK6uOCQC2KZS4MpugbMWt/zyjkopgZoXhZuCi00gLudfUA==}
 
-  js-cookie@3.0.8:
-    resolution: {integrity: sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==}
-
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
 
@@ -1707,9 +1692,6 @@ packages:
   micromatch@4.0.8:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
-
-  mitata@1.0.34:
-    resolution: {integrity: sha512-Mc3zrtNBKIMeHSCQ0XqRLo1vbdIx1wvFV9c8NJAiyho6AjNfMY8bVhbS12bwciUdd1t4rj8099CH3N3NFahaUA==}
 
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
@@ -1934,9 +1916,6 @@ packages:
     resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
     hasBin: true
-
-  server-only@0.0.1:
-    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   sharp@0.34.5:
     resolution: {integrity: sha512-Ou9I5Ft9WNcCbXrU9cMgPBcCK8LiwLqcbywW3t4oDV37n1pzpuNLsYiAV8eODnjbtQlSDwZ2cUEeQz4E54Hltg==}
@@ -3407,8 +3386,6 @@ snapshots:
 
   jose@6.1.0: {}
 
-  js-cookie@3.0.8: {}
-
   js-tokens@9.0.1: {}
 
   js-yaml@3.14.2:
@@ -3498,8 +3475,6 @@ snapshots:
     dependencies:
       braces: 3.0.3
       picomatch: 2.3.2
-
-  mitata@1.0.34: {}
 
   mri@1.2.0: {}
 
@@ -3715,8 +3690,6 @@ snapshots:
   scheduler@0.27.0: {}
 
   semver@7.8.4: {}
-
-  server-only@0.0.1: {}
 
   sharp@0.34.5:
     dependencies:

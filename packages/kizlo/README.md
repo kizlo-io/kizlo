@@ -1,54 +1,74 @@
-# kizlo
+<br>
 
-**A headless WordPress toolkit for TypeScript.**
+<p align="center">
+  <a name="readme-top"></a>
+  <a href="https://kizlo.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://cdn.kizlo.io/logo/icon-light.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://cdn.kizlo.io/logo/icon-dark.svg">
+      <img alt="Kizlo" src="https://cdn.kizlo.io/logo/icon-dark.svg" height="100">
+    </picture>
+  </a>
+</p>
 
-The core package. It wraps the WordPress REST API in a fully-typed
-[oRPC](https://orpc.unnoq.com/) router and exposes a pluggable extension and
-adapter system. Plugin integrations (WooCommerce, Contact Form 7, …) ship as
-separate `@kizlo/*` packages that layer on top.
+<h3 align="center">Headless WordPress Toolkit</h3>
 
-## Install
+<p align="center">
+  Your backend, your frontend — Kizlo handles the plumbing.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/kizlo"><img src="https://img.shields.io/npm/v/kizlo?style=flat-square&color=333" alt="npm version"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/kizlo-io/kizlo?style=flat-square&color=333" alt="License"></a>
+  <a href="https://www.npmjs.com/package/kizlo"><img src="https://img.shields.io/npm/dt/kizlo?style=flat-square&color=333" alt="npm downloads"></a>
+</p>
+
+<p align="center">
+  <a href="https://kizlo.io"><strong>Website</strong></a> ·
+  <a href="https://kizlo.io/docs"><strong>Docs</strong></a> ·
+  <a href="https://discord.com/invite/MjAUZamx5g"><strong>Discord</strong></a> ·
+  <a href="https://x.com/kizlo_io"><strong>Twitter</strong></a>
+</p>
+
+---
+
+## What is Kizlo?
+
+Kizlo is a framework-agnostic toolkit for headless WordPress, built for a stack you host and own from top to bottom. Use it to build websites, mobile apps, agentic applications, and more — Kizlo takes care of the plumbing so you can focus on the design.
+
+## Quick start
+
+Set up Kizlo in your project:
 
 ```bash
-pnpm add kizlo
+npx kizlo init
 ```
 
-## Usage
+Watch your extensions and regenerate the contract during development:
 
-```ts
-import { Kizlo } from "kizlo"
-
-const kizlo = new Kizlo({
-  baseUrl: process.env.NEXT_PUBLIC_SERVER_BASE_URL!,
-  siteSecret: process.env.SITE_SECRET!,
-  environment: process.env.NODE_ENV,
-  credentials: {
-    url: process.env.WORDPRESS_URL!,
-    username: process.env.WORDPRESS_USERNAME!,
-    password: process.env.WORDPRESS_APPLICATION_PASSWORD!,
-  },
-})
-
-const posts = await kizlo.client.post.list({ per_page: 10 })
+```bash
+npx kizlo dev
 ```
 
-## Features
+Generate the contract once for production builds:
 
-- **Typed WordPress REST client** — posts, comments, users, menus, media, and more.
-- **Router** — server-to-server `client`, plus RPC and OpenAPI fetch handlers.
-- **Extensions** — register plugin integrations via `extensions: [...]`.
-- **Adapters** — plug in your own `auth`, `captcha`, `geo`, `logger`, and `cookies`.
-- **Webhooks** — handle WordPress events through a typed event router.
+```bash
+npx kizlo generate
+```
 
-## Entry points
+See the [docs](https://kizlo.io/docs) for the full guide.
 
-| Import | Purpose |
-| --- | --- |
-| `kizlo` | Core `Kizlo` server, client, router, adapters, WordPress types. |
-| `kizlo/extensions` | Helpers for authoring extensions. |
-| `kizlo/nextjs` | Next.js client-side helpers. |
-| `kizlo/nextjs/server` | Next.js server-side helpers. |
+## Contributing
 
-## License
+Contributions are welcome — see [CONTRIBUTING.md](https://github.com/kizlo-io/kizlo/blob/main/CONTRIBUTING.md) for setup,
+workflow, and PR guidelines.
 
-[MIT](../../LICENSE) © Kizlo
+## Security
+
+If you discover a security vulnerability within Kizlo, please send an e-mail to security@kizlo.io.
+
+All reports will be promptly addressed, and you'll be credited accordingly.
+
+## Disclaimer
+
+Kizlo is an independent project and is not endorsed by, sponsored by, or affiliated with the WordPress Foundation or WooCommerce, Inc. The WordPress® trademarks are the intellectual property of the WordPress Foundation, and the Woo® and WooCommerce® trademarks are the intellectual property of WooCommerce, Inc. Uses of the WordPress®, Woo®, and WooCommerce® names in this organization are for identification purposes only and do not imply endorsement.
