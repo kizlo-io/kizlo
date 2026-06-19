@@ -1,5 +1,4 @@
 import type { Cookie, CookieOptions, CookieWithOptions } from "@kizlo/shared"
-import JsCookies from "js-cookie"
 import type { CookiesAdapter } from "./shared/types"
 
 export class CookiesStorage {
@@ -28,23 +27,5 @@ export class CookiesStorage {
 	public async delete(cookies: { name: string; options?: CookieOptions }[]): Promise<void>
 	public async delete(nameOrCookies: string | { name: string; options?: CookieOptions }[], options?: CookieOptions): Promise<void> {
 		return await Promise.resolve(this.cookies?.deleteAll(Array.isArray(nameOrCookies) ? nameOrCookies : [{ name: nameOrCookies, options }]))
-	}
-}
-
-export class BrowserCookies implements CookiesAdapter {
-	setAll(cookies: CookieWithOptions[]): Promise<void> | void {
-		cookies.forEach((cookie) => {
-			JsCookies.set(cookie.name, cookie.value, cookie.options)
-		})
-	}
-
-	getAll(): Promise<{ name: string; value: string }[] | null> | { name: string; value: string }[] | null {
-		return Object.entries(JsCookies.get()).map(([name, value]) => ({ name, value }))
-	}
-
-	deleteAll(cookies: { name: string; options?: CookieOptions }[]): Promise<void> | void {
-		for (const cookie of cookies) {
-			JsCookies.remove(cookie.name, cookie.options)
-		}
 	}
 }
