@@ -49,21 +49,34 @@ pnpm test:only    # run tests for one package, e.g. pnpm test:only @kizlo/woocom
 pnpm test:watch   # run Vitest in watch mode
 ```
 
-`pnpm test` and `pnpm test:only` need the WordPress stack running first — see
-below. `pnpm lint:ws` also runs automatically on `postinstall`.
+`pnpm test` needs the WP stack seeded first (`pnpm kizlo wp up`). Seeding is an
+explicit lifecycle now, not part of the test run — `pnpm test` only reads the
+credentials artifact (~1s). `pnpm lint:ws` also runs automatically on `postinstall`.
 
 ## WordPress test stack
 
-The test suite runs against a local WordPress + WooCommerce stack via Docker.
+The test stack ships inside the `kizlo` CLI (`kizlo wp` / `kizlo test`); the
+extension layers it seeds are declared in the root `kizlo.config.ts` (`test.use`).
+Seeding is driven explicitly by the CLI — `pnpm test` itself never boots or seeds.
+Needs Docker available. In this monorepo the CLI loads each extension's seed from
+its built `dist`, so build once first (`pnpm wp:build`); a real consumer installs
+built packages and skips that step.
 
 ```bash
-cp tooling/wp/.env.example tooling/wp/.env
-pnpm wp:up        # boot WordPress and wait for it to be ready
-pnpm wp:seed      # seed fixtures (users, products, …)
-pnpm test         # run tests
-pnpm wp:down      # tear the stack down
-pnpm wp:reset     # down (with volumes) + up + seed, from scratch
+pnpm wp:build       # build the kizlo CLI + extensions (monorepo only)
+pnpm kizlo wp up    # boot the stack, then seed only if not already seeded (no-op when warm)
+pnpm test           # run tests — just reads the credentials artifact
+pnpm kizlo wp stop  # pause the stack (non-destructive; DB + plugins kept)
+pnpm kizlo wp reset # full wipe (down -v) + reseed — the only command that re-downloads plugins
 ```
+
+For a one-shot CI-style run, `pnpm kizlo test` boots the stack, seeds it, runs
+your `test` script, and tears it down (`--keep` to leave it up, `--reset` for a
+fresh DB first).
+
+The CLI writes a credentials artifact to `.kizlo/test-credentials.json`, anchored
+to the directory containing `kizlo.config.ts`, so tests find it from any
+sub-directory with no configuration.
 
 ## Code style
 

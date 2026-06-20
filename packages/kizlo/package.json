@@ -54,6 +54,16 @@
 				"default": "./dist/config.cjs"
 			}
 		},
+		"./test": {
+			"import": {
+				"types": "./dist/test.d.ts",
+				"default": "./dist/test.js"
+			},
+			"require": {
+				"types": "./dist/test.d.cts",
+				"default": "./dist/test.cjs"
+			}
+		},
 		"./nextjs": {
 			"import": {
 				"types": "./dist/nextjs.d.ts",
@@ -86,7 +96,7 @@
 	},
 	"scripts": {
 		"build": "tsdown",
-		"dev": "tsdown --no-clean -w",
+		"dev": "tsdown -w",
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
 		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
 		"typecheck": "tsc --noEmit",

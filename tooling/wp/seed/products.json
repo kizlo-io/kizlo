@@ -1,7 +1,0 @@
-[
-	{ "slug": "test-product-1", "name": "Test Product 1", "price": "10" },
-	{ "slug": "test-product-2", "name": "Test Product 2", "price": "20" },
-	{ "slug": "test-product-3", "name": "Test Product 3", "price": "30" },
-	{ "slug": "test-product-4", "name": "Test Product 4", "price": "40" },
-	{ "slug": "test-product-5", "name": "Test Product 5", "price": "50" }
-]

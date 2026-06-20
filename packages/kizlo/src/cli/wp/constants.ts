@@ -1,0 +1,51 @@
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+import type { PluginSource, TestAdminUser, TestUser } from "./types"
+import { githubRelease } from "./utils"
+
+export const DEFAULT_PORT = 8080
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+
+/** The docker-compose file shipped alongside this module (in both `src/` and `dist/`). */
+export const COMPOSE_FILE = resolve(HERE, "compose/docker-compose.yml")
+export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
+
+/** Credentials artifact location, relative to the config root. */
+export const CREDENTIALS_REL = ".kizlo/test-credentials.json"
+
+export const COMPOSE = ["compose", "-f", COMPOSE_FILE]
+
+/**
+ * DB-side marker written as the final bootstrap step and checked by `isSeeded`.
+ * It records that this database holds a completed bootstrap — independent of any
+ * fixture content, which is optional and varies per consumer. Bump `SEED_VERSION`
+ * to force a reseed when the bootstrap contract changes.
+ */
+export const SEED_MARKER_OPTION = "kizlo_test_seeded"
+export const SEED_VERSION = "1"
+
+/** The kizlo core WordPress plugin, always installed during bootstrap. */
+export const DEFAULT_PLUGINS: PluginSource[] = [
+	{
+		name: "kizlo",
+		source: githubRelease("kizlo-io/kizlo-wordpress", "kizlo-v1.0.0-beta.3"),
+	},
+]
+
+export const TEST_ADMIN: Omit<TestAdminUser, "id" | "applicationPassword"> = {
+	firstName: "Admin",
+	lastName: "",
+	username: "admin",
+	password: "admin_pass",
+	email: "admin@example.com",
+}
+
+export const TEST_USER: Omit<TestUser, "id"> = {
+	firstName: "User",
+	lastName: "",
+	username: "user",
+	email: "user@example.com",
+	password: "user_pass",
+	role: "subscriber",
+}

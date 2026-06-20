@@ -1,6 +1,6 @@
 import type { Service } from "../service"
-import { WP_KIZLO_BASE } from "../wordpress/constants"
-import type { WP_CommonErrorCode } from "../wordpress/types"
+import type { WP_CommonErrorCode } from "../wordpress"
+import { WP_KIZLO_BASE } from "../wordpress"
 import type { EmailSendParams } from "./service.interface"
 
 export class EmailService {

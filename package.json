@@ -17,6 +17,8 @@
 	"packageManager": "pnpm@10.11.1",
 	"scripts": {
 		"build": "turbo run build",
+		"wp:build": "turbo run build --filter=kizlo --filter=@kizlo/woocommerce --filter=@kizlo/cf7",
+		"wp": "node packages/kizlo/dist/cli/index.js wp",
 		"dev": "turbo watch dev --continue",
 		"kill": "taskkill /f /im node.exe",
 		"clean": "git clean -xdf node_modules",
@@ -29,17 +31,16 @@
 		"test:only": "turbo run test --filter",
 		"test:watch": "vitest",
 		"check": "biome check .",
-		"check:fix": "biome check . --write",
-		"wp:up": "docker compose -f tooling/wp/docker-compose.yml up -d --wait",
-		"wp:seed": "bash tooling/wp/seed.sh",
-		"wp:down": "docker compose -f tooling/wp/docker-compose.yml down",
-		"wp:reset": "docker compose -f tooling/wp/docker-compose.yml down -v && pnpm wp:up && pnpm wp:seed"
+		"check:fix": "biome check . --write"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.0",
 		"@changesets/changelog-github": "^0.7.0",
 		"@changesets/cli": "^2.29.7",
+		"@kizlo/cf7": "workspace:*",
+		"@kizlo/woocommerce": "workspace:*",
 		"@types/bun": "^1.3.0",
+		"kizlo": "workspace:*",
 		"turbo": "^2.5.8",
 		"typescript": "catalog:"
 	}

@@ -1,6 +1,6 @@
 import { EmailService } from "./email/service"
-import { WordPressService } from "./wordpress/service"
-import type { WordPressCredentials } from "./wordpress/types"
+import type { WordPressCredentials } from "./wordpress"
+import { WordPressService } from "./wordpress"
 
 export interface ServiceConfig {
 	credentials: WordPressCredentials

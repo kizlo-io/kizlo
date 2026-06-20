@@ -1,6 +1,7 @@
 import { trimLeadingTrailingSlashes } from "@kizlo/shared"
 import type { Identifier } from "../shared/identifier"
 import type {
+	WordPressService,
 	WP_PostCreateErrorCode,
 	WP_PostDeleteErrorCode,
 	WP_PostListErrorCode,
@@ -8,8 +9,7 @@ import type {
 	WP_PostRetrieveErrorCode,
 	WP_PostUpdateErrorCode,
 } from "../wordpress"
-import { WP_KIZLO_BASE } from "../wordpress/constants"
-import type { WordPressService } from "../wordpress/service"
+import { WP_KIZLO_BASE } from "../wordpress"
 import type { WPK_CreatePostTypeInput, WPK_DeletePostTypeInput, WPK_PostType, WPK_UpdatePostTypeInput } from "./service.interface"
 
 export class PostTypeService<T = WPK_PostType> {

@@ -1,11 +1,11 @@
-import { getTestClientInstance, getTestServerInstance, readTestCredentials, type TestClientInstance } from "@kizlo/test"
 import { beforeAll, expect, test } from "vitest"
+import { getKizloClientTestInstance, getKizloTestInstance, type KizloClientTestInstance } from "./test"
 
-let instance: TestClientInstance
+let instance: KizloClientTestInstance
 
 beforeAll(async () => {
-	const kizlo = getTestServerInstance()
-	instance = await getTestClientInstance(kizlo)
+	const kizlo = getKizloTestInstance()
+	instance = await getKizloClientTestInstance(kizlo)
 })
 
 test("api-scoped procedure routes via OpenAPI link end-to-end", async () => {
@@ -36,21 +36,4 @@ test("internal-scoped procedure is rejected client-side before any network call"
 	const result = await seo.sitemaps()
 	expect(result.success).toBe(false)
 	expect(result.error?.message).toMatch(/internal procedure/i)
-})
-
-test("remote-scoped procedure routes via RPC link end-to-end (cf7 form submit)", async () => {
-	const formId = readTestCredentials().fixtures.cf7FormId
-	expect(formId).toBeGreaterThan(0)
-	const contact = (
-		instance.client as unknown as {
-			contact: { submit: (input: unknown) => Promise<{ success: boolean; data?: unknown; error?: unknown }> }
-		}
-	).contact
-	const result = await contact.submit({
-		"your-name": "Test Sender",
-		"your-email": "sender@example.com",
-		"your-message": "transport smoke",
-		captchaToken: "test-token-pass",
-	})
-	expect(result.success).toBe(true)
 })

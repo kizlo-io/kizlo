@@ -283,7 +283,7 @@ export const init = defineCommand({
 
 		const exampleCreated = writeFileIfAbsent(path.join(cwd, ".env.example"), `${keys.map((key) => `${key}=`).join("\n")}\n`)
 
-		// kizlo.config.ts — the daemon (`kizlo dev`/`generate`) reads dir from here
+		// kizlo.config.ts — the daemon (`kizlo watch`/`generate`) reads dir from here
 		const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
 		const configCreated = writeFileIfAbsent(path.join(cwd, "kizlo.config.ts"), kizloConfigTemplate(dirRel, setup.alias))
 
@@ -305,7 +305,7 @@ export const init = defineCommand({
 		}
 
 		// Generated contract stub so the client typechecks before the first
-		// `kizlo dev`; the daemon overwrites it on run.
+		// `kizlo watch`; the daemon overwrites it on run.
 		const generatedDirRel = path.join(serverDirRel, "generated")
 		writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")
 		writeFileIfAbsent(path.join(cwd, generatedDirRel, "index.ts"), CONTRACT_BARREL)
@@ -349,7 +349,7 @@ export const init = defineCommand({
 		p.note(
 			[
 				`Watch your extensions and regenerate the contract during development:`,
-				`  npx kizlo dev`,
+				`  npx kizlo watch`,
 				``,
 				`Generate the contract once for production builds:`,
 				`  npx kizlo generate`,

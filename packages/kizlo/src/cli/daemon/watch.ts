@@ -13,9 +13,15 @@ function debounce<T extends (...args: never[]) => Promise<void>>(fn: T, delay: n
 }
 
 async function regenerate(cfg: ResolvedConfig): Promise<void> {
-	const ok = await generateOnce(cfg)
-	if (ok) log.success("Contract updated")
-	else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
+	try {
+		const ok = await generateOnce(cfg)
+		if (ok) log.success("Contract updated")
+		else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
+	} catch (error) {
+		// A transient error in the user's server (e.g. mid-edit syntax error) must
+		// not crash the watcher — keep the previous contract and wait for the fix.
+		log.error("Failed to update the Kizlo contract:", error)
+	}
 }
 
 /** Watches the server directory and regenerates the contract on change. */

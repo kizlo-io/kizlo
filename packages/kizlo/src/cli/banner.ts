@@ -1,4 +1,4 @@
-const WORDMARK = [
+const KIZLO_CLI_WORD_MARK = [
 	"██╗  ██╗██╗███████╗██╗      ██████╗ ",
 	"██║ ██╔╝██║╚══███╔╝██║     ██╔═══██╗",
 	"█████╔╝ ██║  ███╔╝ ██║     ██║   ██║",
@@ -7,7 +7,7 @@ const WORDMARK = [
 	"╚═╝  ╚═╝╚═╝╚══════╝╚══════╝ ╚═════╝ ",
 ]
 
-const TAGLINE = "Headless WordPress toolkit for TypeScript"
+const KIZLO_TAGLINE = "Headless WordPress toolkit for TypeScript"
 
 function colorSupported(): boolean {
 	return Boolean(process.stdout.isTTY) && process.env.NO_COLOR === undefined && process.env.TERM !== "dumb"
@@ -20,7 +20,7 @@ export function printBanner(version: string): void {
 	const dim = color ? "\x1b[2m" : ""
 	const reset = color ? "\x1b[0m" : ""
 
-	const art = WORDMARK.map((line) => `${cyan}${line}${reset}`).join("\n")
+	const art = KIZLO_CLI_WORD_MARK.map((line) => `${cyan}${line}${reset}`).join("\n")
 	process.stdout.write(`\n${art}\n\n`)
-	process.stdout.write(`${dim}${TAGLINE}${reset}  ${bold}v${version}${reset}\n\n`)
+	process.stdout.write(`${dim}${KIZLO_TAGLINE}${reset}  ${bold}v${version}${reset}\n\n`)
 }

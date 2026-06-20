@@ -1,6 +1,0 @@
-<label>Your name (required)
-[text* your-name]</label>
-<label>Your email (required)
-[email* your-email]</label>
-<label>Your message (required)
-[textarea* your-message]</label>

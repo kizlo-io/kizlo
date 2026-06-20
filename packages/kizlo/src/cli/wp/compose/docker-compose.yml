@@ -41,7 +41,9 @@ services:
     volumes:
       - wp_data:/var/www/html
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/wp-json"]
+      # wp-login.php always returns 200 unauthenticated; /wp-json can be gated to 401
+      # by plugins, so it's not a reliable liveness probe.
+      test: ["CMD-SHELL", "curl -sf http://localhost/wp-login.php > /dev/null || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 60
@@ -62,7 +64,9 @@ services:
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD:-wppass}
       HOME: /tmp
       WP_CLI_CACHE_DIR: /tmp/wp-cli-cache
-    profiles: ["cli"]
+    # Kept warm (long-lived) so the harness can `docker compose exec wp-cli wp ...`
+    # instead of paying container-startup cost on every wp-cli call.
+    entrypoint: ["tail", "-f", "/dev/null"]
 
 volumes:
   mysql_data:
