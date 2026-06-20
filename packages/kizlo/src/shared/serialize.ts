@@ -1,4 +1,4 @@
-import type { WP_CurrencyFormat, WP_ListMetadata } from "../wordpress/types"
+import type { WP_CurrencyFormat, WP_ListMetadata } from "../wordpress"
 import type { CurrencyFormat, ListMetadata } from "./schema"
 import type { List } from "./types"
 

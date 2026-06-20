@@ -1,6 +1,0 @@
-{
-	"name": "Primary",
-	"slug": "primary",
-	"location": "primary",
-	"items": [{ "label": "Home", "url": "/" }, { "label": "About", "url": "/about" }, { "label": "Contact", "url": "/contact" }]
-}

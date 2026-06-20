@@ -1,6 +1,5 @@
-import type { WP_User } from "../wordpress"
-import { WP_KIZLO_BASE } from "../wordpress/constants"
-import type { WordPressService } from "../wordpress/service"
+import type { WordPressService, WP_User } from "../wordpress"
+import { WP_KIZLO_BASE } from "../wordpress"
 import type {
 	KizloUserDeleteErrorCode,
 	KizloUserDeleteInput,

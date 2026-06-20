@@ -17,7 +17,7 @@ import { createOrpcRouter } from "./shared/router"
 import type { CookiesAdapter } from "./shared/types"
 import { isTypescriptObject } from "./shared/utils"
 import { createWebhookRouter, type EventHandler } from "./webhook"
-import type { WordPressCredentials } from "./wordpress/types"
+import type { WordPressCredentials } from "./wordpress"
 
 export type AnyKizloConfig = KizloConfig<any>
 

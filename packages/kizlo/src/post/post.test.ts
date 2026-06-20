@@ -1,11 +1,11 @@
-import { getTestServerInstance, type TestServerInstance } from "@kizlo/test"
 import { beforeAll, expect, test } from "vitest"
+import { getKizloTestInstance, type KizloTestInstance } from "../test"
 import { Post, PostList } from "./schema"
 
-let kizlo: TestServerInstance
+let kizlo: KizloTestInstance
 
 beforeAll(() => {
-	kizlo = getTestServerInstance()
+	kizlo = getKizloTestInstance()
 })
 
 test("posts.list returns posts conforming to PostList", async () => {

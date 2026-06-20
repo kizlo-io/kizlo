@@ -7,7 +7,7 @@ import type {
 	WP_CommentRetrieveErrorCode,
 	WP_CommentRetrieveInput,
 } from "../wordpress"
-import { WP_CORE_BASE, WP_KIZLO_BASE } from "../wordpress/constants"
+import { WP_CORE_BASE, WP_KIZLO_BASE } from "../wordpress"
 import { GET_COMMENT_ERROR_MAP, LIST_COMMENT_ERROR_MAP, SUBMIT_COMMENT_ERROR_MAP } from "./errors"
 import { Comment, CommentList, GetCommentInput, ListCommentInput, SubmitCommentInput } from "./schema"
 import type { WPK_Comment, WPK_CreateCommentInput } from "./types"

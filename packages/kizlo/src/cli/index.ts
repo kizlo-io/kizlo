@@ -10,8 +10,10 @@ const main = defineCommand({
 	},
 	subCommands: {
 		init: () => import("./commands/init").then((m) => m.init),
-		dev: () => import("./commands/dev").then((m) => m.dev),
+		watch: () => import("./commands/watch").then((m) => m.watch),
 		generate: () => import("./commands/generate").then((m) => m.generate),
+		wp: () => import("./commands/wp").then((m) => m.wp),
+		test: () => import("./commands/test").then((m) => m.test),
 	},
 })
 

@@ -8,7 +8,7 @@ import type { ServiceAdapters } from "./kizlo"
 import { Service } from "./service"
 import { compare, hmac } from "./shared/crypto"
 import { PreviewTokenData, type PreviewTokenPayload } from "./shared/schema"
-import type { WordPressCredentials } from "./wordpress/types"
+import type { WordPressCredentials } from "./wordpress"
 
 export interface ContextConfig {
 	siteSecret: string

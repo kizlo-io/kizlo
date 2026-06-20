@@ -43,7 +43,7 @@
 		"access": "public"
 	},
 	"scripts": {
-		"dev": "tsdown --no-clean -w",
+		"dev": "tsdown -w",
 		"build": "tsdown",
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
 		"prepack": "bun ../../.github/replace-workspace-protocol.ts",

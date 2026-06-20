@@ -1,0 +1,81 @@
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { CONFIG_FILES, CREDENTIALS_REL, SEED_MARKER_OPTION, SEED_VERSION } from "./constants"
+import { compose, wpCli } from "./docker"
+import type { PluginSource, TestCredentials } from "./types"
+
+/**
+ * True only when the stack is already seeded: the credentials artifact exists on
+ * the host and this database carries the current seed marker (an option written
+ * as the final bootstrap step). The marker is independent of fixture content, so
+ * it stays accurate no matter which fixtures a consumer mounts; `option get` also
+ * fails when core isn't installed, so it doubles as the DB-initialized check.
+ *
+ * After `wp reset` the DB volume is gone so the marker is absent and `wp up`
+ * reseeds; after `wp stop` the DB is intact so it passes and `wp up` just resumes.
+ * Bumping `SEED_VERSION` invalidates older marks and forces a reseed.
+ */
+export async function isSeeded(): Promise<boolean> {
+	if (!existsSync(credentialsPath())) return false
+
+	const marker = await compose(["exec", "-T", "wp-cli", "wp", "option", "get", SEED_MARKER_OPTION])
+	return marker.code === 0 && marker.stdout.trim() === SEED_VERSION
+}
+
+/** Build a GitHub release-zip URL for `PluginSource.source` (asset named `<tag>.zip`). */
+export function githubRelease(repo: string, tag: string): string {
+	return `https://github.com/${repo}/releases/download/${tag}/${tag}.zip`
+}
+
+/** Resolve a `PluginSource` to the `(name, source)` pair `ensurePlugin` needs. */
+export function resolvePluginSource(plugin: PluginSource): [name: string, source: string] {
+	return typeof plugin === "string" ? [plugin, plugin] : [plugin.name, plugin.source]
+}
+
+/**
+ * Ensure a plugin is active without ever re-downloading. Plugin files persist in
+ * the `wp_data` volume, so an already-installed plugin is just activated; the
+ * download (`source` = release zip URL or wp.org slug) happens only when the files
+ * are absent (i.e. after `wp reset` wipes the volume).
+ */
+export async function ensurePlugin(name: string, source: string): Promise<void> {
+	const active = await compose(["exec", "-T", "wp-cli", "wp", "plugin", "is-active", name])
+	if (active.code === 0) return
+
+	const installed = await compose(["exec", "-T", "wp-cli", "wp", "plugin", "is-installed", name])
+	if (installed.code === 0) {
+		await wpCli(["plugin", "activate", name])
+		return
+	}
+
+	await wpCli(["plugin", "install", source, "--activate"])
+}
+
+/**
+ * The directory holding `kizlo.config.*`, found by walking up from `cwd` (falling
+ * back to `cwd` when none is found). Anchoring the credentials artifact here —
+ * rather than each process's cwd — is what lets the CLI writer and the test reader
+ * agree even when tests run from a sub-directory of the config root.
+ */
+export function findConfigDir(cwd: string = process.cwd()): string {
+	let dir = resolve(cwd)
+	for (;;) {
+		if (CONFIG_FILES.some((name) => existsSync(resolve(dir, name)))) return dir
+		const parent = dirname(dir)
+		if (parent === dir) return resolve(cwd)
+		dir = parent
+	}
+}
+
+/** Fixed credentials artifact path, anchored to the config root. */
+export function credentialsPath(cwd?: string): string {
+	return resolve(findConfigDir(cwd), CREDENTIALS_REL)
+}
+
+let cached: TestCredentials | null = null
+
+export function getTestCredentials(): TestCredentials {
+	if (cached) return cached
+	cached = JSON.parse(readFileSync(credentialsPath(), "utf-8")) as TestCredentials
+	return cached
+}

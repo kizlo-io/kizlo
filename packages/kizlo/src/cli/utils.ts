@@ -2,14 +2,15 @@ import { spawnSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import * as p from "@clack/prompts"
 
 export type PackageManager = "pnpm" | "yarn" | "bun" | "npm"
 
-function stripJsonComments(source: string): string {
+export function stripJsonComments(source: string): string {
 	return source.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (match, comment) => (comment ? "" : match))
 }
 
-function readTsconfigPaths(cwd: string): Record<string, string[]> | undefined {
+export function readTsconfigPaths(cwd: string): Record<string, string[]> | undefined {
 	const file = path.join(cwd, "tsconfig.json")
 	if (!fs.existsSync(file)) return undefined
 	const raw = fs.readFileSync(file, "utf8")
@@ -72,7 +73,7 @@ export function resolveModuleImport(cwd: string, targetRel: string, fromDirRel: 
 
 /**
  * Loads the project's `.env` files into `process.env`. The single place env
- * values come from — shared by `init --yes` and the `kizlo dev`/`generate`
+ * values come from — shared by `init --yes` and the `kizlo watch`/`generate`
  * daemon so they always read the same source.
  */
 export function loadEnvFiles(cwd: string): void {
@@ -176,4 +177,22 @@ export function ensureGitignored(cwd: string, entry: string): "created" | "added
 	const prefix = contents.length && !contents.endsWith("\n") ? `${contents}\n` : contents
 	fs.writeFileSync(gitignorePath, `${prefix}${entry}\n`)
 	return existed ? "added" : "created"
+}
+
+/**
+ * Run a slow async step behind a clack spinner. Shows `message` while `fn` runs,
+ * stops with `done` (or `message`) on success, and stops with an error mark then
+ * rethrows on failure so callers keep their existing try/finally control flow.
+ */
+export async function withSpinner<T>(message: string, fn: () => Promise<T>, done?: string): Promise<T> {
+	const s = p.spinner()
+	s.start(message)
+	try {
+		const result = await fn()
+		s.stop(done ?? message)
+		return result
+	} catch (error) {
+		s.error(`${message} failed`)
+		throw error
+	}
 }

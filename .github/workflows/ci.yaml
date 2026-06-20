@@ -75,23 +75,24 @@ jobs:
       - name: Setup
         uses: ./tooling/gh-actions/setup
 
-      - name: Configure wp test stack env
-        shell: bash
-        run: cp tooling/wp/.env.example tooling/wp/.env
+      # The root kizlo.config.ts imports each extension's seed from its built
+      # `dist`, so the CLI needs kizlo + the extensions built before it loads.
+      - name: Build kizlo CLI + extensions
+        run: pnpm wp:build
 
-      - name: Boot WordPress stack
-        run: pnpm wp:up
-
-      - name: Seed WordPress stack
-        run: pnpm wp:seed
+      # Cold runner: boots the stack, downloads plugins + installs WP, and seeds
+      # once, writing `.kizlo/test-credentials.json`. `pnpm test` then just reads
+      # that artifact — no seeding in the per-test path.
+      - name: Boot + seed WordPress stack
+        run: pnpm kizlo wp up
 
       - name: Run tests
         run: pnpm test
 
       - name: Print docker logs on failure
         if: failure()
-        run: docker compose -f tooling/wp/docker-compose.yml logs --tail=200
+        run: docker compose -f packages/kizlo/src/cli/wp/compose/docker-compose.yml logs --tail=200
 
-      - name: Tear down WordPress stack
+      - name: Stop WordPress stack
         if: always()
-        run: pnpm wp:down
+        run: pnpm kizlo wp stop

@@ -1,6 +1,6 @@
 import { createProcedure } from "../shared/procedure"
-import { WP_KIZLO_BASE } from "../wordpress/constants"
-import type { WP_CommonErrorCode } from "../wordpress/types"
+import type { WP_CommonErrorCode } from "../wordpress"
+import { WP_KIZLO_BASE } from "../wordpress"
 import { ListSitemapUrlInput, Robots, SitemapList, SitemapUrlList } from "./schema"
 import type { WPK_Robots, WPK_Sitemap, WPK_SitemapUrl } from "./types"
 
