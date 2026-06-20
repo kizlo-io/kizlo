@@ -1,7 +1,7 @@
 import { defineCommand } from "citty"
 import { resolveTestConfig } from "../daemon/config"
 import { log } from "../daemon/logger"
-import { withSpinner } from "../spinner"
+import { withSpinner } from "../utils"
 import { composeDown, composeStop, composeUp } from "../wp/docker"
 import { runSeeds } from "../wp/setup"
 import { isSeeded } from "../wp/utils"
