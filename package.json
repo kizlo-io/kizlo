@@ -17,6 +17,8 @@
 	"packageManager": "pnpm@10.11.1",
 	"scripts": {
 		"build": "turbo run build",
+		"wp:build": "turbo run build --filter=kizlo --filter=@kizlo/woocommerce --filter=@kizlo/cf7",
+		"wp": "node packages/kizlo/dist/cli/index.js wp",
 		"dev": "turbo watch dev --continue",
 		"kill": "taskkill /f /im node.exe",
 		"clean": "git clean -xdf node_modules",

@@ -84,7 +84,7 @@ jobs:
       # once, writing `.kizlo/test-credentials.json`. `pnpm test` then just reads
       # that artifact — no seeding in the per-test path.
       - name: Boot + seed WordPress stack
-        run: pnpm kizlo wp up
+        run: pnpm wp up
 
       - name: Run tests
         run: pnpm test
@@ -95,4 +95,4 @@ jobs:
 
       - name: Stop WordPress stack
         if: always()
-        run: pnpm kizlo wp stop
+        run: pnpm wp stop
