@@ -69,6 +69,6 @@
 		"vitest": "catalog:"
 	},
 	"peerDependencies": {
-		"kizlo": "workspace:^"
+		"kizlo": ">=0.1.0"
 	}
 }
