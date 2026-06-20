@@ -1,6 +1,6 @@
 {
 	"name": "@kizlo/shared",
-	"version": "1.0.0-alpha.8",
+	"version": "0.0.0",
 	"type": "module",
 	"description": "Framework-agnostic shared types and utilities for Kizlo.",
 	"keywords": [
@@ -20,7 +20,7 @@
 	"engines": {
 		"node": ">=22.14.0"
 	},
-	"main": "./dist/index.cjs",
+	"main": "./dist/index.js",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -29,10 +29,6 @@
 			"import": {
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
-			},
-			"require": {
-				"types": "./dist/index.d.cts",
-				"default": "./dist/index.cjs"
 			}
 		}
 	},
