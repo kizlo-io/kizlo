@@ -1,6 +1,6 @@
 {
 	"name": "@kizlo/shared",
-	"version": "1.0.0-alpha.8",
+	"version": "0.1.0",
 	"type": "module",
 	"description": "Framework-agnostic shared types and utilities for Kizlo.",
 	"keywords": [

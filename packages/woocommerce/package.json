@@ -1,6 +1,6 @@
 {
 	"name": "@kizlo/woocommerce",
-	"version": "1.0.0-alpha.2",
+	"version": "0.1.0",
 	"type": "module",
 	"description": "WooCommerce extension for Kizlo.",
 	"keywords": [
