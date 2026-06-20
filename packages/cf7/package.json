@@ -1,6 +1,6 @@
 {
 	"name": "@kizlo/cf7",
-	"version": "0.1.0",
+	"version": "0.0.0",
 	"type": "module",
 	"description": "Contact Form 7 extension for Kizlo.",
 	"keywords": [
@@ -23,7 +23,7 @@
 	"engines": {
 		"node": ">=22.14.0"
 	},
-	"main": "./dist/index.cjs",
+	"main": "./dist/index.js",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -32,20 +32,12 @@
 			"import": {
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
-			},
-			"require": {
-				"types": "./dist/index.d.cts",
-				"default": "./dist/index.cjs"
 			}
 		},
 		"./test": {
 			"import": {
 				"types": "./dist/test.d.ts",
 				"default": "./dist/test.js"
-			},
-			"require": {
-				"types": "./dist/test.d.cts",
-				"default": "./dist/test.cjs"
 			}
 		}
 	},
@@ -76,6 +68,6 @@
 		"vitest": "catalog:"
 	},
 	"peerDependencies": {
-		"kizlo": "^1.0.0-alpha.18"
+		"kizlo": "workspace:^"
 	}
 }

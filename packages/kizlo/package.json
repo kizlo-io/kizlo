@@ -1,6 +1,6 @@
 {
 	"name": "kizlo",
-	"version": "0.1.0",
+	"version": "0.0.0",
 	"type": "module",
 	"description": "A headless WordPress toolkit for TypeScript.",
 	"keywords": [
@@ -26,7 +26,7 @@
 	"engines": {
 		"node": ">=22.14.0"
 	},
-	"main": "./dist/index.cjs",
+	"main": "./dist/index.js",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
@@ -38,50 +38,30 @@
 			"import": {
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
-			},
-			"require": {
-				"types": "./dist/index.d.cts",
-				"default": "./dist/index.cjs"
 			}
 		},
 		"./config": {
 			"import": {
 				"types": "./dist/config.d.ts",
 				"default": "./dist/config.js"
-			},
-			"require": {
-				"types": "./dist/config.d.cts",
-				"default": "./dist/config.cjs"
 			}
 		},
 		"./test": {
 			"import": {
 				"types": "./dist/test.d.ts",
 				"default": "./dist/test.js"
-			},
-			"require": {
-				"types": "./dist/test.d.cts",
-				"default": "./dist/test.cjs"
 			}
 		},
 		"./nextjs": {
 			"import": {
 				"types": "./dist/nextjs.d.ts",
 				"default": "./dist/nextjs.js"
-			},
-			"require": {
-				"types": "./dist/nextjs.d.cts",
-				"default": "./dist/nextjs.cjs"
 			}
 		},
 		"./nextjs/server": {
 			"import": {
 				"types": "./dist/nextjs/server.d.ts",
 				"default": "./dist/nextjs/server.js"
-			},
-			"require": {
-				"types": "./dist/nextjs/server.d.cts",
-				"default": "./dist/nextjs/server.cjs"
 			}
 		}
 	},
