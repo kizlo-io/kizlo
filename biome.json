@@ -15,7 +15,8 @@
 			"!!**/.changeset",
 			"!!**/drizzle",
 			"!!**/apps",
-			"!!**/projects"
+			"!!**/projects",
+			"!node_modules"
 		]
 	},
 	"formatter": {
@@ -35,6 +36,9 @@
 			},
 			"suspicious": {
 				"noExplicitAny": "off"
+			},
+			"complexity": {
+				"noImportantStyles": "off"
 			}
 		}
 	},
