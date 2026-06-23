@@ -1,13 +1,22 @@
+import * as PhosphorIcons from "@phosphor-icons/react/dist/ssr"
 import { docs } from "collections/server"
 import { loader } from "fumadocs-core/source"
-import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons"
+import { type ComponentType, createElement } from "react"
+import { brandIcons } from "@/components/icons"
 import { docsContentRoute, docsImageRoute, docsRoute } from "./shared"
 
-// See https://fumadocs.dev/docs/headless/source-api for more info
+function resolveIcon(name: string | undefined) {
+	if (!name) return
+	if (name in brandIcons) return createElement(brandIcons[name as keyof typeof brandIcons])
+	const Icon = (PhosphorIcons as unknown as Record<string, ComponentType>)[name]
+	if (Icon) return createElement(Icon)
+	console.warn(`[icons] unknown icon: ${name}`)
+}
+
 export const source = loader({
 	baseUrl: docsRoute,
 	source: docs.toFumadocsSource(),
-	plugins: [lucideIconsPlugin()],
+	icon: resolveIcon,
 })
 
 export function getPageImage(page: (typeof source)["$inferPage"]) {

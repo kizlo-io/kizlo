@@ -1,0 +1,76 @@
+---
+title: Plugin
+icon: Plug
+description: Learn how the Kizlo plugin connects your toolkit to WordPress, and why a headless setup needs it.
+---
+
+Kizlo has two halves: the **toolkit** in your app (TypeScript), and **WordPress** itself. For the two to work
+as one system — not an app poking at a distant service — WordPress needs a piece that speaks the toolkit's
+language. That piece is a **plugin**.
+
+WordPress already exposes an API, and so do plugins like WooCommerce. So the real question is: *why install
+anything on the WordPress side at all?*
+
+It comes up twice — once for WordPress, once for third-party plugins — and the answer is the same shape both
+times. There are two kinds of plugin:
+
+- **The Kizlo plugin** — required, installed once. Makes WordPress itself a partner to the toolkit.
+- **Companion plugins** — optional. Make a *third-party* plugin part of that same system, and exist only when
+  an [extension](/docs/concepts/extension) needs one.
+
+## The Kizlo plugin
+
+WordPress on its own is a content system with an API you can call. You can read from it — but on its own it
+isn't a complete, or safe, backend for a frontend:
+
+- It **leaves gaps.** A real web project needs more than WordPress ships, and what it ships is shaped around
+  WordPress, not around the app consuming it.
+- It's **one-directional.** Your app can ask WordPress for things, but WordPress can't tell your app when
+  something changes.
+- It's **too open.** Left as-is, it exposes more of itself than a headless frontend needs or should reach.
+
+The **Kizlo plugin** turns WordPress into a backend built *for* a frontend. It fills those gaps, sets the
+guardrails, and makes the relationship two-way — so WordPress can **send events** the toolkit reacts to (see
+[Events](/docs/concepts/extension#events)), not just answer calls.
+
+That's why it's **required.** It's what makes a WordPress install a Kizlo backend at all — without it, the
+toolkit is talking to plain WordPress, not to Kizlo. You install it once (see
+[Installation](/docs/installation)) and leave it; everything else builds on top.
+
+<Callout>
+  The Kizlo plugin is the **foundation**, and deliberately generic — it knows nothing about WooCommerce,
+  Contact Form 7, or any other specific plugin. Bridging those is what companion plugins are for.
+</Callout>
+
+## Companion plugins
+
+**Not every extension needs one.** An extension that builds on what the toolkit already reaches — WordPress,
+through the Kizlo plugin — is self-contained: add the package to your app and it works. Most extensions are
+like this.
+
+A companion plugin only appears when an extension **bridges a third-party plugin** like WooCommerce or
+Contact Form 7. Which raises the same question again: WooCommerce has its own API — so why a plugin of its
+own?
+
+Because that plugin sits *outside* the relationship the Kizlo plugin set up. Reaching it directly means the
+toolkit taking on a second, separate world — and still only getting what that plugin chose to expose.
+
+A **companion plugin** brings it **inside** that relationship instead. It's the WordPress-side half of the
+extension, and it does one or both of:
+
+- **Glue** — connect the plugin into Kizlo so it shows up through the toolkit like everything else.
+- **Extra features** — add what the third-party plugin doesn't offer at all, so the extension can expose it too.
+
+So a bridging extension ships as **two halves**: the **extension** in your app, and the **companion plugin**
+in WordPress. You add both — the companion next to the third-party plugin in WordPress, the extension in your
+app.
+
+<Callout>
+  *Kizlo for WooCommerce* does both: it brings WooCommerce into Kizlo for the `@kizlo/woocommerce` extension,
+  and adds features WooCommerce doesn't ship — like product swatches. *Kizlo for Contact Form 7* just brings
+  CF7 in so the extension can reach it.
+</Callout>
+
+This holds whether you're starting fresh or adding Kizlo to an existing site: install the Kizlo plugin, and
+add a companion only when an extension calls for one. Nothing about your existing WordPress content has to
+change to fit it.

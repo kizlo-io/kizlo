@@ -1,0 +1,3 @@
+{
+	"pages": ["cli", "plugin", "extension", "client", "adapter", "testing"]
+}

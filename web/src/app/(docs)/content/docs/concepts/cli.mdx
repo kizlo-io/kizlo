@@ -1,0 +1,171 @@
+---
+title: CLI
+icon: Terminal
+description: Learn how the kizlo CLI scaffolds a project, generates the typed contract, and runs your tests.
+---
+
+The **`kizlo` CLI** is the tool you run alongside your project. It does three jobs: it **scaffolds** Kizlo
+into a new or existing app, it **generates the contract** that types your [client](/docs/concepts/client)
+against your [server](/docs/concepts/extension), and it **runs your tests** against a real, disposable
+WordPress stack.
+
+It ships with the `kizlo` package, so there's nothing extra to install — reach for it through your package
+runner:
+
+```bash
+npx kizlo <command>
+```
+
+## The commands
+
+Five commands cover the whole workflow, from first scaffold to a green test run:
+
+| Command | What it does |
+| --- | --- |
+| [`kizlo init`](#kizlo-init) | Set up Kizlo in the current project |
+| [`kizlo generate`](#kizlo-generate) | Generate the contract once — for builds and CI |
+| [`kizlo watch`](#kizlo-watch) | Regenerate the contract on every save, during development |
+| [`kizlo test`](#kizlo-test) | Boot a WordPress test stack, seed it, and run your tests |
+| [`kizlo wp`](#kizlo-wp) | Manage that test stack by hand — `up`, `reset`, `stop` |
+
+Every command reads [`kizlo.config.ts`](#configuration) to find where your server lives and how your test
+stack is set up.
+
+## `kizlo init`
+
+`init` sets Kizlo up in an existing project. It detects your framework, package manager, `src` directory, and
+import alias, then scaffolds the server, client, route handler, and config — prompting for your WordPress
+credentials along the way and writing them to `.env`.
+
+```bash
+npx kizlo init
+```
+
+It's the recommended path through the [Installation](/docs/installation) guide, which walks the prompts in
+detail. Past the defaults, a few flags tune the run:
+
+| Flag | Effect |
+| --- | --- |
+| `--yes`, `-y` | Skip the prompts and scaffold with defaults — non-interactive, for CI |
+| `--force`, `-f` | Overwrite existing `.env` values and the server entry without asking |
+| `--preset <id>` | Force a setup preset (`base`, `nextjs`) instead of auto-detecting |
+| `--alias <prefix>` | Set the import alias for generated imports (e.g. `@`); blank for relative |
+
+## `kizlo generate`
+
+`generate` builds the [contract](/docs/concepts/client) **once** and exits. It's the command for builds and
+CI — run it before you typecheck or bundle, so `server/generated/` exists and is current when the client
+imports it.
+
+```bash
+npx kizlo generate
+```
+
+It exits non-zero if it can't find a Kizlo server in your entry file or if generation fails, so a stale or
+broken contract fails the build rather than slipping through.
+
+<Callout>
+  Wire `kizlo generate` into your `build` script (e.g. `"build": "kizlo generate && next build"`) so the
+  contract is always regenerated as part of every production build.
+</Callout>
+
+## `kizlo watch`
+
+`watch` is the development counterpart. It generates the contract once at startup, then watches your server
+directory and regenerates on every save — debounced, so a burst of saves collapses into one rebuild. Your
+client stays typed against the latest server without you thinking about it.
+
+```bash
+npx kizlo watch
+```
+
+A broken server entry doesn't stop the watcher: it reports the error and keeps watching, so the next save can
+fix it. And only one watcher writes the contract at a time — a single-instance lock means a framework dev
+script and a manual `kizlo watch` won't fight over the same file.
+
+<Callout>
+  Run `kizlo watch` next to your framework's dev server — for example `"dev": "kizlo watch & next dev"` — so
+  the contract refreshes as you edit procedures.
+</Callout>
+
+Both `generate` and `watch` accept `--dir` to point at a Kizlo directory other than the one in
+`kizlo.config.ts`.
+
+## `kizlo test`
+
+`kizlo test` runs your test suite against a **real WordPress stack** — no mocks. It boots a Docker-based
+WordPress, seeds it with your [fixtures](#configuration), then runs your project's own test command against
+it:
+
+```bash
+npx kizlo test
+```
+
+The stack is idempotent. The first run boots the containers and seeds them; later runs reuse the same stack
+and skip the slow seed, so reruns are fast. After the suite finishes the stack is **left running** by default
+for that reason. Two flags change the lifecycle:
+
+| Flag | Effect |
+| --- | --- |
+| `--reset` | Wipe the database and reseed from scratch before running |
+| `--teardown` | Stop the stack after the suite finishes, instead of leaving it up |
+
+```bash
+npx kizlo test --reset --teardown   # a clean stack, torn down afterward
+```
+
+Under the hood `test` runs your package manager's `test` script — `pnpm test`, `npm test`, `bun run test` —
+detected from your lockfile, or whatever you set as the test [`command`](#configuration). Its output streams
+straight to your terminal, and `kizlo test` exits with your suite's exit code.
+
+<Callout>
+  See [Testing](/docs/concepts/testing) for how to write the suites that run against this stack, and how
+  fixtures seed the data they expect.
+</Callout>
+
+## `kizlo wp`
+
+`kizlo wp` manages the same test stack `kizlo test` uses, by hand. Reach for it when you want the stack
+running outside a test run — to poke at WP Admin, debug a [fixture](/docs/concepts/testing), or keep it warm
+across sessions. It has three subcommands:
+
+| Command | What it does |
+| --- | --- |
+| `kizlo wp up` | Start the stack and seed it if needed — idempotent |
+| `kizlo wp reset` | Wipe the database volume and reseed a fresh stack |
+| `kizlo wp stop` | Stop the stack, keeping the database volume for a fast resume |
+
+```bash
+npx kizlo wp up      # http://localhost:8080 by default
+```
+
+`up` prints the stack URL and the path to the seeded credentials artifact, so you can log in or point another
+tool at it. The difference between `stop` and `reset` is the database volume — `stop` keeps it, `reset` throws
+it away.
+
+## Configuration
+
+`kizlo.config.ts` lives at your project root (`.js` and `.mjs` work too). `init` writes it for you; you edit
+it as your project grows. Define it with `defineConfig` for a fully typed config:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  alias: "@",
+  test: {
+    port: 8080,
+    fixtures: [],
+  },
+})
+```
+
+| Field | Used by | Meaning |
+| --- | --- | --- |
+| `dir` | all | Kizlo's home directory — where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory) |
+| `alias` | `init` | Import-alias prefix for generated imports, e.g. `@`. Blank means relative imports |
+| `test.port` | `test`, `wp` | Port the WordPress test stack listens on. Defaults to `8080` |
+| `test.fixtures` | `test`, `wp` | Fixtures to install and seed onto the stack — core content plus any extension's fixtures |
+| `test.packageManager` | `test` | Package manager for the test command. Auto-detected from your lockfile when unset |
+| `test.command` | `test` | Override the test command entirely, instead of `<packageManager> test` |

@@ -1,0 +1,221 @@
+---
+title: Installation
+icon: DownloadSimple
+description: Install the Kizlo plugin and add Kizlo to your project.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+import { File, Folder, Files } from 'fumadocs-ui/components/files'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+
+This installation guide uses Next.js for its examples. Other frameworks like Astro, SolidJS, and Vue are supported through their own adapters — the CLI detects your framework and wires the right one.
+
+<Steps>
+
+<Step>
+
+#### Install & activate the WordPress plugin
+
+Download the latest release kizlo plugin from the [GitHub Releases](https://github.com/IDJGILL/kizlo/releases),
+then in WP Admin go to **Plugins → Add New → Upload Plugin**, choose the zip, and **Activate**.
+
+</Step>
+
+<Step>
+
+#### Create an admin Application Password
+
+In WP Admin go to **Users → Profile → Application Passwords** (on a user with admin capability),
+give it a name like `kizlo`, and generate it.
+
+This is the credential Kizlo uses to talk to WordPress. Copy it now — WordPress only shows it
+once — and keep for upcoming step.
+
+</Step>
+
+  <Step>
+
+  #### Add Kizlo to your project
+
+  You have two ways to set up Kizlo in an existing project: the CLI or a manual setup. We recommend the CLI — it has smart framework detection that wires each piece itself and walks you step by step through setting up your environment variables.
+
+  <Tabs defaultValue="CLI">
+    <TabsList variant="line">
+      <TabsTrigger value="CLI">
+          CLI
+      </TabsTrigger>
+
+      <TabsTrigger value="manual">
+          Manual
+      </TabsTrigger>
+    </TabsList>
+
+    <TabsContent value="CLI">
+      ### CLI Setup
+      Run the initializer in your project root: 
+
+      ```bash
+      npx kizlo init
+      ```
+      It detects your framework, `src` dir (if present), package manager, import alias, etc. and scaffolds:
+
+      <Files>
+        <Folder name="src" defaultOpen>
+          <Folder name="app" defaultOpen>
+            <Folder name="api" defaultOpen>
+              <Folder name="kizlo" defaultOpen>
+                <Folder name="[[...rest]]" defaultOpen>
+                  <File name="route.ts" />
+                </Folder>
+              </Folder>
+            </Folder>
+          </Folder>
+          <Folder name="lib" defaultOpen>
+            <Folder name="kizlo" defaultOpen>
+              <Folder name="server" defaultOpen>
+                <File name="index.ts" />
+                  <Folder name="generated">
+                    <File name="contract.json" />
+                    <File name="index.ts" />
+                  </Folder>
+              </Folder>
+              <File name="client.ts" />
+            </Folder>
+          </Folder>
+        </Folder>
+        <File name="kizlo.config.ts" />
+        <File name=".env" />
+      </Files>
+
+      Along the way it prompts you for your WordPress credentials and writes them to `.env`, then
+      generates the contract — so when `init` finishes you're ready to make your first call.
+
+      <Callout>
+        Feel free to customize this folder structure however you like — just point the `dir` option in
+        `kizlo.config.ts` at it, so kizlo knows where your server files and kizlo instance live and can
+        generate the server contract.
+      </Callout>
+    </TabsContent>
+
+    <TabsContent value="manual">
+      ### Manual Setup
+      Prefer to wire it yourself? Create the same files by hand.
+
+      <Steps>
+
+      <Step>
+
+      #### Install the package
+
+      ```bash
+      npm install kizlo
+      ```
+
+      </Step>
+
+      <Step>
+
+      #### Add `kizlo.config.ts`
+
+      At your project root — it tells the CLI where Kizlo lives and which import alias to use:
+
+      ```ts title="kizlo.config.ts"
+      import { defineConfig } from "kizlo"
+
+      export default defineConfig({
+        dir: "src/lib/kizlo",
+        alias: "@",
+      })
+      ```
+
+      </Step>
+
+      <Step>
+
+      #### Create the server
+
+      At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `SITE_SECRET` from `.env`:
+
+      ```ts title="src/lib/kizlo/server/index.ts"
+      import { createKizlo } from "kizlo/nextjs/server"
+
+      export const { router, client, context, handler } = createKizlo()
+      ```
+
+      </Step>
+
+      <Step>
+
+      #### Mount the route handler
+
+      Next.js, at `src/app/api/kizlo/[[...rest]]/route.ts` — re-export the server's `handler` for every method:
+
+      ```ts title="src/app/api/kizlo/[[...rest]]/route.ts"
+      import { handler } from "@/lib/kizlo/server"
+
+      export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS }
+      ```
+
+      </Step>
+
+      <Step>
+
+      #### Add `.env`
+
+      With the credentials from the config and Application Password steps above:
+
+      ```bash title=".env"
+      KIZLO_WORDPRESS_URL=https://your-site.com
+      KIZLO_WORDPRESS_USERNAME=admin
+      KIZLO_WORDPRESS_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
+      KIZLO_SITE_SECRET=                       # a long random string
+      NEXT_PUBLIC_SERVER_BASE_URL=http://localhost:3000
+      ```
+
+      </Step>
+
+      <Step>
+
+      #### Generate the contract
+
+      So `server/generated/` exists before the client imports it:
+
+      ```bash
+      npm kizlo generate
+      ```
+
+      <Callout>
+        Instead of re-running this every time you add or change a procedure, run `npm kizlo watch` — it
+        watches your server files and refreshes the contract automatically, so the client is always
+        typed against the latest.
+      </Callout>
+
+      </Step>
+
+      <Step>
+
+      #### Create the client
+
+      At `src/lib/kizlo/client.ts` from the generated contract — it's typed automatically:
+
+      ```ts title="src/lib/kizlo/client.ts"
+      import { createKizloClient } from "kizlo/nextjs"
+      import { contract } from "./server/generated"
+
+      export const client = createKizloClient(contract)
+      ```
+
+      </Step>
+
+      </Steps>
+    </TabsContent>
+  </Tabs>
+</Step>
+
+  <Step>
+    #### Thats it 🎉!
+    With the files in place, your project is wired up — head to the [Quickstart](/docs/quickstart) to make your first calls and tour the API surface.
+  </Step>
+
+</Steps>
+

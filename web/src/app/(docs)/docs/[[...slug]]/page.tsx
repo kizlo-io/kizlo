@@ -15,7 +15,11 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
 	const markdownUrl = getPageMarkdownUrl(page).url
 
 	return (
-		<DocsPage toc={page.data.toc} full={page.data.full}>
+		<DocsPage
+			toc={page.data.toc}
+			full={page.data.full}
+			className="max-w-172 prose-code:bg-fd-muted/15 prose-p:text-fd-foreground/80 prose-p:text-sm prose-ul:text-sm"
+		>
 			<DocsTitle>{page.data.title}</DocsTitle>
 			<DocsDescription className="mb-0">{page.data.description}</DocsDescription>
 			<div className="flex flex-row items-center gap-2 border-b pb-6">
@@ -28,7 +32,6 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
 			<DocsBody>
 				<MDX
 					components={getMDXComponents({
-						// this allows you to link to other pages with relative file paths
 						a: createRelativeLink(source, page),
 					})}
 				/>
@@ -47,7 +50,7 @@ export async function generateMetadata(props: PageProps<"/docs/[[...slug]]">): P
 	if (!page) notFound()
 
 	return {
-		title: page.data.title,
+		title: `${page.data.title} | Kizlo`,
 		description: page.data.description,
 		openGraph: {
 			images: getPageImage(page).url,

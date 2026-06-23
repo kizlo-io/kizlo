@@ -1,0 +1,150 @@
+---
+title: Testing
+icon: TestTube
+description: Learn how Kizlo tests against a real, disposable WordPress instead of mocks.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+
+A mock of the WordPress REST API only proves your code agrees with your *guesses* about WordPress — not that
+the guesses are right. Kizlo's whole job is talking to a real WordPress, so its tests do too.
+
+Setting that up by hand is a chore: a database, WordPress core, plugins, content, credentials. Kizlo does it
+for you in one command. You write tests in any runner — Vitest, Jest, `node --test`, Bun — and when a test
+needs WordPress, Kizlo starts a throwaway one, fills it with known content, and points your tests at it.
+
+```bash
+npx kizlo test
+```
+
+The [CLI page](/docs/concepts/cli#kizlo-test) covers the command. This page covers the ideas behind it that the
+code won't show you.
+
+## A real WordPress, set up for you
+
+The stack is a small Docker setup — WordPress, a database, and `wp-cli`. The first run starts and fills it;
+later runs reuse it, so tests stay fast. You can run it as often as you like — Kizlo only sets things up once.
+
+All you install is Docker ([Docker Desktop](https://www.docker.com/products/docker-desktop/) or similar).
+There's nothing to configure: Kizlo starts the containers, fills them, keeps them warm, and shuts them down
+when you ask. You never run a `docker` command yourself.
+
+The stack is also opt-in. It only starts when your [config](#configure-a-stack) asks for one — when you give it
+fixtures to seed. Without that, `kizlo test` is just a plain test run, no WordPress involved. So you only pay
+for a stack on the tests that actually need one.
+
+<Callout>
+  Mocks still belong at the *edges*. Identity, geo, captcha, and logging come through
+  [adapters](/docs/concepts/adapter), and each ships a mock so a test can pin a known user without a real
+  provider. WordPress itself is never mocked.
+</Callout>
+
+## Two ways to run a test
+
+Once a procedure can reach the stack, you can test it at two levels:
+
+- **Server-side** — call the procedure directly and get its data back (or its typed error thrown). The quickest
+  way to check what a procedure *does*.
+- **End-to-end** — go through the real [client](/docs/concepts/client) and back as the `{ success }` envelope,
+  exactly what your frontend sees. This catches what server-side calls can't: how data is serialized, the typed
+  error in the response body, and rules like internal procedures never leaving the server.
+
+Pick the level that matches the bug you're trying to catch.
+
+## Fixtures fill the stack
+
+A test that reads `"hello-world-test"` only passes because something created that post first. That something is
+a **fixture** — the piece that seeds known content. A fixture can also install the plugins it needs and undo
+its own changes after each test. You list fixtures once in `kizlo.config.ts`, and Kizlo seeds them before your
+tests run.
+
+This is how an [extension](/docs/concepts/extension) ships its test data too: alongside its code it exports a
+fixture that installs its plugin and seeds what its procedures expect. Drop it into your config and its tests
+have a world to run in.
+
+Two rules keep fixtures reliable:
+
+- **Check before you create.** A fixture looks for its content before adding it, so re-seeding a warm stack
+  changes nothing instead of piling up duplicates.
+- **Hand back a reference, not a copy.** A fixture returns an `id` or `slug`, never a frozen snapshot. Tests use
+  that reference to fetch the live record and check it — so they track what WordPress actually holds, not a copy
+  that's already out of date.
+
+## A full run, end to end
+
+Here's the whole loop on a real example — testing that your blog's post procedures read what WordPress holds.
+
+<Steps>
+
+<Step>
+
+#### Configure a stack
+
+The `test` block in `kizlo.config.ts` is what turns a stack on. Give it fixtures and `kizlo test` starts and
+seeds one; leave it out and the command just runs your tests. `coreFixtures` seeds a couple of sample posts
+(including `hello-world-test`); add any extension fixtures alongside them.
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+import { coreFixtures } from "kizlo/test"
+
+export default defineConfig({
+  test: { fixtures: [...coreFixtures] },
+})
+```
+
+The other `test` options — `port`, `packageManager`, `command` — are optional; see the
+[config reference](/docs/concepts/cli#configuration).
+
+</Step>
+
+<Step>
+
+#### Write the test
+
+Ask for an instance pointed at the stack, then call a procedure and check the result. No setup, no mocks —
+`getKizloTestInstance` reads the seeded credentials and wires the [adapter](/docs/concepts/adapter) mocks for
+you.
+
+```ts title="post.test.ts"
+import { beforeAll, expect, test } from "vitest"
+import { getKizloTestInstance, type KizloTestInstance } from "kizlo/test"
+
+let kizlo: KizloTestInstance
+beforeAll(() => { kizlo = getKizloTestInstance() })
+
+test("reads a seeded post by slug", async () => {
+  const post = await kizlo.client.posts.get.call({ params: { identifier: "hello-world-test" } })
+  expect(post.slug).toBe("hello-world-test")
+})
+
+test("a missing post throws its typed error", async () => {
+  await expect(
+    kizlo.client.posts.get.call({ params: { identifier: "999999" } }),
+  ).rejects.toMatchObject({ code: "POST_NOT_FOUND" })
+})
+```
+
+</Step>
+
+<Step>
+
+#### Run it
+
+```bash
+npx kizlo test
+```
+
+The first run starts Docker and seeds WordPress, then runs your tests against it. The stack stays warm, so the
+next run skips straight to your tests. Want a clean slate, or to shut it down afterward? Use `--reset` and
+`--teardown` — see the [CLI page](/docs/concepts/cli#kizlo-test).
+
+</Step>
+
+</Steps>
+
+<Callout>
+  Not every test needs the stack. Pure logic — validating a schema, a procedure's branching — runs on its own,
+  no WordPress, no Docker. Reach for the stack only when a test depends on how WordPress actually responds. The
+  fast tests are what make the slow ones worth trusting.
+</Callout>
