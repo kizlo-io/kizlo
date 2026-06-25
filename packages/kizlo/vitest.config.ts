@@ -19,7 +19,7 @@ export default defineConfig({
 		include: ["src/**/*.test.ts"],
 		testTimeout: 15_000,
 		// Seeding is an explicit CLI lifecycle now; tests only read the artifact
-		// written by `kizlo wp up`, resolved relative to the root `kizlo.config.ts`.
+		// written by `kizlo test up`, resolved relative to the root `kizlo.config.ts`.
 	},
 	resolve: { alias: WORKSPACE_ALIASES },
 })

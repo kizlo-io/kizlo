@@ -1,5 +1,5 @@
 import { WC_CORE_BASE, WC_STORE_BASE } from "kizlo"
-import { defineFixture, githubRelease, type SeedContext } from "kizlo/test"
+import { type DevPluginSource, defineFixture, githubRelease, type SeedContext } from "kizlo/test"
 import type { WC_Product, WC_ProductCreateInput } from "../product/types.wc"
 
 const PRODUCTS: Array<Pick<WC_ProductCreateInput, "slug" | "name" | "regular_price">> = [
@@ -31,11 +31,15 @@ async function upsertCoupon(service: SeedContext["service"], coupon: (typeof COU
 	if (created.error) throw created.error
 }
 
-/** WooCommerce test fixture: installs WooCommerce + the kizlo-woocommerce plugin, seeds products/coupons. */
-export function woocommerce() {
+/**
+ * WooCommerce test fixture: installs WooCommerce + the kizlo-woocommerce plugin, seeds
+ * products/coupons. Pass `plugins` to override the defaults — e.g. bind-mount your local
+ * source with `{ path: "plugins/kizlo-woocommerce" }` to develop/test against live files.
+ */
+export function woocommerce(opts: { plugins?: DevPluginSource[] } = {}) {
 	return defineFixture({
 		name: "woocommerce",
-		plugins: [
+		plugins: opts.plugins ?? [
 			"woocommerce",
 			{
 				name: "kizlo-woocommerce",

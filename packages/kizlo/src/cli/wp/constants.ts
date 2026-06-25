@@ -9,12 +9,14 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 /** The docker-compose file shipped alongside this module (in both `src/` and `dist/`). */
 export const COMPOSE_FILE = resolve(HERE, "compose/docker-compose.yml")
+/** Dev PHP OPcache config, shipped alongside this module and bind-mounted into the dev stack. */
+export const OPCACHE_INI = resolve(HERE, "compose/opcache.ini")
+/** Linux-only entrypoint that retags www-data to the host user (see the script for why). */
+export const REMAP_ENTRYPOINT = resolve(HERE, "compose/remap-entrypoint.sh")
 export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
 
 /** Credentials artifact location, relative to the config root. */
 export const CREDENTIALS_REL = ".kizlo/test-credentials.json"
-
-export const COMPOSE = ["compose", "-f", COMPOSE_FILE]
 
 /**
  * DB-side marker written as the final bootstrap step and checked by `isSeeded`.
