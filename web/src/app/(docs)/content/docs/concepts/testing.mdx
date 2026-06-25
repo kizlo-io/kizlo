@@ -54,9 +54,14 @@ Pick the level that matches the bug you're trying to catch.
 ## Fixtures fill the stack
 
 A test that reads `"hello-world-test"` only passes because something created that post first. That something is
-a **fixture** — the piece that seeds known content. A fixture can also install the plugins it needs and undo
+a **fixture** — the piece that seeds known content. A fixture can also declare the plugins it needs and undo
 its own changes after each test. You list fixtures once in `kizlo.config.ts`, and Kizlo seeds them before your
 tests run.
+
+A fixture's plugins are either installed (a wp.org slug or zip source) or, written as `{ path: "..." }`,
+**bind-mounted** live from your repo over `wp-content/plugins` — the same shape `kizlo dev` uses, so the
+fixture behaves identically in the dev and test stacks. That means you can test against your plugin's local
+source with no build-and-zip step.
 
 This is how an [extension](/docs/concepts/extension) ships its test data too: alongside its code it exports a
 fixture that installs its plugin and seeds what its procedures expect. Drop it into your config and its tests
