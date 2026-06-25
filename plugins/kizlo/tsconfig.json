@@ -1,0 +1,11 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"paths": {
+			"@/*": ["./src/js/*"],
+			"@shared/*": ["./src/js/shared/*"]
+		},
+		"types": ["@types/jquery"]
+	},
+	"include": ["src/js/**/*"]
+}

@@ -1,0 +1,8 @@
+{
+	"name": "@kizlo/plugin-woocommerce",
+	"private": true,
+	"scripts": {
+		"typecheck": "composer phpstan",
+		"clean": "git clean -xdf .cache .turbo vendor build node_modules"
+	}
+}
