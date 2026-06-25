@@ -84,11 +84,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Boot + seed WordPress stack
-        run: pnpm wp up
-
-      - name: Run tests
-        run: pnpm test
+      - name: Boot + seed WordPress stack + run tests
+        run: pnpm kizlo test
 
       - name: Print docker logs on failure
         if: failure()
@@ -96,4 +93,4 @@ jobs:
 
       - name: Stop WordPress stack
         if: always()
-        run: pnpm wp stop
+        run: pnpm kizlo test stop
