@@ -10,12 +10,12 @@
 		"includes": [
 			"**",
 			"!!**/tooling/typescript",
-			"!!**/worker-configuration.d.ts",
 			"!!**/generated",
 			"!!**/.changeset",
-			"!!**/drizzle",
-			"!!**/apps",
-			"!!**/projects"
+			"!!**/*.php",
+			"!!**/src/php",
+			"!!**/vendor",
+			"!node_modules"
 		]
 	},
 	"formatter": {
@@ -34,7 +34,19 @@
 				}
 			},
 			"suspicious": {
-				"noExplicitAny": "off"
+				"noConsole": "off",
+				"noExplicitAny": "off",
+				"noEmptyInterface": "off"
+			},
+			"complexity": {
+				"noImportantStyles": "off"
+			},
+			"a11y": {
+				"useSemanticElements": "off",
+				"useKeyWithClickEvents": "off"
+			},
+			"correctness": {
+				"noUnusedFunctionParameters": "off"
 			}
 		}
 	},
@@ -56,5 +68,31 @@
 		"parser": {
 			"tailwindDirectives": true
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["plugins/**"],
+			"linter": {
+				"rules": {
+					"a11y": {
+						"useSemanticElements": "off",
+						"useKeyWithClickEvents": "off"
+					},
+					"correctness": {
+						"noUnusedFunctionParameters": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["scripts/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noUndeclaredEnvVars": "off"
+					}
+				}
+			}
+		}
+	]
 }

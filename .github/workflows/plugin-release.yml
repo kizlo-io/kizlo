@@ -1,0 +1,70 @@
+name: Plugin Release
+
+on:
+  push:
+    tags:
+      - 'kizlo-v*'
+      - 'kizlo-cf7-v*'
+      - 'kizlo-woocommerce-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse tag
+        id: tag
+        run: |
+          # Tag form: <plugin>-v<version>  (e.g. kizlo-v0.1.0)
+          ref="${GITHUB_REF_NAME}"
+          plugin="${ref%-v*}"
+          version="${ref##*-v}"
+          if [ -z "$plugin" ] || [ -z "$version" ] || [ "$plugin" = "$ref" ]; then
+            echo "::error::Tag '$ref' does not match <plugin>-v<version>"
+            exit 1
+          fi
+          if [ ! -d "plugins/$plugin" ]; then
+            echo "::error::Tag refers to plugin '$plugin' but plugins/$plugin does not exist"
+            exit 1
+          fi
+          echo "plugin=$plugin"   >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      # Guards against publishing a plugin whose version is out of sync across
+      # its PHP header, _VERSION define, readme.txt, and package.json. Lives
+      # here (not per-PR CI) because it only matters at release time.
+      - name: Version-sync check
+        run: node scripts/check-versions.mjs ${{ steps.tag.outputs.plugin }}
+
+      - name: Build zip
+        run: node scripts/build-plugin.mjs ${{ steps.tag.outputs.plugin }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: plugins/${{ steps.tag.outputs.plugin }}/dist/${{ steps.tag.outputs.plugin }}-v${{ steps.tag.outputs.version }}.zip
+          generate_release_notes: true

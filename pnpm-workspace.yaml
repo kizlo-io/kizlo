@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - tooling/*
+  - plugins/*
 
 catalog:
   next: ^16.2.9
@@ -22,3 +23,7 @@ catalogs:
 onlyBuiltDependencies:
   - esbuild
   - sharp
+  - "@parcel/watcher"
+  - core-js
+  - core-js-pure
+  - unrs-resolver
