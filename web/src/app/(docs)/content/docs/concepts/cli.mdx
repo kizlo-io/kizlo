@@ -12,7 +12,7 @@ your tests** against a real, disposable WordPress stack.
 It ships with the `kizlo` package, so there's nothing extra to install — reach for it through your package
 runner:
 
-```bash
+```package-install
 npx kizlo <command>
 ```
 
@@ -37,7 +37,7 @@ stack is set up.
 import alias, then scaffolds the server, client, route handler, and config — prompting for your WordPress
 credentials along the way and writing them to `.env`.
 
-```bash
+```package-install
 npx kizlo init
 ```
 
@@ -57,7 +57,7 @@ detail. Past the defaults, a few flags tune the run:
 CI — run it before you typecheck or bundle, so `server/generated/` exists and is current when the client
 imports it.
 
-```bash
+```package-install
 npx kizlo generate
 ```
 
@@ -75,7 +75,7 @@ broken contract fails the build rather than slipping through.
 directory and regenerates on every save — debounced, so a burst of saves collapses into one rebuild. Your
 client stays typed against the latest server without you thinking about it.
 
-```bash
+```package-install
 npx kizlo watch
 ```
 
@@ -111,8 +111,8 @@ Both `generate` and `watch` accept `--dir` to point at a Kizlo directory other t
 | `kizlo dev down` | Stop and remove the containers — keeps the database and your files (use `reset` to wipe) |
 | `kizlo dev reset` | Wipe the database **and** the `dev.path` folder, then rebuild fresh |
 
-```bash
-npx kizlo dev      # http://localhost:8080
+```package-install
+npx kizlo dev
 ```
 
 On first install, `kizlo dev` mints a **random** admin password (not a guessable default) and prints it once
@@ -190,7 +190,7 @@ stack, fixtures don't re-run, so your manual edits are never clobbered.
 WordPress (on `http://localhost:8889`, independent of the dev stack), seeds it with your
 [fixtures](#configuration), then runs your project's own test command against it:
 
-```bash
+```package-install
 npx kizlo test
 ```
 
@@ -203,7 +203,7 @@ for that reason. Two flags change the lifecycle:
 | `--reset` | Wipe the database and reseed from scratch before running |
 | `--teardown` | Stop the stack after the suite finishes, instead of leaving it up |
 
-```bash
+```package-install
 npx kizlo test --reset --teardown   # a clean stack, torn down afterward
 ```
 
