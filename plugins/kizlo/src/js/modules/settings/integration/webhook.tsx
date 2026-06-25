@@ -95,9 +95,7 @@ export function WebhookSettingsPage() {
 				<SettingsGroup
 					heading={<>Triggers</>}
 					description={
-						<>
-							Choose which post types and taxonomies cause a webhook to fire when their content is created, updated, or deleted.
-						</>
+						<>Choose which post types and taxonomies cause a webhook to fire when their content is created, updated, or deleted.</>
 					}
 				>
 					<Card>

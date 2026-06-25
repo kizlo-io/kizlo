@@ -84,7 +84,11 @@ export async function detectTablePrefix(sqlPath: string): Promise<string> {
  * read its table prefix. Returns the prefix (to match the regenerated config) and the host
  * path of the staged dump (the caller pipes it into the `mysql` container, then deletes it).
  */
-export async function prepareByo(archivePath: string, wordpressDir: string, configDir: string): Promise<{ prefix: string; sqlPath: string }> {
+export async function prepareByo(
+	archivePath: string,
+	wordpressDir: string,
+	configDir: string,
+): Promise<{ prefix: string; sqlPath: string }> {
 	const sqlName = validateByoArchive(archivePath, wordpressDir)
 
 	const tmp = join(configDir, ".kizlo", "byo-extract")
