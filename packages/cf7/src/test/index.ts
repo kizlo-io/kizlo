@@ -1,4 +1,4 @@
-import { defineFixture, githubRelease, wpCli } from "kizlo/test"
+import { type DevPluginSource, defineFixture, githubRelease, wpCli } from "kizlo/test"
 
 const CF7_TITLE = "Test Form"
 
@@ -11,12 +11,14 @@ const CF7_FORM = `<label>Your name (required)
 
 /**
  * Contact Form 7 test layer. CF7 has no REST create endpoint, so the form is
- * created via the `wpCli` escape hatch (`wp eval` over `WPCF7_ContactForm`).
+ * created via the `wpCli` escape hatch (`wp eval` over `WPCF7_ContactForm`). Pass
+ * `plugins` to override the defaults — e.g. bind-mount your local source with
+ * `{ path: "plugins/kizlo-cf7" }` to develop/test against live files.
  */
-export function cf7() {
+export function cf7(opts: { plugins?: DevPluginSource[] } = {}) {
 	return defineFixture({
 		name: "cf7",
-		plugins: [
+		plugins: opts.plugins ?? [
 			"contact-form-7",
 			{
 				name: "kizlo-cf7",

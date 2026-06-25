@@ -2,6 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
+import { isLocalPlugin } from "./types"
 import { credentialsPath, findConfigDir, githubRelease, resolvePluginSource } from "./utils"
 
 describe("githubRelease", () => {
@@ -22,6 +23,17 @@ describe("resolvePluginSource", () => {
 			"kizlo",
 			"https://example.com/kizlo.zip",
 		])
+	})
+})
+
+describe("isLocalPlugin", () => {
+	test("is true only for the { path } mount form", () => {
+		expect(isLocalPlugin({ path: "plugins/kizlo" })).toBe(true)
+	})
+
+	test("is false for a wp.org slug and a { name, source } install", () => {
+		expect(isLocalPlugin("woocommerce")).toBe(false)
+		expect(isLocalPlugin({ name: "kizlo", source: "https://example.com/kizlo.zip" })).toBe(false)
 	})
 })
 

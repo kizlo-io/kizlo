@@ -1,0 +1,42 @@
+<?php
+
+namespace Kizlo\Modules\Settings\Crawling;
+
+use WP_REST_Request;
+use WP_REST_Response;
+
+class CrawlingSettingsService
+{
+    /**
+     * Register identity settings REST routes.
+     */
+    public function register(): void
+    {
+        $this->registerRestRoutes();
+    }
+
+    /**
+     * Register GET and PUT routes for identity settings.
+     */
+    private function registerRestRoutes(): void
+    {
+        kizlo_register_route([
+            'methods'  => 'PUT',
+            'route'    => '/settings/crawling',
+            'callback' => function (WP_REST_Request $request) {
+                $data = $request->get_json_params();
+
+                $crawling = CrawlingSettings::load();
+                $crawling->robots->setData($data['robots'])->save();
+                $crawling->sitemaps->setData($data['sitemaps'])->save();
+
+                return new WP_REST_Response(null, 204);
+            },
+        ]);
+    }
+
+    public function toResponse(CrawlingSettings $settings): array
+    {
+        return $settings->getData();
+    }
+}
