@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs"
-import { dirname, resolve } from "node:path"
+import { basename, dirname, resolve } from "node:path"
 import { CONFIG_FILES, CREDENTIALS_REL, SEED_MARKER_OPTION, SEED_VERSION } from "./constants"
 import { compose, wpCli } from "./docker"
-import type { PluginSource, TestCredentials } from "./types"
+import { type DevPluginSource, isLocalPlugin, type PluginSource, type TestCredentials } from "./types"
 
 /**
  * True only when the stack is already seeded: the credentials artifact exists on
@@ -49,6 +49,34 @@ export async function ensurePlugin(name: string, source: string): Promise<void> 
 	}
 
 	await wpCli(["plugin", "install", source, "--activate"])
+}
+
+/**
+ * Activate a bind-mounted local plugin by its directory basename (the slug the
+ * mount lands at under `wp-content/plugins`). Idempotent: the files arrive via the
+ * compose bind, so there's nothing to install — just activate if it isn't already.
+ */
+export async function activateLocalPlugin(pluginPath: string): Promise<void> {
+	const slug = basename(pluginPath)
+	const active = await compose(["exec", "-T", "wp-cli", "wp", "plugin", "is-active", slug])
+	if (active.code !== 0) await wpCli(["plugin", "activate", slug])
+}
+
+/**
+ * Ensure every plugin is active. Installable sources go first so a bind-mounted
+ * local plugin that depends on one (e.g. a WooCommerce extension) finds it already
+ * present; then each {@link LocalPlugin} is activated by basename. A local plugin
+ * whose slug matches an installable (e.g. mounting `kizlo` over the released
+ * `kizlo`) is seen as already installed, so `ensurePlugin` activates the live
+ * files instead of downloading over them.
+ */
+export async function ensurePlugins(plugins: DevPluginSource[]): Promise<void> {
+	for (const plugin of plugins) {
+		if (!isLocalPlugin(plugin)) await ensurePlugin(...resolvePluginSource(plugin))
+	}
+	for (const plugin of plugins) {
+		if (isLocalPlugin(plugin)) await activateLocalPlugin(plugin.path)
+	}
 }
 
 /**

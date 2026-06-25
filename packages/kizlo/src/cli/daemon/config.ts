@@ -19,6 +19,18 @@ const fixtureSchema = z.custom<Fixture>(
 const configSchema = z.object({
 	dir: z.string().optional(),
 	alias: z.string().optional(),
+	name: z.string().optional(),
+	dev: z
+		.object({
+			// Required at runtime (see resolveDevConfig); kept optional here so a missing
+			// `path` produces our guiding message instead of a raw schema error.
+			path: z.string().optional(),
+			port: z.number().int().positive().optional(),
+			dbPort: z.number().int().positive().optional(),
+			byo: z.string().optional(),
+			fixtures: z.array(fixtureSchema).optional(),
+		})
+		.optional(),
 	test: z
 		.object({
 			port: z.number().int().positive().optional(),
@@ -28,6 +40,13 @@ const configSchema = z.object({
 		})
 		.optional(),
 })
+
+/**
+ * Parsed config shape. Looser than {@link KizloGlobalConfig} on purpose: the public
+ * type marks `dev.path` required for good authoring DX, but a loaded file might omit
+ * it — `resolveDevConfig` enforces it at runtime with a guiding message.
+ */
+type LoadedConfig = z.infer<typeof configSchema>
 
 export interface ResolvedConfig {
 	cwd: string
@@ -46,7 +65,7 @@ function defaultDir(cwd: string): string {
 	return fs.existsSync(path.join(cwd, "src")) ? "src/lib/kizlo" : "lib/kizlo"
 }
 
-async function loadConfigFile(cwd: string): Promise<KizloGlobalConfig | undefined> {
+async function loadConfigFile(cwd: string): Promise<LoadedConfig | undefined> {
 	const file = CONFIG_FILES.map((name) => path.join(cwd, name)).find((p) => fs.existsSync(p))
 	if (!file) return undefined
 
@@ -86,9 +105,43 @@ export async function resolveConfig(cwd: string, flags?: { dir?: string }): Prom
 	}
 }
 
+/**
+ * Sanitize an arbitrary package/dir name into a valid Docker compose project id:
+ * lowercase, `@scope/pkg` → `scope-pkg`, dropping anything outside `[a-z0-9_-]`.
+ */
+function sanitizeProjectName(raw: string): string {
+	const id = raw
+		.toLowerCase()
+		.replace(/^@/, "")
+		.replace(/\//g, "-")
+		.replace(/[^a-z0-9_-]/g, "")
+		.replace(/^[-_]+|[-_]+$/g, "")
+	return id || "kizlo"
+}
+
+/**
+ * Base name for the local stacks: the config `name` if set, else the `package.json`
+ * `name` at `configDir`, else the config dir basename — sanitized to a Docker id.
+ */
+export function resolveStackName(configDir: string, configName?: string): string {
+	if (configName) return sanitizeProjectName(configName)
+
+	let pkgName: string | undefined
+	try {
+		const pkg = JSON.parse(fs.readFileSync(path.join(configDir, "package.json"), "utf8")) as { name?: string }
+		pkgName = pkg.name
+	} catch {
+		pkgName = undefined
+	}
+
+	return sanitizeProjectName(pkgName ?? path.basename(configDir))
+}
+
 export interface ResolvedTestConfig {
 	/** Directory holding `kizlo.config.*` (the credentials artifact root). */
 	configDir: string
+	/** Docker compose project name (`<name>-test`). */
+	project: string
 	/** Resolved credentials artifact path under `configDir`. */
 	credentialsPath: string
 	port: number
@@ -100,8 +153,8 @@ export interface ResolvedTestConfig {
 
 /**
  * Resolve the `test` block from `kizlo.config.*` into concrete values for the
- * `wp`/`test` commands, applying defaults (port 8080, auto-detected package
- * manager) and anchoring the credentials artifact to the config directory.
+ * `test` command, applying defaults (port 8889, auto-detected package manager)
+ * and anchoring the credentials artifact to the config directory.
  */
 export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig> {
 	const configDir = findConfigDir(cwd)
@@ -110,10 +163,65 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 
 	return {
 		configDir,
+		project: `${resolveStackName(configDir, fileConfig?.name)}-test`,
 		command: test.command,
-		port: test.port ?? 8080,
+		port: test.port ?? 8889,
 		fixtures: test.fixtures ?? [],
 		credentialsPath: credentialsPath(cwd),
 		packageManager: test.packageManager ?? detectPackageManager(configDir),
+	}
+}
+
+export interface ResolvedDevConfig {
+	/** Directory holding `kizlo.config.*`. */
+	configDir: string
+	/** Docker compose project name (`<name>-dev`). */
+	project: string
+	port: number
+	/** Host port the dev MySQL is published on (bound to `127.0.0.1`) for direct DB access. */
+	dbPort: number
+	/** Absolute path to a BYO archive (`wordpress/` + `.sql`) to hydrate a fresh stack from, if set. */
+	byo?: string
+	/** Fixtures to seed on a fresh stack (mutually exclusive with `byo`); also carry the stack's plugins. */
+	fixtures: Fixture[]
+	/** Repo-relative folder holding the install (from `dev.path`); used for gitignore. */
+	wordpressPath: string
+	/** Absolute path the whole install is bind-mounted to; wiped by `reset`. */
+	wordpressDir: string
+}
+
+/**
+ * Resolve the `dev` block from `kizlo.config.*` into concrete values for the `dev`
+ * command, applying defaults (port 8080). `dev.path` is required — the whole
+ * WordPress install lives there, so we make the user choose a real folder rather
+ * than hide it under a default.
+ */
+export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> {
+	const configDir = findConfigDir(cwd)
+	const fileConfig = await loadConfigFile(configDir)
+	const dev = fileConfig?.dev ?? {}
+
+	if (!dev.path) {
+		log.error(
+			"`dev.path` is required in kizlo.config — it's the folder your local WordPress lives in.\n" +
+				'Pick a real, visible folder (it persists your site between runs), e.g. dev: { path: "wordpress" }.',
+		)
+		process.exit(1)
+	}
+
+	if (dev.byo && dev.fixtures?.length) {
+		log.error("`dev.byo` and `dev.fixtures` are mutually exclusive — byo imports an existing site, so it brings its own data.")
+		process.exit(1)
+	}
+
+	return {
+		configDir,
+		project: `${resolveStackName(configDir, fileConfig?.name)}-dev`,
+		port: dev.port ?? 8080,
+		dbPort: dev.dbPort ?? 3307,
+		byo: dev.byo ? path.resolve(configDir, dev.byo) : undefined,
+		fixtures: dev.fixtures ?? [],
+		wordpressPath: dev.path,
+		wordpressDir: path.resolve(configDir, dev.path),
 	}
 }

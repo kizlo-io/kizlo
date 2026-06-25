@@ -1,7 +1,7 @@
 import { DEFAULT_PLUGINS, DEFAULT_PORT, SEED_MARKER_OPTION, SEED_VERSION, TEST_ADMIN, TEST_USER } from "./constants"
 import { compose, composeUp, wpCli } from "./docker"
 import type { Fixture, TestCredentials } from "./types"
-import { ensurePlugin, resolvePluginSource } from "./utils"
+import { ensurePlugins } from "./utils"
 
 export interface BootstrapConfig {
 	/** Published WP port (default 8080). */
@@ -10,7 +10,7 @@ export interface BootstrapConfig {
 	fixtures?: Fixture[]
 }
 
-async function seedUsers(): Promise<number> {
+export async function seedUsers(): Promise<number> {
 	const existing = await wpCli(["user", "get", TEST_USER.username, "--field=ID"]).catch(() => "")
 	const id = existing
 		? existing
@@ -27,9 +27,9 @@ async function seedUsers(): Promise<number> {
 	return Number(id)
 }
 
-async function createAdminAppPassword(): Promise<string> {
+export async function createAdminAppPassword(label = "harness"): Promise<string> {
 	await compose(["exec", "-T", "wp-cli", "wp", "user", "application-password", "delete", TEST_ADMIN.username, "--all"])
-	return wpCli(["user", "application-password", "create", TEST_ADMIN.username, "harness", "--porcelain"])
+	return wpCli(["user", "application-password", "create", TEST_ADMIN.username, label, "--porcelain"])
 }
 
 /**
@@ -41,7 +41,6 @@ async function createAdminAppPassword(): Promise<string> {
 export async function bootstrapWp(config: BootstrapConfig): Promise<TestCredentials> {
 	const port = config.port ?? DEFAULT_PORT
 	const url = `http://localhost:${port}`
-	process.env.WP_PORT = String(port)
 
 	await composeUp()
 
@@ -61,16 +60,20 @@ export async function bootstrapWp(config: BootstrapConfig): Promise<TestCredenti
 
 	await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
 
-	for (const plugin of [...DEFAULT_PLUGINS, ...(config.fixtures?.flatMap((a) => a.plugins ?? []) ?? [])]) {
-		await ensurePlugin(...resolvePluginSource(plugin))
-	}
+	// Install the wp.org / zip dependencies (kizlo core + each fixture's), then activate
+	// any bind-mounted local plugins the test fixtures carry — same handling as `kizlo dev`.
+	await ensurePlugins([...DEFAULT_PLUGINS, ...(config.fixtures?.flatMap((f) => f.plugins ?? []) ?? [])])
 
 	const adminId = Number(await wpCli(["user", "get", TEST_ADMIN.username, "--field=ID"]))
 	const userId = await seedUsers()
 	const appPassword = await createAdminAppPassword()
 
 	// Final step: stamp the DB so `isSeeded` can detect a completed bootstrap.
-	await wpCli(["option", "update", SEED_MARKER_OPTION, SEED_VERSION, "--autoload=no"])
+	// `option update` errors when the value is unchanged, which breaks reseeds where
+	// the marker survived (e.g. credentials artifact deleted but DB volume intact), so
+	// delete-then-add to keep the stamp idempotent.
+	await wpCli(["option", "delete", SEED_MARKER_OPTION]).catch(() => {})
+	await wpCli(["option", "add", SEED_MARKER_OPTION, SEED_VERSION, "--autoload=no"])
 
 	return {
 		url,

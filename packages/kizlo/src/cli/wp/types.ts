@@ -55,12 +55,34 @@ export interface SeedContext {
  */
 export type PluginSource = string | { name: string; source: string }
 
+/**
+ * A local plugin directory to bind-mount into the dev stack (`kizlo dev`) instead
+ * of installing it. The container gets the live files at
+ * `wp-content/plugins/<basename(path)>`, so edits show up without a reinstall, and
+ * the plugin is activated by that basename. `path` is relative to the config dir.
+ */
+export type LocalPlugin = { path: string }
+
+/** A `kizlo dev` plugin entry: an installable {@link PluginSource} or a {@link LocalPlugin} to mount. */
+export type DevPluginSource = PluginSource | LocalPlugin
+
+/** True when a dev plugin entry is a local directory to bind-mount, not something to install. */
+export function isLocalPlugin(plugin: DevPluginSource): plugin is LocalPlugin {
+	return typeof plugin === "object" && "path" in plugin
+}
+
 /** The serializable test layer an extension ships alongside its live extension. */
 export interface Fixture {
 	/** Namespace key under `TestCredentials.fixtures`. */
 	name: string
-	/** Plugins to install + activate via wp-cli during bootstrap, in order (deps first). */
-	plugins?: PluginSource[]
+	/**
+	 * Plugins this fixture needs active, in order (deps first). Each entry is either
+	 * an installable {@link PluginSource} (wp.org slug / zip source) or a
+	 * {@link LocalPlugin} (`{ path }`) bind-mounted live from your repo — the same
+	 * shape `kizlo dev` mounts, so a fixture can carry your plugin's local source
+	 * and it behaves identically in the dev and test stacks (no build/zip step).
+	 */
+	plugins?: DevPluginSource[]
 	/** Build this extension's world once during seeding; return created handles. */
 	seed?: (ctx: SeedContext) => Promise<Record<string, JsonValue>>
 	/** Revert per-test mutations (teardown); does NOT uninstall plugins or seeded data. */

@@ -1,5 +1,4 @@
-name: kizlo-wp-test
-
+# Project name is supplied per-stack via `docker compose -p <project>`.
 services:
   mysql:
     image: mysql:8

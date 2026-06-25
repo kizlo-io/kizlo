@@ -1,0 +1,29 @@
+{
+	"name": "kizlo/plugin",
+	"description": "Kizlo WordPress Plugin",
+	"type": "wordpress-plugin",
+	"license": "proprietary",
+	"autoload": {
+		"psr-4": {
+			"Kizlo\\": "src/php/"
+		}
+	},
+	"authors": [
+		{
+			"name": "IDJGILL",
+			"email": "inderjeetgill.me@gmail.com"
+		}
+	],
+	"require": {
+		"php": ">=8.2",
+		"standard-webhooks/standard-webhooks": "^1.0",
+		"yahnis-elsts/plugin-update-checker": "^5.7"
+	},
+	"require-dev": {
+		"phpstan/phpstan": "^2.2",
+		"szepeviktor/phpstan-wordpress": "^2.0"
+	},
+	"scripts": {
+		"phpstan": "phpstan analyse --memory-limit=1G"
+	}
+}

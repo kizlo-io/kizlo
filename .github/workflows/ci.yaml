@@ -15,24 +15,6 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup
-        uses: ./tooling/gh-actions/setup
-
-      - name: Setup environment for CI
-        shell: bash
-        run: cp .env.example .env
-
-      - name: Build
-        run: pnpm run build
-
   quality:
     runs-on: ubuntu-latest
     permissions:
@@ -61,12 +43,12 @@ jobs:
       - name: Setup
         uses: ./tooling/gh-actions/setup
 
-      - name: Typecheck
+      - name: Typecheck (TS + PHP)
         run: pnpm run typecheck
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -75,19 +57,15 @@ jobs:
       - name: Setup
         uses: ./tooling/gh-actions/setup
 
-      # The root kizlo.config.ts imports each extension's seed from its built
-      # `dist`, so the CLI needs kizlo + the extensions built before it loads.
-      - name: Build kizlo CLI + extensions
-        run: pnpm wp:build
+      - name: Setup environment for CI
+        shell: bash
+        run: cp .env.example .env
 
-      # Cold runner: boots the stack, downloads plugins + installs WP, and seeds
-      # once, writing `.kizlo/test-credentials.json`. `pnpm test` then just reads
-      # that artifact — no seeding in the per-test path.
-      - name: Boot + seed WordPress stack
-        run: pnpm wp up
+      - name: Build
+        run: pnpm build
 
-      - name: Run tests
-        run: pnpm test
+      - name: Boot + seed WordPress stack + run tests
+        run: pnpm kizlo test
 
       - name: Print docker logs on failure
         if: failure()
@@ -95,4 +73,4 @@ jobs:
 
       - name: Stop WordPress stack
         if: always()
-        run: pnpm wp stop
+        run: pnpm kizlo test stop

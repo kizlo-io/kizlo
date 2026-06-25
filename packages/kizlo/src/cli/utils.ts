@@ -3,6 +3,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import * as p from "@clack/prompts"
+import type { ArgsDef, CommandContext } from "citty"
 
 export type PackageManager = "pnpm" | "yarn" | "bun" | "npm"
 
@@ -194,5 +195,24 @@ export async function withSpinner<T>(message: string, fn: () => Promise<T>, done
 	} catch (error) {
 		s.error(`${message} failed`)
 		throw error
+	}
+}
+
+/**
+ * Wrap a command group's default `run` so it fires only for the bare invocation
+ * (`kizlo test`), not when a subcommand was given (`kizlo test up`). citty runs a
+ * group's own `run` *in addition to* the matched subcommand, so without this guard
+ * the default would double-fire on every subcommand. Pass the group's subcommand
+ * names; the first non-flag arg is matched the same way citty picks the subcommand.
+ */
+export function groupDefault<T extends ArgsDef>(
+	subCommandNames: Iterable<string>,
+	run: (ctx: CommandContext<T>) => unknown,
+): (ctx: CommandContext<T>) => Promise<void> {
+	const names = new Set(subCommandNames)
+	return async (ctx) => {
+		const sub = ctx.rawArgs.find((arg) => !arg.startsWith("-"))
+		if (sub !== undefined && names.has(sub)) return
+		await run(ctx)
 	}
 }

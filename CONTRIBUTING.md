@@ -49,30 +49,56 @@ pnpm test:only    # run tests for one package, e.g. pnpm test:only @kizlo/woocom
 pnpm test:watch   # run Vitest in watch mode
 ```
 
-`pnpm test` needs the WP stack seeded first (`pnpm kizlo wp up`). Seeding is an
-explicit lifecycle now, not part of the test run — `pnpm test` only reads the
-credentials artifact (~1s). `pnpm lint:ws` also runs automatically on `postinstall`.
+`pnpm test` needs the WP test stack seeded first (`pnpm kizlo test up`). Seeding
+is an explicit lifecycle now, not part of the test run — `pnpm test` only reads
+the credentials artifact (~1s). `pnpm lint:ws` also runs automatically on
+`postinstall`.
 
-## WordPress test stack
+## Local WordPress stacks
 
-The test stack ships inside the `kizlo` CLI (`kizlo wp` / `kizlo test`); the
-extension layers it seeds are declared in the root `kizlo.config.ts` (`test.use`).
-Seeding is driven explicitly by the CLI — `pnpm test` itself never boots or seeds.
-Needs Docker available. In this monorepo the CLI loads each extension's seed from
-its built `dist`, so build once first (`pnpm wp:build`); a real consumer installs
-built packages and skips that step.
+Both stacks ship inside the `kizlo` CLI and run on Docker — no Local/Valet setup
+needed. They are independent: `kizlo dev` (port 8080) is a long-lived working
+environment, and `kizlo test` (port 8889) is the seeded fixture stack the suites
+run against.
+
+### Dev stack — `kizlo dev`
+
+`kizlo dev` keeps the whole WordPress install in `dev.path` (`wordpress/` here,
+git-ignored) — bind-mounted into the container so you can browse and edit every
+file live. Its `dev.plugins` `{ path }` entries also bind-mount this repo's plugins
+into `wp-content/plugins`, and the bare slugs install the wp.org dependencies.
+Build the plugin assets first, then bring it up:
 
 ```bash
-pnpm wp:build       # build the kizlo CLI + extensions (monorepo only)
-pnpm kizlo wp up    # boot the stack, then seed only if not already seeded (no-op when warm)
-pnpm test           # run tests — just reads the credentials artifact
-pnpm kizlo wp stop  # pause the stack (non-destructive; DB + plugins kept)
-pnpm kizlo wp reset # full wipe (down -v) + reseed — the only command that re-downloads plugins
+pnpm install
+pnpm build            # build the workspace incl. the CLI + plugin assets
+pnpm kizlo dev up     # boot + provision (idempotent, never wipes); prints .env lines
+pnpm kizlo dev stop   # pause (DB + plugins kept)
+pnpm kizlo dev reset  # full wipe (down -v) + rebuild
 ```
 
-For a one-shot CI-style run, `pnpm kizlo test` boots the stack, seeds it, runs
-your `test` script, and tears it down (`--keep` to leave it up, `--reset` for a
-fresh DB first).
+`kizlo dev up` prints the URL, admin login, and the `.env` lines to paste
+(`WORDPRESS_URL`/`USERNAME`/`APPLICATION_PASSWORD`).
+
+### Test stack — `kizlo test`
+
+The extension layers the test stack seeds are declared in the root
+`kizlo.config.ts` (`test.fixtures`). Seeding is driven explicitly by the CLI —
+`pnpm test` itself never boots or seeds. In this monorepo the CLI loads each
+extension's seed from its built `dist`, so build once first (`pnpm build`); a
+real consumer installs built packages and skips that step.
+
+```bash
+pnpm build            # build the workspace incl. the CLI + extensions (monorepo only)
+pnpm kizlo test up    # boot the stack, then seed only if not already seeded (no-op when warm)
+pnpm test             # run tests — just reads the credentials artifact
+pnpm kizlo test stop  # pause the stack (non-destructive; DB + plugins kept)
+pnpm kizlo test reset # full wipe (down -v) + reseed — the only command that re-downloads plugins
+```
+
+For a one-shot CI-style run, `pnpm kizlo test run` boots the stack, seeds it,
+runs your `test` script, and leaves it up (`--teardown` to stop it after,
+`--reset` for a fresh DB first). Bare `pnpm kizlo test` is shorthand for `run`.
 
 The CLI writes a credentials artifact to `.kizlo/test-credentials.json`, anchored
 to the directory containing `kizlo.config.ts`, so tests find it from any

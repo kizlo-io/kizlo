@@ -12,5 +12,24 @@
 		"source.fixAll.biome": "explicit",
 		"source.organizeImports.biome": "explicit"
 	},
-	"cSpell.words": ["bacs", "dangurousload", "healthcheck", "mysqladmin", "Retruningprocedure", "rootpass", "uroot", "wppass"]
+	"cSpell.words": ["bacs", "dangurousload", "healthcheck", "mysqladmin", "Retruningprocedure", "rootpass", "uroot", "wppass"],
+	"intelephense.stubs": [
+		"Core",
+		"standard",
+		"wordpress",
+		"superglobals",
+		"date",
+		"json",
+		"hash",
+		"random",
+		"regex",
+		"pcre",
+		"filter",
+		"SPL"
+	],
+	"intelephense.environment.includePaths": [
+		"/Users/inderjeet.gill3icloud.com/Local Sites/shoppertize/app/public/wp-content/plugins/woocommerce",
+		"/Users/inderjeet.gill3icloud.com/Local Sites/shoppertize/app/public/wp-content/plugins/advanced-custom-fields",
+		"/Users/inderjeet.gill3icloud.com/Local Sites/shoppertize/app/public/wp-content/plugins/contact-form-7"
+	]
 }

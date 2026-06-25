@@ -1,0 +1,129 @@
+import { randomBytes } from "node:crypto"
+import { existsSync, rmSync } from "node:fs"
+import { join } from "node:path"
+import { WordPressService } from "../../wordpress"
+import type { ResolvedDevConfig } from "../daemon/config"
+import { createAdminAppPassword, seedUsers } from "./bootstrap"
+import { prepareByo } from "./byo"
+import { TEST_ADMIN } from "./constants"
+import { compose, composeUp, wpCli } from "./docker"
+import type { SeedContext } from "./types"
+import { ensurePlugins } from "./utils"
+
+/** What `bootstrapDev` reports back so the command can print a connection summary. */
+export interface DevStackInfo {
+	url: string
+	username: string
+	/** Host port the MySQL service is published on (loopback) for direct DB access. */
+	dbPort: number
+	/** True when this run hydrated an existing site from `dev.byo` (login is the imported site's). */
+	imported: boolean
+	/** Number of `dev.fixtures` seeded this run (0 unless a fresh stack was just seeded). */
+	seeded: number
+	/**
+	 * The generated admin password for the wp-admin login. Present only on a fresh
+	 * install — the one moment we can show it, since WordPress stores it hashed and we
+	 * keep no artifact to read it back from. The dev stack mints no application
+	 * password; that is a test-stack concern (REST auth for the harness).
+	 */
+	secrets?: { password: string }
+}
+
+/** A strong random admin password (144 bits, URL/JSON/CLI-safe characters). */
+function generatePassword(): string {
+	return randomBytes(18).toString("base64url")
+}
+
+/**
+ * Seed `dev.fixtures` into a freshly installed dev stack, reusing the test seeding
+ * primitives: seed the default subscriber so `ctx.userId` exists, then run each `seed`
+ * over REST. Plugins are already active (`bootstrapDev` ensures them before seeding).
+ * The application password is minted only to drive seeding here — it's never printed
+ * or persisted. Returns the number of fixtures seeded.
+ */
+async function seedDevFixtures(cfg: ResolvedDevConfig, url: string): Promise<number> {
+	const userId = await seedUsers()
+	const adminId = Number(await wpCli(["user", "get", TEST_ADMIN.username, "--field=ID"]))
+	const password = await createAdminAppPassword("kizlo-dev-seed")
+	const service = new WordPressService({ credentials: { url, username: TEST_ADMIN.username, password } })
+	const ctx: SeedContext = { service, adminId, userId }
+
+	let seeded = 0
+	for (const fixture of cfg.fixtures) {
+		if (fixture.seed) {
+			await fixture.seed(ctx)
+			seeded++
+		}
+	}
+	return seeded
+}
+
+/**
+ * Boot the dev stack via docker + wp-cli. A fresh stack is provisioned one of two ways:
+ * a default `wp core install`, or — when `dev.byo` points at an archive — hydrated from
+ * that existing site (files + database). Either way it then sets permalinks and ensures
+ * the `dev.fixtures` plugins (installed sources + bind-mounted locals). An already-provisioned
+ * stack is left untouched (idempotent reruns).
+ *
+ * Credentials are an output, not a stored file: a default fresh install mints a random
+ * admin password and returns it once (to log into wp-admin); a BYO install uses the
+ * imported site's own users. No application password is minted — that's a test-stack
+ * concern.
+ */
+export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo> {
+	const url = `http://localhost:${cfg.port}`
+
+	// Decide before the containers boot whether to lay a BYO install onto disk: the files
+	// must be present when the WordPress image starts. Existing core in `dev.path` means
+	// it's a provisioned stack we leave alone.
+	const fresh = !existsSync(join(cfg.wordpressDir, "wp-includes", "version.php"))
+	const byo = fresh && cfg.byo ? await prepareByo(cfg.byo, cfg.wordpressDir, cfg.configDir) : undefined
+
+	await composeUp()
+
+	const installed = (await compose(["exec", "-T", "wp-cli", "wp", "core", "is-installed"])).code === 0
+	let password: string | undefined
+	let imported = false
+
+	if (!installed && byo) {
+		imported = true
+		// The image regenerated wp-config.php with a `wp_` prefix; match the dump's.
+		if (byo.prefix !== "wp_") await wpCli(["config", "set", "table_prefix", byo.prefix, "--type=variable"])
+		// Import through the mysql container's own client, not `wp db import`: the wp-cli
+		// image ships the MariaDB client, which can't auth to MySQL 8's caching_sha2_password.
+		const imp = await compose(["exec", "-T", "mysql", "mysql", "-uwordpress", "-pwppass", "wordpress"], { inputFile: byo.sqlPath })
+		if (imp.code !== 0) throw new Error(`importing dev.byo database failed:\n${imp.stderr || imp.stdout}`)
+		rmSync(byo.sqlPath, { force: true })
+		// Repoint the imported site at the dev URL. `search-replace` re-serializes PHP
+		// correctly (a raw replace would corrupt serialized string lengths); guids stay put.
+		const oldUrl = await wpCli(["option", "get", "siteurl"]).catch(() => "")
+		if (oldUrl && oldUrl !== url) {
+			await wpCli(["search-replace", oldUrl, url, "--all-tables", "--skip-columns=guid", "--report-changed-only"])
+		}
+		await wpCli(["rewrite", "flush", "--hard"])
+	} else if (!installed) {
+		password = generatePassword()
+		await wpCli([
+			"core",
+			"install",
+			`--url=${url}`,
+			"--title=Kizlo Dev",
+			`--admin_user=${TEST_ADMIN.username}`,
+			`--admin_password=${password}`,
+			`--admin_email=${TEST_ADMIN.email}`,
+			"--skip-email",
+		])
+		await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
+	}
+
+	// Ensure the fixtures' plugins every run (cheap when already active): install the
+	// wp.org / zip dependencies first, then activate the bind-mounted local plugins, so
+	// a mounted plugin that depends on an installed one finds it present.
+	await ensurePlugins(cfg.fixtures.flatMap((fixture) => fixture.plugins ?? []))
+
+	// Seed fixtures only on a just-completed fresh default install — never on BYO (it brings
+	// its own data) or a provisioned rerun. Runs after plugins so a fixture can use them.
+	const seeded = !installed && !byo && cfg.fixtures.length ? await seedDevFixtures(cfg, url) : 0
+
+	return { url, username: TEST_ADMIN.username, dbPort: cfg.dbPort, imported, seeded, secrets: password ? { password } : undefined }
+}
