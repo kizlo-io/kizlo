@@ -3,6 +3,7 @@ import { createRelativeLink } from "fumadocs-ui/mdx"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getMDXComponents } from "@/components/mdx"
+import { createMetadata } from "@/lib/metadata"
 import { gitConfig } from "@/lib/shared"
 import { getPageImage, getPageMarkdownUrl, source } from "@/lib/source"
 
@@ -49,11 +50,13 @@ export async function generateMetadata(props: PageProps<"/docs/[[...slug]]">): P
 	const page = source.getPage(params.slug)
 	if (!page) notFound()
 
-	return {
-		title: `${page.data.title} | Kizlo`,
+	const image = getPageImage(page).url
+
+	return createMetadata({
+		title: page.data.title,
 		description: page.data.description,
-		openGraph: {
-			images: getPageImage(page).url,
-		},
-	}
+		alternates: { canonical: page.url },
+		openGraph: { images: image },
+		twitter: { images: image },
+	})
 }
