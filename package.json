@@ -26,7 +26,6 @@
 		"lint:ws:fix": "pnpm dlx sherif@latest --ignore-package @kizlo/plugin-kizlo --ignore-package @kizlo/plugin-cf7 --ignore-package @kizlo/plugin-woocommerce --fix",
 		"plugin:build": "node scripts/build-plugin.mjs",
 		"plugin:release": "node scripts/release.mjs",
-		"link:plugins": "node scripts/link.mjs",
 		"postinstall": "pnpm lint:ws && node scripts/postinstall.mjs",
 		"typecheck": "turbo run typecheck",
 		"test": "turbo run test --filter \"./packages/*\"",

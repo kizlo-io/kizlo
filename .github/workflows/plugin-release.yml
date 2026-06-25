@@ -36,23 +36,8 @@ jobs:
           echo "plugin=$plugin"   >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          tools: composer:v2
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install JS deps
-        run: pnpm install --frozen-lockfile
+      - name: Setup
+        uses: ./tooling/gh-actions/setup
 
       # Guards against publishing a plugin whose version is out of sync across
       # its PHP header, _VERSION define, readme.txt, and package.json. Lives

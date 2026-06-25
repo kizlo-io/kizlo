@@ -40,28 +40,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          tools: composer:v2
-
       - name: Setup
         uses: ./tooling/gh-actions/setup
-
-      # PHPStan (run via `pnpm typecheck`) needs each plugin's composer deps for
-      # its WP/WC stubs. The setup action's `pnpm install` skips this in CI
-      # (postinstall is local-only), so install + validate them here explicitly.
-      - name: Validate + install plugin composer deps
-        shell: bash
-        run: |
-          for dir in plugins/*/; do
-            [ -f "${dir}composer.json" ] || continue
-            echo "::group::${dir}"
-            composer validate --strict --working-dir="$dir"
-            composer install --no-progress --prefer-dist --no-interaction --working-dir="$dir"
-            echo "::endgroup::"
-          done
 
       - name: Typecheck (TS + PHP)
         run: pnpm run typecheck

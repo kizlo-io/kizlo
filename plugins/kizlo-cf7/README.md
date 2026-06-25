@@ -24,7 +24,7 @@ WordPress 6.5+'s `Requires Plugins:` header enforces both dependencies — this 
 
 ### From this monorepo (development)
 
-See the [Link plugins into WordPress](../../CONTRIBUTING.md#link-plugins-into-wordpress) step in `CONTRIBUTING.md` — `pnpm install` will symlink this directory into your local WP install once `KIZLO_WP_PLUGINS_DIR` is set.
+See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `CONTRIBUTING.md` — `pnpm kizlo dev` bind-mounts this directory into your local WP install, so PHP edits show up live without a build or symlink step.
 
 ## Auth
 
