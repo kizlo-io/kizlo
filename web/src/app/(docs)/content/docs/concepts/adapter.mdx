@@ -4,13 +4,11 @@ icon: PlugsConnected
 description: Learn how adapters let you plug in your own auth, logging, cookies, geo, and captcha — and swap them later.
 ---
 
-A few of the things Kizlo needs have no single right answer — which provider signs in your app's users, where
-logs are sent, how cookies are read, what separates a real visitor from a bot. There are several auth
-providers, plenty of captcha vendors, any number of places logs can go; which you use should be *yours* to
-decide.
+A few of the things Kizlo needs have no single right answer: which provider signs in your users, where logs
+go, how cookies are read, what separates a real visitor from a bot. That choice should be yours.
 
-So Kizlo doesn't hardcode a choice. For each of these it defines a small **contract** — a handful of methods
-it promises to call — and lets you supply the implementation. That implementation is an **adapter**.
+So Kizlo doesn't hardcode one. For each capability it defines a small **contract** — a handful of methods it
+promises to call — and lets you supply the implementation. That implementation is an **adapter**.
 
 ```ts title="src/lib/kizlo/server/index.ts"
 export const { client, handler } = createKizlo({
@@ -22,27 +20,21 @@ export const { client, handler } = createKizlo({
 })
 ```
 
-You name the implementation you want; Kizlo calls it when it needs that capability and stays out of the rest —
-it never needs to know whether `auth` is Clerk or better-auth, only that it can ask for the current user. It
-makes no difference whether you're bringing a service you already run or picking one for the first time on a
-brand-new project: either way the choice is a line in this block, and yours to change.
+You name the implementation; Kizlo calls it when it needs that capability and stays out of the rest. It never
+knows whether `auth` is Clerk or better-auth, only that it can ask for the current user.
 
 ## Why it's not locked in
 
-Because each adapter is just a contract, the thing behind it is yours to choose — and to change. Move from
-Clerk to better-auth, Vercel to Cloudflare, `console` to Datadog, and you swap **one adapter**. Kizlo and the
-rest of your app don't notice, because they only ever spoke to the contract.
-
-That's the point of the pattern: Kizlo depends on a *capability*, never on a specific service. Your
-architecture isn't bent to fit the toolkit, and the toolkit isn't bent to one vendor — the adapter is the
-seam between them, and it's the only thing that changes when a piece does.
+Because each adapter is just a contract, the thing behind it is yours to swap. Move from Clerk to better-auth,
+Vercel to Cloudflare, `console` to Datadog, and you change **one adapter** — Kizlo and the rest of your app
+never notice, because they only ever spoke to the contract. The dependency is on a *capability*, never on a
+specific service.
 
 ## The interfaces
 
-There's a fixed set of capabilities Kizlo asks for, each with its own contract, and each **optional** —
-provide an adapter when your app needs that capability, leave it out when it doesn't. The contract *is* the
-whole thing you have to build; the sections below are each one in full. (`Promisify<T>` in the signatures is
-just `T | Promise<T>` — return sync or async, whichever suits.)
+Kizlo asks for a fixed set of capabilities, each with its own contract, and each **optional** — provide an
+adapter when your app needs that capability, leave it out when it doesn't. Each section below is one contract
+in full. (`Promisify<T>` in the signatures is `T | Promise<T>` — return sync or async, whichever suits.)
 
 ### `auth` — who's making the request
 
@@ -174,9 +166,9 @@ You rarely write an adapter from scratch. Kizlo ships implementations for the co
 store) so the everyday setup works with little or no `adapters` block at all. You reach for the option to
 **override** a default or plug in something Kizlo doesn't ship.
 
-Because an adapter is just a contract, it's also the natural place to substitute behaviour in tests. Each
-capability has a **mock** — `authMock`, `geoMock` — that returns fixed values, so a test can stand in a known
-user or location without touching a real provider:
+Because an adapter is just a contract, it's also the natural place to substitute behaviour in
+[tests](/docs/concepts/development-and-testing). Each capability has a **mock** — `authMock`, `geoMock` — that returns fixed
+values, so a test can stand in a known user or location without touching a real provider:
 
 ```ts title="kizlo.test.ts"
 createKizlo({

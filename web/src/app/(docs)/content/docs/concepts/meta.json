@@ -1,3 +1,3 @@
 {
-	"pages": ["cli", "plugin", "extension", "client", "adapter", "testing"]
+	"pages": ["cli", "plugin", "extension", "client", "adapter", "development-and-testing"]
 }

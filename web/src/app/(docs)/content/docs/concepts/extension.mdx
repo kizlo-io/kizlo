@@ -15,8 +15,7 @@ is required.
 
 ## Your first extension
 
-An extension is how you build a feature on Kizlo — a few [procedures](#procedures) grouped under a namespace,
-typed end to end. Here's a complete one. It reads a WordPress post through the **WordPress client** at
+Here's a complete extension. It reads a WordPress post through the **WordPress client** at
 `context.service.wordpress` and returns a shape that's yours, not WordPress's:
 
 ```ts title="src/lib/kizlo/server/featured.ts"
@@ -241,13 +240,10 @@ createProcedure(
   adds the codes specific to this procedure.
 </Callout>
 
-That `errors` object is produced by **`createThrowableErrorMap`**, which merges the common errors into your
-defined map and validates any `data` payload against its schema before constructing the `KizloError`. Kizlo
-wires it up for every procedure and middleware, so inside a handler you just use the map you're handed.
-
-You only call it yourself when you need that same callable map **outside** a procedure — for example in a
-plain shared helper that should throw the same typed codes. Pass it a defined map and you get back the exact
-`errors` object you'd have in a handler, common errors included:
+Inside a handler, Kizlo hands you the `errors` map ready to use. To get that same callable map **outside** a
+procedure — in a shared helper that should throw the same typed codes — build one with
+**`createThrowableErrorMap`**. Pass it a defined map and you get back the exact `errors` object a handler
+has, common errors included:
 
 ```ts title="src/lib/kizlo/server/featured/assert.ts"
 import { createThrowableErrorMap } from "kizlo"

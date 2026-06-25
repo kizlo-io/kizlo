@@ -15,10 +15,7 @@ const { data } = await client.featured.get({ params: { id: 42 } })
 ```
 
 You never write the client. It's a mirror of your [server's router](/docs/concepts/extension): add a
-procedure, it appears; change a procedure's `output`, every call site updates with it. The rest of this page
-is how that mirror works — the [two clients](#two-clients-one-surface) you get, the
-[shape every call returns](#calling-a-procedure), how [scope](#scope-on-the-client) shows up here, and the
-[contract](#the-contract) that makes the browser client typed against your server.
+procedure, it appears; change a procedure's `output`, every call site updates with it.
 
 ## Two clients, one surface
 
@@ -43,8 +40,8 @@ import { contract } from "./server/generated"
 export const client = createKizloClient(contract)
 ```
 
-Because the surface is identical, code reads the same on either side — `client.posts.list(...)` is
-`client.posts.list(...)`. Reach for whichever client matches where your code runs.
+Because the surface is identical, a call reads the same on either side. Reach for whichever client matches
+where your code runs.
 
 <Callout>
   Throughout the docs `client` is used generically. When it matters which one, we'll say *server client* or
@@ -111,9 +108,9 @@ import { client } from "@/lib/kizlo/client"
 client.seo.sitemaps() // ❌ omitted from the browser client; rejected at runtime
 ```
 
-You don't configure any of this on the client. The browser client reads each procedure's scope from the
-[contract](#the-contract) and dispatches accordingly — covered [below](#a-clean-call-surface). Authoring scope
-is covered under [Scope](/docs/concepts/extension#scope); here it's just the behaviour you get.
+You don't configure any of this on the client — the browser client reads each procedure's scope from the
+[contract](#the-contract) and dispatches accordingly. Authoring scope lives under
+[Scope](/docs/concepts/extension#scope); here it's just the behaviour you get.
 
 ## The contract
 
@@ -155,9 +152,9 @@ client is fully typed — one definition on the server, nothing repeated by hand
 
 ### A clean call surface
 
-That endpoint config living in the contract is what makes the client feel the way it does. Because the
-contract already knows each procedure's method and path, **you never pass them**. Calling your API feels like
-reaching into a deeply nested object and invoking a function — no URLs, no HTTP verbs, no endpoint strings:
+Because the contract already knows each procedure's method and path, **you never pass them**. Calling your
+API reads like reaching into a nested object and invoking a function — no URLs, no HTTP verbs, no endpoint
+strings:
 
 ```ts
 // the contract knows this is GET /featured/{id} — you just call it
