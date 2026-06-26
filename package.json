@@ -32,7 +32,8 @@
 		"test:only": "turbo run test --filter",
 		"test:watch": "vitest",
 		"check": "biome check .",
-		"check:fix": "biome check . --write"
+		"check:fix": "biome check . --write",
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.0",
@@ -41,6 +42,7 @@
 		"@kizlo/cf7": "workspace:*",
 		"@kizlo/woocommerce": "workspace:*",
 		"@types/bun": "^1.3.0",
+		"husky": "^9.1.7",
 		"kizlo": "workspace:*",
 		"turbo": "^2.5.8",
 		"typescript": "catalog:"
