@@ -1,0 +1,272 @@
+---
+title: CLI
+icon: Terminal
+description: Learn how the kizlo CLI scaffolds a project, generates the typed contract, and runs your tests.
+---
+
+The **`kizlo` CLI** is the tool you run alongside your project. It **scaffolds** Kizlo into a new or existing
+app, **generates the contract** that types your [client](/docs/concepts/client) against your
+[server](/docs/concepts/extension), runs a **local WordPress dev stack** you can build against, and **runs
+your tests** against a real, disposable WordPress stack.
+
+It ships with the `kizlo` package, so there's nothing extra to install — reach for it through your package
+runner:
+
+```package-install
+npx kizlo <command>
+```
+
+## The commands
+
+A handful of commands cover the whole workflow, from first scaffold to a green test run:
+
+| Command | What it does |
+| --- | --- |
+| [`kizlo init`](#kizlo-init) | Set up Kizlo in the current project |
+| [`kizlo generate`](#kizlo-generate) | Generate the contract once — for builds and CI |
+| [`kizlo watch`](#kizlo-watch) | Regenerate the contract on every save, during development |
+| [`kizlo dev`](#kizlo-dev) | Run a local WordPress dev stack — bare starts it; `stop`, `down`, `reset` |
+| [`kizlo test`](#kizlo-test) | Boot a WordPress test stack, seed it, and run your tests — `stop`, `down`, `reset` |
+
+Every command reads [`kizlo.config.ts`](#configuration) to find where your server lives and how your test
+stack is set up.
+
+## `kizlo init`
+
+`init` sets Kizlo up in an existing project. It detects your framework, package manager, `src` directory, and
+import alias, then scaffolds the server, client, route handler, and config — prompting for your WordPress
+credentials along the way and writing them to `.env`.
+
+```package-install
+npx kizlo init
+```
+
+It's the recommended path through the [Installation](/docs/installation) guide, which walks the prompts in
+detail. Past the defaults, a few flags tune the run:
+
+| Flag | Effect |
+| --- | --- |
+| `--yes`, `-y` | Skip the prompts and scaffold with defaults — non-interactive, for CI |
+| `--force`, `-f` | Overwrite existing `.env` values and the server entry without asking |
+| `--preset <id>` | Force a setup preset (`base`, `nextjs`) instead of auto-detecting |
+| `--alias <prefix>` | Set the import alias for generated imports (e.g. `@`); blank for relative |
+
+## `kizlo generate`
+
+`generate` builds the [contract](/docs/concepts/client) **once** and exits. It's the command for builds and
+CI — run it before you typecheck or bundle, so `server/generated/` exists and is current when the client
+imports it.
+
+```package-install
+npx kizlo generate
+```
+
+It exits non-zero if it can't find a Kizlo server in your entry file or if generation fails, so a stale or
+broken contract fails the build rather than slipping through.
+
+<Callout>
+  Wire `kizlo generate` into your `build` script (e.g. `"build": "kizlo generate && next build"`) so the
+  contract is always regenerated as part of every production build.
+</Callout>
+
+## `kizlo watch`
+
+`watch` is the development counterpart. It generates the contract once at startup, then watches your server
+directory and regenerates on every save — debounced, so a burst of saves collapses into one rebuild. Your
+client stays typed against the latest server without you thinking about it.
+
+```package-install
+npx kizlo watch
+```
+
+A broken server entry doesn't stop the watcher: it reports the error and keeps watching, so the next save can
+fix it. And only one watcher writes the contract at a time — a single-instance lock means a framework dev
+script and a manual `kizlo watch` won't fight over the same file.
+
+<Callout>
+  Run `kizlo watch` next to your framework's dev server — for example `"dev": "kizlo watch & next dev"` — so
+  the contract refreshes as you edit procedures.
+</Callout>
+
+Both `generate` and `watch` accept `--dir` to point at a Kizlo directory other than the one in
+`kizlo.config.ts`.
+
+## `kizlo dev`
+
+`kizlo dev` runs a **local WordPress dev stack** — a long-lived Docker WordPress on
+`http://localhost:8080` you build your app against. What sets it apart from the test stack:
+
+- **Every file is editable.** The whole install (core, themes, uploads, plugins) lives in your
+  [`dev.path`](#configuration) folder, bind-mounted into the container — browse and edit it from your file
+  manager, and changes are live.
+- **Plugins come from your [`dev.fixtures`](#configuration)**, the same fixtures the test stack uses. Each
+  fixture installs the plugins it needs (a wp.org slug or zip source), or bind-mounts a local
+  `{ path: "..." }` over `wp-content/plugins` so plugin source edits show up live.
+- **Your data survives.** The stack is never wiped on start; fixtures seed only on a fresh install.
+
+| Command | What it does |
+| --- | --- |
+| `kizlo dev` | Start the stack and provision it — idempotent, never wipes |
+| `kizlo dev stop` | Stop the stack, keeping everything for a fast resume |
+| `kizlo dev down` | Stop and remove the containers — keeps the database and your files (use `reset` to wipe) |
+| `kizlo dev reset` | Wipe the database **and** the `dev.path` folder, then rebuild fresh |
+
+```package-install
+npx kizlo dev
+```
+
+On first install, `kizlo dev` mints a **random** admin password (not a guessable default) and prints it once
+so you can log into `wp-admin`. Save it then; it isn't stored on disk. Later runs are idempotent and leave
+that login untouched. The dev stack mints no application password — that's a test-stack concern; if you want
+to point an app at this stack over REST, create one in `wp-admin → Users → Profile → Application Passwords`.
+
+The dev MySQL is published on `127.0.0.1:3307` (override with [`dev.dbPort`](#configuration)) so you can
+inspect or edit tables directly, beyond what `wp-admin` exposes. Kizlo doesn't bundle a database UI — point
+whatever client you already use (the `mysql` CLI, TablePlus, DBeaver, Sequel Ace) at host `127.0.0.1`, that
+port, database `wordpress`, user `wordpress`, password `wppass`:
+
+```bash
+mysql -h127.0.0.1 -P3307 -uwordpress -pwppass wordpress
+```
+
+<Callout type="warn">
+  The `dev.path` folder is your persistent dev site — it holds the database-linked files, uploads, and edits.
+  Pick a real, visible folder (e.g. `wordpress/`), not a hidden one, and don't delete it by hand; `kizlo dev`
+  adds it to `.gitignore` for you. Only `kizlo dev reset` is meant to wipe it.
+</Callout>
+
+The dev stack always enables PHP OPcache with dev-safe settings (it still picks up your live edits), which
+offsets most of the slower file I/O that a bind-mounted install costs on macOS/Windows. On native Linux it
+also runs the container as **your** user, so the files WordPress writes into the folder are owned by you and
+stay editable — no `sudo`, no permission surprises. macOS/Windows handle that mapping already, so nothing
+extra happens there.
+
+### Adopt an existing site
+
+Point [`dev.byo`](#configuration) at a tar archive (`.tar.gz`, `.tar.xz`, `.tar.bz2`, `.tar.zst`, or plain
+`.tar`) to start from a real site instead of a blank install — handy for reproducing a bug against
+production-like data. The archive's root must hold a `wordpress/` directory (the install) and a single `.sql`
+dump (the database):
+
+```
+backup.tar.gz
+├── wordpress/      # the full install — core, themes, uploads, plugins
+└── db.sql          # the database dump
+```
+
+```ts
+dev: { path: "wordpress", byo: "backup.tar.gz" }
+```
+
+Kizlo hydrates from the archive whenever the stack is **fresh** — the first `kizlo dev` or any time after
+`kizlo dev reset`. It wires the install to the dev database and rewrites the site URL to
+`http://localhost:8080` with a proper `search-replace`, so serialized data stays intact. Log in with your
+**own** site's credentials — the import carries its users over. To swap a running default install for your
+site, set `byo` and run `kizlo dev reset`.
+
+<Callout>
+  Keep the archive **outside** `dev.path` (e.g. at the project root), since `reset` wipes `dev.path`. A dump
+  from MySQL 5.7/MariaDB usually imports into the stack's MySQL 8 fine; if it doesn't, the `mysql` error is
+  surfaced and the run stops.
+</Callout>
+
+### Seed with fixtures
+
+If you want a *code-defined* starting point rather than a real-data snapshot, point
+[`dev.fixtures`](#configuration) at the same [fixtures](/docs/concepts/development-and-testing#fixtures) your test stack uses. Each
+runs once over REST (and can drop to wp-cli for anything REST can't reach) on a **fresh** stack — the first
+`kizlo dev` or after `reset` — so your dev environment mirrors your test data from versioned code:
+
+```ts
+dev: { path: "wordpress", fixtures: [postFixture()] }
+```
+
+`dev.fixtures` and `dev.byo` are mutually exclusive — `byo` brings its own data. On reruns of an existing
+stack, fixtures don't re-run, so your manual edits are never clobbered.
+
+## `kizlo test`
+
+`kizlo test` runs your test suite against a **real WordPress stack** — no mocks. It boots a Docker-based
+WordPress (on `http://localhost:8889`, independent of the dev stack), seeds it with your
+[fixtures](#configuration), then runs your project's own test command against it:
+
+```package-install
+npx kizlo test
+```
+
+The stack is idempotent. The first run boots the containers and seeds them; later runs reuse the same stack
+and skip the slow seed, so reruns are fast. After the suite finishes the stack is **left running** by default
+for that reason. Two flags change the lifecycle:
+
+| Flag | Effect |
+| --- | --- |
+| `--reset` | Wipe the database and reseed from scratch before running |
+| `--teardown` | Stop the stack after the suite finishes, instead of leaving it up |
+
+```package-install
+npx kizlo test --reset --teardown   # a clean stack, torn down afterward
+```
+
+Under the hood `test` runs your package manager's `test` script — `pnpm test`, `npm test`, `bun run test` —
+detected from your lockfile, or whatever you set as the test [`command`](#configuration). Its output streams
+straight to your terminal, and `kizlo test` exits with your suite's exit code.
+
+<Callout>
+  See [Development & Testing](/docs/concepts/development-and-testing) for how to write the suites that run against this stack, and how
+  fixtures seed the data they expect.
+</Callout>
+
+### Managing the test stack by hand
+
+A `kizlo test` run leaves the stack **up** by default, so you can poke at WP Admin, debug a
+[fixture](/docs/concepts/development-and-testing#fixtures), or point another tool at the seeded credentials between runs. To get a
+running stack without invoking your suite, run `kizlo test` once — it seeds and stays up. These subcommands
+drive that same stack's lifecycle by hand:
+
+| Command | What it does |
+| --- | --- |
+| `kizlo test stop` | Stop the stack, keeping the database volume for a fast resume |
+| `kizlo test down` | Stop and remove the containers (`-v` also drops the database volume) |
+| `kizlo test reset` | Wipe the database volume and reseed a fresh stack |
+
+The difference between `stop` and `reset` is the database volume — `stop` keeps it, `reset` throws it away.
+
+## Configuration
+
+`kizlo.config.ts` lives at your project root (`.js` and `.mjs` work too). `init` writes it for you; you edit
+it as your project grows. Define it with `defineConfig` for a fully typed config:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  alias: "@",
+  dev: {
+    path: "wordpress",
+    port: 8080,
+    dbPort: 3307,
+    byo: "backup.tar.gz",
+    fixtures: [],
+  },
+  test: {
+    port: 8889,
+    fixtures: [],
+  },
+})
+```
+
+| Field | Used by | Meaning |
+| --- | --- | --- |
+| `dir` | all | Kizlo's home directory — where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory) |
+| `alias` | `init` | Import-alias prefix for generated imports, e.g. `@`. Blank means relative imports |
+| `name` | `dev`, `test` | Base name for the Docker stacks (`<name>-dev`, `<name>-test`). Defaults to the sanitized `package.json` name, then the config dir basename |
+| `dev.path` | `dev` | **Required.** Folder (relative to the config) where your local WordPress install lives — the whole install is bind-mounted here so every file is editable from your file manager. Your persistent dev site; `reset` wipes it |
+| `dev.port` | `dev` | Port the WordPress dev stack listens on. Defaults to `8080` |
+| `dev.dbPort` | `dev` | Host port the dev MySQL is published on (bound to `127.0.0.1`) so you can point a SQL client at the database. Defaults to `3307`; change it if it clashes |
+| `dev.byo` | `dev` | Path to a tar archive (`.tar.gz`/`.tar.xz`/`.tar.bz2`/`.tar.zst`/`.tar`; `wordpress/` + one `.sql`) to hydrate a **fresh** stack from instead of a blank install. Applied on first `kizlo dev` or after `reset`. Keep it outside `dev.path` |
+| `dev.fixtures` | `dev` | [Fixtures](/docs/concepts/development-and-testing#fixtures) to build the dev stack from — the same fixtures the test stack uses. Each declares the plugins it needs (wp.org slugs / zip sources to install, or `{ path }` local dirs bind-mounted live into `wp-content/plugins` by basename) and is seeded on a **fresh** stack (first `kizlo dev` / after `reset`). Mutually exclusive with `dev.byo` |
+| `test.port` | `test` | Port the WordPress test stack listens on. Defaults to `8889` |
+| `test.fixtures` | `test` | Fixtures to install and seed onto the stack — core content plus any extension's fixtures |
+| `test.packageManager` | `test` | Package manager for the test command. Auto-detected from your lockfile when unset |
+| `test.command` | `test` | Override the test command entirely, instead of `<packageManager> test` |

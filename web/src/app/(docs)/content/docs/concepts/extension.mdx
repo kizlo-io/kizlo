@@ -1,0 +1,410 @@
+---
+title: Extension
+icon: PuzzlePiece
+description: Learn how extensions group procedures and events into a unit of API under their own namespace.
+---
+
+An **extension** is a self-contained unit of API that adds its own namespace to the client. Where a
+[procedure](#procedures) is a single operation — exposed as an HTTP endpoint or kept as a server-only
+function, depending on its [scope](#scope) — an extension is the container that groups a set of related
+procedures under one name.
+
+An extension can be **maintained by Kizlo**, built by the **community**, or written by **you** — all
+registered the same way, with the matching [companion plugin](#companion-plugins) active in WordPress when one
+is required.
+
+## Your first extension
+
+Here's a complete extension. It reads a WordPress post through the **WordPress client** at
+`context.service.wordpress` and returns a shape that's yours, not WordPress's:
+
+```ts title="src/lib/kizlo/server/featured.ts"
+import { createExtension, createProcedure } from "kizlo"
+import { z } from "zod"
+
+export const featured = () =>
+  createExtension({
+    id: "featured",
+    init: () => ({
+      router: {
+        get: createProcedure(
+          {
+            scope: "api",
+            method: "GET",
+            path: "/featured/{id}",
+            params: z.object({ id: z.coerce.number() }),
+            output: z.object({ id: z.number(), headline: z.string() }),
+          },
+          async ({ input, context }) => {
+            const { data, error } = await context.service.wordpress.posts.get({ id: input.params.id })
+            if (error) throw error
+
+            return { id: data.id, headline: data.title.rendered }
+          },
+        ),
+      },
+    }),
+  })
+```
+
+Register it on your server:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { featured } from "./featured"
+
+export const { client, handler } = createKizlo({
+  extensions: [featured()],
+})
+```
+
+That's a working extension — `client.featured.get(...)` is now on the client, typed from the procedure's
+`output`. The rest of this page breaks down each piece: an extension's [anatomy](#anatomy-of-an-extension),
+the [procedures](#procedures) inside it, and the [events](#events) it can react to.
+
+## Anatomy of an extension
+
+You just saw `createExtension` in action. It has two parts: a unique **`id`** that becomes its namespace on
+the client, and an **`init`** function that returns what the extension contributes.
+
+```ts
+createExtension({
+  id: "featured", // → client.featured
+  init: () => ({
+    router: { get, list }, // procedures, grouped
+    events: [/* webhook handlers */],
+  }),
+})
+```
+
+`init` returns two things, **both optional** — an extension can expose a router, handle events, or do both:
+
+- **`router`** — the procedures the extension exposes. Each entry is a [procedure](#procedures) (or a
+  nested group of them) and becomes a method under the namespace.
+- **`events`** — the [webhook handlers](#events) the extension reacts to.
+
+## Procedures
+
+A **procedure** is a single operation that lives inside an extension's `router` — the only place you ever
+author one. Its [scope](#scope) decides whether it's exposed as an HTTP endpoint or stays a server-only
+function. You create it with `createProcedure`, which takes an **options** object describing the operation
+and a **handler** that runs it:
+
+```ts
+import { createProcedure } from "kizlo"
+import { z } from "zod"
+
+createProcedure(
+  {
+    scope: "api",                          // where the procedure can be called from
+    method: "GET",
+    path: "/featured/{id}",
+    params: z.object({ id: z.coerce.number() }),
+    output: z.object({ id: z.number(), headline: z.string() }),
+  },
+  async ({ input, context, errors }) => {
+    // ...build and return a value matching `output`
+  },
+)
+```
+
+### Scope
+
+Every procedure declares a **`scope`**. It decides where the procedure can be called from — and, for `api`
+versus `remote`, what shape the client gets back.
+
+- **`api`** — a REST-style HTTP endpoint, defined with `method` + `path` and typed
+  `params` / `query` / `body` / `headers`. Callable from the server, the browser, and any external HTTP client.
+- **`remote`** — an RPC-style endpoint, defined with a single `input` schema (and optional `method`). Callable
+  from the server and browser clients.
+- **`internal`** — server-only. Left out of the browser client, and rejected at runtime if called there. The
+  built-in `seo` procedures use this.
+
+#### `api` vs `remote`
+
+Both travel over HTTP as JSON, but the return types differ:
+
+- **`api`** returns plain JSON, so the output stays *serialized* — a `Date` arrives as a `string`, and the
+  client types match.
+- **`remote`** *deserializes* the response back to your original types — a `Date` stays a `Date`, at runtime
+  and in the type signature.
+
+So reach for `remote` when you want rich types end to end, and `api` for endpoints external services call —
+like a Stripe webhook.
+
+### Input & output
+
+The schemas you declare in the options become the procedure's contract. For an `api` procedure, `params`,
+`query`, `body`, and `headers` are merged into the typed `input` your handler receives; `remote` and
+`internal` procedures take a single `input` schema instead. **`output`** is always required and types the
+return value — change it and every call site updates with it.
+
+<Callout>
+  Every schema slot speaks [Standard Schema](https://standardschema.dev), so use any compliant library —
+  [Zod](https://zod.dev), [Valibot](https://valibot.dev), [ArkType](https://arktype.io) — or none: pass
+  `schemaType<MyType>()` to type a slot from a plain TypeScript type with no runtime validation. Either way
+  the types flow through to the handler and the client.
+</Callout>
+
+### Handler
+
+The handler receives `{ input, context, errors }`:
+
+- **`input`** — the validated, typed request, shaped by your input schemas.
+- **`context`** — server-side services and adapters (the WordPress client, logger, and more), plus any
+  properties added by the procedure's [middleware](#middleware) — all fully typed.
+- **`errors`** — the procedure's typed error map; throw `errors.SOMETHING()` for a known failure. See
+  [Errors](#errors) below.
+
+### Errors
+
+A procedure declares the failures it can return up front, so the codes are typed end to end — in the
+handler when you throw them, and on the client when you check `error.code`.
+
+The `errors` option takes a plain object — each entry is a code with a `status`, a default `message`, and an
+optional **`data`** schema for a typed payload. For codes used by a single procedure, declare them inline:
+
+```ts title="src/lib/kizlo/server/featured/index.ts"
+createProcedure(
+  {
+    scope: "api",
+    method: "GET",
+    path: "/featured/{id}",
+    params: z.object({ id: z.coerce.number() }),
+    output: z.object({ id: z.number(), headline: z.string() }),
+    errors: {
+      FEATURED_NOT_FOUND: { status: 404, message: "Featured item not found" },
+      FEATURED_EXPIRED: { status: 410, message: "This feature has expired" },
+    },
+  },
+  async ({ errors }) => {
+    throw errors.FEATURED_NOT_FOUND()
+  },
+)
+```
+
+That inline object is all a single procedure needs. To **share the same codes across procedures and
+middlewares**, pull them into a map with **`defineErrorMap`** — define it once, then pass it to each `errors`
+option so they all throw and type the codes identically.
+
+```ts title="src/lib/kizlo/server/featured/error.ts"
+import { defineErrorMap } from "kizlo"
+
+export const FEATURED_ERROR_MAP = defineErrorMap({
+  FEATURED_NOT_FOUND: { status: 404, message: "Featured item not found" },
+  FEATURED_EXPIRED: { status: 410, message: "This feature has expired" },
+})
+```
+
+```ts title="src/lib/kizlo/server/featured/index.ts"
+import { FEATURED_ERROR_MAP } from "./error"
+
+// reused by the list and get procedures, and any middleware that guards them
+createProcedure({ /* ... */ scope: "api", errors: FEATURED_ERROR_MAP }, async ({ errors }) => { /* ... */ })
+```
+
+Inside the handler, the `errors` argument is a callable map built from that definition. Call a code to get a
+typed `KizloError` and `throw` it; override the `message`/`status`/`data` per call if you need to:
+
+```ts title="src/lib/kizlo/server/featured/index.ts"
+createProcedure(
+  {
+    scope: "api",
+    method: "GET",
+    path: "/featured/{id}",
+    params: z.object({ id: z.coerce.number() }),
+    output: z.object({ id: z.number(), headline: z.string() }),
+    errors: FEATURED_ERROR_MAP,
+  },
+  async ({ input, context, errors }) => {
+    const response = await context.service.wordpress.posts.get({ id: input.params.id })
+
+    if (response.error) {
+      switch (response.error.code) {
+        case "rest_post_invalid_id":
+          throw errors.FEATURED_NOT_FOUND()
+        default:
+          // unknown upstream failure — log it and return a generic 500
+          context.logger.error("Get featured unhandled error", response.error)
+          throw errors.INTERNAL_SERVER_ERROR()
+      }
+    }
+
+    return { id: response.data.id, headline: response.data.title.rendered }
+  },
+)
+```
+
+<Callout>
+  The **common HTTP errors** — `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`,
+  `INTERNAL_SERVER_ERROR`, and the rest — are always on `errors` without being declared. Your map only
+  adds the codes specific to this procedure.
+</Callout>
+
+Inside a handler, Kizlo hands you the `errors` map ready to use. To get that same callable map **outside** a
+procedure — in a shared helper that should throw the same typed codes — build one with
+**`createThrowableErrorMap`**. Pass it a defined map and you get back the exact `errors` object a handler
+has, common errors included:
+
+```ts title="src/lib/kizlo/server/featured/assert.ts"
+import { createThrowableErrorMap } from "kizlo"
+import { FEATURED_ERROR_MAP } from "./error"
+
+const errors = createThrowableErrorMap(FEATURED_ERROR_MAP)
+
+export function assertFeatured(item: Item | null): asserts item is Item {
+  if (!item) throw errors.FEATURED_NOT_FOUND()
+  if (item.expired) throw errors.FEATURED_EXPIRED() // your codes
+  // errors.NOT_FOUND(), errors.BAD_REQUEST(), ... // common codes too
+}
+```
+
+Call `assertFeatured(item)` from any procedure handler and the thrown `KizloError` carries the same typed
+code your procedures declare.
+
+### Middleware
+
+Run shared logic before a procedure's handler — auth checks, rate limiting, loading a record — with
+**middleware**. Create one with `createMiddleware` and attach it through the procedure's `middlewares` option:
+
+```ts
+import { createMiddleware, createProcedure } from "kizlo"
+
+const requireMember = createMiddleware(async ({ context, next, errors }) => {
+  const userId = await context.getAuthUserId()
+  if (!userId) throw errors.UNAUTHORIZED()
+
+  // pass control on, extending the context for the handler
+  return next({ context: { userId } })
+})
+
+createProcedure(
+  {
+    scope: "api",
+    method: "GET",
+    path: "/featured/{id}",
+    params: z.object({ id: z.coerce.number() }),
+    output: z.object({ id: z.number(), headline: z.string() }),
+    middlewares: [requireMember],
+  },
+  async ({ input, context }) => {
+    context.userId // ✅ added by requireMember, fully typed
+  },
+)
+```
+
+A middleware receives the same `{ input, context, errors }` as a handler plus a **`next`** function, and:
+
+- **must call `next()`** to pass control down the chain — return its result. Skip the call (e.g. by
+  throwing) to short-circuit before the handler ever runs.
+- **can extend the context** by passing `next({ context: { ... } })`. Whatever you add is merged into
+  `context` and typed for every middleware and the handler after it — that's how `context.userId` above
+  becomes available.
+
+Because `next()` resolves only after the handler (and any later middleware) finishes, awaiting it lets a
+single middleware run logic on **both sides** — before and after the procedure:
+
+```ts
+const timing = createMiddleware(async ({ context, next }) => {
+  const start = Date.now() // before
+
+  const result = await next() // runs the handler
+
+  context.logger.info("procedure done", { ms: Date.now() - start }) // after
+  return result
+})
+```
+
+Middlewares run in the order listed, so put broad guards (auth) before narrower ones that depend on them.
+
+## Events
+
+**Events** let an extension react to things happening in WordPress — a post published, a term deleted,
+settings saved. WordPress sends these as signed webhooks, and Kizlo dispatches each one to the handlers your
+extensions registered.
+
+Register them through the `events` array returned from `init`, building each with `createEventHandler`:
+
+```ts title="src/lib/kizlo/server/cache/index.ts"
+import { createEventHandler, createExtension } from "kizlo"
+
+const onContentChange = createEventHandler(async (event, context) => {
+  if (!event) return
+
+  switch (event.type) {
+    case "post.updated": // event.data → { post_id, post_type }
+      await revalidatePath(`/posts/${event.data.post_id}`)
+      break
+    case "term.deleted": // event.data → { term_id, taxonomy, post_types, count }
+      context.logger.info("Term removed", { id: event.data.term_id })
+      break
+  }
+})
+
+export const cache = createExtension({
+  id: "cache",
+  init: () => ({ events: [onContentChange] }),
+})
+```
+
+The handler receives the `{ type, data }` event and the server `context`, and returns nothing — events are
+**fire-and-forget**. They run server-side after WordPress notifies Kizlo; a handler that throws is caught and
+logged, never surfaced to a caller. A handler with no declared types is invoked for every built-in event, so
+switch on `event.type` to pick the ones you care about.
+
+### Built-in events
+
+The Kizlo plugin ships these events out of the box:
+
+| Event types | `data` |
+| --- | --- |
+| `post.created` `post.updated` `post.trashed` `post.deleted` | `{ post_id, post_type }` |
+| `term.created` `term.updated` `term.deleted` | `{ term_id, taxonomy, post_types, count }` |
+| `payment.status_requested` | `{ transaction_id, payment_method_id, payment_session_id }` |
+| `settings.saved` | `null` |
+
+<Callout>
+  Here `post` means WordPress's **post type**, not just blog posts — most content, even WooCommerce products,
+  is a post type under the hood. So `post.*` events fire for all of them; check `event.data.post_type` to
+  tell which.
+</Callout>
+
+### Custom events
+
+Your own plugin can emit its own events for your extension to handle — the same one-way flow, WordPress → Kizlo. There are two sides.
+
+**Emit from WordPress.** The Kizlo plugin exposes a shared `\Kizlo\Webhook::sendEvent($type, $data)` helper.
+Call it from your plugin wherever the thing happens — the `$data` array becomes the event's payload:
+
+```php
+use Kizlo\Webhook;
+
+Webhook::sendEvent('review.created', [
+    'review_id' => $review->id,
+    'rating'    => $review->rating,
+]);
+```
+
+**Handle in your extension.** Declare the event's type and a matching `data` schema as the first argument to
+`createEventHandler` — the handler is then typed to that union:
+
+```ts
+import { createEventHandler } from "kizlo"
+import { z } from "zod"
+
+const onReview = createEventHandler(
+  [{ types: ["review.created"], data: z.object({ review_id: z.number(), rating: z.number() }) }],
+  async (event, context) => {
+    if (event?.type !== "review.created") return
+    context.logger.info("New review", { rating: event.data.rating }) // typed
+  },
+)
+```
+
+## Companion plugins
+
+Everything above is the **app side** of an extension. Some extensions also have a **WordPress side**: when an
+extension bridges a third-party plugin like WooCommerce, it ships with a matching **companion plugin** that
+makes that plugin reachable — and can add features on top.
+
+When a companion plugin is needed, and why the WordPress side splits into the required Kizlo plugin plus
+optional companions, is covered under [Plugin](/docs/concepts/plugin#companion-plugins).

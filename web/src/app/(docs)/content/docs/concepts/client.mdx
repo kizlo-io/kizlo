@@ -1,0 +1,173 @@
+---
+title: Client
+icon: DeviceMobile
+description: Learn how the typed client gives you one callable surface for your whole API, typed end to end.
+---
+
+The **client** is how you actually *call* your API. Every [procedure](/docs/concepts/extension#procedures)
+your [extensions](/docs/concepts/extension) expose — core WordPress, installed packages, your own — shows up
+on the client as a typed method under its namespace:
+
+```ts
+const { data } = await client.posts.list({ query: { perPage: 10 } })
+const { data } = await client.woocommerce.products.list()
+const { data } = await client.featured.get({ params: { id: 42 } })
+```
+
+You never write the client. It's a mirror of your [server's router](/docs/concepts/extension): add a
+procedure, it appears; change a procedure's `output`, every call site updates with it.
+
+## Two clients, one surface
+
+Installation gives you **two** clients. They expose the exact same namespaces and call style — the only
+difference is *where they run* and *how they reach the server*:
+
+- **Server client** — imported from `@/lib/kizlo/server`. It holds the real router in-process and calls your
+  handlers **directly**, no HTTP. Use it in Server Components, route handlers, and server-to-server code.
+- **Browser client** — imported from `@/lib/kizlo/client`. It has no server code; it calls your API **over
+  HTTP**, through the route handler. Use it in Client Components and the browser.
+
+```ts title="src/lib/kizlo/server/index.ts"
+// the server client comes back from createKizlo, alongside the router and handler
+export const { client, handler } = createKizlo()
+```
+
+```ts title="src/lib/kizlo/client.ts"
+import { createKizloClient } from "kizlo/nextjs"
+import { contract } from "./server/generated"
+
+// the browser client is built from the generated contract
+export const client = createKizloClient(contract)
+```
+
+Because the surface is identical, a call reads the same on either side. Reach for whichever client matches
+where your code runs.
+
+<Callout>
+  Throughout the docs `client` is used generically. When it matters which one, we'll say *server client* or
+  *browser client* — but in your code it's whichever of the two you imported.
+</Callout>
+
+## Calling a procedure
+
+Every call returns the same **result** object — a discriminated union you check, rather than a value that
+might throw:
+
+```ts
+const result = await client.posts.get({ params: { identifier: "hello-world" } })
+
+if (result.error) {
+  // result.error is a typed KizloError — narrow on result.error.code
+  return
+}
+
+result.data // ✅ fully typed from the procedure's `output`
+```
+
+The argument you pass mirrors the procedure's typed input — `params`, `query`, `body`, and `headers` —
+autocompleted and checked from its schemas (see [Input & output](/docs/concepts/extension#input--output)).
+
+The result is `{ data, error, success }`: on success `data` is your `output` and `error` is `null`; on
+failure `data` is `undefined` and `error` is a [`KizloError`](/docs/concepts/extension#errors) whose `code`
+is typed to exactly the failures that procedure declares. No `try/catch` needed for known errors — they're
+values.
+
+When you'd rather throw — a Server Component that should error its route, say — every method also has a
+**`.call()`** variant that returns the data directly and throws the `KizloError` instead of returning it:
+
+```ts
+// returns data, throws KizloError on failure
+const post = await client.posts.get.call({ params: { identifier: "hello-world" } })
+```
+
+Same call, two ergonomics: `client.x()` for `{ data, error }` you branch on, `client.x.call()` for a value
+you `await` and let throw. Error codes are typed end to end either way — see
+[Errors](/docs/concepts/extension#errors) for how a procedure declares them.
+
+## Scope on the client
+
+A procedure's [scope](/docs/concepts/extension#scope) — set when you author it — decides how it shows up
+here:
+
+- **`internal`** — server-only. It's **dropped from the browser client** entirely (not on the namespace) and
+  rejected at runtime if you reach for it anyway. It's only ever on the server client. The built-in `seo`
+  procedures are `internal`.
+- **`api`** and **`remote`** — on **both** clients. The difference is types over the wire: `api` returns
+  plain JSON, so a `Date` arrives as a `string`; `remote` deserializes back to your original types, so a
+  `Date` stays a `Date`. The client's return types match each case.
+
+```ts title="src/app/sitemap.ts"
+import { client } from "@/lib/kizlo/server"
+
+const { data } = await client.seo.sitemaps() // ✅ internal — fine on the server client
+```
+
+```ts title="src/app/widget.tsx"
+import { client } from "@/lib/kizlo/client"
+
+client.seo.sitemaps() // ❌ omitted from the browser client; rejected at runtime
+```
+
+You don't configure any of this on the client — the browser client reads each procedure's scope from the
+[contract](#the-contract) and dispatches accordingly. Authoring scope lives under
+[Scope](/docs/concepts/extension#scope); here it's just the behaviour you get.
+
+## The contract
+
+The server client can call handlers directly because it *is* on the server — it has the router. The browser
+can't: it has no access to your handlers, your validation schemas, or your WordPress credentials, and it
+shouldn't. So how is the browser client fully typed against a server it can't import?
+
+Through the **contract** — a plain **JSON object** generated from your extensions' routers. It's the one
+piece both sides agree on, and it's derived from a single source of truth: your server router.
+
+### Generated from your routers
+
+The server router is the only place your API is defined. The [`kizlo` CLI](/docs/concepts/cli#kizlo-generate)
+walks every extension's router and emits the contract into `server/generated/`:
+
+- **`contract.json`** — the contract itself. For every procedure, its **endpoint configuration**: the `scope`
+  and the `route` it's reached by (`method` + `path`), nested to mirror the router exactly. No handlers, no
+  schemas, no secrets — just the call config the client needs to dispatch each request.
+- **`generated/index.ts`** — a tiny barrel that imports that JSON and re-types it as your server's
+  `typeof router`, so the client is typed end to end:
+
+  ```ts title="src/lib/kizlo/server/generated/index.ts"
+  import type { router } from ".."
+  import contractJson from "./contract.json"
+
+  export const contract = contractJson as unknown as typeof router
+  ```
+
+The JSON is the real artifact; the cast only layers types on top of it. At **build time** that gives
+`contract` the full type of your router — every namespace, input, output, and error code flows into the
+browser client. At **runtime** it's just the small JSON object. The server code is never bundled, yet the
+client is fully typed — one definition on the server, nothing repeated by hand.
+
+<Callout>
+  This is why you regenerate the contract when procedures change. `kizlo generate` does it once for builds and
+  CI; `kizlo watch` does it on every save in development, so the client stays typed against the latest server
+  without you thinking about it. See [CLI](/docs/concepts/cli#kizlo-generate).
+</Callout>
+
+### A clean call surface
+
+Because the contract already knows each procedure's method and path, **you never pass them**. Calling your
+API reads like reaching into a nested object and invoking a function — no URLs, no HTTP verbs, no endpoint
+strings:
+
+```ts
+// the contract knows this is GET /featured/{id} — you just call it
+const { data } = await client.featured.get({ params: { id: 42 } })
+```
+
+You hand the contract to `createKizloClient`, and it becomes the client's routing table. For each call, the
+client looks up that procedure in the contract and dispatches by its `scope`:
+
+- **`api`** → a REST request to the procedure's `method` + `path`.
+- **`remote`** → an RPC request.
+- **`internal`** → refused — it isn't sent at all.
+
+The server client skips this entirely: it has the real router in-process, so it never touches the contract or
+the network. Same surface, same types, different path to the handler — and the contract is what lets the
+browser share that surface without sharing the server.

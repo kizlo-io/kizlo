@@ -1,0 +1,170 @@
+---
+title: Development & Testing
+icon: Cube
+description: Learn how Kizlo runs a real WordPress on your machine — one to build against, one to test against.
+---
+
+Every WordPress project starts with the same chore: getting WordPress running on your machine. The usual route
+is a desktop app — the GUI installers WordPress points you to — and they're fine for a classic site. But
+you're building a *headless* app, and they stop at the WordPress: no way to test against it, no seeded content,
+nothing tied to the project you're actually shipping.
+
+Kizlo gives you a setup built for that, the same in every project: a **dev stack** you build against by hand,
+and a **test stack** your suite runs against. All you install is Docker.
+
+```package-install
+npx kizlo dev
+```
+
+```package-install
+npx kizlo test
+```
+
+The [CLI page](/docs/concepts/cli#kizlo-dev) covers both commands, their subcommands, and every config field.
+This page covers the ideas behind them — why a real WordPress, and which stack does what.
+
+## Why a real WordPress
+
+A mock of the WordPress REST API only proves your code agrees with your *guesses* about WordPress — not that
+the guesses are right. Kizlo's whole job is talking to a real WordPress, so building and testing against one is
+the point, not a compromise.
+
+Pointing at a shared staging site isn't the answer either: you break other people's work when you break yours,
+and you wait on someone else to install a plugin. A local stack is yours alone — start it, fill it, wipe it,
+without asking anyone.
+
+<Callout>
+  [Docker Desktop](https://www.docker.com/products/docker-desktop/) installs in a click, and Kizlo drives it
+  from there — you never run a `docker` command yourself. The first run builds the stack; later runs reuse it,
+  so both stay fast.
+</Callout>
+
+## Two stacks, one model
+
+Both stacks are the same Docker WordPress, and you can seed both from the same fixtures — so what you build
+against is what you test against. What differs is their purpose:
+
+| | `kizlo dev` | `kizlo test` |
+| --- | --- | --- |
+| **For** | Building your app by hand | Running your suite |
+| **Lifecycle** | Persistent — survives restarts | Reused warm, reset on demand |
+| **Files** | Fully editable on disk | Container-internal |
+| **Default URL** | `http://localhost:8080` | `http://localhost:8889` |
+| **Admin login** | Random password, printed once | Managed for the test client |
+
+The two stacks are fully independent: a dev stack can stay up while your tests spin a throwaway one beside it,
+and neither touches the other's data.
+
+You seed each stack from **[fixtures](#fixtures)** in `kizlo.config.ts` — a separate list per stack. Point both
+at the same ones and a post or plugin behaves identically whether you're building or testing; give them
+different sets when a test needs a world your dev site doesn't.
+
+## Fixtures
+
+A **fixture** is the unit of that shared content: a `seed` function that creates known records over the typed
+WordPress client, plus the `plugins` that content depends on. You author one with `defineFixture`:
+
+```ts title="fixtures/blog.ts"
+import { defineFixture } from "kizlo/test"
+
+export const blogFixture = defineFixture({
+  name: "blog",
+  plugins: ["wordpress-seo"], // wp.org slug, zip URL, or a local { path }
+  async seed(ctx) {
+    // ctx.service is the typed WP client; ctx.adminId / ctx.userId are seeded users
+    const post = await ctx.service.posts.create({
+      slug: "hello-world-test",
+      title: "Hello World Test",
+      status: "publish",
+      author: ctx.adminId,
+    })
+    if (post.error) throw post.error
+
+    return { postId: post.data.id } // a live handle a test reads back, not a snapshot
+  },
+})
+```
+
+Each stack takes its own `fixtures` list. Share one to keep building and testing in step, or give them
+different sets when their worlds should differ:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+import { blogFixture } from "./fixtures/blog"
+
+export default defineConfig({
+  dev: { path: "wordpress", fixtures: [blogFixture] },
+  test: { fixtures: [blogFixture] },
+})
+```
+
+Kizlo runs `seed` only when it provisions a fresh stack, so reruns never double up. For setup the REST API
+can't express — pretty permalinks, an option flag — call `wpCli` inside `seed` to run any wp-cli command
+against the stack.
+
+<Callout>
+  An [extension](/docs/concepts/extension) ships its data the same way: it exports a fixture that installs its
+  plugin and seeds what its procedures expect. Drop it into your config and both stacks have a world to run in.
+</Callout>
+
+## The development loop
+
+You build against the dev stack like a site you installed yourself — it persists and stays editable (see the
+table above). What keeps that loop tight is [`kizlo watch`](/docs/concepts/cli#kizlo-watch): edit a
+[procedure](/docs/concepts/extension) and it regenerates the typed [contract](/docs/concepts/client) before you
+call it; change content in `wp-admin` and your app reads it on the next request. Nothing to restart to stay in
+sync.
+
+## Writing tests
+
+Tests run against the test stack, so they exercise real WordPress responses instead of guesses about them. You
+can hit a procedure at two levels.
+
+### Server-side
+
+Call the procedure directly and get its data back, or its typed error thrown — the quickest check of what a
+procedure *does*. `getKizloTestInstance` wires an instance from the seeded credentials and the
+[adapter](/docs/concepts/adapter) mocks:
+
+```ts title="post.test.ts"
+import { beforeAll, expect, test } from "vitest"
+import { getKizloTestInstance, type KizloTestInstance } from "kizlo/test"
+
+let kizlo: KizloTestInstance
+beforeAll(() => { kizlo = getKizloTestInstance() })
+
+test("reads a seeded post by slug", async () => {
+  const post = await kizlo.client.posts.get.call({ params: { identifier: "hello-world-test" } })
+  expect(post.slug).toBe("hello-world-test")
+})
+```
+
+### End-to-end
+
+Go through the real [client](/docs/concepts/client) and get back the `{ success }` envelope your frontend sees.
+This catches what a direct call can't: serialization, and rules like internal procedures never leaving the
+server. `getKizloClientTestInstance` wraps a test instance with that client:
+
+```ts title="post.e2e.test.ts"
+import { beforeAll, expect, test } from "vitest"
+import { getKizloClientTestInstance, getKizloTestInstance, type KizloClientTestInstance } from "kizlo/test"
+
+let instance: KizloClientTestInstance
+beforeAll(async () => { instance = await getKizloClientTestInstance(getKizloTestInstance()) })
+
+test("reads a seeded post over the client", async () => {
+  const result = await instance.client.posts.get({ params: { identifier: "hello-world-test" } })
+  expect(result.success).toBe(true)
+  if (result.success) expect(result.data.slug).toBe("hello-world-test")
+})
+```
+
+Reach for the stack only when a test depends on how WordPress actually responds. Pure logic — a schema, a
+procedure's branching — runs on its own with no WordPress and no Docker, and those fast tests are what make the
+stack-backed ones worth trusting.
+
+<Callout type="info">
+  Even then, mocks live only at the *edges*. Identity, geo, captcha, and logging come through
+  [adapters](/docs/concepts/adapter), and each ships a mock so a test can pin a known user without a real
+  provider. WordPress itself is never mocked.
+</Callout>

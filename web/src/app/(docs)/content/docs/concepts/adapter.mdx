@@ -1,0 +1,186 @@
+---
+title: Adapter
+icon: PlugsConnected
+description: Learn how adapters let you plug in your own auth, logging, cookies, geo, and captcha — and swap them later.
+---
+
+A few of the things Kizlo needs have no single right answer: which provider signs in your users, where logs
+go, how cookies are read, what separates a real visitor from a bot. That choice should be yours.
+
+So Kizlo doesn't hardcode one. For each capability it defines a small **contract** — a handful of methods it
+promises to call — and lets you supply the implementation. That implementation is an **adapter**.
+
+```ts title="src/lib/kizlo/server/index.ts"
+export const { client, handler } = createKizlo({
+  adapters: {
+    auth: betterAuthAdapter(),
+    captcha: turnstile({ secret: process.env.TURNSTILE_SECRET }),
+    logger: consoleLog(),
+  },
+})
+```
+
+You name the implementation; Kizlo calls it when it needs that capability and stays out of the rest. It never
+knows whether `auth` is Clerk or better-auth, only that it can ask for the current user.
+
+## Why it's not locked in
+
+Because each adapter is just a contract, the thing behind it is yours to swap. Move from Clerk to better-auth,
+Vercel to Cloudflare, `console` to Datadog, and you change **one adapter** — Kizlo and the rest of your app
+never notice, because they only ever spoke to the contract. The dependency is on a *capability*, never on a
+specific service.
+
+## The interfaces
+
+Kizlo asks for a fixed set of capabilities, each with its own contract, and each **optional** — provide an
+adapter when your app needs that capability, leave it out when it doesn't. Each section below is one contract
+in full. (`Promisify<T>` in the signatures is `T | Promise<T>` — return sync or async, whichever suits.)
+
+### `auth` — who's making the request
+
+```ts
+interface AuthUser {
+  id: number
+  email?: string
+  phone?: string
+  firstName: string
+  lastName: string
+}
+
+interface AuthAdapter {
+  getUser(request: Request | null): Promisify<AuthUser | null>
+}
+```
+
+Kizlo hands you the incoming `Request`; you read your session however you issue it — cookie, header, bearer
+token — and return the user, or `null` when no one's signed in. This is the seam between Kizlo and whatever
+owns your sessions; the prebuilt [Clerk](/docs/adapters/clerk) and [better-auth](/docs/adapters/better-auth)
+adapters are this same interface, filled in:
+
+```ts
+import type { AuthAdapter } from "kizlo"
+
+export function myAuth(): AuthAdapter {
+  return {
+    async getUser(request) {
+      const session = await mySessionStore.read(request)
+      if (!session) return null
+      return {
+        id: session.userId,
+        firstName: session.firstName,
+        lastName: session.lastName,
+        email: session.email,
+      }
+    },
+  }
+}
+```
+
+<Callout>
+  WordPress keeps its own auth — and should. Admins, editors, and other privileged roles sign in through it,
+  exactly what it's built for. What it *isn't* built for is modern end-user sign-in: social logins, passkeys,
+  the providers a customer-facing app expects. So your users come through an auth adapter instead — <strong>one of the reasons Kizlo keeps WordPress auth off the frontend.</strong>
+</Callout>
+
+### `cookies` — read & write cookies
+
+```ts
+interface CookiesAdapter {
+  getAll(): Promisify<{ name: string; value: string }[] | null>
+  setAll(cookies: CookieWithOptions[]): Promisify<void>
+  deleteAll(cookies: { name: string; options?: CookieOptions }[]): Promisify<void>
+}
+```
+
+Three operations over whatever cookie store your framework gives you — Kizlo uses them to set, read, and clear
+sessions. On Next.js this maps straight onto `next/headers`; on another framework you wrap its equivalent. The
+framework integration usually wires this one for you, so you rarely write it by hand.
+
+### `geo` — describe the connection
+
+```ts
+interface ConnInfo {
+  ip: string | null
+  country: string | null
+  city: string | null
+  state: string | null
+  postcode: string | null
+  timezone: string | null
+  userAgent: string | null
+}
+
+interface GeoAdapter {
+  getConnInfo(request: Request | null): Promisify<ConnInfo>
+}
+```
+
+Given the request, return what you can about where it came from. Fields you can't resolve are `null` — return
+the shape, not an error. The prebuilt `geoVercelNext` reads Vercel's edge headers (`x-vercel-ip-country` and
+friends); behind another CDN, you read its headers instead.
+
+### `captcha` — verify a challenge token
+
+```ts
+type CaptchaAdapter = (input: { token: string; ip: string }) => Promise<boolean>
+```
+
+The simplest of the five — just a function. You get the `token` your frontend collected and the caller's
+`ip`, verify it with your provider, and return `true` for *human*. `turnstile`, `recaptcha`, `hcaptcha`,
+`altcha` and the rest are all this one function pointed at different verification APIs:
+
+```ts
+import type { CaptchaAdapter } from "kizlo"
+
+export function myCaptcha(opts: { secret: string }): CaptchaAdapter {
+  return async ({ token, ip }) => {
+    const data = await verifyWithMyProvider(opts.secret, token, ip)
+    return data.success === true
+  }
+}
+```
+
+### `logger` — receive log records
+
+```ts
+type LogLevel = "debug" | "info" | "warn" | "error"
+
+interface LogPayload {
+  level: LogLevel
+  message: string
+  timestamp: Date
+  context?: Record<string, unknown>
+  error?: Error
+}
+
+type LoggerAdapter = (payload: LogPayload) => void | Promise<void>
+```
+
+Kizlo calls this with every log record it produces; you decide where it goes — stdout, Datadog, Sentry. The
+built-in `consoleLog` prints; a one-liner can forward each `payload` to your platform's SDK instead.
+
+## Built-ins, defaults, and mocks
+
+You rarely write an adapter from scratch. Kizlo ships implementations for the common cases — `turnstile`,
+`recaptcha`, and `hcaptcha` for captcha; `consoleLog` for logging; `geoVercelNext` for reading geo on Vercel
+— and the [framework integration](/docs/installation) wires sensible defaults (like your framework's cookie
+store) so the everyday setup works with little or no `adapters` block at all. You reach for the option to
+**override** a default or plug in something Kizlo doesn't ship.
+
+Because an adapter is just a contract, it's also the natural place to substitute behaviour in
+[tests](/docs/concepts/development-and-testing). Each capability has a **mock** — `authMock`, `geoMock` — that returns fixed
+values, so a test can stand in a known user or location without touching a real provider:
+
+```ts title="kizlo.test.ts"
+createKizlo({
+  adapters: {
+    auth: authMock({ mockUserId: 1 }), // every request is user 1
+    geo: geoMock({ country: "IN" }),   // pinned location
+  },
+})
+```
+
+<Callout>
+  Adapters cover the services *around* a request — identity, cookies, geo, captcha, logs. Bridging WordPress
+  itself, or a third-party plugin, is a different job done by [extensions](/docs/concepts/extension) and
+  [companion plugins](/docs/concepts/plugin), not adapters.
+</Callout>

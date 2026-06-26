@@ -1,0 +1,14 @@
+{
+	"pages": [
+		"---Getting Started---",
+		"index",
+		"installation",
+		"quickstart",
+		"---Concepts---",
+		"...concepts",
+		"---Extensions---",
+		"...extensions",
+		"---Adapters---",
+		"...adapters"
+	]
+}
