@@ -10,3 +10,4 @@ parameters:
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
         - ../.stubs/kizlo-api.php
         - ../.stubs/woocommerce-storeapi.php
+        - ../.stubs/kizlo-woocommerce-constants.php

@@ -1,5 +1,5 @@
 import { WC_CORE_BASE, WC_STORE_BASE } from "kizlo"
-import { type DevPluginSource, defineFixture, githubRelease, type SeedContext } from "kizlo/test"
+import { type DevPluginSource, defineFixture, kizloRelease, type SeedContext } from "kizlo/test"
 import type { WC_Product, WC_ProductCreateInput } from "../product/types.wc"
 
 const PRODUCTS: Array<Pick<WC_ProductCreateInput, "slug" | "name" | "regular_price">> = [
@@ -43,7 +43,7 @@ export function woocommerce(opts: { plugins?: DevPluginSource[] } = {}) {
 			"woocommerce",
 			{
 				name: "kizlo-woocommerce",
-				source: githubRelease("kizlo-io/kizlo-wordpress", "kizlo-woocommerce-v1.0.0-beta.2"),
+				source: kizloRelease("kizlo-woocommerce"),
 			},
 		],
 		async seed({ service }) {

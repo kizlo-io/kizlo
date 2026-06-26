@@ -2,7 +2,7 @@
 
 /**
  * Plugin Name: Kizlo WooCommerce
- * Plugin URI: https://github.com/kizlo-io/kizlo-wordpress/tree/main/plugins/kizlo-woocommerce
+ * Plugin URI: https://kizlo.io/plugins/kizlo-woocommerce
  * Description: Bring your WooCommerce store into any JavaScript runtime. Build storefronts, product pages, and checkout flows with modern tools and AI coding assistants.
  * Version: 1.0.0-beta.2
  * Author: Kizlo Developers

@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { PluginSource, TestAdminUser, TestUser } from "./types"
-import { githubRelease } from "./utils"
+import { kizloRelease } from "./utils"
 
 export const DEFAULT_PORT = 8080
 
@@ -31,7 +31,7 @@ export const SEED_VERSION = "1"
 export const DEFAULT_PLUGINS: PluginSource[] = [
 	{
 		name: "kizlo",
-		source: githubRelease("kizlo-io/kizlo-wordpress", "kizlo-v1.0.0-beta.3"),
+		source: kizloRelease("kizlo"),
 	},
 ]
 

@@ -10,6 +10,7 @@ use Kizlo\WooCommerce\Modules\Order\OrderModule;
 use Kizlo\WooCommerce\Modules\Product\ProductModule;
 use Kizlo\WooCommerce\Modules\Variation\VariationListener;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceModule;
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
 class Plugin
 {
@@ -42,6 +43,12 @@ class Plugin
 
     public function boot(): void
     {
+        PucFactory::buildUpdateChecker(
+            'https://kizlo.io/plugin/updates/kizlo-woocommerce.json',
+            KIZLO_WOOCOMMERCE_FILE,
+            'kizlo-woocommerce'
+        );
+
         foreach ($this->modules as $module) {
             (new $module())->register();
         }

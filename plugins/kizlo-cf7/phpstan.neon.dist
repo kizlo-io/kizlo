@@ -9,3 +9,4 @@ parameters:
     scanFiles:
         - ../.stubs/kizlo-api.php
         - ../.stubs/cf7.php
+        - ../.stubs/kizlo-cf7-constants.php
