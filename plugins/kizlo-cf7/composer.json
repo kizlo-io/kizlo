@@ -15,7 +15,8 @@
 		}
 	],
 	"require": {
-		"php": ">=8.2"
+		"php": ">=8.2",
+		"yahnis-elsts/plugin-update-checker": "^5.7"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^2.2",

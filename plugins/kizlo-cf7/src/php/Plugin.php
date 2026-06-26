@@ -3,6 +3,7 @@
 namespace Kizlo\Cf7;
 
 use Kizlo\Cf7\Modules\Cf7\Cf7Module;
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
 class Plugin
 {
@@ -28,6 +29,12 @@ class Plugin
 
     public function boot(): void
     {
+        PucFactory::buildUpdateChecker(
+            'https://kizlo.io/plugin/updates/kizlo-cf7.json',
+            KIZLO_CF7_FILE,
+            'kizlo-cf7'
+        );
+
         foreach ($this->modules as $module) {
             (new $module())->register();
         }
