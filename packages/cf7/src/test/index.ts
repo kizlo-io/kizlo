@@ -1,4 +1,4 @@
-import { type DevPluginSource, defineFixture, githubRelease, wpCli } from "kizlo/test"
+import { type DevPluginSource, defineFixture, kizloRelease, wpCli } from "kizlo/test"
 
 const CF7_TITLE = "Test Form"
 
@@ -22,7 +22,7 @@ export function cf7(opts: { plugins?: DevPluginSource[] } = {}) {
 			"contact-form-7",
 			{
 				name: "kizlo-cf7",
-				source: githubRelease("kizlo-io/kizlo-wordpress", "kizlo-cf7-v1.0.0-beta.2"),
+				source: kizloRelease("kizlo-cf7"),
 			},
 		],
 		async seed() {

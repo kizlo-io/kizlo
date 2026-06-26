@@ -27,6 +27,15 @@ export function githubRelease(repo: string, tag: string): string {
 	return `https://github.com/${repo}/releases/download/${tag}/${tag}.zip`
 }
 
+/**
+ * Download URL for a Kizlo plugin's latest release, served by kizlo.io (it 302s to
+ * the current GitHub release asset). Always tracks the newest published version —
+ * use {@link githubRelease} instead to pin a specific tag.
+ */
+export function kizloRelease(slug: string): string {
+	return `https://kizlo.io/plugins/${slug}/download`
+}
+
 /** Resolve a `PluginSource` to the `(name, source)` pair `ensurePlugin` needs. */
 export function resolvePluginSource(plugin: PluginSource): [name: string, source: string] {
 	return typeof plugin === "string" ? [plugin, plugin] : [plugin.name, plugin.source]

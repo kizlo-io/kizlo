@@ -3,13 +3,19 @@ import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { isLocalPlugin } from "./types"
-import { credentialsPath, findConfigDir, githubRelease, resolvePluginSource } from "./utils"
+import { credentialsPath, findConfigDir, githubRelease, kizloRelease, resolvePluginSource } from "./utils"
 
 describe("githubRelease", () => {
 	test("builds a release-zip URL where the asset is named after the tag", () => {
-		expect(githubRelease("kizlo-io/kizlo-wordpress", "kizlo-v1.0.0")).toBe(
-			"https://github.com/kizlo-io/kizlo-wordpress/releases/download/kizlo-v1.0.0/kizlo-v1.0.0.zip",
+		expect(githubRelease("kizlo-io/kizlo", "kizlo-v1.0.0")).toBe(
+			"https://github.com/kizlo-io/kizlo/releases/download/kizlo-v1.0.0/kizlo-v1.0.0.zip",
 		)
+	})
+})
+
+describe("kizloRelease", () => {
+	test("builds the kizlo.io latest-download URL for a plugin slug", () => {
+		expect(kizloRelease("kizlo")).toBe("https://kizlo.io/plugins/kizlo/download")
 	})
 })
 
