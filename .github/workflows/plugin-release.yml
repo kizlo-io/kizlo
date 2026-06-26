@@ -53,3 +53,15 @@ jobs:
         with:
           files: plugins/${{ steps.tag.outputs.plugin }}/dist/${{ steps.tag.outputs.plugin }}-v${{ steps.tag.outputs.version }}.zip
           generate_release_notes: true
+
+      # Bust the web app's cached GitHub-releases list so the new version shows
+      # up in the PUC update feed right away. Non-fatal: the feed's time-based
+      # revalidate self-heals within minutes if this call is skipped or fails.
+      - name: Revalidate plugin update feeds
+        if: ${{ env.REVALIDATE_SECRET != '' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: |
+          curl -fsS -X POST "https://kizlo.io/api/revalidate?tag=plugin-releases" \
+            -H "Authorization: Bearer $REVALIDATE_SECRET"

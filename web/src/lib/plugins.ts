@@ -52,6 +52,11 @@ type GitHubRelease = {
 
 const releasesUrl = `https://api.github.com/repos/${gitConfig.user}/${gitConfig.repo}/releases?per_page=100`
 
+// Cache tag for the shared GitHub releases list. The release workflow POSTs to
+// `/api/revalidate?tag=plugin-releases` after publishing a release so a newly-
+// tagged plugin shows up immediately instead of waiting out `revalidate`.
+export const PLUGIN_RELEASES_TAG = "plugin-releases"
+
 // Compares two semvers (a > b → 1). A prerelease sorts below the release of the
 // same x.y.z (1.0.0-beta < 1.0.0), matching semver precedence.
 function compareSemver(a: string, b: string): number {
@@ -79,7 +84,7 @@ async function fetchReleases(): Promise<GitHubRelease[]> {
 		headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
 	}
 
-	const res = await fetch(releasesUrl, { headers, next: { revalidate: 600 } })
+	const res = await fetch(releasesUrl, { headers, next: { revalidate: 600, tags: [PLUGIN_RELEASES_TAG] } })
 	if (!res.ok) {
 		throw new Error(`GitHub releases request failed: ${res.status} ${res.statusText}`)
 	}
