@@ -4,5 +4,6 @@
 	"scripts": {
 		"typecheck": "composer phpstan",
 		"clean": "git clean -xdf .cache .turbo vendor build node_modules"
-	}
+	},
+	"version": "0.1.0"
 }
