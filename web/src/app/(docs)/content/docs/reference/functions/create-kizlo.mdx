@@ -1,0 +1,74 @@
+---
+title: createKizlo
+description: Create a Kizlo server — the client, request handler, and router for your app.
+---
+
+`createKizlo` builds your Kizlo server from credentials and registered [extensions](/docs/reference/functions/create-extension).
+It returns the `handler` you mount on a route, a server-to-server `client`, the resolved `router`, and the `context`.
+Call it once and export the pieces you need.
+
+## Parameters
+
+```ts
+createKizlo(options?)
+```
+
+Every field is optional. Anything you omit falls back to an environment variable, so a credentials-only setup can be
+driven entirely from `.env` with no arguments.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/kizlo.ts"
+  name="CreateKizloOptions"
+  type={`CreateKizloOptions`}
+/>
+
+Each field lists its environment fallback above. When a field is omitted and its env var is also missing, Kizlo throws
+`MISSING_ENV_VARIABLE`.
+
+`extensions` takes the [extensions](/docs/reference/functions/create-extension) whose namespaces are mounted on the
+client and whose routes and event handlers are mounted on the handler. `adapters` supplies the auth, captcha, geo,
+logger, and cookies services.
+
+## Returns
+
+A `Kizlo` instance with four members:
+
+| Member | Description |
+| --- | --- |
+| `handler` | `(request: Request) => Promise<Response>` — the fetch handler to mount on your server route. It is pre-bound, so destructuring keeps it working. |
+| `client` | A server-to-server client for calling your own procedures from server code. |
+| `router` | The resolved router (core routes plus every registered extension and the webhook route). |
+| `context` | The shared server context passed to procedures and middleware. |
+
+## Examples
+
+Zero-config — everything from `.env`:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+
+export const { client, handler } = createKizlo()
+```
+
+With extensions registered:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+import { reviews } from "./reviews"
+
+export const { client, handler } = createKizlo({
+  extensions: [reviews()],
+})
+```
+
+With adapters supplied:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo, consoleLog } from "kizlo"
+
+export const { client, handler } = createKizlo({
+  adapters: {
+    logger: consoleLog(),
+  },
+})
+```

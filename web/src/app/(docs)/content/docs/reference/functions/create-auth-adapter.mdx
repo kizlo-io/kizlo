@@ -1,0 +1,68 @@
+---
+title: createAuthAdapter
+description: Build a custom auth adapter that resolves the caller's identity.
+---
+
+`createAuthAdapter` declares a custom auth adapter, typed against the `AuthAdapter` contract. Kizlo calls it to
+resolve who is making a request — mapping your session to a WordPress user. Register the result on
+[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.auth`.
+
+Reach for this when you bring your own session layer. For common providers, use a prebuilt adapter instead — those
+are covered in the adapter guides, not here.
+
+## Parameters
+
+```ts
+createAuthAdapter(adapter)
+```
+
+<AutoTypeTable
+  path="../packages/kizlo/src/adapters/auth.ts"
+  name="AuthAdapter"
+  type={`AuthAdapter`}
+/>
+
+`getUser` returns the resolved user, whose `id` is the WordPress user the caller maps to:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/adapters/auth.ts"
+  name="AuthUser"
+  type={`AuthUser`}
+/>
+
+## Returns
+
+The adapter, unchanged — `createAuthAdapter` attaches the `AuthAdapter` type for inference and gives you one
+documented entry point.
+
+## Examples
+
+```ts title="src/lib/kizlo/adapters/auth.ts"
+import { createAuthAdapter } from "kizlo"
+import { getSession } from "../session"
+
+export const auth = createAuthAdapter({
+  async getUser(request) {
+    const session = await getSession(request)
+    if (!session) return null
+
+    return {
+      id: session.wpUserId,
+      firstName: session.firstName,
+      lastName: session.lastName,
+      email: session.email,
+    }
+  },
+})
+```
+
+Register it:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+import { auth } from "../adapters/auth"
+
+export const { client, handler } = createKizlo({
+  adapters: { auth },
+})
+```

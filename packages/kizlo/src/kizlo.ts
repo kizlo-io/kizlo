@@ -162,11 +162,17 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 }
 
 export interface CreateKizloOptions<TExts extends readonly AnyExtension[] = []> {
+	/** Public base URL of your Kizlo server, used to route requests. Falls back to the `SERVER_BASE_URL` env var. */
 	baseUrl?: string
+	/** Secret shared with the WordPress plugin to sign and verify webhooks. Falls back to the `SITE_SECRET` env var. */
 	siteSecret?: string
+	/** Extensions to register, built with `createExtension` — mounts their namespaces on the client and their routes and event handlers on the handler. */
 	extensions?: TExts
+	/** Runtime environment. Falls back to `NODE_ENV`, then `"development"`. */
 	environment?: Environment
+	/** Service adapters: auth, captcha, geo, logger, and cookies. */
 	adapters?: ServiceAdapters
+	/** WordPress connection. Each credential falls back to its env var: `WORDPRESS_URL`, `WORDPRESS_USERNAME`, `WORDPRESS_APPLICATION_PASSWORD`. */
 	wordpress?: { credentials?: Partial<WordPressCredentials> }
 }
 

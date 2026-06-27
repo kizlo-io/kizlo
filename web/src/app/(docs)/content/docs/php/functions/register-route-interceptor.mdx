@@ -1,0 +1,51 @@
+---
+title: kizlo_register_route_interceptor
+description: Run a callback after a matching REST route's handler to inspect or rewrite its response.
+---
+
+`kizlo_register_route_interceptor` hooks `rest_request_after_callbacks` at maximum priority and runs your callback
+only for requests matching a given route pattern (and, optionally, HTTP methods). Use it to inspect or rewrite the
+response of an existing route — yours or core's — without re-registering it. Successful responses are passed through;
+existing `WP_Error` responses are left untouched.
+
+## Parameters
+
+```php
+kizlo_register_route_interceptor(array $args)
+```
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `route` | `string` | **Required.** Route pattern matched against the request, via [`kizlo_route_match`](/docs/php/functions/register-route#route-patterns) — use `:param` syntax (e.g. `/forms/:id`). |
+| `methods` | `string[]` | Optional HTTP methods to match (e.g. `['GET', 'POST']`). Matches all methods when empty. |
+| `callback` | `callable` | **Required.** Invoked as `callback($request, $response)` when the request matches; return the (possibly modified) response. |
+
+Missing `route` or `callback` throws an `InvalidArgumentException`.
+
+## Returns
+
+`void`. The interceptor is attached as a `rest_request_after_callbacks` filter at `PHP_INT_MAX`, so it runs after the
+route's own handler.
+
+## Examples
+
+Add a field to every single-form response:
+
+```php title="wp-content/plugins/your-plugin/forms.php"
+kizlo_register_route_interceptor([
+    'route'    => '/forms/:id',
+    'methods'  => ['GET'],
+    'callback' => function (WP_REST_Request $request, WP_REST_Response $response): WP_REST_Response {
+        $data = $response->get_data();
+        $data['submission_count'] = get_form_submission_count($request->get_param('id'));
+        $response->set_data($data);
+
+        return $response;
+    },
+]);
+```
+
+<Callout>
+  The interceptor only runs for successful responses — if the route's handler already returned a `WP_Error`, your
+  callback is skipped and the error passes through unchanged.
+</Callout>

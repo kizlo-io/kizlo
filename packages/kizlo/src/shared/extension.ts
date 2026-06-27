@@ -7,7 +7,9 @@ export interface ExtensionInitOptions {
 }
 
 export interface ExtensionInitResult<TRouter extends AnyProcedureRouter> {
+	/** Procedures the extension exposes, grouped by name. Each entry (or nested group) becomes a client method under the extension's `id`. */
 	router?: TRouter
+	/** Webhook event handlers, built with `createEventHandler`, run when WordPress emits a matching event. */
 	events?: EventHandler[]
 }
 

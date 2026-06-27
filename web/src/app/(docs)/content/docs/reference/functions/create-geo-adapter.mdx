@@ -1,0 +1,67 @@
+---
+title: createGeoAdapter
+description: Build a custom geo adapter that describes the caller's connection.
+---
+
+`createGeoAdapter` declares a custom geo adapter, typed against the `GeoAdapter` contract. Kizlo calls it to describe
+the connection — IP, location, and user agent — for the current request. Register the result on
+[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.geo`.
+
+Reach for this when your platform exposes geo data Kizlo doesn't read out of the box. For Vercel's edge headers,
+use the prebuilt adapter instead — covered in the adapter guides, not here.
+
+## Parameters
+
+```ts
+createGeoAdapter(adapter)
+```
+
+<AutoTypeTable
+  path="../packages/kizlo/src/adapters/geo.ts"
+  name="GeoAdapter"
+  type={`GeoAdapter`}
+/>
+
+`getConnInfo` returns the connection info — fill in what you know and leave the rest `null`:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/adapters/geo.ts"
+  name="ConnInfo"
+  type={`ConnInfo`}
+/>
+
+## Returns
+
+The adapter, unchanged — `createGeoAdapter` attaches the `GeoAdapter` type for inference and gives you one
+documented entry point.
+
+## Examples
+
+```ts title="src/lib/kizlo/adapters/geo.ts"
+import { createGeoAdapter } from "kizlo"
+
+export const geo = createGeoAdapter({
+  getConnInfo(request) {
+    return {
+      ip: request?.headers.get("x-forwarded-for") ?? null,
+      country: request?.headers.get("x-geo-country") ?? null,
+      city: request?.headers.get("x-geo-city") ?? null,
+      state: null,
+      postcode: null,
+      timezone: null,
+      userAgent: request?.headers.get("user-agent") ?? null,
+    }
+  },
+})
+```
+
+Register it:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+import { geo } from "../adapters/geo"
+
+export const { client, handler } = createKizlo({
+  adapters: { geo },
+})
+```

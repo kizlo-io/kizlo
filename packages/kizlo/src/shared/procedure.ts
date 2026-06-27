@@ -11,8 +11,7 @@ import {
 	type ThrowableErrorMap,
 	type WithCommonErrorMap,
 } from "./error"
-import type { InferUses } from "./middleware"
-import type { AnyContext } from "./types"
+import type { AnyMiddleware, InferUses, Middleware } from "./middleware"
 
 // ====================================================
 // SHARED
@@ -44,49 +43,14 @@ export type ExtractProcedureByScope<
 					: never
 		}
 
-// ====================================================
-// MIDDLEWARE
-// ====================================================
-
-export interface MiddlewareResult<TOutContext extends AnyContext, TOutput> {
-	output: TOutput
-	context: TOutContext
-}
-
-export type MiddlewareNextFn<TOutput> = {
-	(): Promise<MiddlewareResult<AnyContext, TOutput>>
-	<UOutContext extends AnyContext>(options: { context: UOutContext }): Promise<MiddlewareResult<UOutContext, TOutput>>
-}
-
-export type MiddlewareOptions<TInput, TOutput, TError extends DefinedErrorMapLike> = {
+/** The base options passed to every procedure handler and middleware. */
+export interface BaseHandlerOptions<TInput, TContext, TError extends DefinedErrorMapLike> {
+	/** The validated, typed request. For `api`, the merged `{ params, query, body, headers }`; for `remote`/`internal`, the `input` schema's type. */
 	input: TInput
-	context: ServerContext
-	next: MiddlewareNextFn<TOutput>
-	errors: ThrowableErrorMap<TError>
-}
-
-export type MiddlewareHandler<TInput, TOutput, TError extends DefinedErrorMapLike, TOutContext extends AnyContext> = (
-	options: MiddlewareOptions<TInput, TOutput, TError>,
-) => Promise<MiddlewareResult<TOutContext, TOutput>>
-
-export type Middleware<
-	TInput,
-	TOutput,
-	TError extends DefinedErrorMapLike = DefinedErrorMapLike,
-	TOutContext extends AnyContext = AnyContext,
-> = MiddlewareHandler<TInput, TOutput, TError, TOutContext>
-
-export type AnyMiddleware = Middleware<any, any, any, any>
-
-export type ExtractMiddlewareContextOutput<M> = M extends Middleware<infer TOut, any, any, any> ? TOut : never
-
-export function createMiddleware<
-	TInput = any,
-	TOutput = any,
-	TError extends DefinedErrorMapLike = DefinedErrorMapLike,
-	TOutContext extends AnyContext = AnyContext,
->(handler: MiddlewareHandler<TInput, TOutput, TError, TOutContext>): Middleware<TInput, TOutput, TError, TOutContext> {
-	return handler
+	/** Server-side services and adapters — the WordPress client, logger, cookies, auth, and more — plus anything middleware adds. */
+	context: TContext
+	/** Typed error map — throw `errors.SOME_CODE()` for a known failure. */
+	errors: ProcedureErrors<TError>
 }
 
 // ====================================================
@@ -95,11 +59,12 @@ export function createMiddleware<
 
 export type InvocationScope = "internal" | "remote" | "api"
 
-export type ProcedureHandler<TInput, TOutput, TError extends DefinedErrorMapLike, TContext extends ServerContext> = (ctx: {
-	input: TInput
-	context: TContext
-	errors: ThrowableErrorMap<WithCommonErrorMap<TError>>
-}) => Promisify<TOutput>
+/** Callable map of a procedure's declared error codes plus the built-in common HTTP errors. */
+export type ProcedureErrors<TError extends DefinedErrorMapLike = DefinedErrorMapLike> = ThrowableErrorMap<WithCommonErrorMap<TError>>
+
+export type ProcedureHandler<TInput, TOutput, TError extends DefinedErrorMapLike, TContext extends ServerContext> = (
+	options: BaseHandlerOptions<TInput, TContext, TError>,
+) => Promisify<TOutput>
 
 export interface Procedure<TScope extends InvocationScope, TInput, TOutput, TError extends DefinedErrorMapLike = DefinedErrorMapLike> {
 	"~kizlo": {
@@ -191,27 +156,50 @@ export type ProcedureOptions<
 		TError
 	>[],
 > = {
+	/** Where the procedure can be called from: `"api"` (HTTP REST endpoint), `"remote"` (RPC-style endpoint), or `"internal"` (server-only). */
 	scope: TScope
+	/** Error codes this procedure can throw, on top of the built-in common HTTP errors. An inline object or a `defineErrorMap`. */
 	errors?: TError
+	/** Schema that types — and, when `outputValidation` is on, validates — the handler's return value. */
 	output: TOutput
+	/** Middleware to run before the handler, in declaration order. */
 	middlewares?: TMiddlewares
+	/**
+	 * Validate the incoming request against the input schemas.
+	 * @default true
+	 */
 	inputValidation?: boolean
+	/**
+	 * Validate the return value against `output`.
+	 * @default false
+	 */
 	outputValidation?: boolean
 } & (TScope extends "api"
 	? {
+			/** HTTP method for the route, e.g. `"GET"` or `"POST"`. */
 			method?: HTTPMethod
+			/** REST path with `{param}` placeholders, e.g. `/featured/{id}`. */
 			path?: TPathname
+			/** Schema for the request body. */
 			body?: TBody
+			/** Schema for the query string. */
 			query?: TQuery
+			/** Schema for the path parameters. */
 			params?: TParams
+			/** Schema for the request headers. */
 			headers?: THeaders
 		}
 	: TScope extends "remote"
 		? {
+				/** Schema for the call's single input argument. */
 				input?: TInput
+				/** HTTP method for the underlying request. */
 				method?: HTTPMethod
 			}
-		: { input?: TInput })
+		: {
+				/** Schema for the call's single input argument. */
+				input?: TInput
+			})
 
 export function createProcedure<
 	TScope extends InvocationScope,

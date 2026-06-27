@@ -8,7 +8,12 @@ import { validateWebhookEvent } from "./utils"
 
 export type AnyWebhookEventSchema<TData = unknown> = Schema<unknown, TData>
 
-export type AnyWebhookEvents = { types: string[]; data: AnyWebhookEventSchema }[]
+export type AnyWebhookEvents = {
+	/** Event type strings this entry matches, e.g. `["review.created"]`. The handler's `event.type` is narrowed to this union. */
+	types: string[]
+	/** Standard Schema that validates and types each matched event's `data` payload. */
+	data: AnyWebhookEventSchema
+}[]
 
 export type InferWebhookEventUnion<T extends AnyWebhookEvents> = {
 	[K in keyof T]: { type: T[K]["types"][number]; data: SchemaOutput<T[K]["data"]> }

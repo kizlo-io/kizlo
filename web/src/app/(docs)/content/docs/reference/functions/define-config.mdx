@@ -1,0 +1,70 @@
+---
+title: defineConfig
+description: Define a fully typed kizlo.config.ts for the CLI's dev and test stacks.
+---
+
+`defineConfig` wraps your `kizlo.config.ts` so it is fully typed. The config lives at your project root (`.js` and
+`.mjs` work too); `kizlo init` writes it for you, and you edit it as your project grows. It configures where your
+Kizlo server lives and the local WordPress stacks that `kizlo dev` and `kizlo test` provision.
+
+## Parameters
+
+```ts
+defineConfig(config)
+```
+
+<AutoTypeTable
+  path="../packages/kizlo/src/config.ts"
+  name="KizloGlobalConfig"
+  type={`KizloGlobalConfig`}
+/>
+
+### `dev`
+
+The local WordPress dev stack used by `kizlo dev`.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/config.ts"
+  name="KizloDevConfig"
+  type={`KizloDevConfig`}
+/>
+
+### `test`
+
+The WordPress test environment used by `kizlo test`.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/config.ts"
+  name="KizloTestConfig"
+  type={`KizloTestConfig`}
+/>
+
+## Returns
+
+The same config object, unchanged — `defineConfig` is an identity function that exists purely to attach types.
+
+## Examples
+
+A minimal config — a dev path is all `kizlo dev` needs:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dev: { path: "wordpress" },
+})
+```
+
+With shared fixtures seeding both stacks:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+import { blogFixture } from "./fixtures/blog"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  alias: "@",
+  dev: { path: "wordpress", fixtures: [blogFixture] },
+  test: { fixtures: [blogFixture] },
+})
+```

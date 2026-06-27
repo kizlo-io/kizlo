@@ -20,8 +20,15 @@ export interface RedirectInput {
 	searchParams?: Record<string, string>
 }
 
+export type CookiesSetAll = (cookies: CookieWithOptions[]) => Promise<void> | void
+export type CookiesGetAll = () => Promise<{ name: string; value: string }[] | null> | { name: string; value: string }[] | null
+export type CookiesDeleteAll = (cookies: { name: string; options?: CookieOptions }[]) => Promise<void> | void
+
 export interface CookiesAdapter {
-	setAll(cookies: CookieWithOptions[]): Promise<void> | void
-	getAll(): Promise<{ name: string; value: string }[] | null> | { name: string; value: string }[] | null
-	deleteAll(cookies: { name: string; options?: CookieOptions }[]): Promise<void> | void
+	/** Write the given cookies, each with its options. */
+	setAll: CookiesSetAll
+	/** Read all cookies as name/value pairs, or `null` when none are available. */
+	getAll: CookiesGetAll
+	/** Delete the named cookies, honoring each entry's options (e.g. `path`). */
+	deleteAll: CookiesDeleteAll
 }

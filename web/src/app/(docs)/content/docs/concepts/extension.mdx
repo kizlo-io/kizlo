@@ -372,13 +372,11 @@ The Kizlo plugin ships these events out of the box:
 
 Your own plugin can emit its own events for your extension to handle — the same one-way flow, WordPress → Kizlo. There are two sides.
 
-**Emit from WordPress.** The Kizlo plugin exposes a shared `\Kizlo\Webhook::sendEvent($type, $data)` helper.
-Call it from your plugin wherever the thing happens — the `$data` array becomes the event's payload:
+**Emit from WordPress.** The Kizlo plugin exposes a global `kizlo_emit_event($type, $data)` helper. Call it from
+your plugin wherever the thing happens — the `$data` array becomes the event's payload:
 
 ```php
-use Kizlo\Webhook;
-
-Webhook::sendEvent('review.created', [
+kizlo_emit_event('review.created', [
     'review_id' => $review->id,
     'rating'    => $review->rating,
 ]);

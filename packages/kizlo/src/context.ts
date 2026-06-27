@@ -22,16 +22,27 @@ export type VerifyCaptchaFn = (token: string) => Promise<boolean>
 export type VerifyPreviewTokenFn = (token: string) => Promise<PreviewTokenPayload | null>
 
 export interface ServerContext {
+	/** The incoming HTTP `Request`, or `null` for server-side (non-HTTP) invocations. */
 	request: Request | null
+	/** Response headers to be sent (e.g. `Set-Cookie`), or `null` server-side. */
 	headers: Headers | null
+	/** The configured logger adapter. */
 	logger: Logger
+	/** Typed service clients — the WordPress client at `service.wordpress`, with more services added over time. */
 	service: Service
+	/** The resolved context config: site secret, adapters, and WordPress credentials. */
 	config: ContextConfig
+	/** Resolve the caller's connection info (IP, geo) via the geo adapter, or `null`. */
 	getConnInfo: ConnInfoFn
+	/** Resolve the authenticated user via the auth adapter, or `null`. */
 	getAuthUser: AuthUserFn
+	/** Read and write cookies through the cookies adapter. */
 	cookies: CookiesStorage
+	/** Verify a CAPTCHA token via the captcha adapter. */
 	verifyCaptcha: VerifyCaptchaFn
+	/** Verify a preview token and return its payload, or `null`. */
 	verifyPreviewToken: VerifyPreviewTokenFn
+	/** How the procedure was called: `"client"` (over HTTP) or `"server"` (direct server invocation). */
 	invokedBy: "client" | "server"
 }
 

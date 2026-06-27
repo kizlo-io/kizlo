@@ -19,7 +19,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
 		<DocsPage
 			toc={page.data.toc}
 			full={page.data.full}
-			className="max-w-172 prose-code:bg-fd-muted/15 prose-p:text-fd-foreground/80 prose-p:text-sm prose-ul:text-sm"
+			className="max-w-182 prose-code:bg-fd-muted/15 prose-p:text-fd-foreground/80 prose-p:text-sm prose-ul:text-sm"
 		>
 			<DocsTitle>{page.data.title}</DocsTitle>
 			<DocsDescription className="mb-0">{page.data.description}</DocsDescription>

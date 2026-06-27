@@ -320,5 +320,28 @@ function kizlo_include_taxonomy(string $taxonomy): void
     });
 }
 
+/**
+ * Emit a signed Kizlo webhook event from WordPress.
+ *
+ * Sends the event to every configured webhook URL so matching `createEventHandler`
+ * handlers in your Kizlo app receive the `{ type, data }` payload. Delivery is
+ * non-blocking and best-effort. Thin wrapper over \Kizlo\Modules\Webhook\Webhook::sendEvent().
+ *
+ * @param string     $type The event type, e.g. 'review.created'. Handlers match on this.
+ * @param array|null $data Optional payload merged into the event's `data`. Default null.
+ *
+ * @return bool False when no site secret or webhook URLs are configured; otherwise true once dispatched.
+ *
+ * @example
+ * kizlo_emit_event('review.created', [
+ *     'review_id' => $review->id,
+ *     'rating'    => $review->rating,
+ * ]);
+ */
+function kizlo_emit_event(string $type, ?array $data = null): bool
+{
+    return \Kizlo\Modules\Webhook\Webhook::sendEvent($type, $data);
+}
+
 
 kizlo_include_post_type('projects');

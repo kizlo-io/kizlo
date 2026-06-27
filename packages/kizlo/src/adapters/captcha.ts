@@ -1,5 +1,10 @@
 export type CaptchaAdapter = (input: { token: string; ip: string }) => Promise<boolean>
 
+/** Author a custom captcha adapter — types your verify function against the {@link CaptchaAdapter} contract. */
+export function createCaptchaAdapter(adapter: CaptchaAdapter): CaptchaAdapter {
+	return adapter
+}
+
 export function recaptcha(opts: { secret: string; minScore?: number }): CaptchaAdapter {
 	return async ({ token, ip }) => {
 		const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {

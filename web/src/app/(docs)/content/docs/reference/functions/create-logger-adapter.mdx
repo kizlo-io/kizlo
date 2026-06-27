@@ -1,0 +1,61 @@
+---
+title: createLoggerAdapter
+description: Build a custom logger adapter that receives Kizlo's log records.
+---
+
+`createLoggerAdapter` declares a custom logger adapter, typed against the `LoggerAdapter` contract. Kizlo calls it
+with a structured record for every log; forward each one to your platform's logging SDK. Register the result on
+[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.logger`.
+
+Reach for this to ship logs somewhere specific. To just print to the console, use the prebuilt `consoleLog` adapter
+instead — covered in the adapter guides, not here.
+
+## Parameters
+
+```ts
+createLoggerAdapter(adapter)
+```
+
+### `adapter`
+
+The handler — `(payload: LogPayload) => void | Promise<void>`. It receives one record per log call and does whatever
+your platform needs (write, forward, drop). Apply any level filtering inside the handler.
+
+The record:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/adapters/logger.ts"
+  name="LogPayload"
+  type={`LogPayload`}
+/>
+
+## Returns
+
+The handler, unchanged — `createLoggerAdapter` attaches the `LoggerAdapter` type for inference and gives you one
+documented entry point.
+
+## Examples
+
+```ts title="src/lib/kizlo/adapters/logger.ts"
+import { createLoggerAdapter } from "kizlo"
+import { logtail } from "../logtail"
+
+export const logger = createLoggerAdapter((payload) => {
+  logtail.log(payload.level, payload.message, {
+    ...payload.context,
+    error: payload.error,
+    timestamp: payload.timestamp,
+  })
+})
+```
+
+Register it:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+import { logger } from "../adapters/logger"
+
+export const { client, handler } = createKizlo({
+  adapters: { logger },
+})
+```

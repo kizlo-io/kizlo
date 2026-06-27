@@ -81,7 +81,7 @@ export const COMMON_ERRORS = {
 		status: 500,
 		message: "An unexpected error occurred",
 	},
-} satisfies Record<string, DefinedErrorLike>
+} satisfies Record<string, ErrorDefinition>
 
 export type CommonErrorMap = typeof COMMON_ERRORS
 export type CommonErrorCode = keyof CommonErrorMap
@@ -92,16 +92,24 @@ export type WithCommonErrorMap<TErrors extends DefinedErrorMapLike> = CommonErro
 }
 
 export interface KizloErrorOptions {
+	/** Human-readable message. Defaults to the matching common error's preset message, or the code itself. */
 	message?: string
+	/** HTTP status to send. Defaults to the matching common error's status, or `500`. */
 	status?: number
+	/** Arbitrary payload carried on the error and surfaced to the client. */
 	data?: unknown
+	/** Underlying error that triggered this one; set as the native `Error` `cause`. */
 	cause?: unknown
 }
 
 export class KizloError<TCode extends CommonErrorLiteral = CommonErrorLiteral, TData = unknown> extends Error {
+	/** Always `"KizloError"` — the discriminator `isKizloError` checks. */
 	readonly name = "KizloError"
+	/** The error code, e.g. `"NOT_FOUND"` or a custom code from your error map. */
 	readonly code: TCode
+	/** The payload passed when the error was thrown, or `null`. */
 	readonly data: TData
+	/** The HTTP status this error maps to. */
 	readonly status: number
 
 	constructor(code: TCode, options?: KizloErrorOptions) {
@@ -135,15 +143,22 @@ export function toKizloError(e: unknown): KizloError {
 	return new KizloError("INTERNAL_SERVER_ERROR", { message, cause: e })
 }
 
-export type DefinedErrorLike = { status?: number; message?: string; data?: AnySchema }
+export type ErrorDefinition = {
+	/** HTTP status sent when this error is thrown. Defaults to the matching common error's status, or 500. */
+	status?: number
+	/** Human-readable message. Overridable per throw via `errors.CODE({ message })`. */
+	message?: string
+	/** Standard Schema for the error's `data` payload — validated and typed when you throw `errors.CODE({ data })`. */
+	data?: AnySchema
+}
 
-export function defineErrorMap<const T extends Partial<Record<CommonErrorLiteral, DefinedErrorLike>>>(map: T) {
+export function defineErrorMap<const T extends Partial<Record<CommonErrorLiteral, ErrorDefinition>>>(map: T) {
 	return map
 }
 
-export type DefinedErrorMapLike = Record<string, DefinedErrorLike>
+export type DefinedErrorMapLike = Record<string, ErrorDefinition>
 
-export type ThrowableErrorFn<TCode extends string, T extends DefinedErrorLike> = T["data"] extends AnySchema
+export type ThrowableErrorFn<TCode extends string, T extends ErrorDefinition> = T["data"] extends AnySchema
 	? undefined extends SchemaInput<T["data"]>
 		? (options?: { status?: number; message?: string; data?: SchemaInput<T["data"]> }) => KizloError<TCode, SchemaOutput<T["data"]>>
 		: (options: { status?: number; message?: string; data: SchemaInput<T["data"]> }) => KizloError<TCode, SchemaOutput<T["data"]>>
@@ -159,7 +174,7 @@ export function createThrowableErrorMap<TError extends DefinedErrorMapLike>(erro
 			if (typeof p === "symbol") return undefined
 			const preset = { COMMON_ERRORS, ...errors }[p]
 
-			return (options?: DefinedErrorLike) => {
+			return (options?: ErrorDefinition) => {
 				let data = options?.data
 
 				if (preset?.data) {

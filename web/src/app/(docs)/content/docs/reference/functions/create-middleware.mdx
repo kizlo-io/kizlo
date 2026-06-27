@@ -1,0 +1,106 @@
+---
+title: createMiddleware
+description: Define reusable logic that runs before a procedure's handler — guard access, extend the context, or wrap the call.
+---
+
+`createMiddleware` builds one middleware: a function that runs before a procedure's handler. Attach it through a
+procedure's `middlewares` option, where it can short-circuit the request, add typed values to `context`, or wrap
+the handler to run logic on both sides of the call.
+
+## Parameters
+
+```ts
+createMiddleware(handler)
+```
+
+### `handler`
+
+`(options) => Promise<{ output, context }>` — return the result of `next()` (or a value of the same shape). It
+receives:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/middleware.ts"
+  name="MiddlewareOptions"
+  type={`MiddlewareOptions<unknown, unknown, DefinedErrorMapLike>`}
+/>
+
+`input`, `context`, and `errors` are the same arguments a [handler](/docs/reference/functions/create-procedure#handler)
+receives — `input` typed from the procedure's schemas, `errors` carrying that procedure's codes plus the common
+HTTP errors. `next` is the one addition.
+
+#### `next`
+
+Advances the chain — runs the next middleware, then the handler — and resolves with its result. Call it bare to
+continue, or pass options to extend the downstream context:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/middleware.ts"
+  name="NextOptions"
+  type={`Parameters<MiddlewareNextFn<unknown>>[0]`}
+/>
+
+Whatever you put on `context` is merged in and typed for every middleware and the handler after it. Skip the call
+to short-circuit: throw `errors.SOME_CODE()` and nothing downstream runs.
+
+`next()` resolves with the same `{ output, context }` your handler must return:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/middleware.ts"
+  name="MiddlewareResult"
+  type={`MiddlewareResult<AnyContext, unknown>`}
+/>
+
+## Returns
+
+A `Middleware` — pass it in a procedure's `middlewares` array. It's never called directly.
+
+## Examples
+
+A guard that adds a typed value to `context`. Anything you pass to `next({ context })` is available, fully
+typed, on every middleware and handler after it:
+
+```ts
+import { createMiddleware } from "kizlo"
+
+export const requireMember = createMiddleware(async ({ context, next, errors }) => {
+  const userId = await context.getAuthUserId()
+  if (!userId) throw errors.UNAUTHORIZED()
+
+  return next({ context: { userId } })
+})
+```
+
+Wrap a middleware in a factory when it needs configuration — return `createMiddleware` from a function that
+takes options:
+
+```ts title="src/lib/kizlo/server/session.ts"
+import { createMiddleware } from "kizlo"
+
+export function sessionMiddleware(options?: { cookieName?: string }) {
+  const cookieName = options?.cookieName ?? "guest-session"
+
+  return createMiddleware(async ({ context, next }) => {
+    const token = await context.cookies.get(cookieName)
+    return next({ context: { sessionToken: token } })
+  })
+}
+```
+
+Attach either through the procedure's `middlewares` option:
+
+```ts
+createProcedure(
+  {
+    scope: "api",
+    method: "GET",
+    path: "/featured/{id}",
+    params: z.object({ id: z.coerce.number() }),
+    output: z.object({ id: z.number(), headline: z.string() }),
+    middlewares: [requireMember, sessionMiddleware()],
+  },
+  async ({ context }) => {
+    context.userId // ✅ added by requireMember, fully typed
+    context.sessionToken // ✅ added by sessionMiddleware
+  },
+)
+```

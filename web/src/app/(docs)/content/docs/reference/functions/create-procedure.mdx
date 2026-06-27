@@ -1,0 +1,137 @@
+---
+title: createProcedure
+description: Define a single API operation — its scope, schemas, errors, middleware, and handler.
+---
+
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+
+`createProcedure` builds one procedure: a single operation you place as a key in an extension's `router`, where
+that key becomes a client method typed from the procedure's `output`. It takes an **options** object that
+describes the operation and a **handler** that runs it. See [Examples](#examples) for the full setup.
+
+## Parameters
+
+```ts
+createProcedure(options, handler)
+```
+
+### `options`
+
+`scope` and `output` are required on every procedure; the remaining fields depend on the scope. Pick a tab
+for the full, type-checked shape:
+
+<Tabs defaultValue="api">
+  <TabsList variant="line">
+    <TabsTrigger value="api">api</TabsTrigger>
+    <TabsTrigger value="remote">remote</TabsTrigger>
+    <TabsTrigger value="internal">internal</TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="api">
+    <AutoTypeTable
+      path="../packages/kizlo/src/shared/procedure.ts"
+      name="ApiProcedureOptions"
+      type={`ProcedureOptions<"api", Pathname, Schema, Schema, Schema, Schema, Schema, Schema, DefinedErrorMapLike, AnyMiddleware[]>`}
+    />
+  </TabsContent>
+
+  <TabsContent value="remote">
+    <AutoTypeTable
+      path="../packages/kizlo/src/shared/procedure.ts"
+      name="RemoteProcedureOptions"
+      type={`ProcedureOptions<"remote", never, Schema, undefined, undefined, undefined, undefined, Schema, DefinedErrorMapLike, AnyMiddleware[]>`}
+    />
+  </TabsContent>
+
+  <TabsContent value="internal">
+    <AutoTypeTable
+      path="../packages/kizlo/src/shared/procedure.ts"
+      name="InternalProcedureOptions"
+      type={`ProcedureOptions<"internal", never, Schema, undefined, undefined, undefined, undefined, Schema, DefinedErrorMapLike, AnyMiddleware[]>`}
+    />
+  </TabsContent>
+</Tabs>
+
+<Callout>
+  Every schema slot speaks [Standard Schema](https://standardschema.dev) — use [Zod](https://zod.dev),
+  [Valibot](https://valibot.dev), [ArkType](https://arktype.io), or pass `schemaType<MyType>()` to type a
+  slot from a plain TypeScript type with no runtime validation.
+</Callout>
+
+### `handler`
+
+`(ctx) => output | Promise<output>` — runs the operation and returns a value matching `output`. It receives:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/procedure.ts"
+  name="ProcedureHandlerContext"
+  type={`Parameters<ProcedureHandler<Schema, Schema, DefinedErrorMapLike, ServerContext>>[0]`}
+/>
+
+## Returns
+
+A `Procedure` object — the value you assign to a `router` key; it's never called directly.
+
+Its output type depends on scope: `api` serializes to JSON, so a `Date` arrives as a `string`; `remote` and
+`internal` preserve your original types end to end.
+
+## Examples
+
+One extension can group procedures of every scope in its `router` — here an `internal` server-only operation,
+a `remote` call, and an `api` endpoint, exposed as `client.content.sitemap` / `.search` / `.get`:
+
+```ts title="src/lib/kizlo/server/content/index.ts"
+import { createExtension, createProcedure } from "kizlo"
+import { z } from "zod"
+
+export const content = () =>
+  createExtension({
+    id: "content",
+    init: () => ({
+      router: {
+        // internal — server-only, left out of the browser client
+        sitemap: createProcedure(
+          {
+            scope: "internal",
+            output: z.array(z.object({ loc: z.string(), lastmod: z.string() })),
+          },
+          async ({ context }) => buildSitemap(context),
+        ),
+
+        // remote — RPC-style, one input schema, types preserved on the client
+        search: createProcedure(
+          {
+            scope: "remote",
+            method: "POST",
+            input: z.object({ term: z.string() }),
+            output: z.array(z.object({ id: z.number(), title: z.string() })),
+          },
+          async ({ input, context, errors }) => {
+            const { data, error } = await context.service.wordpress.posts.list({ search: input.term })
+            if (error) throw errors.INTERNAL_SERVER_ERROR()
+
+            return data.map((post) => ({ id: post.id, title: post.title.rendered }))
+          },
+        ),
+
+        // api — a REST endpoint with typed params, callable over HTTP from anywhere
+        get: createProcedure(
+          {
+            scope: "api",
+            method: "GET",
+            path: "/featured/{id}",
+            params: z.object({ id: z.coerce.number() }),
+            output: z.object({ id: z.number(), headline: z.string() }),
+            errors: { FEATURED_NOT_FOUND: { status: 404, message: "Featured item not found" } },
+          },
+          async ({ input, context, errors }) => {
+            const { data, error } = await context.service.wordpress.posts.get({ id: input.params.id })
+            if (error) throw errors.FEATURED_NOT_FOUND()
+
+            return { id: data.id, headline: data.title.rendered }
+          },
+        ),
+      },
+    }),
+  })
+```

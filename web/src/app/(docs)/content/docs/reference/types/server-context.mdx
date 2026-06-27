@@ -1,0 +1,17 @@
+---
+title: ServerContext
+description: The `context` object every procedure handler and middleware receives.
+types: [ServerContext]
+---
+
+The `context` argument in a [procedure handler](/docs/reference/functions/create-procedure) and in middleware
+is a `ServerContext`. It bundles the server-side services and adapters you reach for in a handler — the
+WordPress client, logger, cookies, auth, and more.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/context.ts"
+  name="ServerContext"
+/>
+
+The adapter-backed fields (`getAuthUser`, `getConnInfo`, `verifyCaptcha`, `cookies`) resolve through the
+adapters you register. Middleware can also add its own properties to `context` for everything downstream.

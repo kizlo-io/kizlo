@@ -1,0 +1,78 @@
+---
+title: kizlo_register_route
+description: Register an admin-only REST endpoint under the Kizlo namespace.
+---
+
+`kizlo_register_route` registers a REST endpoint under Kizlo's namespace (`kizlo/v1`). It is **admin-only**: Kizlo
+attaches a permission check requiring the `manage_options` capability, so the route is reachable only by
+authenticated administrators. Call it from your plugin — it's a global, so no import is needed.
+
+## Parameters
+
+```php
+kizlo_register_route(array $args): void
+```
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `route` | `string` | **Required.** Route pattern, e.g. `/forms/(?P<id>\d+)`. Build one from `:param` syntax with [`kizlo_route`](#route-patterns). |
+| `methods` | `string\|string[]` | HTTP method(s). Use `WP_REST_Server` constants (`READABLE`, `CREATABLE`, …). |
+| `callback` | `callable` | Handler receiving a `WP_REST_Request`, returning a `WP_REST_Response` or `WP_Error`. |
+| `args` | `array` | Optional per-parameter validation/sanitization rules, passed through to `register_rest_route`. |
+
+A `route` is required — omitting it triggers `_doing_it_wrong` and the route is skipped. The callback is wrapped so a
+thrown `InvalidArgumentException` becomes a `400 invalid_param` response automatically.
+
+## Returns
+
+`void`. The route is registered on `rest_api_init`, served at `/wp-json/kizlo/v1<route>`.
+
+## Examples
+
+```php title="wp-content/plugins/your-plugin/forms.php"
+kizlo_register_route([
+    'route'    => '/forms/(?P<id>\d+)',
+    'methods'  => WP_REST_Server::READABLE,
+    'callback' => function (WP_REST_Request $request): WP_REST_Response {
+        return new WP_REST_Response(['id' => $request->get_param('id')]);
+    },
+]);
+```
+
+## Route patterns
+
+Two helpers build and match `:param`-style route patterns instead of hand-writing regex.
+
+### `kizlo_route`
+
+```php
+kizlo_route(string $path): string
+```
+
+Converts each `:name` placeholder into a named capture group matching `[a-zA-Z0-9_.%+-]+`:
+
+```php
+kizlo_route('/cf7/submit/:form_id');
+// → '/cf7/submit/(?P<form_id>[a-zA-Z0-9_.%+-]+)'
+
+kizlo_register_route([
+    'route'    => kizlo_route('/forms/:id/fields/:field_id'),
+    'methods'  => WP_REST_Server::READABLE,
+    'callback' => $handler,
+]);
+```
+
+### `kizlo_route_match`
+
+```php
+kizlo_route_match(string $route, WP_REST_Request $request): bool
+```
+
+Returns `true` when a request's route matches a `:param` pattern — the same matching
+[`kizlo_register_route_interceptor`](/docs/php/functions/register-route-interceptor) uses internally.
+
+```php
+if (kizlo_route_match('/forms/:id', $request)) {
+    // this request targets a single form
+}
+```

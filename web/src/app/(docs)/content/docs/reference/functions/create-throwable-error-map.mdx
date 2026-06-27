@@ -1,0 +1,89 @@
+---
+title: createThrowableErrorMap
+description: Turn an error map into the callable errors object that throws typed KizloErrors.
+types: [ThrowableErrorMap]
+---
+
+`createThrowableErrorMap` turns an error map into the callable `errors` object — `errors.CODE(options)` returns a
+`KizloError` ready to throw. Kizlo builds this for every procedure and passes it to your handler as `errors`, so
+you rarely call it yourself.
+
+Reach for it when a shared error map has to be thrown from somewhere that isn't a procedure handler — most often a
+**standalone middleware in its own file**. A handler gets `errors` typed from its own procedure, but a reusable
+middleware defined elsewhere doesn't know which procedure it's attached to, so it can't rely on that argument.
+Build its own callable map from the same [`defineErrorMap`](/docs/reference/functions/define-error-map) the
+procedures use, and both throw identical, typed errors.
+
+## Parameters
+
+```ts
+createThrowableErrorMap(errors)
+```
+
+### `errors`
+
+Your error map — an object keyed by code, each value an
+[`ErrorDefinition`](/docs/reference/types/error-definition). Usually the result of
+[`defineErrorMap`](/docs/reference/functions/define-error-map).
+
+## Returns
+
+A `ThrowableErrorMap` — the map you passed, merged with the built-in [common HTTP errors](/docs/reference/functions/define-error-map#common-codes).
+Each key is a function:
+
+```ts
+errors.CODE(options?: { status?: number; message?: string; data?: ... }) => KizloError
+```
+
+- `status` and `message` override the map's defaults for this throw.
+- `data` is **required and typed** when the code declares a `data` schema, and validated synchronously on the call
+  — an invalid payload throws. Codes without a schema take optional, untyped `data`.
+
+## Examples
+
+Share one error map between a procedure and a middleware that live in different files.
+
+Define the map once:
+
+```ts title="src/lib/kizlo/server/member/error.ts"
+import { defineErrorMap } from "kizlo"
+
+export const MEMBER_ERRORS = defineErrorMap({
+  NOT_A_MEMBER: { status: 403, message: "Members only" },
+})
+```
+
+A standalone middleware builds its own callable map from it — it can't use the handler's `errors`, since it
+doesn't know which procedure it guards:
+
+```ts title="src/lib/kizlo/server/member/middleware.ts"
+import { createMiddleware, createThrowableErrorMap } from "kizlo"
+import { MEMBER_ERRORS } from "./error"
+
+const errors = createThrowableErrorMap(MEMBER_ERRORS)
+
+export const requireMember = createMiddleware(async ({ context, next }) => {
+  const userId = await context.getAuthUserId()
+  if (!userId) throw errors.NOT_A_MEMBER()
+
+  return next({ context: { userId } })
+})
+```
+
+The procedure throws the same typed codes through its handler `errors` by passing the map to `errors`:
+
+```ts title="src/lib/kizlo/server/member/index.ts"
+import { createProcedure } from "kizlo"
+import { MEMBER_ERRORS } from "./error"
+import { requireMember } from "./middleware"
+
+createProcedure(
+  { scope: "api", method: "GET", path: "/perks", /* …schemas… */ errors: MEMBER_ERRORS, middlewares: [requireMember] },
+  async ({ errors }) => {
+    throw errors.NOT_A_MEMBER() // same code, same type, raised in the handler
+  },
+)
+```
+
+`errors.NOT_A_MEMBER()` returns a `KizloError` with status `403`; common codes (`errors.UNAUTHORIZED()`, …) are
+always available on the built map too.

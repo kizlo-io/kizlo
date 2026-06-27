@@ -1,0 +1,59 @@
+---
+title: defineFixture
+description: Author a typed test/dev fixture — seed data plus the plugins it depends on.
+---
+
+`defineFixture` authors a fixture: the serializable test layer an extension ships alongside its live code. A fixture
+bundles a `seed` function that creates known records over the typed WordPress client with the `plugins` that content
+depends on. Pass fixtures to a config's [`dev`/`test`](/docs/reference/functions/define-config) stacks, or to
+`getKizloTestInstance`, to provision a consistent world.
+
+## Parameters
+
+```ts
+defineFixture(fixture)
+```
+
+`fixture` is a [`Fixture`](/docs/reference/types/fixture) — its `seed`/`cleanup` functions, the `plugins` it needs,
+and the `name` its seeded handles are stored under.
+
+## Returns
+
+The same fixture object, unchanged — `defineFixture` is an identity function that exists purely to attach types and
+give you inference and autocomplete while authoring.
+
+## Examples
+
+A fixture that installs a plugin and seeds one post:
+
+```ts title="fixtures/blog.ts"
+import { defineFixture } from "kizlo/test"
+
+export const blogFixture = defineFixture({
+  name: "blog",
+  plugins: ["wordpress-seo"], // wp.org slug, zip URL, or a local { path }
+  async seed(ctx) {
+    const post = await ctx.service.posts.create({
+      slug: "hello-world-test",
+      title: "Hello World Test",
+      status: "publish",
+      author: ctx.adminId,
+    })
+    if (post.error) throw post.error
+
+    return { postId: post.data.id } // a live handle a test reads back, not a snapshot
+  },
+})
+```
+
+Register it on the dev and test stacks:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+import { blogFixture } from "./fixtures/blog"
+
+export default defineConfig({
+  dev: { path: "wordpress", fixtures: [blogFixture] },
+  test: { fixtures: [blogFixture] },
+})
+```

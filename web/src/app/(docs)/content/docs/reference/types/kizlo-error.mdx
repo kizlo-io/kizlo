@@ -1,0 +1,43 @@
+---
+title: KizloError
+description: The error type Kizlo throws and your error maps produce.
+types: [KizloError]
+---
+
+A `KizloError` is the error Kizlo throws across the framework. The throwable functions from
+[`createThrowableErrorMap`](/docs/reference/functions/create-throwable-error-map) return one, and you can construct
+one directly. It carries a stable `code`, an HTTP `status`, and an optional `data` payload alongside the standard
+`Error` `message`.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/error.ts"
+  name="KizloError"
+  type={`KizloError`}
+/>
+
+## Constructing
+
+```ts
+new KizloError(code, options?)
+```
+
+The first argument is the `code`; the rest come from `options`, each with a sensible fallback (a known common code
+fills in its preset `status` and `message`):
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/error.ts"
+  name="KizloErrorOptions"
+  type={`KizloErrorOptions`}
+/>
+
+```ts
+import { KizloError } from "kizlo"
+
+throw new KizloError("NOT_FOUND", { message: "Post not found" })
+```
+
+## Detecting
+
+`isKizloError(value)` narrows an unknown value to `KizloError` — it matches a real instance or any object with the
+`KizloError` shape (so it survives serialization across a boundary). `toKizloError(value)` normalizes any thrown
+value into a `KizloError`, falling back to `INTERNAL_SERVER_ERROR`.

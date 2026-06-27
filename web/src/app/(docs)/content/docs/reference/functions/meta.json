@@ -1,0 +1,23 @@
+{
+	"title": "Functions",
+	"icon": "Function",
+	"pages": [
+		"create-kizlo",
+		"create-kizlo-client",
+		"define-config",
+		"define-fixture",
+		"get-kizlo-test-instance",
+		"get-kizlo-client-test-instance",
+		"create-auth-adapter",
+		"create-captcha-adapter",
+		"create-cookies-adapter",
+		"create-geo-adapter",
+		"create-logger-adapter",
+		"create-extension",
+		"create-procedure",
+		"create-middleware",
+		"create-event-handler",
+		"define-error-map",
+		"create-throwable-error-map"
+	]
+}
