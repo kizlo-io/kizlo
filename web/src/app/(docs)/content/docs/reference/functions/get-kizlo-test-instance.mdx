@@ -1,0 +1,63 @@
+---
+title: getKizloTestInstance
+description: Wire a Kizlo instance against the seeded test stack for integration tests.
+---
+
+`getKizloTestInstance` builds a Kizlo instance wired to the running test stack — admin credentials read from the
+seeded test-credentials artifact, with the adapter mocks in place. Call your
+[procedures](/docs/reference/functions/create-procedure) directly through its `client` to test what they *do*
+against real WordPress responses.
+
+## Parameters
+
+```ts
+getKizloTestInstance(options?)
+```
+
+### `options.extensions`
+
+The [extensions](/docs/reference/functions/create-extension) to register on the test instance — the same array you
+pass to [`createKizlo`](/docs/reference/functions/create-kizlo). Their namespaces appear on the returned `client`.
+Omit it to test only the core routes.
+
+## Returns
+
+A `KizloTestInstance` — a [`createKizlo`](/docs/reference/functions/create-kizlo) instance pre-configured for tests:
+
+- Credentials come from the seeded test stack (the admin user), read from the test-credentials artifact that
+  `kizlo test` writes — so the stack must be provisioned first.
+- Adapters are mocked: `geo`, `auth` (resolves the seeded user), and `captcha` (accepts test tokens). The logger is
+  restricted to `warn` and `error`.
+
+Call procedures through `instance.client`. Use `.call(...)` to get the value back (or its typed error thrown) — the
+quickest check of a procedure's behavior.
+
+## Examples
+
+An integration test reading a seeded post:
+
+```ts title="post.test.ts"
+import { beforeAll, expect, test } from "vitest"
+import { getKizloTestInstance, type KizloTestInstance } from "kizlo/test"
+
+let kizlo: KizloTestInstance
+beforeAll(() => {
+  kizlo = getKizloTestInstance()
+})
+
+test("reads a seeded post by slug", async () => {
+  const post = await kizlo.client.posts.get.call({ params: { identifier: "hello-world-test" } })
+  expect(post.slug).toBe("hello-world-test")
+})
+```
+
+With an extension registered so its namespace is testable:
+
+```ts title="reviews.test.ts"
+import { getKizloTestInstance } from "kizlo/test"
+import { reviews } from "../src/lib/kizlo/server/reviews"
+
+const kizlo = getKizloTestInstance({ extensions: [reviews()] })
+
+const list = await kizlo.client.reviews.list.call()
+```

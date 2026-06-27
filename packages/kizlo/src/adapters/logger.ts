@@ -5,14 +5,24 @@ export type LogLevel = "debug" | "info" | "warn" | "error"
 export type Environment = LiteralUnion<"development" | "production" | "test", string>
 
 export interface LogPayload {
+	/** Severity of the record: `debug`, `info`, `warn`, or `error`. */
 	level: LogLevel
+	/** The log message. */
 	message: string
+	/** When the record was created. */
 	timestamp: Date
+	/** Structured fields attached to the call, if any. */
 	context?: Record<string, unknown>
+	/** The associated error, present on `error`-level records that pass one. */
 	error?: Error
 }
 
 export type LoggerAdapter = (payload: LogPayload) => void | Promise<void>
+
+/** Author a custom logger adapter — types your handler against the {@link LoggerAdapter} contract. */
+export function createLoggerAdapter(adapter: LoggerAdapter): LoggerAdapter {
+	return adapter
+}
 
 export interface Logger {
 	debug(message: string, context?: Record<string, unknown>): void

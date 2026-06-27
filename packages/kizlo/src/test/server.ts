@@ -7,6 +7,11 @@ import { testAuthAdapter } from "./auth"
 import { captchaMock } from "./captcha"
 import { toTestUser } from "./users"
 
+/**
+ * Wires a Kizlo instance against the seeded test stack: admin credentials read from
+ * the test-credentials artifact, with mock geo, auth, and captcha adapters and a
+ * warn/error logger. Call procedures directly through its `client` in integration tests.
+ */
 export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>(options?: { extensions?: TExts }) {
 	const creds = getTestCredentials()
 

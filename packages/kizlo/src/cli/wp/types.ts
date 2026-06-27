@@ -71,6 +71,10 @@ export function isLocalPlugin(plugin: DevPluginSource): plugin is LocalPlugin {
 	return typeof plugin === "object" && "path" in plugin
 }
 
+export type FixtureSeedFn = (ctx: SeedContext) => Promise<Record<string, JsonValue>>
+
+export type FixtureCleanupFn = (ctx: SeedContext) => Promise<void>
+
 /** The serializable test layer an extension ships alongside its live extension. */
 export interface Fixture {
 	/** Namespace key under `TestCredentials.fixtures`. */
@@ -84,9 +88,9 @@ export interface Fixture {
 	 */
 	plugins?: DevPluginSource[]
 	/** Build this extension's world once during seeding; return created handles. */
-	seed?: (ctx: SeedContext) => Promise<Record<string, JsonValue>>
+	seed?: FixtureSeedFn
 	/** Revert per-test mutations (teardown); does NOT uninstall plugins or seeded data. */
-	cleanup?: (ctx: SeedContext) => Promise<void>
+	cleanup?: FixtureCleanupFn
 }
 
 /** Identity helper for authoring a `Fixture` with full inference and autocomplete. */

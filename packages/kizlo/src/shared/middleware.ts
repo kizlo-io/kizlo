@@ -1,39 +1,8 @@
 import type { UnionToIntersection } from "@kizlo/shared"
 import type { ServerContext } from "../context"
-import type { DefinedErrorMapLike, ThrowableErrorMap } from "./error"
+import type { DefinedErrorMapLike } from "./error"
+import type { BaseHandlerOptions } from "./procedure"
 import type { AnyContext } from "./types"
-
-export interface MiddlewareResult<TOutContext extends AnyContext, TOutput> {
-	output: TOutput
-	context: TOutContext
-}
-
-export type MiddlewareNextFn<TOutput> = {
-	(): Promise<MiddlewareResult<AnyContext, TOutput>>
-	<UOutContext extends AnyContext>(options: { context: UOutContext }): Promise<MiddlewareResult<UOutContext, TOutput>>
-}
-
-export type MiddlewareOptions<TInput, TOutput, TError extends DefinedErrorMapLike> = {
-	input: TInput
-	context: ServerContext
-	next: MiddlewareNextFn<TOutput>
-	errors: ThrowableErrorMap<TError>
-}
-
-export type MiddlewareHandler<TOutContext extends AnyContext, TInput, TOutput, TError extends DefinedErrorMapLike> = (
-	options: MiddlewareOptions<TInput, TOutput, TError>,
-) => Promise<MiddlewareResult<TOutContext, TOutput>>
-
-export type Middleware<TOutContext extends AnyContext, TInput, TOutput, TError extends DefinedErrorMapLike> = MiddlewareHandler<
-	TOutContext,
-	TInput,
-	TOutput,
-	TError
->
-
-export type AnyMiddleware = Middleware<any, any, any, any>
-
-export type ExtractMiddlewareContextOutput<M> = M extends Middleware<infer TOut, any, any, any> ? TOut : never
 
 export type InferUses<T extends readonly AnyMiddleware[] | undefined> = T extends readonly []
 	? object
@@ -41,11 +10,46 @@ export type InferUses<T extends readonly AnyMiddleware[] | undefined> = T extend
 		? UnionToIntersection<ExtractMiddlewareContextOutput<T[number]>>
 		: object
 
-export function createMiddleware<
+export interface MiddlewareResult<TOutContext extends AnyContext, TOutput> {
+	/** The handler's return value, as it flows back up through any middleware that awaited `next()`. */
+	output: TOutput
+	/** The context after this point in the chain, including anything middleware added via `next({ context })`. */
+	context: TOutContext
+}
+
+export type MiddlewareNextFn<TOutput> = {
+	(): Promise<MiddlewareResult<AnyContext, TOutput>>
+	<UOutContext extends AnyContext>(options: {
+		/** Values to merge into the context for every middleware and the handler downstream — added to it, fully typed. */
+		context: UOutContext
+	}): Promise<MiddlewareResult<UOutContext, TOutput>>
+}
+
+export type MiddlewareOptions<TInput, TOutput, TError extends DefinedErrorMapLike> = BaseHandlerOptions<TInput, ServerContext, TError> & {
+	/** Run the next middleware (or the handler) and return its result; pass `{ context }` to extend the context for everything downstream. */
+	next: MiddlewareNextFn<TOutput>
+}
+
+export type MiddlewareHandler<TInput, TOutput, TError extends DefinedErrorMapLike, TOutContext extends AnyContext> = (
+	options: MiddlewareOptions<TInput, TOutput, TError>,
+) => Promise<MiddlewareResult<TOutContext, TOutput>>
+
+export type Middleware<
+	TInput,
+	TOutput,
+	TError extends DefinedErrorMapLike = DefinedErrorMapLike,
 	TOutContext extends AnyContext = AnyContext,
+> = MiddlewareHandler<TInput, TOutput, TError, TOutContext>
+
+export type AnyMiddleware = Middleware<any, any, any, any>
+
+export type ExtractMiddlewareContextOutput<M> = M extends Middleware<any, any, any, infer TOut> ? TOut : never
+
+export function createMiddleware<
 	TInput = any,
 	TOutput = any,
 	TError extends DefinedErrorMapLike = DefinedErrorMapLike,
->(handler: MiddlewareHandler<TOutContext, TInput, TOutput, TError>): Middleware<TOutContext, TInput, TOutput, TError> {
+	TOutContext extends AnyContext = AnyContext,
+>(handler: MiddlewareHandler<TInput, TOutput, TError, TOutContext>): Middleware<TInput, TOutput, TError, TOutContext> {
 	return handler
 }

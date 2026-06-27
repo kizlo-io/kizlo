@@ -1,0 +1,54 @@
+---
+title: createCaptchaAdapter
+description: Build a custom captcha adapter that verifies a challenge token.
+---
+
+`createCaptchaAdapter` declares a custom captcha adapter, typed against the `CaptchaAdapter` contract. Kizlo calls it
+to verify a challenge token submitted with a request. Register the result on
+[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.captcha`.
+
+Reach for this to support a provider Kizlo doesn't ship. For Turnstile, reCAPTCHA, hCaptcha, and friends, use a
+prebuilt adapter instead — covered in the adapter guides, not here.
+
+## Parameters
+
+```ts
+createCaptchaAdapter(adapter)
+```
+
+### `adapter`
+
+The verify function — `(input: { token, ip }) => Promise<boolean>`. It receives the user-submitted `token` and the
+caller's `ip`, verifies the token with your provider, and resolves `true` for a human, `false` otherwise.
+
+## Returns
+
+The function, unchanged — `createCaptchaAdapter` attaches the `CaptchaAdapter` type for inference and gives you one
+documented entry point.
+
+## Examples
+
+```ts title="src/lib/kizlo/adapters/captcha.ts"
+import { createCaptchaAdapter } from "kizlo"
+
+export const captcha = createCaptchaAdapter(async ({ token, ip }) => {
+  const res = await fetch("https://example.com/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ secret: process.env.CAPTCHA_SECRET!, response: token, remoteip: ip }),
+  })
+  const data = await res.json()
+  return data.success === true
+})
+```
+
+Register it:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+import { captcha } from "../adapters/captcha"
+
+export const { client, handler } = createKizlo({
+  adapters: { captcha },
+})
+```

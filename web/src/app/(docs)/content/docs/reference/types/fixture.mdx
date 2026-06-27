@@ -1,0 +1,30 @@
+---
+title: Fixture
+description: The serializable test layer — seed data plus the plugins it depends on.
+types: [Fixture]
+---
+
+A `Fixture` is the serializable test layer an extension ships alongside its live code: a `seed` function that creates
+known records over the typed WordPress client, plus the `plugins` that content depends on. Author one with
+[`defineFixture`](/docs/reference/functions/define-fixture), then hand it to a config's
+[`dev`/`test`](/docs/reference/functions/define-config) stacks.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/cli/wp/types.ts"
+  name="Fixture"
+  type={`Fixture`}
+/>
+
+## Seed context
+
+`seed` and `cleanup` receive a context with the typed WordPress client and the ids of the seeded users:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/cli/wp/types.ts"
+  name="SeedContext"
+  type={`SeedContext`}
+/>
+
+`seed` returns a record of **handles** — ids, codes, or slugs of what it created — stored under the fixture's `name`
+so a test can read them back and re-fetch the live resource. Return handles, not full snapshots, which would drift
+from WordPress state.

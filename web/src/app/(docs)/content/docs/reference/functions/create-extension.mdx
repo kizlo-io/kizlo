@@ -1,0 +1,73 @@
+---
+title: createExtension
+description: Group a set of procedures and event handlers into one namespaced unit of API.
+---
+
+`createExtension` defines an extension: a named unit of API that adds its own namespace to the client. It bundles
+[procedures](/docs/reference/functions/create-procedure) — exposed under the extension's `id` — and webhook event
+handlers. Register the result on your server through `createKizlo`'s `extensions` array.
+
+## Parameters
+
+```ts
+createExtension(extension)
+```
+
+### `id`
+
+The extension's namespace — a string literal, unique across registered extensions. It becomes the key on the
+client: a procedure at `router.get` on an extension with `id: "featured"` is called as `client.featured.get(...)`.
+
+### `init`
+
+A function returning what the extension exposes. Both fields are optional — an extension can expose a router,
+handle events, or both:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/extension.ts"
+  name="ExtensionInitResult"
+  type={`ExtensionInitResult<AnyProcedureRouter>`}
+/>
+
+## Returns
+
+The extension object, typed. Pass it to `createKizlo({ extensions: [...] })` to mount its namespace on the client
+and its routes on the handler.
+
+## Examples
+
+Wrap the call in a factory function — a plain function that returns the extension — so each app creates its own
+instance and can pass options in later:
+
+```ts title="src/lib/kizlo/server/reviews/index.ts"
+import { createEventHandler, createExtension, createProcedure } from "kizlo"
+import { z } from "zod"
+
+export const reviews = () =>
+  createExtension({
+    id: "reviews",
+    init: () => ({
+      router: {
+        list: createProcedure(
+          { scope: "api", method: "GET", path: "/reviews", output: z.array(z.object({ id: z.number() })) },
+          async () => [{ id: 1 }],
+        ),
+      },
+      events: [
+        createEventHandler(async (event, context) => {
+          if (event) context.logger.info("webhook received", { type: event.type })
+        }),
+      ],
+    }),
+  })
+```
+
+Register it, and `client.reviews.list()` is typed from the procedure's `output`:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { reviews } from "./reviews"
+
+export const { client, handler } = createKizlo({
+  extensions: [reviews()],
+})
+```

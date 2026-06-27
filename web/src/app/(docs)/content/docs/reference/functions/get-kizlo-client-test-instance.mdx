@@ -1,0 +1,48 @@
+---
+title: getKizloClientTestInstance
+description: Wrap a test instance with the real client for end-to-end tests.
+---
+
+`getKizloClientTestInstance` wraps a [`getKizloTestInstance`](/docs/reference/functions/get-kizlo-test-instance)
+with the real browser client, routing its requests through the test instance's `handler`. Use it for end-to-end
+tests — calls go through serialization and the same scope rules as production (internal procedures never leave the
+server), returning the `{ success, data, error }` envelope your frontend sees.
+
+## Parameters
+
+```ts
+getKizloClientTestInstance(kizlo)
+```
+
+### `kizlo`
+
+A `KizloTestInstance` from [`getKizloTestInstance`](/docs/reference/functions/get-kizlo-test-instance). Its
+contract is generated and its `handler` becomes the client's transport, so requests never leave the process.
+
+## Returns
+
+A `Promise` of a `KizloClientTestInstance` — a [`createKizloClient`](/docs/reference/functions/create-kizlo-client)
+client bound to the test instance. `await` it, then call procedures through `instance.client`; each resolves to a
+`{ success, data, error }` result.
+
+It complements `getKizloTestInstance`: that calls procedures directly through the server `client` (the quickest
+check of what a procedure *does*); this goes through the full client → handler path, catching what a direct call
+can't — serialization and rules like internal procedures never reaching the browser.
+
+## Examples
+
+```ts title="post.e2e.test.ts"
+import { beforeAll, expect, test } from "vitest"
+import { getKizloClientTestInstance, getKizloTestInstance, type KizloClientTestInstance } from "kizlo/test"
+
+let instance: KizloClientTestInstance
+beforeAll(async () => {
+  instance = await getKizloClientTestInstance(getKizloTestInstance())
+})
+
+test("reads a seeded post over the client", async () => {
+  const result = await instance.client.posts.get({ params: { identifier: "hello-world-test" } })
+  expect(result.success).toBe(true)
+  if (result.success) expect(result.data.slug).toBe("hello-world-test")
+})
+```

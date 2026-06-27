@@ -1,0 +1,5 @@
+{
+	"title": "Functions",
+	"icon": "Function",
+	"pages": ["emit-event", "register-route", "register-route-interceptor"]
+}

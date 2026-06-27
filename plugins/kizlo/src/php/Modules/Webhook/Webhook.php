@@ -20,7 +20,7 @@ class Webhook
 
     const KIZLO_WEBHOOK_URL = 'http://localhost:9191/plugin/webhooks';
 
-    public static function sendEvent(string $type, array|null $data = null)
+    public static function sendEvent(string $type, array|null $data = null): bool
     {
         $settings = Utils::getSettings();
         $urls = $settings->webhook->getWebhookUrls();

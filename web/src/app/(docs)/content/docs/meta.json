@@ -9,6 +9,10 @@
 		"---Extensions---",
 		"...extensions",
 		"---Adapters---",
-		"...adapters"
+		"...adapters",
+		"---Reference (TS)---",
+		"...reference",
+		"---Reference (PHP)---",
+		"...php"
 	]
 }

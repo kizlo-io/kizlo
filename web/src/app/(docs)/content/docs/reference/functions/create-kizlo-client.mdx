@@ -1,0 +1,53 @@
+---
+title: createKizloClient
+description: Create a typed client for calling your Kizlo procedures from the browser.
+---
+
+`createKizloClient` builds a typed client from your generated contract. Each [procedure](/docs/reference/functions/create-procedure)
+becomes a callable method, dispatched by its `scope` — `api` procedures over REST, `remote` procedures over RPC.
+It is the browser counterpart to the server-to-server `client` returned by [`createKizlo`](/docs/reference/functions/create-kizlo).
+
+## Parameters
+
+```ts
+createKizloClient(contract, options?)
+```
+
+### `contract`
+
+The generated contract — the client's routing table. For each call, the client looks up the procedure in the
+contract and dispatches by its `scope`. `internal` procedures are omitted from the browser client.
+
+### `options.url`
+
+Base URL of your Kizlo server. Defaults to the current page origin (`window.location.href`), which is correct when
+the client and server share an origin. Set it to call a server on a different origin.
+
+## Returns
+
+A typed client for your contract. Each procedure is callable as `client.<path>(...)` and resolves to a
+`{ data, error }` result you branch on; append `.call(...)` for the throwing variant that returns the value directly.
+
+```ts
+const { data, error } = await client.posts.list({ query: { perPage: 10 } })
+const post = await client.posts.get.call({ params: { identifier: "hello-world" } })
+```
+
+## Examples
+
+Build the client from the generated contract and export it:
+
+```ts title="src/lib/kizlo/client.ts"
+import { createKizloClient } from "kizlo"
+import { contract } from "./server/generated"
+
+export const client = createKizloClient(contract)
+```
+
+Point it at a server on a different origin:
+
+```ts title="src/lib/kizlo/client.ts"
+export const client = createKizloClient(contract, {
+  url: "https://api.example.com",
+})
+```
