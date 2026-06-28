@@ -10,6 +10,8 @@ pnpm-lock.yaml
 pnpm-workspace.yaml
 biome.json
 composer.lock
+changelog
+CHANGELOG.md
 phpstan.neon.dist
 phpstan-baseline.neon
 debug.txt

@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Kizlo Contact Form 7
  * Plugin URI: https://kizlo.io/plugins/kizlo-cf7
- * Description: Bring your Contact Form 7 forms into any JavaScript runtime. Submit and validate forms from AI-built UIs without touching the CF7 page markup.
+ * Description: Connects contact form 7 plugin with @kizlo/cf7 extension.
  * Version: 0.1.0
  * Author: Kizlo Developers
  * Author URI: https://kizlo.io

@@ -64,3 +64,5 @@ plugins/*/vendor/
 
 .source
 wordpress
+
+debug.txt

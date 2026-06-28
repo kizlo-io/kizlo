@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Kizlo
  * Plugin URI: https://kizlo.io/plugins/kizlo
- * Description: Core bridge between WordPress and the Kizlo JS SDK. Install Kizlo extension plugins (WooCommerce, Contact Form 7, …) to expose integration-specific endpoints.
+ * Description: A plugin that connects your WordPress with Kizlo toolkit, headlessly.
  * Version: 0.1.0
  * Author: Kizlo Developers
  * Author URI: https://kizlo.io
