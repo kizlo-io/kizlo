@@ -173,9 +173,12 @@ function kizlo_register_route_interceptor(array $args)
         throw new InvalidArgumentException('Missing required arguments.');
     }
 
-    $filter = static function (WP_REST_Response | WP_Error $response, $handler, WP_REST_Request $request) use ($route, $methods, $callback): WP_REST_Response | WP_Error {
+    $filter = static function ($response, $handler, WP_REST_Request $request) use ($route, $methods, $callback) {
         // Bail out if $response is an error or $response isn't a WP_REST_Response.
-        if (is_wp_error($response)) {
+        // The rest_request_after_callbacks filter may pass an array or other
+        // value for some endpoints (e.g. /wc-admin/options), not just a
+        // WP_REST_Response or WP_Error.
+        if (is_wp_error($response) || ! ($response instanceof WP_REST_Response)) {
             return $response;
         }
 
