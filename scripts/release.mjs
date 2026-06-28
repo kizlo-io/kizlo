@@ -7,11 +7,13 @@ import { fileURLToPath } from "node:url"
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, "..")
 
-const plugin = process.argv[2]
-const bump = process.argv[3]
+const plugin = process.argv.slice(2).find((a) => !a.startsWith("-"))
+const dryRun = process.argv.includes("--dry-run")
+const prereleaseArg = process.argv.find((a) => a.startsWith("--prerelease="))
+const prerelease = prereleaseArg ? prereleaseArg.slice("--prerelease=".length) : ""
 
-if (!plugin || !bump) {
-	console.error("usage: release.mjs <plugin-name> <patch|minor|major|x.y.z[-pre]>")
+if (!plugin) {
+	console.error("usage: release.mjs <plugin-name> [--prerelease=<suffix>] [--dry-run]")
 	process.exit(1)
 }
 
@@ -21,56 +23,24 @@ if (!fs.existsSync(pluginDir)) {
 	process.exit(1)
 }
 
-const semverRe = /^\d+\.\d+\.\d+(-[\w.-]+)?$/
-const bumpKeywords = new Set(["patch", "minor", "major"])
+// The version is owned entirely by the accumulated change files: significance
+// in the files decides the bump, so there is no manual bump argument to get
+// out of sync with the changelog. Prereleases are the one exception, via the
+// changelogger-native --prerelease suffix.
+const changeloggerBin = path.join(pluginDir, "vendor/bin/changelogger")
+if (!fs.existsSync(changeloggerBin)) {
+	console.error(
+		`plugins/${plugin} has no changelogger — run:\n` + `  (cd plugins/${plugin} && composer require --dev automattic/jetpack-changelogger)`,
+	)
+	process.exit(1)
+}
 
 // The PHP header is the canonical version source (build-plugin.mjs reads it
-// too) — every plugin has one, even pure-PHP ones without package.json.
+// too) — used here only for the bump log line.
 const phpPath = path.join(pluginDir, `${plugin}.php`)
 const currentVersion = fs.readFileSync(phpPath, "utf8").match(/^\s*\*\s*Version:\s*(\S+)/m)?.[1]
 if (!currentVersion) {
 	console.error(`could not read current Version from plugins/${plugin}/${plugin}.php`)
-	process.exit(1)
-}
-
-function nextVersion(current, kind) {
-	const m = current.match(/^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/)
-	if (!m) throw new Error(`current version '${current}' is not a recognised semver`)
-	const major = +m[1]
-	const minor = +m[2]
-	const patch = +m[3]
-	const pre = m[4]
-
-	if (pre) {
-		// Prerelease cycle: bump the trailing numeric segment regardless of kind.
-		// X.Y.Z hasn't shipped yet, so iterating means a new prerelease, not a new
-		// patch/minor/major. To graduate, pass an explicit version.
-		const parts = pre.split(".")
-		const last = parts.length - 1
-		if (/^\d+$/.test(parts[last])) {
-			parts[last] = String(+parts[last] + 1)
-		} else {
-			parts.push("1")
-		}
-		return `${major}.${minor}.${patch}-${parts.join(".")}`
-	}
-
-	if (kind === "major") return `${major + 1}.0.0`
-	if (kind === "minor") return `${major}.${minor + 1}.0`
-	return `${major}.${minor}.${patch + 1}`
-}
-
-let version
-if (bumpKeywords.has(bump)) {
-	version = nextVersion(currentVersion, bump)
-	const isPre = currentVersion.includes("-")
-	if (isPre && bump !== "patch") {
-		console.log(`Note: current ${currentVersion} is a prerelease — bumping the prerelease counter and ignoring '${bump}'.`)
-	}
-} else if (semverRe.test(bump)) {
-	version = bump
-} else {
-	console.error(`'${bump}' is not 'patch', 'minor', 'major', or a semver string`)
 	process.exit(1)
 }
 
@@ -82,17 +52,40 @@ function shCapture(cmd) {
 	return execSync(cmd, { cwd: repoRoot }).toString().trim()
 }
 
-const branch = shCapture("git rev-parse --abbrev-ref HEAD")
-if (branch !== "main") {
-	console.error(`refusing to release from branch '${branch}' (must be 'main')`)
+function changelogger(args, opts = {}) {
+	return execSync(`${changeloggerBin} ${args}`, { cwd: pluginDir, ...opts })
+}
+
+if (dryRun) {
+	console.log("DRY RUN — skipping branch/clean-tree guards, pre-release checks, and git commit/tag/push.\n")
+} else {
+	const branch = shCapture("git rev-parse --abbrev-ref HEAD")
+	if (branch !== "main") {
+		console.error(`refusing to release from branch '${branch}' (must be 'main')`)
+		process.exit(1)
+	}
+
+	const dirty = shCapture("git status --porcelain")
+	if (dirty) {
+		console.error("working tree is dirty — commit or stash first")
+		process.exit(1)
+	}
+}
+
+const changesDir = path.join(pluginDir, "changelog")
+const changeFiles = fs.existsSync(changesDir) ? fs.readdirSync(changesDir).filter((f) => !f.startsWith(".")) : []
+if (changeFiles.length === 0) {
+	console.error(
+		`no change files in plugins/${plugin}/changelog — nothing to release.\n` +
+			`Add one in a PR with: (cd plugins/${plugin} && vendor/bin/changelogger add)`,
+	)
 	process.exit(1)
 }
 
-const dirty = shCapture("git status --porcelain")
-if (dirty) {
-	console.error("working tree is dirty — commit or stash first")
-	process.exit(1)
-}
+changelogger("validate", { stdio: "inherit" })
+
+const preFlag = prerelease ? `--prerelease=${prerelease}` : ""
+const version = changelogger(`version next ${preFlag}`).toString().trim()
 
 const tag = `${plugin}-v${version}`
 const existingTag = shCapture(`git tag --list ${tag}`)
@@ -103,13 +96,21 @@ if (existingTag) {
 
 const hasPackageJson = fs.existsSync(path.join(pluginDir, "package.json"))
 
-console.log(`Pre-release checks for ${plugin}…`)
-if (hasPackageJson) {
-	sh(`pnpm exec turbo run typecheck build --filter=./plugins/${plugin}`)
+if (dryRun) {
+	console.log("(dry run) skipping pre-release typecheck/build + biome check.")
+} else {
+	console.log(`Pre-release checks for ${plugin}…`)
+	if (hasPackageJson) {
+		sh(`pnpm exec turbo run typecheck build --filter=./plugins/${plugin}`)
+	}
+	sh("pnpm check")
 }
-sh("pnpm check")
 
 console.log(`Bumping ${plugin}: ${currentVersion} → ${version}…`)
+// Compile the change files into CHANGELOG.md (this deletes them), then mirror
+// the new entry into the WordPress readme.txt changelog section.
+changelogger(`write --use-version=${version} --yes`, { stdio: "inherit" })
+sh(`node scripts/changelog-to-readme.mjs ${plugin}`)
 sh(`node scripts/sync-versions.mjs ${plugin} ${version}`)
 sh(`node scripts/check-versions.mjs ${plugin}`)
 
@@ -117,7 +118,20 @@ const filesToAdd = [`plugins/${plugin}/${plugin}.php`, `plugins/${plugin}/readme
 if (hasPackageJson) {
 	filesToAdd.push(`plugins/${plugin}/package.json`)
 }
-sh(`git add ${filesToAdd.join(" ")}`)
+// CHANGELOG.md plus the changelog/ dir (`-A` stages the change-file deletions).
+filesToAdd.push(`plugins/${plugin}/CHANGELOG.md`, `plugins/${plugin}/changelog`)
+
+if (dryRun) {
+	console.log("\n(dry run) would now run:")
+	console.log(`  git add -A ${filesToAdd.join(" ")}`)
+	console.log(`  git commit -m "release(${plugin}): v${version}"`)
+	console.log(`  git tag ${tag}`)
+	console.log(`  git push && git push origin ${tag}`)
+	console.log(`\nDry run complete for ${tag}. Inspect the working tree, then revert it.`)
+	process.exit(0)
+}
+
+sh(`git add -A ${filesToAdd.join(" ")}`)
 sh(`git commit -m "release(${plugin}): v${version}"`)
 sh(`git tag ${tag}`)
 

@@ -7,21 +7,21 @@ import { gitConfig, siteUrl } from "./shared"
 export const PLUGINS = {
 	kizlo: {
 		name: "Kizlo",
-		description: "A kizlo platform plugin for WordPress.",
+		description: "A plugin that connects your WordPress with Kizlo toolkit, headlessly.",
 		requires: "5.0",
 		tested: "6.7",
 		requires_php: "8.2",
 	},
 	"kizlo-cf7": {
 		name: "Kizlo Contact Form 7",
-		description: "Contact Form 7 integration for the Kizlo headless WordPress toolkit.",
+		description: "Connects contact form 7 plugin with @kizlo/cf7 extension.",
 		requires: "6.5",
 		tested: "6.7",
 		requires_php: "8.2",
 	},
 	"kizlo-woocommerce": {
 		name: "Kizlo WooCommerce",
-		description: "WooCommerce integration for the Kizlo headless WordPress toolkit.",
+		description: "Connects woocommerce plugin with @kizlo/woocommerce extension.",
 		requires: "6.5",
 		tested: "6.7",
 		requires_php: "8.2",

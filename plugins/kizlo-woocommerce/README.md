@@ -1,10 +1,23 @@
+<br>
+
 <p align="center">
-  <img src="../../.github/assets/kizlo.svg" alt="Kizlo" width="120" />
+  <a name="readme-top"></a>
+  <a href="https://kizlo.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://cdn.kizlo.io/logo/icon-light.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://cdn.kizlo.io/logo/icon-dark.svg">
+      <img alt="Kizlo" src="https://cdn.kizlo.io/logo/icon-dark.svg" height="100">
+    </picture>
+  </a>
 </p>
 
-<h1 align="center">Kizlo WooCommerce</h1>
+<h3 align="center">Kizlo WooCommerce</h3>
 
-Bring your WooCommerce store into any JavaScript runtime. Build storefronts, product pages, and checkout flows with modern tools and AI coding assistants.
+<p align="center">
+Connects woocommerce plugin with @kizlo/woocommerce extension.
+</p>
+
+---
 
 ## Requirements
 

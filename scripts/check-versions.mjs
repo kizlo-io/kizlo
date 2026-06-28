@@ -41,6 +41,14 @@ if (fs.existsSync(pkgPath)) {
 	if (pkgVersion !== undefined) sources["package.json version"] = pkgVersion
 }
 
+// Plugins managed by changelogger keep their newest CHANGELOG.md entry in lock
+// step with the shipped version; enforce it so the two never drift.
+const changelogPath = path.join(pluginDir, "CHANGELOG.md")
+if (fs.existsSync(changelogPath)) {
+	const latest = read("CHANGELOG.md").match(/^## \[?([^\]\s]+)\]?/m)?.[1]
+	sources["CHANGELOG.md latest"] = latest
+}
+
 console.log(`[${plugin}] Version sources:`)
 for (const [k, v] of Object.entries(sources)) console.log(`  ${k}: ${v ?? "(missing)"}`)
 

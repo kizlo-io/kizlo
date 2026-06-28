@@ -15,6 +15,8 @@ tsconfig.json
 postcss.config.js
 components.json
 composer.lock
+changelog
+CHANGELOG.md
 phpstan.neon.dist
 phpstan-baseline.neon
 debug.txt

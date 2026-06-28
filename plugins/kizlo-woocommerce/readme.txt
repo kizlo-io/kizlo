@@ -12,11 +12,13 @@ Bring your WooCommerce store into any JavaScript runtime.
 
 == Description ==
 
-Bring your WooCommerce store into any JavaScript runtime. Build storefronts, product pages, and checkout flows with modern tools and AI coding assistants.
+Connects woocommerce plugin with @kizlo/woocommerce extension.
 
 Requires the Kizlo core plugin and WooCommerce to be active.
 
 == Changelog ==
 
-= 1.0.0-beta.1 =
-* Initial beta release. Extracted from Kizlo core.
+= 0.1.0 =
+* Added: Initial release. Extracted from Kizlo core.
+
+[See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo-woocommerce/CHANGELOG.md).

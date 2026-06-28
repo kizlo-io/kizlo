@@ -48,11 +48,18 @@ jobs:
       - name: Build zip
         run: node scripts/build-plugin.mjs ${{ steps.tag.outputs.plugin }}
 
+      # Release notes come from the plugin's own CHANGELOG.md entry (with a
+      # correct <plugin>-v compare link). GitHub's generate_release_notes is
+      # avoided: it picks the wrong "previous tag" across this repo's mixed tag
+      # namespaces (e.g. @kizlo/cf7@…) and produces a broken Full Changelog link.
+      - name: Build release notes
+        run: node scripts/extract-changelog.mjs ${{ steps.tag.outputs.plugin }} ${{ steps.tag.outputs.version }} > release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: plugins/${{ steps.tag.outputs.plugin }}/dist/${{ steps.tag.outputs.plugin }}-v${{ steps.tag.outputs.version }}.zip
-          generate_release_notes: true
+          body_path: release-notes.md
 
       # Bust the web app's cached GitHub-releases list so the new version shows
       # up in the PUC update feed right away. Non-fatal: the feed's time-based

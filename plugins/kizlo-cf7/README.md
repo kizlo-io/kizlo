@@ -1,10 +1,23 @@
+<br>
+
 <p align="center">
-  <img src="../../.github/assets/kizlo.svg" alt="Kizlo" width="120" />
+  <a name="readme-top"></a>
+  <a href="https://kizlo.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://cdn.kizlo.io/logo/icon-light.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://cdn.kizlo.io/logo/icon-dark.svg">
+      <img alt="Kizlo" src="https://cdn.kizlo.io/logo/icon-dark.svg" height="100">
+    </picture>
+  </a>
 </p>
 
-<h1 align="center">Kizlo Contact Form 7</h1>
+<h3 align="center">Kizlo Contact Form 7</h3>
 
-Bring your Contact Form 7 forms into any JavaScript runtime. Submit and validate forms from AI-built UIs without touching the CF7 page markup.
+<p align="center">
+Connects contact form 7 plugin with @kizlo/cf7 extension.
+</p>
+
+---
 
 ## Requirements
 

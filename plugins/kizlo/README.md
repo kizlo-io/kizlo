@@ -1,12 +1,23 @@
+<br>
+
 <p align="center">
-  <img src="../../.github/assets/kizlo.svg" alt="Kizlo" width="120" />
+  <a name="readme-top"></a>
+  <a href="https://kizlo.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://cdn.kizlo.io/logo/icon-light.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://cdn.kizlo.io/logo/icon-dark.svg">
+      <img alt="Kizlo" src="https://cdn.kizlo.io/logo/icon-dark.svg" height="100">
+    </picture>
+  </a>
 </p>
 
-<h1 align="center">Kizlo</h1>
+<h3 align="center">Kizlo</h3>
 
-Core plugin for the Kizlo headless toolkit. Bootstraps the runtime that every other Kizlo plugin extensions builds on, and exposes a typed REST surface that the Kizlo SDK uses to drive content, commerce, and user flows in a WordPress site from any JavaScript runtime.
+<p align="center">
+  A plugin that connects your WordPress with Kizlo toolkit, headlessly.
+</p>
 
-This plugin is **always required** — install it before any optional Kizlo plugin.
+---
 
 ## Requirements
 

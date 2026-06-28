@@ -8,13 +8,15 @@ Stable tag: 0.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A kizlo platform plugin for WordPress.
+A plugin that connects your WordPress with Kizlo toolkit, headlessly.
 
 == Description ==
 
-Kizlo is a platform plugin for WordPress that exposes a headless content + commerce API, SEO/sitemap generation, and a webhook bridge to the Kizlo platform.
+-TODO
 
 == Changelog ==
 
-= 1.0.0-beta.1 =
-* Initial beta release.
+= 0.1.0 =
+* Added: Initial release.
+
+[See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo/CHANGELOG.md).
