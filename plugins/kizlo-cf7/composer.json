@@ -23,6 +23,11 @@
 		"szepeviktor/phpstan-wordpress": "^2.0",
 		"automattic/jetpack-changelogger": "^6.0"
 	},
+	"config": {
+		"platform": {
+			"php": "8.2"
+		}
+	},
 	"scripts": {
 		"phpstan": "phpstan analyse --memory-limit=1G",
 		"changelog": "changelogger"
