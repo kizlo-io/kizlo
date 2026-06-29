@@ -18,13 +18,19 @@ class Webhook
 
     const SETTINGS_SAVED_EVENT = 'settings.saved';
 
-    const KIZLO_WEBHOOK_URL = 'http://localhost:9191/plugin/webhooks';
+    const WEBHOOK_PATH = '/webhooks';
 
     public static function sendEvent(string $type, array|null $data = null): bool
     {
         $settings = Utils::getSettings();
-        $urls = $settings->webhook->getWebhookUrls();
         $plugin_secret = $settings->site->getSecret();
+
+        $urls = $settings->webhook->getWebhookUrls();
+        $backend_url = $settings->site->getBackendUrl();
+        if (!empty($backend_url)) {
+            array_unshift($urls, rtrim($backend_url, '/') . self::WEBHOOK_PATH);
+        }
+        $urls = array_values(array_unique(array_filter($urls)));
 
         if (empty($plugin_secret) || empty($urls)) return false;
 

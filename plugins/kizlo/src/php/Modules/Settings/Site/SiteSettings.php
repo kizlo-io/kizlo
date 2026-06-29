@@ -21,6 +21,7 @@ class SiteSettings extends SettingsAbstract
 
     protected array $data = [
         'url'                     => null,
+        'backend_url'             => null,
         'secret'                  => null,
         'name'                    => null,
         'alternate_name'          => null,
@@ -34,6 +35,7 @@ class SiteSettings extends SettingsAbstract
     {
         return match ($key) {
             'url',
+            'backend_url',
             'name',
             'secret',
             'tagline',
@@ -51,6 +53,7 @@ class SiteSettings extends SettingsAbstract
     {
         match ($key) {
             'url'             => $this->assertValidUrl($key, $value),
+            'backend_url'     => $this->assertValidUrl($key, $value),
             'fallback_image'  => $this->assertValidMediaId($key, $value),
             'title_separator' => ! in_array($value, static::TITLE_SEPARATORS, true) ? throw new InvalidArgumentException('Invalid title separator.') : null,
             default           => null,
@@ -75,6 +78,24 @@ class SiteSettings extends SettingsAbstract
     public function setUrl(?string $value): static
     {
         $this->set('url', $value);
+        return $this;
+    }
+
+    /**
+     * Base URL where the Kizlo backend handler is mounted (e.g. https://example.com/api/kizlo).
+     * Events are delivered to this URL plus the fixed webhook path.
+     */
+    public function getBackendUrl(): ?string
+    {
+        return $this->get('backend_url');
+    }
+
+    /**
+     * @param string|null $value Valid URL or null to clear.
+     */
+    public function setBackendUrl(?string $value): static
+    {
+        $this->set('backend_url', $value);
         return $this;
     }
 

@@ -1,88 +1,83 @@
 import z from "zod/v4"
 
-export const TERM_WEBHOOK_EVENT_TYPES = ["term.created", "term.updated", "term.deleted"] as const
-export const TermWebhookEventType = z.enum(TERM_WEBHOOK_EVENT_TYPES)
-export type TermWebhookEventType = z.infer<typeof TermWebhookEventType>
+export const TERM_EVENT_TYPES = ["term.created", "term.updated", "term.deleted"] as const
+export const TermEventType = z.enum(TERM_EVENT_TYPES)
+export type TermEventType = z.infer<typeof TermEventType>
 
-export const POST_WEBHOOK_EVENT_TYPES = ["post.created", "post.updated", "post.trashed", "post.deleted"] as const
-export const PostWebhookEventType = z.enum(POST_WEBHOOK_EVENT_TYPES)
-export type PostWebhookEventType = z.infer<typeof PostWebhookEventType>
+export const POST_EVENT_TYPES = ["post.created", "post.updated", "post.trashed", "post.deleted"] as const
+export const PostEventType = z.enum(POST_EVENT_TYPES)
+export type PostEventType = z.infer<typeof PostEventType>
 
-export const PAYMENT_WEBHOOK_EVENT_TYPES = ["payment.status_requested"] as const
-export const PaymentWebhookEventType = z.enum(PAYMENT_WEBHOOK_EVENT_TYPES)
-export type PaymentWebhookEventType = z.infer<typeof PaymentWebhookEventType>
+export const PAYMENT_EVENT_TYPES = ["payment.status_requested"] as const
+export const PaymentEventType = z.enum(PAYMENT_EVENT_TYPES)
+export type PaymentEventType = z.infer<typeof PaymentEventType>
 
-export const SETTINGS_WEBHOOK_EVENT_TYPES = ["settings.saved"] as const
-export const SettingsWebhookEventType = z.enum(SETTINGS_WEBHOOK_EVENT_TYPES)
-export type SettingsWebhookEventType = z.infer<typeof SettingsWebhookEventType>
+export const SETTINGS_EVENT_TYPES = ["settings.saved"] as const
+export const SettingsEventType = z.enum(SETTINGS_EVENT_TYPES)
+export type SettingsEventType = z.infer<typeof SettingsEventType>
 
-export const WEBHOOK_EVENT_TYPES = [
-	...TERM_WEBHOOK_EVENT_TYPES,
-	...POST_WEBHOOK_EVENT_TYPES,
-	...PAYMENT_WEBHOOK_EVENT_TYPES,
-	...SETTINGS_WEBHOOK_EVENT_TYPES,
-] as const
-export const WebhookEventType = z.enum(WEBHOOK_EVENT_TYPES)
-export type WebhookEventType = z.infer<typeof WebhookEventType>
+export const EVENT_TYPES = [...TERM_EVENT_TYPES, ...POST_EVENT_TYPES, ...PAYMENT_EVENT_TYPES, ...SETTINGS_EVENT_TYPES] as const
+export const EventType = z.enum(EVENT_TYPES)
+export type EventType = z.infer<typeof EventType>
 
 // ====================================================
 // POST
 // ====================================================
 
-export const PostWebhookEventData = z.object({
+export const PostEventData = z.object({
 	post_id: z.number(),
 	post_type: z.string(),
 })
-export type PostWebhookEventData = z.infer<typeof PostWebhookEventData>
+export type PostEventData = z.infer<typeof PostEventData>
 
-export const PostWebhookEvent = z.object({ type: PostWebhookEventType, data: PostWebhookEventData })
-export type PostWebhookEvent = z.infer<typeof PostWebhookEvent>
+export const PostEvent = z.object({ type: PostEventType, data: PostEventData })
+export type PostEvent = z.infer<typeof PostEvent>
 
 // ====================================================
 // TERM
 // ====================================================
 
-export const TermWebhookEventData = z.object({
+export const TermEventData = z.object({
 	term_id: z.number(),
 	taxonomy: z.string(),
 	post_types: z.array(z.string()),
 	count: z.number().nonnegative(),
 })
-export type TermWebhookEventData = z.infer<typeof TermWebhookEventData>
+export type TermEventData = z.infer<typeof TermEventData>
 
-export const TermWebhookEvent = z.object({ type: TermWebhookEventType, data: TermWebhookEventData })
-export type TermWebhookEvent = z.infer<typeof TermWebhookEvent>
+export const TermEvent = z.object({ type: TermEventType, data: TermEventData })
+export type TermEvent = z.infer<typeof TermEvent>
 
 // ====================================================
 // PAYMENT
 // ====================================================
 
-export const PaymentWebhookEventData = z.object({
+export const PaymentEventData = z.object({
 	transaction_id: z.nullable(z.string()),
 	payment_method_id: z.string(),
 	payment_session_id: z.string(),
 })
-export type PaymentWebhookEventData = z.infer<typeof PaymentWebhookEventData>
+export type PaymentEventData = z.infer<typeof PaymentEventData>
 
-export const PaymentWebhookEvent = z.object({ type: PaymentWebhookEventType, data: PaymentWebhookEventData })
-export type PaymentWebhookEvent = z.infer<typeof PaymentWebhookEvent>
+export const PaymentEvent = z.object({ type: PaymentEventType, data: PaymentEventData })
+export type PaymentEvent = z.infer<typeof PaymentEvent>
 
 // ====================================================
 // SETTINGS
 // ====================================================
 
-export const SettingsWebhookEventData = z.null()
-export type SettingsWebhookEventData = z.infer<typeof SettingsWebhookEventData>
+export const SettingsEventData = z.null()
+export type SettingsEventData = z.infer<typeof SettingsEventData>
 
-export const SettingsWebhookEvent = z.object({ type: SettingsWebhookEventType, data: SettingsWebhookEventData })
-export type SettingsWebhookEvent = z.infer<typeof SettingsWebhookEvent>
+export const SettingsEvent = z.object({ type: SettingsEventType, data: SettingsEventData })
+export type SettingsEvent = z.infer<typeof SettingsEvent>
 
 // ====================================================
-// WEBHOOK
+// EVENT
 // ====================================================
 
-export const WebhookEvent = z.union([PostWebhookEvent, TermWebhookEvent, PaymentWebhookEvent, SettingsWebhookEvent])
-export type WebhookEvent = z.infer<typeof WebhookEvent>
+export const KizloEvent = z.union([PostEvent, TermEvent, PaymentEvent, SettingsEvent])
+export type KizloEvent = z.infer<typeof KizloEvent>
 
-export const AnyWebhookEvent = z.object({ type: z.string(), data: z.unknown() })
-export type AnyWebhookEvent = z.infer<typeof AnyWebhookEvent>
+export const AnyEvent = z.object({ type: z.string(), data: z.unknown() })
+export type AnyEvent = z.infer<typeof AnyEvent>

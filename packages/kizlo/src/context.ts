@@ -62,7 +62,7 @@ export class Context {
 
 		return {
 			headers,
-			request,
+			request: request.clone(),
 			config: this.config,
 			logger: this.logger,
 			service: this.service,

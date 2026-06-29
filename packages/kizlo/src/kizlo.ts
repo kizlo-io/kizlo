@@ -1,4 +1,4 @@
-import { type Pathname, tryCatch } from "@kizlo/shared"
+import { tryCatch } from "@kizlo/shared"
 import { OpenAPIHandler } from "@orpc/openapi/fetch"
 import { createRouterClient, ORPCError } from "@orpc/server"
 import { RPCHandler } from "@orpc/server/fetch"
@@ -28,7 +28,6 @@ export interface KizloConfig<TExts extends readonly AnyExtension[]> {
 	environment: Environment
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
-	webhookPath?: Pathname
 }
 
 export interface ServiceAdapters {
@@ -63,7 +62,6 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 
 		this.router = Object.assign(Object.assign({}, { ...extensions.router, ...ROUTER_MAP }), {
 			webhooks: createWebhookRouter({
-				path: this.config.webhookPath,
 				events: extensions.events,
 			}),
 		})

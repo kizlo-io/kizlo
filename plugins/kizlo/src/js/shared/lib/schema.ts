@@ -22,6 +22,7 @@ export interface SocialProfile {
 
 export interface SiteSettings {
 	url: string | null
+	backend_url: string | null
 	secret: string | null
 	name: string | null
 	alternate_name: string | null
@@ -222,6 +223,7 @@ export type SocialProfileSchema = z.infer<typeof SocialProfileSchema>
 
 export const SiteSettingsSchema = z.object({
 	url: NulledUrlSchema,
+	backend_url: NulledUrlSchema,
 	secret: NulledStringSchema,
 	name: NulledStringSchema,
 	alternate_name: NulledStringSchema,
