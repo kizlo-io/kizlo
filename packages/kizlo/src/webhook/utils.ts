@@ -1,12 +1,12 @@
 import { safeValidateSchema } from "@kizlo/shared"
-import type { AnyWebhookEvents, InferWebhookEventUnion } from "."
-import { type AnyWebhookEvent, WebhookEvent } from "./schema"
+import type { AnyEvents, InferEventUnion } from "."
+import { type AnyEvent, KizloEvent } from "./schema"
 
-export async function validateWebhookEvent<T extends AnyWebhookEvents>(
+export async function validateEvent<T extends AnyEvents>(
 	events: T | undefined,
-	data: AnyWebhookEvent,
-): Promise<WebhookEvent | InferWebhookEventUnion<T> | null> {
-	const internal = await safeValidateSchema(WebhookEvent, data)
+	data: AnyEvent,
+): Promise<KizloEvent | InferEventUnion<T> | null> {
+	const internal = await safeValidateSchema(KizloEvent, data)
 	if (internal.success) return internal.value
 
 	const external = events?.find((a) => a.types.includes(data.type))?.data

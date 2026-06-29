@@ -152,6 +152,10 @@ export class WordPressService {
 			}
 		}
 
+		if (response.ok && text.trim() === "") {
+			return { data: null as TData, status: response.status, headers: response.headers, error: null }
+		}
+
 		const [parseErr, data] = tryCatchSync<TData>(() => JSON.parse(text))
 
 		if (!response.ok) {
