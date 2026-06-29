@@ -22,8 +22,17 @@ git clone https://github.com/kizlo-io/kizlo.git
 cd kizlo
 corepack enable             # provides the pinned pnpm version
 pnpm install
-cp .env.example .env        # fill in your values
 ```
+
+No env is needed to build the packages or run the `kizlo dev` / `kizlo test`
+stacks. The only thing that reads env is the `web/` app (a live Kizlo server).
+If you're working on it locally, copy its template and fill in the values:
+
+```bash
+cp web/.env.example web/.env   # only to run the web app locally
+```
+
+CI doesn't build `web/` — the deployed site is built by Vercel on every PR.
 
 ## Repository layout
 
