@@ -15,6 +15,13 @@ test("posts.list returns posts conforming to PostList", async () => {
 	expect(result.items.length).toBeGreaterThanOrEqual(2)
 })
 
+test("posts.list is callable with no arguments when every input part is optional", async () => {
+	const result = await kizlo.client.posts.list.call()
+	const parsed = PostList.safeParse(result)
+	expect(parsed.success).toBe(true)
+	expect(result.items.length).toBeGreaterThanOrEqual(2)
+})
+
 test("posts.list per_page=1 returns at most 1 item", async () => {
 	const result = await kizlo.client.posts.list.call({ query: { perPage: 1 } })
 	expect(result.items.length).toBeLessThanOrEqual(1)
