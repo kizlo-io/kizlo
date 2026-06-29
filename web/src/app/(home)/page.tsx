@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { Command } from "@/components/command"
 import { ShaderBackdrop } from "@/components/shader-backdrop"
-import { client } from "@/lib/kizlo/server"
 import { createMetadata } from "@/lib/metadata"
 import { appName, docsRoute, socials } from "@/lib/shared"
 
@@ -10,8 +9,6 @@ export const metadata = createMetadata({
 })
 
 export default async function HomePage() {
-	console.log(await client.posts.list.call())
-
 	return (
 		<main className="relative flex max-h-dvh flex-1 flex-col items-center justify-center overflow-hidden px-6 py-24 text-center">
 			<ShaderBackdrop />
