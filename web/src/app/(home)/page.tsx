@@ -10,7 +10,8 @@ export const metadata = createMetadata({
 })
 
 export default async function HomePage() {
-	// console.log(await client.posts.list.call({}))
+	console.log(await client.posts.list.call())
+
 	return (
 		<main className="relative flex max-h-dvh flex-1 flex-col items-center justify-center overflow-hidden px-6 py-24 text-center">
 			<ShaderBackdrop />

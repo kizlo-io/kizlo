@@ -339,10 +339,10 @@ export function combineDetailed(parts: Record<string, AnySchema>): AnySchema {
 			version: 1,
 			vendor: "kizlo",
 			validate: async (value: unknown) => {
-				if (typeof value !== "object" || value === null) {
+				if (value != null && typeof value !== "object") {
 					return { issues: [{ message: "Expected object" }] }
 				}
-				const input = value as Record<string, unknown>
+				const input = (value ?? {}) as Record<string, unknown>
 				const result: Record<string, unknown> = {}
 				const issues: SchemaIssue[] = []
 
