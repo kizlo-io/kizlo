@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Add a Backend URL setting so events are delivered to your Kizlo backend automatically, without entering the full webhook URL by hand.
