@@ -1,7 +1,8 @@
 packages:
+  - web
+  - playground
   - packages/*
   - tooling/*
-  - web
   - plugins/*
 
 catalog:

@@ -21,11 +21,19 @@ import type { WordPressCredentials } from "./wordpress"
 
 export type AnyKizloConfig = KizloConfig<any>
 
+/**
+ * Which credential set to read from the environment. Independent of `environment`
+ * (which carries logging semantics off `NODE_ENV`): `"dev"` reads the `KIZLO_DEV_WORDPRESS_*`
+ * / `KIZLO_DEV_SITE_SECRET` keys the local stack manages, `"production"` reads `KIZLO_WORDPRESS_*` / `KIZLO_SITE_SECRET`.
+ */
+export type KizloTarget = "dev" | "production"
+
 export interface KizloConfig<TExts extends readonly AnyExtension[]> {
 	baseUrl: string
 	siteSecret: string
 	extensions?: TExts
 	environment: Environment
+	target: KizloTarget
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
 }
@@ -160,17 +168,27 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 }
 
 export interface CreateKizloOptions<TExts extends readonly AnyExtension[] = []> {
-	/** Public base URL of your Kizlo server, used to route requests. Falls back to the `SERVER_BASE_URL` env var. */
+	/** Public base URL of your Kizlo server, used to route requests. Falls back to the `KIZLO_BACKEND_URL` env var. */
 	baseUrl?: string
-	/** Secret shared with the WordPress plugin to sign and verify webhooks. Falls back to the `SITE_SECRET` env var. */
+	/** Secret shared with the WordPress plugin to sign and verify webhooks. Falls back to the `KIZLO_SITE_SECRET` env var (target-selected). */
 	siteSecret?: string
 	/** Extensions to register, built with `createExtension` — mounts their namespaces on the client and their routes and event handlers on the handler. */
 	extensions?: TExts
 	/** Runtime environment. Falls back to `NODE_ENV`, then `"development"`. */
 	environment?: Environment
+	/**
+	 * Which credential set to use. Falls back to the `KIZLO_TARGET` env var, then `"production"`.
+	 * Independent of `environment`: `"dev"` reads `KIZLO_DEV_WORDPRESS_*` / `KIZLO_DEV_SITE_SECRET` (the keys the
+	 * local dev stack manages), `"production"` reads `KIZLO_WORDPRESS_*` / `KIZLO_SITE_SECRET`.
+	 */
+	target?: KizloTarget
 	/** Service adapters: auth, captcha, geo, logger, and cookies. */
 	adapters?: ServiceAdapters
-	/** WordPress connection. Each credential falls back to its env var: `WORDPRESS_URL`, `WORDPRESS_USERNAME`, `WORDPRESS_APPLICATION_PASSWORD`. */
+	/**
+	 * WordPress connection. Each credential falls back to a target-selected env var: with the default
+	 * `"production"` target to `KIZLO_WORDPRESS_URL` / `KIZLO_WORDPRESS_USERNAME` / `KIZLO_WORDPRESS_APPLICATION_PASSWORD`,
+	 * and with the `"dev"` target to their `KIZLO_DEV_WORDPRESS_*` counterparts.
+	 */
 	wordpress?: { credentials?: Partial<WordPressCredentials> }
 }
 
@@ -178,6 +196,21 @@ function requireEnv(name: string): string {
 	const value = process.env[name]?.trim()
 	if (!value) throw new KizloError("MISSING_ENV_VARIABLE", { message: `Please define ${name} in your .env file.` })
 	return value
+}
+
+function resolveTarget(option?: KizloTarget): KizloTarget {
+	return option ?? (process.env.KIZLO_TARGET === "dev" ? "dev" : "production")
+}
+
+/** Env var names for a credential set: `KIZLO_DEV_WORDPRESS_URL` / `KIZLO_DEV_SITE_SECRET` for dev, `KIZLO_WORDPRESS_URL` / `KIZLO_SITE_SECRET` for production. */
+function targetEnvKeys(target: KizloTarget) {
+	const prefix = target === "dev" ? "KIZLO_DEV_" : "KIZLO_"
+	return {
+		siteSecret: `${prefix}SITE_SECRET`,
+		url: `${prefix}WORDPRESS_URL`,
+		username: `${prefix}WORDPRESS_USERNAME`,
+		password: `${prefix}WORDPRESS_APPLICATION_PASSWORD`,
+	}
 }
 
 /**
@@ -190,25 +223,28 @@ export function resolveKizloConfig<TExts extends readonly AnyExtension[]>(
 	defaults: { baseUrlEnvKey: string; adapters?: ServiceAdapters },
 ): KizloConfig<TExts> {
 	const credentials = options?.wordpress?.credentials
+	const target = resolveTarget(options?.target)
+	const keys = targetEnvKeys(target)
 	return {
 		baseUrl: options?.baseUrl ?? requireEnv(defaults.baseUrlEnvKey),
-		siteSecret: options?.siteSecret ?? requireEnv("SITE_SECRET"),
+		siteSecret: options?.siteSecret ?? requireEnv(keys.siteSecret),
 		environment: options?.environment ?? (process.env.NODE_ENV as Environment) ?? "development",
+		target,
 		extensions: options?.extensions,
 		adapters: { ...defaults.adapters, ...options?.adapters },
 		credentials: {
-			url: credentials?.url ?? requireEnv("WORDPRESS_URL"),
-			username: credentials?.username ?? requireEnv("WORDPRESS_USERNAME"),
-			password: credentials?.password ?? requireEnv("WORDPRESS_APPLICATION_PASSWORD"),
+			url: credentials?.url ?? requireEnv(keys.url),
+			username: credentials?.username ?? requireEnv(keys.username),
+			password: credentials?.password ?? requireEnv(keys.password),
 		},
 	}
 }
 
 /**
- * Creates a Kizlo server from the environment (`SERVER_BASE_URL`, `SITE_SECRET`,
- * `WORDPRESS_*`), with options taking precedence. Framework packages wrap this
+ * Creates a Kizlo server from the environment (`KIZLO_BACKEND_URL`, `KIZLO_SITE_SECRET`,
+ * `KIZLO_WORDPRESS_*`), with options taking precedence. Framework packages wrap this
  * with their own URL convention and adapters.
  */
 export function createKizlo<TExts extends readonly AnyExtension[] = []>(options?: CreateKizloOptions<TExts>): Kizlo<TExts> {
-	return new Kizlo(resolveKizloConfig(options, { baseUrlEnvKey: "SERVER_BASE_URL" }))
+	return new Kizlo(resolveKizloConfig(options, { baseUrlEnvKey: "KIZLO_BACKEND_URL" }))
 }

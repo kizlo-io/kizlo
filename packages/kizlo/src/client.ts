@@ -61,13 +61,13 @@ export class KizloClient<TRouter extends AnyProcedureRouter> {
 	}
 
 	private getUrl() {
-		return this.config.url ?? window.location.href
+		return this.config.url ?? window.location.origin
 	}
 }
 
 /**
  * Creates a browser client for a generated contract. Defaults the URL to the
- * current origin; framework packages wrap this to resolve it from their env.
+ * current origin (`window.location.origin`); framework packages wrap this to resolve it from their env.
  */
 export function createKizloClient<T extends AnyProcedureRouter>(contract: T, options?: { url?: string }): KizloClient<T> {
 	return new KizloClient({ contract, url: options?.url })

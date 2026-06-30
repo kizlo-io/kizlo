@@ -66,6 +66,30 @@ describe("mergeEnv", () => {
 		expect(result.added).toEqual(["A"])
 		expect(result.updated).toEqual(["B"])
 	})
+
+	test("groups appended keys under comment headers", () => {
+		const groups = [
+			{ comment: "First", keys: ["A", "B"] },
+			{ comment: "Second", keys: ["C"] },
+		]
+		const result = mergeEnv("", { A: "1", B: "2", C: "3" }, new Set(["A", "B", "C"]), groups)
+		expect(result.content).toBe("# First\nA=1\nB=2\n\n# Second\nC=3\n")
+	})
+
+	test("skips a group whose keys are all absent and separates from existing body", () => {
+		const groups = [
+			{ comment: "First", keys: ["A"] },
+			{ comment: "Second", keys: ["C"] },
+		]
+		const result = mergeEnv("EXISTING=keep\n", { A: "1" }, new Set(["A"]), groups)
+		expect(result.content).toBe("EXISTING=keep\n\n# First\nA=1\n")
+	})
+
+	test("appends grouped keys but leaves ungrouped ones bare", () => {
+		const groups = [{ comment: "First", keys: ["A"] }]
+		const result = mergeEnv("", { A: "1", Z: "9" }, new Set(["A", "Z"]), groups)
+		expect(result.content).toBe("# First\nA=1\nZ=9\n")
+	})
 })
 
 describe("stripJsonComments", () => {

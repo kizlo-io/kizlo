@@ -2,4 +2,4 @@
 "kizlo": patch
 ---
 
-Fix calling an `api`-scoped procedure with no arguments throwing "Input validation failed" when every input part is optional — e.g. `client.posts.list.call()` now works without passing an empty `{}`. Procedures with a required `params`/`query`/`body` part still validate as before.
+Fix `api`-scoped procedures whose input parts are all optional throwing "Input validation failed" when called with no arguments — `client.posts.list.call()` now works without passing `{}`. Procedures with a required `params`/`query`/`body` still validate.

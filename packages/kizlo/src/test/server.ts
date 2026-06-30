@@ -19,6 +19,7 @@ export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>
 		baseUrl: "http://test.local",
 		siteSecret: "test-secret",
 		environment: "test",
+		target: "production",
 		credentials: {
 			url: creds.url,
 			username: creds.users.admin.username,

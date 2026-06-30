@@ -8,11 +8,11 @@
 		"build": {
 			"dependsOn": ["topo", "^build"],
 			"env": [
-				"NEXT_PUBLIC_SERVER_BASE_URL",
-				"SITE_SECRET",
-				"WORDPRESS_URL",
-				"WORDPRESS_USERNAME",
-				"WORDPRESS_APPLICATION_PASSWORD",
+				"KIZLO_SITE_SECRET",
+				"KIZLO_WORDPRESS_URL",
+				"KIZLO_WORDPRESS_USERNAME",
+				"NEXT_PUBLIC_KIZLO_BACKEND_URL",
+				"KIZLO_WORDPRESS_APPLICATION_PASSWORD",
 				"REVALIDATE_SECRET",
 				"GITHUB_TOKEN"
 			],
@@ -43,7 +43,6 @@
 			"cache": false
 		}
 	},
-	"globalEnv": ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_DATABASE_ID", "CLOUDFLARE_D1_TOKEN"],
 	"concurrency": "20",
 	"globalPassThroughEnv": ["NODE_ENV", "CI", "VERCEL", "VERCEL_ENV", "VERCEL_URL", "NEXT_RUNTIME", "npm_lifecycle_event"]
 }

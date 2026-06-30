@@ -2,27 +2,66 @@ import { spawn } from "node:child_process"
 import { type ArgsDef, type CommandContext, defineCommand } from "citty"
 import { type ResolvedTestConfig, resolveTestConfig } from "../daemon/config"
 import { log } from "../daemon/logger"
-import { groupDefault, type PackageManager, withSpinner } from "../utils"
+import { groupDefault, type PackageManager, pickStackPort, withSpinner } from "../utils"
 import { createStack, type DockerStack } from "../wp/docker"
+import { isFree } from "../wp/ports"
 import { runSeeds } from "../wp/setup"
 import { testStack } from "../wp/stack"
-import { isSeeded } from "../wp/utils"
+import { isSeeded, recordedPort } from "../wp/utils"
 
 async function resolve(cwd: string): Promise<{ cfg: ResolvedTestConfig; stack: DockerStack }> {
 	const cfg = await resolveTestConfig(cwd)
 	return { cfg, stack: createStack(testStack(cfg)) }
 }
 
-/** Boot the stack and seed it once (idempotent — skips seeding if already seeded). */
-async function bringUp(cfg: ResolvedTestConfig, stack: DockerStack): Promise<void> {
-	await withSpinner("Starting WordPress test stack", () => stack.composeUp(), "WordPress test stack ready")
-	if (await isSeeded()) {
-		log.info("Stack already seeded — skipping seed.")
-		return
-	}
+/**
+ * The host port to bring the test stack up on. Unlike the dev stack (rebuilt every run), the
+ * test stack is reused and its tests connect via the URL recorded in the credentials artifact —
+ * so the port can't just be re-chosen each time:
+ *
+ * - A **running** stack keeps its live published port (fast reruns stay on the same URL).
+ * - A **warm but stopped** stack reuses the port recorded in the credentials — that URL is what
+ *   tests read, so it must not move; if something else stole it meanwhile we stop and say so,
+ *   rather than silently relocate.
+ * - Only a **cold** stack (never seeded, or wiped by `reset` / `--reset`) picks a fresh free port
+ *   from the configured default — auto-stepping past a collision (e.g. another project's stack)
+ *   unless `test.port` was set explicitly, in which case the user owns the clash.
+ *
+ * `fresh` forces the cold path so a `reset` re-picks — that's how a poisoned recorded port heals.
+ */
+async function resolveTestPort(cfg: ResolvedTestConfig, stack: DockerStack, fresh: boolean): Promise<number> {
+	if (!fresh) {
+		const live = await stack.publishedPort()
+		if (live !== undefined) return live
 
-	await withSpinner("Seeding WordPress", () => runSeeds({ port: cfg.port, fixtures: cfg.fixtures }), "WordPress seeded")
-	log.success(`Stack ready on http://localhost:${cfg.port} — credentials at ${cfg.credentialsPath}`)
+		const recorded = recordedPort()
+		if (recorded !== undefined) {
+			if (await isFree(recorded)) return recorded
+			log.error(
+				`The test stack's port ${recorded} (from a previous run) is now held by something else.\n` +
+					"Free that port, or run `kizlo test reset` to rebuild on a fresh one.",
+			)
+			process.exit(1)
+		}
+	}
+	return pickStackPort(cfg.port, { fixed: cfg.portExplicit, configKey: "test.port" })
+}
+
+/**
+ * Boot the test stack on a resolved host port and seed it once (idempotent — skips seeding when
+ * already seeded). Returns the port-bound stack and the port, so callers report the real URL.
+ */
+async function bringUp(cfg: ResolvedTestConfig, stack: DockerStack, fresh = false): Promise<{ stack: DockerStack; port: number }> {
+	const port = await resolveTestPort(cfg, stack, fresh)
+	// Rebind the stack to the resolved port (publishes WP_PORT there); reuse the existing
+	// binding when the port didn't move, so the common fast-rerun path allocates nothing.
+	const bound = port === cfg.port ? stack : createStack(testStack({ ...cfg, port }))
+
+	await withSpinner("Starting WordPress test stack", () => bound.composeUp(), "WordPress test stack ready")
+	if (await isSeeded()) log.info("Stack already seeded — skipping seed.")
+	else await withSpinner("Seeding WordPress", () => runSeeds({ port, fixtures: cfg.fixtures }), "WordPress seeded")
+
+	return { stack: bound, port }
 }
 
 /** `<pm> test` runs the project's own test script (bun needs `run` to skip its built-in runner). */
@@ -50,14 +89,11 @@ const runArgs = {
 
 /** Boot (+ seed) the stack, run the project's test script, then leave it up (or tear down). */
 async function runSuite({ args }: CommandContext<typeof runArgs>): Promise<void> {
-	const { cfg, stack } = await resolve(process.cwd())
+	const { cfg, stack: probe } = await resolve(process.cwd())
 
-	if (args.reset) await withSpinner("Wiping WordPress database", () => stack.composeDown({ volumes: true }), "Database wiped")
+	if (args.reset) await withSpinner("Wiping WordPress database", () => probe.composeDown({ volumes: true }), "Database wiped")
 
-	await withSpinner("Starting WordPress test stack", () => stack.composeUp(), "WordPress test stack ready")
-	if (!(await isSeeded())) {
-		await withSpinner("Seeding WordPress", () => runSeeds({ port: cfg.port, fixtures: cfg.fixtures }), "WordPress seeded")
-	}
+	const { stack } = await bringUp(cfg, probe, Boolean(args.reset))
 
 	log.info(cfg.command ? `Running: ${cfg.command}` : `Running: ${testCommand(cfg.packageManager).join(" ")}`)
 	let code = 1
@@ -96,7 +132,8 @@ const reset = defineCommand({
 	async run() {
 		const { cfg, stack } = await resolve(process.cwd())
 		await withSpinner("Wiping WordPress database", () => stack.composeDown({ volumes: true }), "Database wiped")
-		await bringUp(cfg, stack)
+		const { port } = await bringUp(cfg, stack, true)
+		log.success(`Stack ready on http://localhost:${port} — credentials at ${cfg.credentialsPath}`)
 	},
 })
 

@@ -7,7 +7,7 @@ export const nextjs: Preset = {
 		const deps = { ...ctx.pkg.dependencies, ...ctx.pkg.devDependencies }
 		return deps.next ? 100 : 0
 	},
-	baseUrlEnvKey: "NEXT_PUBLIC_SERVER_BASE_URL",
+	baseUrlEnvKey: "NEXT_PUBLIC_KIZLO_BACKEND_URL",
 	apiPath: "/api/kizlo",
 	serverEntry() {
 		return `import { createKizlo } from "kizlo/nextjs/server"

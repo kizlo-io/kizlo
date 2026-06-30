@@ -4,8 +4,33 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import * as p from "@clack/prompts"
 import type { ArgsDef, CommandContext } from "citty"
+import { log } from "./daemon/logger"
+import { PortInUseError, resolveHostPort } from "./wp/ports"
 
 export type PackageManager = "pnpm" | "yarn" | "bun" | "npm"
+
+/**
+ * Resolve a host port for a stack, exiting with a clear message when an *explicitly*
+ * configured port (`fixed`) is already taken. A default port auto-steps to the next free
+ * one (another project's stack or a stray server just shifts us over); an explicit
+ * `configKey` collision is the user's own to resolve, so we stop rather than silently
+ * serving on a port they didn't choose.
+ */
+export async function pickStackPort(
+	preferred: number,
+	{ fixed, host, configKey }: { fixed: boolean; host?: string; configKey: string },
+): Promise<number> {
+	try {
+		return await resolveHostPort(preferred, { fixed, host })
+	} catch (error) {
+		if (!(error instanceof PortInUseError)) throw error
+		log.error(
+			`${configKey} ${preferred} is set in kizlo.config but is already in use.\n` +
+				`Free that port or change ${configKey} — an explicitly set port is never auto-reassigned.`,
+		)
+		process.exit(1)
+	}
+}
 
 export function stripJsonComments(source: string): string {
 	return source.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (match, comment) => (comment ? "" : match))
@@ -132,12 +157,53 @@ export interface EnvMergeResult {
 	kept: string[]
 }
 
+/** A `.env` section: a comment header written above its keys when any of them are newly appended. */
+export interface EnvGroup {
+	/** Header text (without the leading `# `). */
+	comment: string
+	/** Keys that belong under this header, in write order. */
+	keys: readonly string[]
+}
+
+/**
+ * The grouped `.env` layout shared by `init` and `dev`, so both write the same sectioned file:
+ * a target switch, the backend URL, then the production and dev connection blocks. `baseUrlEnvKey`
+ * varies per preset (e.g. `NEXT_PUBLIC_KIZLO_BACKEND_URL`), so it's threaded in. Only sections whose
+ * keys are actually being appended get a header, so a remote/prod run skips the dev block and vice versa.
+ */
+export function envGroups(baseUrlEnvKey: string): EnvGroup[] {
+	return [
+		{ comment: "Kizlo Target (dev | prod)", keys: ["KIZLO_TARGET"] },
+		{ comment: "Kizlo Backend URL", keys: [baseUrlEnvKey] },
+		{
+			comment: "Kizlo Production Env",
+			keys: ["KIZLO_SITE_SECRET", "KIZLO_WORDPRESS_URL", "KIZLO_WORDPRESS_USERNAME", "KIZLO_WORDPRESS_APPLICATION_PASSWORD"],
+		},
+		{
+			comment: "Kizlo Development Env",
+			keys: [
+				"KIZLO_DEV_SITE_SECRET",
+				"KIZLO_DEV_WORDPRESS_URL",
+				"KIZLO_DEV_WORDPRESS_USERNAME",
+				"KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD",
+			],
+		},
+	]
+}
+
 /**
  * Merges `values` into an existing .env body: other variables, comments and
  * blank lines are preserved. A managed key is rewritten only when listed in
- * `overwriteKeys`; otherwise its existing line is kept. Missing keys are appended.
+ * `overwriteKeys`; otherwise its existing line is kept. Missing keys are appended —
+ * grouped under their `groups` comment header (with a blank-line separator) when one
+ * is given, or as bare lines otherwise.
  */
-export function mergeEnv(existing: string, values: Record<string, string>, overwriteKeys: ReadonlySet<string>): EnvMergeResult {
+export function mergeEnv(
+	existing: string,
+	values: Record<string, string>,
+	overwriteKeys: ReadonlySet<string>,
+	groups?: readonly EnvGroup[],
+): EnvMergeResult {
 	const body = existing.replace(/\s*$/, "")
 	const lines = body.length ? body.split(/\r?\n/) : []
 	const added: string[] = []
@@ -158,12 +224,24 @@ export function mergeEnv(existing: string, values: Record<string, string>, overw
 		return line
 	})
 
-	for (const [key, value] of Object.entries(values)) {
-		if (!present.has(key)) {
-			added.push(key)
-			next.push(`${key}=${value}`)
-		}
+	// Keys not yet in the file, appended below. Grouped sections come first, each with its header
+	// and a blank-line separator; anything left over (no group) is appended bare, preserving order.
+	const remaining = new Map(Object.entries(values).filter(([key]) => !present.has(key)))
+	const append = (key: string) => {
+		added.push(key)
+		next.push(`${key}=${remaining.get(key)}`)
+		remaining.delete(key)
 	}
+
+	for (const group of groups ?? []) {
+		const groupKeys = group.keys.filter((key) => remaining.has(key))
+		if (!groupKeys.length) continue
+		if (next.length) next.push("")
+		next.push(`# ${group.comment}`)
+		for (const key of groupKeys) append(key)
+	}
+
+	for (const key of remaining.keys()) append(key)
 
 	return { content: `${next.join("\n")}\n`, added, updated, kept }
 }
