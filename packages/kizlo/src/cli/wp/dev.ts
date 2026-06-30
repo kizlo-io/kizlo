@@ -5,7 +5,7 @@ import { WordPressService } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
 import { createAdminAppPassword, seedUsers } from "./bootstrap"
 import { prepareByo } from "./byo"
-import { TEST_ADMIN } from "./constants"
+import { DEFAULT_PLUGINS, TEST_ADMIN } from "./constants"
 import { compose, composeUp, wpCli } from "./docker"
 import type { SeedContext } from "./types"
 import { ensurePlugins } from "./utils"
@@ -23,10 +23,16 @@ export interface DevStackInfo {
 	/**
 	 * The generated admin password for the wp-admin login. Present only on a fresh
 	 * install — the one moment we can show it, since WordPress stores it hashed and we
-	 * keep no artifact to read it back from. The dev stack mints no application
-	 * password; that is a test-stack concern (REST auth for the harness).
+	 * keep no artifact to read it back from.
 	 */
 	secrets?: { password: string }
+	/**
+	 * A freshly minted REST application password, present only on a fresh default install.
+	 * The prior one (if any) died with the wiped database, so callers write this into `.env`
+	 * to keep REST auth working. A BYO import keeps its own users and a warm resume keeps the
+	 * existing credentials, so it's absent in those cases (nothing changed to invalidate them).
+	 */
+	appPassword?: string
 }
 
 /** A strong random admin password (144 bits, URL/JSON/CLI-safe characters). */
@@ -116,14 +122,27 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 		await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
 	}
 
-	// Ensure the fixtures' plugins every run (cheap when already active): install the
-	// wp.org / zip dependencies first, then activate the bind-mounted local plugins, so
-	// a mounted plugin that depends on an installed one finds it present.
-	await ensurePlugins(cfg.fixtures.flatMap((fixture) => fixture.plugins ?? []))
+	// Ensure the kizlo core plugin plus the fixtures' plugins every run (cheap when already
+	// active): install the wp.org / zip dependencies first, then activate the bind-mounted
+	// local plugins, so a mounted plugin that depends on an installed one finds it present.
+	await ensurePlugins([...DEFAULT_PLUGINS, ...cfg.fixtures.flatMap((fixture) => fixture.plugins ?? [])])
 
 	// Seed fixtures only on a just-completed fresh default install — never on BYO (it brings
 	// its own data) or a provisioned rerun. Runs after plugins so a fixture can use them.
 	const seeded = !installed && !byo && cfg.fixtures.length ? await seedDevFixtures(cfg, url) : 0
 
-	return { url, username: TEST_ADMIN.username, dbPort: cfg.dbPort, imported, seeded, secrets: password ? { password } : undefined }
+	// Mint the REST application password for `.env` last — after seeding, whose transient
+	// password (created with the same `--all` reset) would otherwise clobber it. Only on a
+	// fresh default install: a warm resume keeps its existing one, and BYO uses its own users.
+	const appPassword = password ? await createAdminAppPassword("kizlo-dev") : undefined
+
+	return {
+		url,
+		username: TEST_ADMIN.username,
+		dbPort: cfg.dbPort,
+		imported,
+		seeded,
+		appPassword,
+		secrets: password ? { password } : undefined,
+	}
 }

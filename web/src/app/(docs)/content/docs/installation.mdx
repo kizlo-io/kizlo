@@ -138,7 +138,7 @@ once — and keep for upcoming step.
 
       #### Create the server
 
-      At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `SITE_SECRET` from `.env`:
+      At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `KIZLO_SITE_SECRET` from `.env`:
 
       ```ts title="src/lib/kizlo/server/index.ts"
       import { createKizlo } from "kizlo/nextjs/server"
@@ -171,9 +171,9 @@ once — and keep for upcoming step.
       ```bash title=".env"
       KIZLO_WORDPRESS_URL=https://your-site.com
       KIZLO_WORDPRESS_USERNAME=admin
-      KIZLO_WORDPRESS_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
+      KIZLO_WORDPRESS_APPLICATION_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
       KIZLO_SITE_SECRET=                       # a long random string
-      NEXT_PUBLIC_SERVER_BASE_URL=http://localhost:3000
+      NEXT_PUBLIC_KIZLO_BACKEND_URL=http://localhost:3000/api/kizlo
       ```
 
       </Step>

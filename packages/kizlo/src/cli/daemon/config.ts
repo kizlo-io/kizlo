@@ -61,6 +61,10 @@ export interface ResolvedConfig {
 
 const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
 
+export const DEFAULT_DEV_PORT = 8080
+export const DEFAULT_DEV_DB_PORT = 3307
+const DEFAULT_TEST_PORT = 8889
+
 function defaultDir(cwd: string): string {
 	return fs.existsSync(path.join(cwd, "src")) ? "src/lib/kizlo" : "lib/kizlo"
 }
@@ -145,6 +149,8 @@ export interface ResolvedTestConfig {
 	/** Resolved credentials artifact path under `configDir`. */
 	credentialsPath: string
 	port: number
+	/** True when `test.port` was set in config — the user owns collisions, so don't auto-step. */
+	portExplicit: boolean
 	fixtures: Fixture[]
 	packageManager: PackageManager
 	/** Explicit override; when unset, callers run `<packageManager> test`. */
@@ -165,7 +171,8 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 		configDir,
 		project: `${resolveStackName(configDir, fileConfig?.name)}-test`,
 		command: test.command,
-		port: test.port ?? 8889,
+		port: test.port ?? DEFAULT_TEST_PORT,
+		portExplicit: test.port !== undefined,
 		fixtures: test.fixtures ?? [],
 		credentialsPath: credentialsPath(cwd),
 		packageManager: test.packageManager ?? detectPackageManager(configDir),
@@ -178,8 +185,12 @@ export interface ResolvedDevConfig {
 	/** Docker compose project name (`<name>-dev`). */
 	project: string
 	port: number
+	/** True when `dev.port` was set in config — the user owns collisions, so don't auto-step. */
+	portExplicit: boolean
 	/** Host port the dev MySQL is published on (bound to `127.0.0.1`) for direct DB access. */
 	dbPort: number
+	/** True when `dev.dbPort` was set in config — the user owns collisions, so don't auto-step. */
+	dbPortExplicit: boolean
 	/** Absolute path to a BYO archive (`wordpress/` + `.sql`) to hydrate a fresh stack from, if set. */
 	byo?: string
 	/** Fixtures to seed on a fresh stack (mutually exclusive with `byo`); also carry the stack's plugins. */
@@ -217,8 +228,10 @@ export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> 
 	return {
 		configDir,
 		project: `${resolveStackName(configDir, fileConfig?.name)}-dev`,
-		port: dev.port ?? 8080,
-		dbPort: dev.dbPort ?? 3307,
+		port: dev.port ?? DEFAULT_DEV_PORT,
+		portExplicit: dev.port !== undefined,
+		dbPort: dev.dbPort ?? DEFAULT_DEV_DB_PORT,
+		dbPortExplicit: dev.dbPort !== undefined,
 		byo: dev.byo ? path.resolve(configDir, dev.byo) : undefined,
 		fixtures: dev.fixtures ?? [],
 		wordpressPath: dev.path,

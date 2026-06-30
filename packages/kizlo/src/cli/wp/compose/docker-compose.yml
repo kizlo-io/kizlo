@@ -35,8 +35,20 @@ services:
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE:-wordpress}
       WORDPRESS_DB_USER: ${MYSQL_USER:-wordpress}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD:-wppass}
+      # The wordpress image eval()s WORDPRESS_CONFIG_EXTRA at runtime, and Compose
+      # interpolates `$` in this file first — so every PHP variable below is written
+      # `$$` to survive Compose and reach PHP as a literal `$`.
       WORDPRESS_CONFIG_EXTRA: |
         define('WP_ENVIRONMENT_TYPE', 'local');
+        // Dev only: serve under whatever host the request came in on (localhost or a LAN
+        // IP) instead of the stored siteurl, so the stack is reachable from other devices
+        // on the network, like `next dev`. CLI requests have no HTTP_HOST and fall back to
+        // the database value, so wp-cli/bootstrap stay on the canonical URL.
+        if (!empty($$_SERVER['HTTP_HOST'])) {
+          $$kizlo_scheme = (!empty($$_SERVER['HTTPS']) && $$_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+          define('WP_HOME', $$kizlo_scheme . $$_SERVER['HTTP_HOST']);
+          define('WP_SITEURL', $$kizlo_scheme . $$_SERVER['HTTP_HOST']);
+        }
     volumes:
       - wp_data:/var/www/html
     healthcheck:

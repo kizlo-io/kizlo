@@ -116,3 +116,20 @@ export function getTestCredentials(): TestCredentials {
 	cached = JSON.parse(readFileSync(credentialsPath(), "utf-8")) as TestCredentials
 	return cached
 }
+
+/**
+ * The host port the credentials artifact advertises, if it exists — the port a warm test
+ * stack is pinned to. Tests connect via this URL, so a reused stack must come back up on
+ * the same port; `undefined` means no stack has ever been seeded here (a cold boot).
+ */
+export function recordedPort(): number | undefined {
+	const path = credentialsPath()
+	if (!existsSync(path)) return undefined
+	try {
+		const { url } = JSON.parse(readFileSync(path, "utf-8")) as TestCredentials
+		const port = new URL(url).port
+		return port ? Number(port) : undefined
+	} catch {
+		return undefined
+	}
+}

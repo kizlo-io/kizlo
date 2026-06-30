@@ -51,6 +51,18 @@ detail. Past the defaults, a few flags tune the run:
 | `--preset <id>` | Force a setup preset (`base`, `nextjs`) instead of auto-detecting |
 | `--alias <prefix>` | Set the import alias for generated imports (e.g. `@`); blank for relative |
 
+### Backend URL
+
+The plugin delivers webhook events to your Kizlo backend, so `init` records where it's reachable. A detected
+framework mounts the handler at a known path (`/api/kizlo` for Next.js), so `init` asks one question — your
+app's public URL — and derives the backend from it, writing it to `NEXT_PUBLIC_KIZLO_BACKEND_URL`.
+
+The **base** preset has no known mount, so `init` asks two URLs: your public **site URL** (what the plugin
+points back at) and the **backend URL** where you've mounted the handler (written to `KIZLO_BACKEND_URL`). The
+generated `client.ts` routes to the backend: same-origin deploys default to the page origin, and a backend on a
+different origin is inlined into `createKizloClient(contract, { url })` — swap that for your bundler's own
+public env var (e.g. `import.meta.env.VITE_KIZLO_BACKEND_URL`) to set it per environment.
+
 ## `kizlo generate`
 
 `generate` builds the [contract](/docs/concepts/client) **once** and exits. It's the command for builds and

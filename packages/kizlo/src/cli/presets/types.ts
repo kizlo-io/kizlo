@@ -20,6 +20,12 @@ export interface ScaffoldContext {
 	appDir: string
 	/** Import specifier for the server entry from `fromDir` (tsconfig alias or relative). */
 	serverImport(fromDir: string): string
+	/**
+	 * Backend URL to inline into the browser client, set only when it differs from the site origin
+	 * (base preset, split deployment). Undefined when the client can default to the page origin or
+	 * resolves the URL from a framework env var.
+	 */
+	clientUrl?: string
 }
 
 export interface RouteFile {

@@ -87,7 +87,7 @@ pnpm kizlo dev reset  # full wipe (down -v) + rebuild
 ```
 
 `kizlo dev up` prints the URL, admin login, and the `.env` lines to paste
-(`WORDPRESS_URL`/`USERNAME`/`APPLICATION_PASSWORD`).
+(`KIZLO_DEV_WORDPRESS_URL`/`USERNAME`/`APPLICATION_PASSWORD`).
 
 ### Test stack — `kizlo test`
 
