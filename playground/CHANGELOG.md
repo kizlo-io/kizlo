@@ -1,5 +1,12 @@
 # playground
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`2ca9854`](https://github.com/kizlo-io/kizlo/commit/2ca9854f8575567b997493141acd02ba7d375067), [`2ec6cd3`](https://github.com/kizlo-io/kizlo/commit/2ec6cd30f29cac53d792de9d4c2ba4775694a659)]:
+  - kizlo@0.2.1
+
 ## 0.1.1
 
 ### Patch Changes

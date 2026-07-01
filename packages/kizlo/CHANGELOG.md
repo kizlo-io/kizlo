@@ -1,5 +1,13 @@
 # kizlo
 
+## 0.2.1
+
+### Patch Changes
+
+- [#22](https://github.com/kizlo-io/kizlo/pull/22) [`2ca9854`](https://github.com/kizlo-io/kizlo/commit/2ca9854f8575567b997493141acd02ba7d375067) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo dev` now runs the contract watcher inline, so contract types regenerate automatically without a separate `kizlo watch` process.
+
+- [#20](https://github.com/kizlo-io/kizlo/pull/20) [`2ec6cd3`](https://github.com/kizlo-io/kizlo/commit/2ec6cd30f29cac53d792de9d4c2ba4775694a659) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo init` now installs `kizlo@latest` instead of bare `kizlo`, ensuring the newest version is always added to new projects rather than a cached older one.
+
 ## 0.2.0
 
 ### Minor Changes
