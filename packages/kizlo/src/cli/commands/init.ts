@@ -428,9 +428,9 @@ export const init = defineCommand({
 		if (!hasKizlo) {
 			const s = p.spinner()
 			s.start(`Installing kizlo with ${pm}`)
-			const ok = runCommand(addDependencyArgs(pm, "kizlo"), cwd, "ignore")
+			const ok = runCommand(addDependencyArgs(pm, "kizlo@latest"), cwd, "ignore")
 			s.stop(ok ? "Installed kizlo" : "Could not install kizlo automatically")
-			if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, "kizlo").join(" ")}`)
+			if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, "kizlo@latest").join(" ")}`)
 		}
 
 		// Supported frameworks mount the API at a sub-path; reflect it in the base
