@@ -225,13 +225,6 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	}
 	printSummary(creds)
 
-	// Fold the contract watcher into `kizlo dev` so a single terminal both runs the
-	// WordPress stack and regenerates the contract on save. Skips silently when a
-	// standalone `kizlo watch` already holds the lock; its stop() releases that lock
-	// on exit (release is synchronous, so the process-exit handler is enough).
-	const stopWatcher = await startWatcher(ready.configDir)
-	if (stopWatcher) process.on("exit", stopWatcher)
-
 	const { green, dim, bold, reset } = palette()
 	const ms = Date.now() - start
 	const took = ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
@@ -239,6 +232,15 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 		`\n   ${dim}Press ${reset}${bold}Ctrl+C${reset}${dim} (or close the terminal) to stop the development stack${reset}\n`,
 	)
 	process.stdout.write(`\n ${green}✓${reset} Ready in ${took}\n\n`)
+
+	// Fold the contract watcher into `kizlo dev` so a single terminal both runs the
+	// WordPress stack and regenerates the contract on save. Started *after* the "Ready"
+	// summary so its "Contract generated" / "Watching for changes…" lines trail the stack
+	// output instead of splitting it. Skips silently when a standalone `kizlo watch` already
+	// holds the lock; its stop() releases that lock on exit (release is synchronous, so the
+	// process-exit handler is enough).
+	const stopWatcher = await startWatcher(ready.configDir)
+	if (stopWatcher) process.on("exit", stopWatcher)
 
 	setInterval(() => {}, 1 << 30)
 	await new Promise<never>(() => {})

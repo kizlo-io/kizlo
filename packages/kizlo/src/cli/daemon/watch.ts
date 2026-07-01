@@ -36,7 +36,7 @@ export async function watch(cfg: ResolvedConfig): Promise<FSWatcher> {
 	const onChange = debounce(() => regenerate(cfg), 300)
 
 	watcher.add(path.resolve(cfg.cwd, cfg.serverDir))
-	watcher.on("ready", () => log.start("Watching for changes..."))
+	watcher.on("ready", () => log.start("Watching for contract changes..."))
 	watcher.on("all", () => void onChange())
 
 	return watcher
