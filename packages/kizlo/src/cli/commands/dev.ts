@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { defineCommand } from "citty"
 import { palette, printBanner } from "../banner"
 import { type ResolvedDevConfig, resolveDevConfig } from "../daemon/config"
+import { startWatcher } from "../daemon/watch"
 import { ensureGitignored, envGroups, getVersion, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
 import { createStack, type DockerStack } from "../wp/docker"
@@ -223,6 +224,13 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 		}
 	}
 	printSummary(creds)
+
+	// Fold the contract watcher into `kizlo dev` so a single terminal both runs the
+	// WordPress stack and regenerates the contract on save. Skips silently when a
+	// standalone `kizlo watch` already holds the lock; its stop() releases that lock
+	// on exit (release is synchronous, so the process-exit handler is enough).
+	const stopWatcher = await startWatcher(ready.configDir)
+	if (stopWatcher) process.on("exit", stopWatcher)
 
 	const { green, dim, bold, reset } = palette()
 	const ms = Date.now() - start

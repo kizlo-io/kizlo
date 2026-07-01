@@ -584,10 +584,12 @@ export const init = defineCommand({
 
 		p.note(
 			[
-				...(setup.mode === "local" ? [`Start your local WordPress dev stack:`, `  npx kizlo dev`, ``] : []),
-				`Watch your extensions and regenerate the contract during development:`,
-				`  npx kizlo watch`,
-				``,
+				// Local: `kizlo dev` runs the WordPress stack and folds in the contract watcher,
+				// so it's the single command to run. Remote: there's no dev stack, so `kizlo watch`
+				// is the standalone way to regenerate the contract while you work.
+				...(setup.mode === "local"
+					? [`Start your local WordPress dev stack (also watches your extensions):`, `  npx kizlo dev`, ``]
+					: [`Watch your extensions and regenerate the contract during development:`, `  npx kizlo watch`, ``]),
 				`Generate the contract once for production builds:`,
 				`  npx kizlo generate`,
 			].join("\n"),
