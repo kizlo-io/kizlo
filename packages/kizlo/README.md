@@ -41,7 +41,7 @@ Kizlo is a framework-agnostic toolkit for headless WordPress, built for a stack 
 Set up Kizlo in your project:
 
 ```bash
-npx kizlo init
+npx kizlo@latest init
 ```
 
 Watch your extensions and regenerate the contract during development:
