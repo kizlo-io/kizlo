@@ -5,7 +5,11 @@ export function useClipboard(options?: { cb?: () => void; time?: number }) {
 
 	const copy = async (text: string) => {
 		try {
-			await navigator.clipboard.writeText(text)
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(text)
+			} else {
+				fallbackCopy(text)
+			}
 			setCopied(true)
 			options?.cb?.()
 			setTimeout(() => setCopied(false), options?.time ?? 2000)
@@ -16,4 +20,21 @@ export function useClipboard(options?: { cb?: () => void; time?: number }) {
 	}
 
 	return { copied, copy }
+}
+
+function fallbackCopy(text: string) {
+	const textarea = document.createElement("textarea")
+	textarea.value = text
+	textarea.style.position = "fixed"
+	textarea.style.opacity = "0"
+	document.body.appendChild(textarea)
+	textarea.focus()
+	textarea.select()
+
+	try {
+		const ok = document.execCommand("copy")
+		if (!ok) throw new Error("execCommand copy failed")
+	} finally {
+		document.body.removeChild(textarea)
+	}
 }

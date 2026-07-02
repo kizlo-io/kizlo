@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { Globe, Plus, Trash } from "@phosphor-icons/react"
 import { Controller, useFieldArray, useForm } from "react-hook-form"
 import { TextInputField } from "@/modules/settings/shared/fields"
 import { SettingsGroup, SettingsSet } from "@/modules/settings/shared/settings"
@@ -52,7 +52,7 @@ export function CrawlingSettingsPage() {
 									name="sitemaps.pathname_structure"
 									label="Sitemap Pathname"
 									description="The pathname for your sitemap index. Defaults to /sitemap_index.xml if left blank."
-									icon={<GlobeIcon />}
+									icon={<Globe />}
 									placeholder="/sitemap_index.xml"
 								/>
 							</FieldGroup>
@@ -149,7 +149,7 @@ export function CrawlingSettingsPage() {
 																		onClick={() => remove(index)}
 																		aria-label="Remove rule"
 																	>
-																		<Trash2Icon />
+																		<Trash />
 																	</InputGroupButton>
 																</InputGroupAddon>
 															</InputGroup>
@@ -163,7 +163,7 @@ export function CrawlingSettingsPage() {
 								))}
 
 								<Button type="button" variant="outline" size="sm" onClick={() => append({ user_agent: "", rule: "disallow", path: "" })}>
-									<PlusIcon />
+									<Plus />
 									Add Rule
 								</Button>
 							</FieldGroup>

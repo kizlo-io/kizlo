@@ -1,4 +1,4 @@
-import { ImageIcon, XIcon } from "lucide-react"
+import { Image, X } from "@phosphor-icons/react"
 import { useState } from "react"
 import { type MediaItem, type MediaType, useMediaLibrary } from "@/shared/hooks/use-media-library"
 import { cn } from "@/shared/lib/utils"
@@ -50,7 +50,7 @@ export function MediaPicker({ ...props }: MediaInputProps) {
 			) : (
 				<div className="flex flex-col items-center justify-center gap-2 p-4">
 					<Button type="button" size={"xs"} variant={"outline"} className="bg-card capitalize">
-						{props.type === "image" ? <ImageIcon className="text-muted-foreground" /> : null}
+						{props.type === "image" ? <Image className="text-muted-foreground" /> : null}
 						Select {props.type}
 					</Button>
 
@@ -70,7 +70,7 @@ export function MediaPicker({ ...props }: MediaInputProps) {
 					}}
 					className="absolute top-2 right-2 bg-white"
 				>
-					<XIcon />
+					<X />
 				</Button>
 			) : null}
 		</button>

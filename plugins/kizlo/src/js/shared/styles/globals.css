@@ -73,7 +73,7 @@ kbd {
 
 :root {
 	--background: oklch(97.913% 0.00011 271.152);
-	--foreground: oklch(0.25 0 0);
+	--foreground: oklch(0% 0 0);
 	--card: oklch(1 0 0);
 	--card-foreground: oklch(0.145 0 0);
 	--popover: oklch(1 0 0);
@@ -83,7 +83,7 @@ kbd {
 	--secondary: oklch(0.97 0 0);
 	--secondary-foreground: oklch(0.205 0 0);
 	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.56 0 0);
+	--muted-foreground: oklch(43.495% 0.00005 271.152);
 	--accent: oklch(95% 0.0001 271.152);
 	--accent-foreground: oklch(0.205 0 0);
 	--destructive: oklch(0.577 0.245 27.325);
@@ -156,16 +156,11 @@ body {
 		Segoe UI Symbol,
 		Noto Color Emoji;
 	@apply bg-background;
-	/* @apply bg-(--kizlo-admin-menu-bg); */
 }
 
 #wpcontent {
 	@apply p-0!;
 }
-/* 
-#wpbody {
-	@apply p-4;
-} */
 
 #wpbody-content {
 	padding-bottom: 8px;
