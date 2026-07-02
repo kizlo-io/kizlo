@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { Globe, Plus, Trash } from "@phosphor-icons/react"
 import { Controller, useFieldArray, useForm } from "react-hook-form"
 
 import { ComboboxField } from "@/modules/settings/shared/fields"
@@ -32,9 +32,9 @@ export function WebhookSettingsPage() {
 	return (
 		<form onSubmit={form.handleSubmit(onSubmit)} className="relative">
 			<SettingsSet isLoading={isLoading}>
-				{/* ── Webhook URLs ── */}
+				{/* ── WebhooksLogo URLs ── */}
 				<SettingsGroup
-					heading={<>Webhook URLs</>}
+					heading={<>WebhooksLogo URLs</>}
 					description={
 						<>
 							One or more endpoints that will receive a POST request when triggered content changes. Each URL must be publicly accessible.
@@ -53,7 +53,7 @@ export function WebhookSettingsPage() {
 											<Field data-invalid={fieldState.invalid}>
 												<InputGroup>
 													<InputGroupAddon align="inline-start">
-														<GlobeIcon />
+														<Globe />
 													</InputGroupAddon>
 													<InputGroupInput
 														{...field}
@@ -70,7 +70,7 @@ export function WebhookSettingsPage() {
 															onClick={() => remove(index)}
 															aria-label="Remove URL"
 														>
-															<Trash2Icon />
+															<Trash />
 														</InputGroupButton>
 													</InputGroupAddon>
 												</InputGroup>
@@ -81,8 +81,8 @@ export function WebhookSettingsPage() {
 								))}
 
 								<Button type="button" variant="outline" size="sm" onClick={() => append("" as never)}>
-									<PlusIcon />
-									Add Webhook URL
+									<Plus />
+									Add WebhooksLogo URL
 								</Button>
 							</FieldGroup>
 						</CardContent>

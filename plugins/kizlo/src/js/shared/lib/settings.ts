@@ -1,6 +1,6 @@
 import { useStore } from "@nanostores/react"
+import { FileText, Gear, Tag, WebhooksLogo } from "@phosphor-icons/react"
 import apiFetch from "@wordpress/api-fetch"
-import { FileText, SettingsIcon, Tag, Webhook } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import type { Settings, SettingsMap } from "./schema"
@@ -75,7 +75,7 @@ export function useMenus() {
 		() => [
 			{
 				name: "General",
-				icon: SettingsIcon,
+				icon: Gear,
 				items: [
 					{
 						name: "Site",
@@ -113,7 +113,7 @@ export function useMenus() {
 			},
 			{
 				name: "Integrations",
-				icon: Webhook,
+				icon: WebhooksLogo,
 				items: [
 					{
 						name: "Webhooks",

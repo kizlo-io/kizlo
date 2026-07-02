@@ -1,8 +1,8 @@
-import type { LucideProps } from "lucide-react"
+import type { Icon } from "@phosphor-icons/react"
 
 export interface Menu {
 	name: string
-	icon: React.ForwardRefExoticComponent<Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>>
+	icon: Icon
 	items: MenuItem[]
 }
 

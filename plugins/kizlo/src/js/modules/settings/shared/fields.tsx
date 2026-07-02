@@ -1,4 +1,4 @@
-import { CheckIcon, ChevronDownIcon, CopyIcon, EyeClosed, EyeIcon, XIcon } from "lucide-react"
+import { CaretDown, Check, Copy, Eye, EyeClosed, X } from "@phosphor-icons/react"
 import { useState } from "react"
 import { type Control, Controller, type FieldPath, type FieldValues } from "react-hook-form"
 import { toast } from "sonner"
@@ -67,7 +67,7 @@ export function TextInputField<TFieldValues extends FieldValues = FieldValues, T
 						/>
 						{type === "password" ? (
 							<InputGroupAddon align="inline-end">
-								<InputGroupButton onClick={() => setVisible((v) => !v)}>{isVisible ? <EyeIcon /> : <EyeClosed />}</InputGroupButton>
+								<InputGroupButton onClick={() => setVisible((v) => !v)}>{isVisible ? <Eye /> : <EyeClosed />}</InputGroupButton>
 							</InputGroupAddon>
 						) : null}
 
@@ -260,7 +260,7 @@ export function VariableBadge({ ...token }: Variable) {
 		<Tooltip>
 			<TooltipTrigger type="button">
 				<Badge variant="outline" className="cursor-pointer text-xs" onClick={() => copy(token.value)}>
-					{token.value} {copied ? <CheckIcon /> : <CopyIcon />}
+					{token.value} {copied ? <Check /> : <Copy />}
 				</Badge>
 			</TooltipTrigger>
 
@@ -355,7 +355,7 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 													className="rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
 													aria-label={`Remove ${option.label}`}
 												>
-													<XIcon className="size-3" />
+													<X className="size-3" />
 												</button>
 											</Badge>
 										))
@@ -365,7 +365,7 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 										<span className="text-muted-foreground">{placeholder}</span>
 									)}
 
-									<ChevronDownIcon className="pointer-events-none absolute top-2.5 right-2.5 size-4 text-muted-foreground opacity-50" />
+									<CaretDown className="pointer-events-none absolute top-2.5 right-2.5 size-4 text-muted-foreground opacity-50" />
 								</div>
 							</PopoverTrigger>
 
@@ -386,7 +386,7 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 														className="cursor-pointer"
 													>
 														{option.label}
-														{isSelected && <CheckIcon className="ml-auto shrink-0" />}
+														{isSelected && <Check className="ml-auto shrink-0" />}
 													</CommandItem>
 												)
 											})}

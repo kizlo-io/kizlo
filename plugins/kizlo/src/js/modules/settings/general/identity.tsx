@@ -1,16 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import {
-	AtSignIcon,
-	BuildingIcon,
-	CalendarIcon,
-	FileTextIcon,
-	PhoneIcon,
-	PlusIcon,
-	TagIcon,
-	Trash2Icon,
-	TypeIcon,
-	UserIcon,
-} from "lucide-react"
+import { At, Buildings, Calendar, FileText, Phone, Plus, Tag, TextT, Trash, User } from "@phosphor-icons/react"
 import { type Control, Controller, type FieldPath, useFieldArray, useForm } from "react-hook-form"
 import { NumberInputField, TextInputField } from "@/modules/settings/shared/fields"
 import { MediaPicker } from "@/modules/settings/shared/media-picker"
@@ -43,13 +32,13 @@ const IDENTITY_OPTIONS: IdentityTypeOption[] = [
 		value: "person",
 		label: "Person",
 		description: "A personal brand, blogger, freelancer, or individual creator.",
-		icon: <UserIcon />,
+		icon: <User />,
 	},
 	{
 		value: "organization",
 		label: "Organization",
 		description: "A company, nonprofit, agency, or any structured entity.",
-		icon: <BuildingIcon />,
+		icon: <Buildings />,
 	},
 ]
 
@@ -168,7 +157,7 @@ export function IdentitySettingsPage() {
 											name="person.name"
 											label="Full Name"
 											placeholder="Jane Smith"
-											icon={<UserIcon />}
+											icon={<User />}
 											description="The person's full name as it should appear in search results and author bios."
 										/>
 
@@ -231,7 +220,7 @@ export function IdentitySettingsPage() {
 											name="organization.name"
 											label="Organization Name"
 											placeholder="Acme Inc."
-											icon={<BuildingIcon />}
+											icon={<Buildings />}
 											description="The official public-facing name of your organization."
 										/>
 
@@ -240,7 +229,7 @@ export function IdentitySettingsPage() {
 											name="organization.alternate_name"
 											label="Alternate Name"
 											placeholder="Acme"
-											icon={<TypeIcon />}
+											icon={<TextT />}
 											description={
 												<>
 													A shorter or alternate name (e.g. acronym or brand nickname). Added to the <code>alternateName</code> field in
@@ -254,7 +243,7 @@ export function IdentitySettingsPage() {
 											name="organization.slogan"
 											label="Slogan"
 											placeholder="Building tools people love"
-											icon={<TagIcon />}
+											icon={<Tag />}
 											description="Your organization's tagline or motto. Maps to the Schema.org sameAs slogan field."
 										/>
 
@@ -263,7 +252,7 @@ export function IdentitySettingsPage() {
 											name="organization.description"
 											label="Description"
 											placeholder="We build fast, reliable WordPress plugins..."
-											icon={<FileTextIcon />}
+											icon={<FileText />}
 											description="A short description of what your organization does. Used in structured data and as a meta description fallback."
 										/>
 									</FieldGroup>
@@ -326,7 +315,7 @@ export function IdentitySettingsPage() {
 											name="organization.email"
 											label="Email"
 											placeholder="hello@acme.com"
-											icon={<AtSignIcon />}
+											icon={<At />}
 											description="A public contact email address for your organization."
 										/>
 
@@ -335,7 +324,7 @@ export function IdentitySettingsPage() {
 											name="organization.phone"
 											label="Phone"
 											placeholder="+1 (555) 000-0000"
-											icon={<PhoneIcon />}
+											icon={<Phone />}
 											description="A public phone number in international format (e.g. +1 555 000 0000)."
 										/>
 
@@ -344,7 +333,7 @@ export function IdentitySettingsPage() {
 											name="organization.legal_name"
 											label="Legal Name"
 											placeholder="Acme Incorporated"
-											icon={<FileTextIcon />}
+											icon={<FileText />}
 											description={
 												<>
 													The registered legal name of your organization if different from the display name. Maps to Schema.org{" "}
@@ -358,7 +347,7 @@ export function IdentitySettingsPage() {
 											name="organization.founding_date"
 											label="Founding Date"
 											placeholder="2018-04-01"
-											icon={<CalendarIcon />}
+											icon={<Calendar />}
 											description={
 												<>
 													The date your organization was founded in <code>YYYY-MM-DD</code> format. Maps to Schema.org{" "}
@@ -421,7 +410,7 @@ export function IdentitySettingsPage() {
 											name="organization.founder.name"
 											label="Founder Name"
 											placeholder="Jane Smith"
-											icon={<UserIcon />}
+											icon={<User />}
 											description="Full name of the organization's founder."
 										/>
 
@@ -506,7 +495,7 @@ export function SocialProfilesField<TFieldValues extends IdentitySettingsInput, 
 												onClick={() => remove(index)}
 												aria-label={`Remove ${field.value?.platform || "profile"}`}
 											>
-												<Trash2Icon />
+												<Trash />
 											</InputGroupButton>
 										</InputGroupAddon>
 									</InputGroup>
@@ -520,7 +509,7 @@ export function SocialProfilesField<TFieldValues extends IdentitySettingsInput, 
 
 				{/* Add custom platform */}
 				<Button type="button" variant="outline" size="sm" onClick={() => append({ platform: "", url: "" } as never)}>
-					<PlusIcon />
+					<Plus />
 					Add Platform
 				</Button>
 			</FieldGroup>

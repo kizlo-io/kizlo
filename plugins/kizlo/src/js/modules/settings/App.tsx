@@ -1,5 +1,5 @@
 import { useStore } from "@nanostores/react"
-import { ChevronRightIcon, ExternalLinkIcon, SearchIcon, TextAlignJustifyIcon } from "lucide-react"
+import { BookOpenIcon, CaretRight, DiscordLogoIcon, GithubLogoIcon, TextAlignJustifyIcon } from "@phosphor-icons/react"
 import type React from "react"
 import { useState } from "react"
 import { NavLink, Outlet, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom"
@@ -11,7 +11,6 @@ import type { Menu, MenuItem } from "@/shared/lib/types"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/shared/ui/input-group"
 import { TooltipProvider } from "@/shared/ui/tooltip"
 import { AuthorsSettingsPage } from "./general/authors"
 import { CrawlingSettingsPage } from "./general/crawling"
@@ -75,11 +74,28 @@ function Header({ ...props }: React.HTMLAttributes<HTMLElement>) {
 					</Button>
 				</div>
 
-				<SearchBox />
+				<div />
 
-				<div className="flex justify-end">
-					<Button size={"xs"} variant={"outline"}>
-						Dashboard <ExternalLinkIcon />
+				<div className="flex justify-end gap-1">
+					<Button asChild variant="ghost" size="icon">
+						<a href="https://kizlo.io/docs" target="_blank" rel="noreferrer" aria-label="Kizlo documentation">
+							<BookOpenIcon className="size-5" />
+							<span className="sr-only">Kizlo documentation</span>
+						</a>
+					</Button>
+
+					<Button asChild variant="ghost" size="icon">
+						<a href="https://discord.com/invite/MjAUZamx5g" target="_blank" rel="noreferrer" aria-label="Kizlo on Discord">
+							<DiscordLogoIcon className="size-5" />
+							<span className="sr-only">Kizlo on Discord</span>
+						</a>
+					</Button>
+
+					<Button asChild variant="ghost" size="icon">
+						<a href="https://github.com/kizlo-io/kizlo" target="_blank" rel="noreferrer" aria-label="Kizlo on GitHub">
+							<GithubLogoIcon className="size-5" />
+							<span className="sr-only">Kizlo on GitHub</span>
+						</a>
 					</Button>
 				</div>
 			</div>
@@ -104,10 +120,6 @@ function Menus({ ...props }: MenusProps) {
 				<div className="h-full space-y-1 overflow-y-auto md:sticky md:top-(--admin-bar-height) md:left-0 md:h-max">
 					<div className="m-0 flex h-(--kizlo-header-height) items-center border-b pl-4">
 						<Logo />
-					</div>
-
-					<div className="p-4 pb-2 md:hidden">
-						<SearchBox />
 					</div>
 
 					<div className="px-4 md:py-4">
@@ -151,7 +163,7 @@ function MenuGroup({ ...props }: { menu: Menu }) {
 					<props.menu.icon className="size-5" />
 					{props.menu.name}
 
-					<ChevronRightIcon
+					<CaretRight
 						className="z-10 ml-auto text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
 						onClick={(e) => {
 							e.stopPropagation()
@@ -195,20 +207,5 @@ function MenuGroupItem({ ...props }: MenuGroupItemProps) {
 				{props.item.name}
 			</NavLink>
 		</Button>
-	)
-}
-
-function SearchBox({ ...props }: React.HTMLAttributes<HTMLElement>) {
-	return (
-		<InputGroup className="w-full">
-			<InputGroupAddon>
-				<SearchIcon />
-			</InputGroupAddon>
-			<InputGroupInput className="" placeholder="Search settings..."></InputGroupInput>
-
-			<InputGroupAddon align={"inline-end"}>
-				<kbd>K</kbd>
-			</InputGroupAddon>
-		</InputGroup>
 	)
 }
