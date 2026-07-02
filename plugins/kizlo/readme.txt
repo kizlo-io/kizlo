@@ -4,7 +4,7 @@ Tags: headless, woocommerce, seo
 Requires at least: 5.0
 Tested up to: 6.7
 Requires PHP: 8.2
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,7 +16,7 @@ A plugin that connects your WordPress with Kizlo toolkit, headlessly.
 
 == Changelog ==
 
-= 0.2.0 =
-* Added: Add a Backend URL setting so events are delivered to your Kizlo backend automatically, without entering the full webhook URL by hand.
+= 0.2.1 =
+* Changed: Refresh the settings screen branding with a consistent icon set and a cleaner logo.
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo/CHANGELOG.md).
