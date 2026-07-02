@@ -11,10 +11,10 @@
   </a>
 </p>
 
-<h3 align="center">Headless WordPress Toolkit</h3>
+<h3 align="center">Headless WordPress Toolkit for TypeScript</h3>
 
 <p align="center">
-  Your backend, your frontend — Kizlo handles the plumbing.
+  Develop, test, and ship from your machine with a fully typed RPC layer and WordPress API client.
 </p>
 
 <p align="center">
@@ -34,7 +34,9 @@
 
 ## What is Kizlo?
 
-Kizlo is a framework-agnostic toolkit for headless WordPress, built for a stack you host and own from top to bottom. Use it to build websites, mobile apps, agentic applications, and more — Kizlo takes care of the plumbing so you can focus on the design.
+Kizlo is an open-source, typesafe toolkit for headless WordPress, built to sit behind any JavaScript framework as your backend or CMS. Its CLI spins up a local, Docker-based environment scoped to your project, giving you a fully typed RPC layer and WordPress API client to develop, test, and ship from your machine.
+
+> Kizlo extends through integrations, whether that's a WordPress plugin like WooCommerce or an external service for auth, analytics, and more. Browse all available [integrations](https://kizlo.io/integrations).
 
 ## Quick start
 
@@ -44,23 +46,17 @@ Set up Kizlo in your project:
 npx kizlo@latest init
 ```
 
-Watch your extensions and regenerate the contract during development:
+Start the local WordPress stack and regenerate the contract as you work:
 
 ```bash
 npx kizlo dev
-```
-
-Generate the contract once for production builds:
-
-```bash
-npx kizlo generate
 ```
 
 See the [docs](https://kizlo.io/docs) for the full guide.
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](https://github.com/kizlo-io/kizlo/blob/main/CONTRIBUTING.md) for setup,
+Contributions are welcome. See [CONTRIBUTING.md](https://github.com/kizlo-io/kizlo/blob/main/CONTRIBUTING.md) for setup,
 workflow, and PR guidelines.
 
 ## Security
