@@ -1,10 +1,68 @@
 import { createProcedure } from "../shared/procedure"
 import type { WP_CommonErrorCode } from "../wordpress"
 import { WP_KIZLO_BASE } from "../wordpress"
-import { ListSitemapUrlInput, Robots, SitemapList, SitemapUrlList } from "./schema"
-import type { WPK_Robots, WPK_Sitemap, WPK_SitemapUrl } from "./types"
+import { ListSitemapUrlInput, Robots, Seo, SitemapList, SitemapUrlList } from "./schema"
+import type { WPK_Robots, WPK_Seo, WPK_Sitemap, WPK_SitemapUrl } from "./types"
 
 export const SEO_ROUTER_MAP = {
+	homepage: createProcedure(
+		{
+			scope: "internal",
+			output: Seo,
+		},
+		async ({ context, errors }) => {
+			const response = await context.service.wordpress.get<WPK_Seo, WP_CommonErrorCode>("/seo/homepage", {
+				base: WP_KIZLO_BASE,
+			})
+
+			if (response.error) {
+				context.logger.error("Get homepage seo unhandled error", response.error)
+				throw errors.INTERNAL_SERVER_ERROR()
+			}
+
+			const { head } = response.data
+
+			return {
+				head: {
+					title: head.title,
+					canonical: head.canonical,
+					robots: {
+						index: head.robots.index,
+						follow: head.robots.follow,
+						maxSnippet: head.robots["max-snippet"],
+						maxImagePreview: head.robots["max-image-preview"],
+						maxVideoPreview: head.robots["max-video-preview"],
+					},
+					og: {
+						locale: head.og.locale,
+						type: head.og.type,
+						title: head.og.title,
+						url: head.og.url,
+						siteName: head.og.site_name,
+						description: head.og.description ?? "",
+						image: head.og.image,
+					},
+					twitter: {
+						card: head.twitter.card,
+						title: head.twitter.title,
+						site: head.twitter.site,
+						creator: head.twitter.creator,
+						description: head.twitter.description ?? "",
+						image: head.twitter.image,
+					},
+					article: head.article && {
+						publishedTime: head.article.published_time,
+						modifiedTime: head.article.modified_time,
+						author: head.article.author,
+						authorUrl: head.article.author_url,
+						section: head.article.section,
+					},
+				},
+				schema: response.data.schema,
+			}
+		},
+	),
+
 	sitemaps: createProcedure(
 		{
 			scope: "internal",

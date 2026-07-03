@@ -1,11 +1,11 @@
-import type { AnySchema, SchemaInput } from "@kizlo/shared"
+import type { Schema, SchemaInput } from "@kizlo/shared"
 import { createExtension, createProcedure, KizloError, schemaType, WP_KIZLO_BASE } from "kizlo"
 import { CaptchaInput, type SubmitFormResult } from "./schema"
 import type { WP_SubmitCF7Data } from "./types"
 
 export interface ContactFormSevenOptions {
 	id: number
-	fields: AnySchema
+	fields: Schema
 }
 
 export function contactFormSeven<TId extends string, TOptions extends ContactFormSevenOptions>(id: TId, options: TOptions) {

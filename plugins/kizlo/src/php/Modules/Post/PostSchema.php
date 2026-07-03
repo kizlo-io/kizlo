@@ -29,6 +29,21 @@ class PostSchema extends SeoBase
             return [];
         }
 
+        $show_on_front = get_option('show_on_front');
+        $posts_page_id = (int) get_option('page_for_posts');
+        $front_page_id = (int) get_option('page_on_front');
+
+        // In the page sitemap, drop the pages that are represented elsewhere: a
+        // static homepage becomes the site root "/" (injected below), and a
+        // static "Posts page" (e.g. /blog) is the blog index emitted in the post
+        // sitemap. Removing them here avoids listing either page twice (and
+        // keeps the homepage as "/" rather than its own pathname).
+        $exclude = [];
+        if ($post_type === 'page' && $show_on_front === 'page') {
+            if ($front_page_id > 0) $exclude[] = $front_page_id;
+            if ($posts_page_id > 0) $exclude[] = $posts_page_id;
+        }
+
         $posts = get_posts([
             'post_type'      => $post_type,
             'post_status'    => 'publish',
@@ -37,11 +52,20 @@ class PostSchema extends SeoBase
             'orderby'        => 'modified',
             'order'          => 'DESC',
             'fields'         => 'ids',
+            'post__not_in'   => $exclude,
         ]);
 
-        if (empty($posts)) return [];
-
         $entries = [];
+
+        // The first page carries an injected entry (the blog index in the post
+        // sitemap, or the homepage in the page sitemap). Build it before the
+        // empty-posts short-circuit so it survives on a brand-new site.
+        if ($page === 1) {
+            $front = $this->sitemapFrontEntry($post_type, $show_on_front, $posts_page_id, $front_page_id);
+            if ($front !== null) $entries[] = $front;
+        }
+
+        if (empty($posts)) return $entries;
 
         foreach ($posts as $post_id) {
             $post = get_post($post_id);
@@ -80,6 +104,51 @@ class PostSchema extends SeoBase
         }
 
         return $entries;
+    }
+
+    /**
+     * Build the injected first-page sitemap entry, mirroring how Yoast splits
+     * the homepage from the blog index:
+     *
+     * - Post sitemap: the blog index, which is the homepage when it lists the
+     *   latest posts, otherwise the assigned "Posts page" URL (e.g. /blog).
+     * - Page sitemap: the homepage, always represented as the site root "/" —
+     *   the selected static page (excluded from the listing so it is not shown
+     *   under its own pathname) or the posts index when the front page lists
+     *   posts.
+     *
+     * lastmod tracks the static homepage's own modification, or the most recent
+     * post when the homepage lists posts, falling back to now on an empty blog.
+     *
+     * @return array{loc: string, lastmod: string, images: array<int, mixed>}|null
+     */
+    protected function sitemapFrontEntry(string $post_type, string $show_on_front, int $posts_page_id, int $front_page_id): ?array
+    {
+        $home       = trailingslashit($this->settings->getBaseUrl());
+        $blog_last  = $this->getPostTypeLastMod('post') ?? gmdate('c');
+
+        if ($post_type === 'post') {
+            if ($show_on_front === 'posts') {
+                $loc = $home;
+            } elseif ($posts_page_id > 0 && ($posts_page = get_post($posts_page_id))) {
+                $loc = trailingslashit($this->resolvePostUrl($posts_page, $this->settings->postTypes->get('page')));
+            } else {
+                // Static homepage with no Posts page: there is no blog index.
+                return null;
+            }
+
+            return ['loc' => $loc, 'lastmod' => $blog_last, 'images' => []];
+        }
+
+        if ($post_type === 'page') {
+            $home_last = ($show_on_front === 'page' && $front_page_id > 0)
+                ? (get_post_modified_time('c', true, $front_page_id) ?: $blog_last)
+                : $blog_last;
+
+            return ['loc' => $home, 'lastmod' => $home_last, 'images' => []];
+        }
+
+        return null;
     }
 
     // ====================================================
@@ -177,7 +246,7 @@ class PostSchema extends SeoBase
         $article = $this->articleLd($post);
         if (!empty($article)) $graph[] = $article;
 
-        $image = $this->imageObjectLd($post);
+        $image = $this->featuredImageLd($post);
         if (!empty($image)) $graph[] = $image;
 
         $graph[] = $this->breadcrumbLd($post);
@@ -347,11 +416,10 @@ class PostSchema extends SeoBase
      *
      * @return array
      */
-    public function imageObjectLd(WP_Post $post): array
+    public function featuredImageLd(WP_Post $post): array
     {
         $post_type_settings = $this->settings->postTypes->get($post->post_type);
 
-        $page_url      = trailingslashit($this->resolvePostUrl($post, $post_type_settings));
         $thumbnail_id  = get_post_thumbnail_id($post->ID);
         $thumbnail_url = get_the_post_thumbnail_url($post, 'full');
 
@@ -359,14 +427,11 @@ class PostSchema extends SeoBase
 
         $metadata = wp_get_attachment_metadata($thumbnail_id);
 
-        return [
-            '@type'      => 'ImageObject',
-            '@id'        => $page_url . '#primaryimage',
-            'url'        => $thumbnail_url,
-            'contentUrl' => $thumbnail_url,
-            'inLanguage' => $this->language(),
-            'width'      => $metadata['width']  ?? null,
-            'height'     => $metadata['height'] ?? null,
-        ];
+        return $this->primaryImageLd(
+            $this->resolvePostUrl($post, $post_type_settings),
+            $thumbnail_url,
+            $metadata['width']  ?? null,
+            $metadata['height'] ?? null,
+        );
     }
 }

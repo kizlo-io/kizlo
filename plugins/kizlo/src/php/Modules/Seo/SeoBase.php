@@ -78,14 +78,28 @@ class SeoBase
     {
         $entries = [];
 
+        $show_on_front = get_option('show_on_front');
+        $posts_page_id = (int) get_option('page_for_posts');
+
         foreach ($this->settings->postTypes->all() as $post_type_slug => $post_type) {
             if (! $post_type->getSearchEngineVisibility()) continue;
 
             $count = wp_count_posts($post_type_slug)->publish ?? 0;
-            if ($count === 0) continue;
 
-            $pages   = (int) ceil($count / self::SITEMAP_PER_PAGE);
-            $lastmod = $this->getPostTypeLastMod($post_type_slug);
+            // The blog's sitemaps carry an injected entry even with no posts of
+            // their own: the page sitemap always holds the homepage, and the
+            // post sitemap holds the blog index whenever one exists. Keep those
+            // groups so neither the homepage nor the blog index is ever dropped.
+            $carries_front = match ($post_type_slug) {
+                'post'  => $show_on_front === 'posts' || $posts_page_id > 0,
+                'page'  => true,
+                default => false,
+            };
+
+            if ($count === 0 && ! $carries_front) continue;
+
+            $pages   = max(1, (int) ceil($count / self::SITEMAP_PER_PAGE));
+            $lastmod = $this->getPostTypeLastMod($post_type_slug) ?? gmdate('c');
 
             $entries[] = [
                 'key'     => $post_type_slug,
@@ -138,7 +152,7 @@ class SeoBase
      *
      * @return string|null
      */
-    private function getPostTypeLastMod(string $post_type): ?string
+    protected function getPostTypeLastMod(string $post_type): ?string
     {
         $posts = get_posts([
             'post_type'      => $post_type,
@@ -508,6 +522,60 @@ class SeoBase
     }
 
     /**
+     * Generate an ImageObject JSON-LD piece.
+     *
+     * The single source of truth for every ImageObject node (page primary
+     * images, logos, avatars). Callers own the `@id` since it varies by usage:
+     * primary images anchor to `<url>#primaryimage`, logos to a schema id, and
+     * profile/avatar images to the image URL itself.
+     *
+     * @param string $id  The node `@id`.
+     * @param string $url The image source URL.
+     * @param array{width?: int|null, height?: int|null, caption?: string|null} $extra
+     *
+     * @return array
+     */
+    protected function imageObjectLd(string $id, string $url, array $extra = []): array
+    {
+        $data = [
+            '@type'      => 'ImageObject',
+            '@id'        => $id,
+            'url'        => $url,
+            'contentUrl' => $url,
+            'inLanguage' => $this->language(),
+        ];
+
+        if (!empty($extra['width']))   $data['width']   = $extra['width'];
+        if (!empty($extra['height']))  $data['height']  = $extra['height'];
+        if (!empty($extra['caption'])) $data['caption'] = $extra['caption'];
+
+        return $data;
+    }
+
+    /**
+     * Generate the primary ImageObject JSON-LD piece for a page.
+     *
+     * The WebPage piece references this node by `@id` (`<url>#primaryimage`),
+     * so it must be emitted into the graph whenever a page carries an image.
+     *
+     * @param string      $url       The page URL the image belongs to.
+     * @param string      $image_url The image source URL.
+     * @param int|null    $width
+     * @param int|null    $height
+     * @param string|null $caption
+     *
+     * @return array
+     */
+    protected function primaryImageLd(string $url, string $image_url, ?int $width = null, ?int $height = null, ?string $caption = null): array
+    {
+        return $this->imageObjectLd(trailingslashit($url) . '#primaryimage', $image_url, [
+            'width'   => $width,
+            'height'  => $height,
+            'caption' => $caption,
+        ]);
+    }
+
+    /**
      * Generate Organization JSON-LD piece for site identity.
      *
      * @return array
@@ -558,18 +626,10 @@ class SeoBase
         $logo_url = !empty($org->getLogo()) ? wp_get_attachment_url($org->getLogo()) : false;
 
         if (!empty($logo_url)) {
-            $data['logo'] = [
-                '@type'      => 'ImageObject',
-                '@id'        => $this->schemaId('logo/image', md5((string) $org->getLogo())),
-                'url'        => $logo_url,
-                'contentUrl' => $logo_url,
-                'inLanguage' => $this->language(),
-                'caption'    => $this->settings->identity->organization->getName(),
-            ];
+            $logo_id = $this->schemaId('logo/image', md5((string) $org->getLogo()));
 
-            $data['image'] = [
-                '@id' => $this->schemaId('logo/image', md5((string) $org->getLogo()))
-            ];
+            $data['logo']  = $this->imageObjectLd($logo_id, $logo_url, ['caption' => $org->getName()]);
+            $data['image'] = ['@id' => $logo_id];
         }
 
         if (!empty($org->getFounder())) {
@@ -606,15 +666,8 @@ class SeoBase
         $image_url = !empty($person->getImage()) ? wp_get_attachment_url($person->getImage()) : false;
 
         if (!empty($image_url)) {
-            $data['image'] = [
-                '@type'      => 'ImageObject',
-                '@id'        => $image_url,
-                'url'        => $image_url,
-                'contentUrl' => $image_url,
-                'inLanguage' => $this->language(),
-                'caption'    => $person->getName(),
-            ];
-            $data['logo'] = ['@id' => $image_url];
+            $data['image'] = $this->imageObjectLd($image_url, $image_url, ['caption' => $person->getName()]);
+            $data['logo']  = ['@id' => $image_url];
         }
 
         if (!empty($person->getSocialProfiles())) {
@@ -645,14 +698,7 @@ class SeoBase
 
         $avatar_url = get_avatar_url($user->ID, ['size' => 96]);
         if (!empty($avatar_url)) {
-            $data['image'] = [
-                '@type'      => 'ImageObject',
-                '@id'        => $avatar_url,
-                'url'        => $avatar_url,
-                'contentUrl' => $avatar_url,
-                'inLanguage' => $this->language(),
-                'caption'    => $user->display_name,
-            ];
+            $data['image'] = $this->imageObjectLd($avatar_url, $avatar_url, ['caption' => $user->display_name]);
         }
 
         if (!empty($user->description)) {
@@ -742,7 +788,13 @@ class SeoBase
     protected function getOrigin(string $url): string
     {
         $parsed = parse_url($url);
-        return $parsed['scheme'] . '://' . $parsed['host'];
+        $origin = $parsed['scheme'] . '://' . $parsed['host'];
+
+        if (!empty($parsed['port'])) {
+            $origin .= ':' . $parsed['port'];
+        }
+
+        return $origin;
     }
 
     /**

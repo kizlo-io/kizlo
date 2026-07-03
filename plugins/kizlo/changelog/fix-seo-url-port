@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Sitemap, canonical, and author URLs no longer drop the port on sites running a non-standard port, so resolved URLs stay well-formed.

@@ -1,0 +1,4 @@
+Significance: patch
+Type: added
+
+Add a `/seo/homepage` REST endpoint that serves the homepage SEO head (title, canonical, robots, Open Graph, Twitter) and its JSON-LD graph so headless front-ends can render homepage metadata.

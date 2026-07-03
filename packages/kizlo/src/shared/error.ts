@@ -1,4 +1,4 @@
-import type { AnySchema, LiteralUnion, Metadata, SchemaInput, SchemaOutput } from "@kizlo/shared"
+import type { LiteralUnion, Metadata, Schema, SchemaInput, SchemaOutput } from "@kizlo/shared"
 
 export const COMMON_ERRORS = {
 	BAD_REQUEST: {
@@ -149,7 +149,7 @@ export type ErrorDefinition = {
 	/** Human-readable message. Overridable per throw via `errors.CODE({ message })`. */
 	message?: string
 	/** Standard Schema for the error's `data` payload — validated and typed when you throw `errors.CODE({ data })`. */
-	data?: AnySchema
+	data?: Schema
 }
 
 export function defineErrorMap<const T extends Partial<Record<CommonErrorLiteral, ErrorDefinition>>>(map: T) {
@@ -158,7 +158,7 @@ export function defineErrorMap<const T extends Partial<Record<CommonErrorLiteral
 
 export type DefinedErrorMapLike = Record<string, ErrorDefinition>
 
-export type ThrowableErrorFn<TCode extends string, T extends ErrorDefinition> = T["data"] extends AnySchema
+export type ThrowableErrorFn<TCode extends string, T extends ErrorDefinition> = T["data"] extends Schema
 	? undefined extends SchemaInput<T["data"]>
 		? (options?: { status?: number; message?: string; data?: SchemaInput<T["data"]> }) => KizloError<TCode, SchemaOutput<T["data"]>>
 		: (options: { status?: number; message?: string; data: SchemaInput<T["data"]> }) => KizloError<TCode, SchemaOutput<T["data"]>>
@@ -174,7 +174,7 @@ export function createThrowableErrorMap<TError extends DefinedErrorMapLike>(erro
 			if (typeof p === "symbol") return undefined
 			const preset = { COMMON_ERRORS, ...errors }[p]
 
-			return (options?: ErrorDefinition) => {
+			return (options?: KizloErrorOptions) => {
 				let data = options?.data
 
 				if (preset?.data) {

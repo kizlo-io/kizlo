@@ -1,4 +1,4 @@
-import type { AnySchema, DeepMerge, Pathname, Prettify, Promisify, Schema, SchemaInput, SchemaIssue, SchemaOutput } from "@kizlo/shared"
+import type { DeepMerge, Pathname, Prettify, Promisify, Schema, SchemaInput, SchemaIssue, SchemaOutput } from "@kizlo/shared"
 import type { JsonifiedValue } from "@orpc/openapi-client"
 import { type HTTPMethod, os } from "@orpc/server"
 import type { ServerContext } from "../context"
@@ -73,14 +73,14 @@ export interface Procedure<TScope extends InvocationScope, TInput, TOutput, TErr
 		options: {
 			scope: TScope
 			errors?: TError
-			output: AnySchema
+			output: Schema
 			inputValidation?: boolean
 			outputValidation?: boolean
 			middlewares?: AnyMiddleware[]
 		} & (
-			| { scope: "internal"; input?: AnySchema }
-			| { scope: "remote"; input?: AnySchema; method?: HTTPMethod }
-			| { scope: "api"; method?: HTTPMethod; path?: Pathname; body?: AnySchema; query?: AnySchema; params?: AnySchema; headers?: AnySchema }
+			| { scope: "internal"; input?: Schema }
+			| { scope: "remote"; input?: Schema; method?: HTTPMethod }
+			| { scope: "api"; method?: HTTPMethod; path?: Pathname; body?: Schema; query?: Schema; params?: Schema; headers?: Schema }
 		)
 	}
 }
@@ -240,18 +240,16 @@ export function createProcedure<
 	}
 }
 
-export function schemaType<TInput, TOutput = TInput>(schema?: AnySchema): Schema<TInput, TOutput> {
-	return (
-		schema ?? {
-			"~standard": {
-				vendor: "custom",
-				version: 1,
-				async validate(value) {
-					return { value: value as TOutput }
-				},
+export function schemaType<TInput, TOutput = TInput>(schema?: Schema): Schema<TInput, TOutput> {
+	return (schema ?? {
+		"~standard": {
+			vendor: "custom",
+			version: 1,
+			async validate(value) {
+				return { value: value as TOutput }
 			},
-		}
-	)
+		},
+	}) as Schema<TInput, TOutput>
 }
 
 export function buildProcedure(procedure: AnyProcedure) {
@@ -297,7 +295,7 @@ export function buildProcedure(procedure: AnyProcedure) {
 				inputStructure: "detailed",
 			})
 
-			const shape: Record<string, AnySchema> = {}
+			const shape: Record<string, Schema> = {}
 			if (options.params) shape.params = options.params
 			if (options.query) shape.query = options.query
 			if (options.headers) shape.headers = options.headers
@@ -333,7 +331,7 @@ export function handleUnexpectedError(error: unknown, errors?: DefinedErrorMapLi
 	throw error
 }
 
-export function combineDetailed(parts: Record<string, AnySchema>): AnySchema {
+export function combineDetailed(parts: Record<string, Schema>): Schema {
 	return {
 		"~standard": {
 			version: 1,
@@ -361,5 +359,5 @@ export function combineDetailed(parts: Record<string, AnySchema>): AnySchema {
 				return issues.length ? { issues } : { value: result }
 			},
 		},
-	} satisfies AnySchema
+	} satisfies Schema
 }

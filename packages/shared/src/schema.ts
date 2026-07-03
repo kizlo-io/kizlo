@@ -87,7 +87,6 @@ export type CookieWithOptions = z.infer<typeof CookieWithOptions>
 // ====================================================
 
 export type Schema<TInput = unknown, TOutput = TInput> = StandardSchemaV1<TInput, TOutput>
-export type AnySchema = Schema<any, any>
 
 export type SchemaInput<T> = T extends Schema ? StandardSchemaV1.InferInput<T> : never
 export type SchemaOutput<T> = T extends Schema ? StandardSchemaV1.InferOutput<T> : never

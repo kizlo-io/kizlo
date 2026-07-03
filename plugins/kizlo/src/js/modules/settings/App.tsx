@@ -153,7 +153,7 @@ function MenuGroup({ ...props }: { menu: Menu }) {
 					data-active={isChildActive}
 					className="group w-full justify-start px-2! data-[active=true]:bg-accent data-[active=true]:text-foreground! data-[active=true]:hover:bg-accent"
 					onClick={(e) => {
-						if (isChildActive) return
+						if (!firstMenu || isChildActive) return
 						nav(firstMenu.path)
 						window.scrollTo({ top: 0, behavior: "smooth" })
 						$sidebar.set(false)

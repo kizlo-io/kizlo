@@ -25,6 +25,12 @@ class SeoModule
 
         kizlo_register_route([
             'methods' => 'GET',
+            'route'   => '/seo/homepage',
+            'callback' => [$this, 'getHomepage']
+        ]);
+
+        kizlo_register_route([
+            'methods' => 'GET',
             'route'   => kizlo_route('/seo/sitemaps'),
             'callback' => [$this, 'getSitemaps']
         ]);
@@ -47,6 +53,17 @@ class SeoModule
         $settings = Utils::getSettings();
         $seo = new SeoBase($settings);
         return new WP_REST_Response($seo->robots());
+    }
+
+    public function getHomepage(WP_REST_Request $request): WP_Error|WP_REST_Response
+    {
+        $settings = Utils::getSettings();
+        $seo = new HomeSchema($settings);
+
+        return new WP_REST_Response([
+            'head'   => $seo->buildMeta(),
+            'schema' => $seo->jsonLd(),
+        ]);
     }
 
     public function getSitemaps(WP_REST_Request $request): WP_Error|WP_REST_Response
