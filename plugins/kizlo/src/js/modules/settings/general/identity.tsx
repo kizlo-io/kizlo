@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { BuildingsIcon, PlusIcon, TrashIcon, UserIcon } from "@phosphor-icons/react"
+import { BuildingsIcon, PlusIcon, UserIcon, XIcon } from "@phosphor-icons/react"
 import { type Control, Controller, type FieldPath, useFieldArray, useForm } from "react-hook-form"
-import { FieldError, NumberInputField, TextInputField } from "@/shared/components/fields"
+import { FieldError, NumberInputField, TextareaInputField, TextInputField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { Button } from "@/shared/components/ui/button"
 import { TextInput } from "@/shared/components/ui/input"
@@ -55,7 +55,12 @@ export function IdentitySettingsPage() {
 	}
 
 	return (
-		<SettingsForm isLoading={isLoading} isDirty={form.formState.isDirty} onSubmit={form.handleSubmit(onSubmit)}>
+		<SettingsForm
+			isLoading={isLoading}
+			isDirty={form.formState.isDirty}
+			onSubmit={form.handleSubmit(onSubmit)}
+			onCancel={() => form.reset()}
+		>
 			<SettingsSection
 				title="Identity"
 				desc="Select whether this site represents a person or an organization. This determines which structured data (Schema.org) Kizlo outputs and which fields are shown below."
@@ -140,7 +145,7 @@ export function IdentitySettingsPage() {
 							description="Your organization's tagline or motto. Maps to the Schema.org sameAs slogan field."
 						/>
 
-						<TextInputField
+						<TextareaInputField
 							control={form.control}
 							name="organization.description"
 							label="Description"
@@ -273,25 +278,27 @@ function SocialProfilesField({ control, name, legend, description }: SocialProfi
 							const value = field.value as { platform?: string; url?: string }
 
 							return (
-								<div>
-									<div className="flex items-center gap-2">
+								<div className="border-neutral-200 border-b pb-4">
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 										<TextInput
 											name={`${field.name}.platform`}
 											placeholder="Platform"
 											value={value?.platform ?? ""}
 											onChange={(platform) => field.onChange({ ...value, platform })}
-											className="w-40"
+											className="w-full sm:w-40"
 										/>
-										<TextInput
-											name={`${field.name}.url`}
-											placeholder="https://..."
-											value={value?.url ?? ""}
-											onChange={(url) => field.onChange({ ...value, url })}
-											className="flex-1"
-										/>
-										<Button type="button" variant="ghost" onClick={() => remove(index)} aria-label="Remove profile">
-											<TrashIcon />
-										</Button>
+										<div className="flex items-center gap-2 sm:contents">
+											<TextInput
+												name={`${field.name}.url`}
+												placeholder="https://..."
+												value={value?.url ?? ""}
+												onChange={(url) => field.onChange({ ...value, url })}
+												className="flex-1"
+											/>
+											<Button type="button" variant="secondary" onClick={() => remove(index)} aria-label="Remove profile">
+												<XIcon />
+											</Button>
+										</div>
 									</div>
 									<FieldError message={fieldState.error?.message} />
 								</div>

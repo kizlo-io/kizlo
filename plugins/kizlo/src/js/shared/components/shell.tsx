@@ -46,7 +46,7 @@ export function ShellSidebar({ open = false, onClose, className, children, ...pr
 				<button
 					type="button"
 					aria-label="Close menu"
-					className="fixed inset-0 z-[99999] cursor-pointer appearance-none border-0 bg-neutral-950/40 p-0 md:hidden"
+					className="fixed inset-0 z-99999 cursor-pointer appearance-none border-0 bg-neutral-950/40 p-0 md:hidden"
 					onClick={onClose}
 				/>
 			)}
@@ -56,7 +56,7 @@ export function ShellSidebar({ open = false, onClose, className, children, ...pr
 				data-open={open}
 				className={cn(
 					// Mobile: off-canvas fixed drawer that slides in when data-open.
-					"fixed inset-y-0 left-0 z-[999999] flex w-64 shrink-0 -translate-x-full flex-col border-neutral-200 border-r bg-white transition-transform duration-200 data-[open=true]:translate-x-0",
+					"fixed inset-y-0 left-0 z-999999 flex w-64 shrink-0 -translate-x-full flex-col border-neutral-200 border-r bg-white transition-transform duration-200 data-[open=true]:translate-x-0",
 					// Desktop: static sticky rail, always visible.
 					"md:sticky md:top-(--kizlo-admin-bar) md:z-auto md:h-[calc(100vh-var(--kizlo-admin-bar))] md:translate-x-0 md:transition-none",
 					className,

@@ -29,7 +29,12 @@ export function AuthorsSettingsPage() {
 	}
 
 	return (
-		<SettingsForm isLoading={isLoading} isDirty={form.formState.isDirty} onSubmit={form.handleSubmit(onSubmit)}>
+		<SettingsForm
+			isLoading={isLoading}
+			isDirty={form.formState.isDirty}
+			onSubmit={form.handleSubmit(onSubmit)}
+			onCancel={() => form.reset()}
+		>
 			<SettingsSection
 				title="Authors"
 				desc="Manage the URL structure and SEO configuration for author archive pages, including title templates, meta descriptions, and search visibility."

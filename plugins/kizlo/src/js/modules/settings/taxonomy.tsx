@@ -37,7 +37,13 @@ export function TaxonomySettingsPage() {
 	const content = getContent({ name: taxonomy.name })
 
 	return (
-		<SettingsForm key={params.slug} isLoading={isLoading} isDirty={form.formState.isDirty} onSubmit={form.handleSubmit(onSubmit)}>
+		<SettingsForm
+			key={params.slug}
+			isLoading={isLoading}
+			isDirty={form.formState.isDirty}
+			onSubmit={form.handleSubmit(onSubmit)}
+			onCancel={() => form.reset()}
+		>
 			<SettingsSection title={content.url.heading} desc={content.url.description}>
 				<VariableField
 					name="pathname_structure"

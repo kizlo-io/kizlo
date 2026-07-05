@@ -1,6 +1,6 @@
 import { createRoot } from "@wordpress/element"
 import { HashRouter } from "react-router-dom"
-import { Toaster } from "@/shared/ui/sonner"
+import { Toaster } from "@/shared/components/ui/sonner"
 import App from "./App"
 
 const container = document.getElementById("kizlo-root")

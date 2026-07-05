@@ -17,12 +17,17 @@ export const webpageTypeOptions: SelectOption[] = [
 ]
 
 interface PageTypeFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
-	extends Omit<BaseFieldProps<TFieldValues, TContext, TTransformedValues>, "label" | "placeholder"> {}
+	extends Omit<BaseFieldProps<TFieldValues, TContext, TTransformedValues>, "label" | "placeholder"> {
+	label?: string
+}
 
 export function PageTypeField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
 	control,
+	label,
 	name,
 	description,
 }: PageTypeFieldProps<TFieldValues, TContext, TTransformedValues>) {
-	return <ComboboxField control={control} name={name} label="Web Page Type" options={webpageTypeOptions} description={description} />
+	return (
+		<ComboboxField control={control} name={name} label={label ?? "Web Page Type"} options={webpageTypeOptions} description={description} />
+	)
 }

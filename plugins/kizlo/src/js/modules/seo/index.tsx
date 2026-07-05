@@ -1,6 +1,6 @@
 import { createRoot } from "@wordpress/element"
 import { ComponentGallery } from "@/shared/components/ui/gallery"
-import { Toaster } from "@/shared/ui/sonner"
+import { Toaster } from "@/shared/components/ui/sonner"
 import { MetaBox } from "./MetaBox"
 import "./types"
 

@@ -1,4 +1,7 @@
+import { useNavigate } from "react-router-dom"
 import { cn } from "@/shared/lib/utils"
+
+const LOGO_ICON_DARK = "https://cdn.kizlo.io/logo/icon-dark.svg"
 
 export function Logo({
 	iconOnly = false,
@@ -11,19 +14,13 @@ export function Logo({
 	logoClassNames?: string
 	textClassNames?: string
 } & React.HTMLAttributes<HTMLElement>) {
+	const navigate = useNavigate()
 	return (
-		<div className={cn("group/logo flex w-max items-center *:transition-all *:duration-200", className)} {...props}>
-			<div className="aspect-square rounded-md bg-background-panel p-2">
-				<LogoIcon className={cn("size-6", logoClassNames)} />
-			</div>
+		// biome-ignore lint/a11y/noStaticElementInteractions: ignore
+		<div className={cn("flex w-max cursor-pointer items-center gap-2", className)} onClick={() => navigate("/general/site")} {...props}>
+			<img alt="Kizlo" src={LOGO_ICON_DARK} className={cn("size-6 object-contain", className)} {...props} />
 
 			{!iconOnly && <div className={cn("relative text-xl tracking-tight", textClassNames)}>kizlo</div>}
 		</div>
 	)
-}
-
-const LOGO_ICON_DARK = "https://cdn.kizlo.io/logo/icon-dark.svg"
-
-export function LogoIcon({ className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
-	return <img alt="Kizlo" src={LOGO_ICON_DARK} className={cn("object-contain", className)} {...props} />
 }

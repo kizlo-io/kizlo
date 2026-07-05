@@ -1,13 +1,25 @@
+import {
+	ArticleIcon,
+	BrowsersIcon,
+	EyeIcon,
+	GlobeIcon,
+	LinkIcon,
+	PaperPlaneTiltIcon,
+	TextAlignLeftIcon,
+	TextTIcon,
+	XLogoIcon,
+} from "@phosphor-icons/react"
 import { useMemo, useState } from "react"
 import { type Control, type FieldPath, useForm } from "react-hook-form"
-import { ArticleTypeField } from "@/modules/settings/shared/article-type-field"
-import { PageTypeField } from "@/modules/settings/shared/page-type-field"
+import { ArticleTypeField, articleTypeOptions } from "@/modules/settings/shared/article-type-field"
+import { PageTypeField, webpageTypeOptions } from "@/modules/settings/shared/page-type-field"
 import { SwitchField, TextInputField } from "@/shared/components/fields"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
-import { Tabs } from "@/shared/components/ui/tabs"
 import { VariableField } from "@/shared/components/variable-field"
 import type { MediaItem } from "@/shared/hooks/use-media-library"
 import type { Variable } from "@/shared/lib/schema"
+import { Accordion, AccordionRow, type Tone } from "./accordion"
+import { Preview } from "./Preview"
 import type { SeoDefaults, SeoImage, SeoMeta } from "./types"
 
 interface SeoForm {
@@ -29,6 +41,9 @@ interface MetaBoxProps {
 	defaults: SeoDefaults
 	variables: Variable[]
 }
+
+const TITLE_MAX = 60
+const DESC_MAX = 160
 
 export function MetaBox({ meta, defaults, variables }: MetaBoxProps) {
 	const form = useForm<SeoForm>({
@@ -76,121 +91,157 @@ export function MetaBox({ meta, defaults, variables }: MetaBoxProps) {
 		[values, defaults.webpage_type, defaults.article_type, ogImage, twitterImage],
 	)
 
+	const effectiveTitle = (values.title.trim() || defaults.title).trim()
+	const effectiveDescription = (values.description.trim() || defaults.description).trim()
+	const indexable = defaults.indexable && !values.noindex
+	const hasImage = Boolean(ogImage?.url || defaults.og_image?.url)
+
 	return (
-		<div className="py-2">
+		<div>
 			<input type="hidden" name="kizlo_seo" value={serialized} />
 
-			<Tabs
-				tabs={[
-					{ name: "seo", title: "SEO" },
-					{ name: "schema", title: "Schema" },
-					{ name: "social", title: "Social" },
-					{ name: "advanced", title: "Advanced" },
-				]}
-			>
-				{(name) => (
-					<div className="pt-4">
-						{name === "seo" ? (
-							<div className="flex flex-col gap-7">
-								<VariableField
-									control={form.control}
-									name="title"
-									variant="text"
-									label="SEO title"
-									placeholder={defaults.title}
-									description="Leave empty to use the post-type title template."
-									variables={variables}
-								/>
-								<VariableField
-									control={form.control}
-									name="description"
-									variant="textarea"
-									label="Meta description"
-									placeholder={defaults.description}
-									description="Shown in search results and social previews when set."
-									variables={variables}
-								/>
-							</div>
-						) : null}
+			<div className="flex flex-col">
+				<Preview
+					title={effectiveTitle}
+					description={effectiveDescription}
+					url={values.canonical.trim() || defaults.canonical}
+					indexable={indexable}
+				/>
 
-						{name === "schema" ? (
-							<div className="flex flex-col gap-7">
-								<PageTypeField
-									control={form.control}
-									name="webpage_type"
-									description="The Schema.org WebPage subtype. Preset to the post-type default; change it to override for this post."
-								/>
-								<ArticleTypeField
-									control={form.control}
-									name="article_type"
-									description="The Schema.org Article subtype. Preset to the post-type default; change it to override for this post."
-								/>
-							</div>
-						) : null}
+				<Accordion defaultOpen={["title", "description"]}>
+					<AccordionRow
+						id="title"
+						icon={TextTIcon}
+						label="SEO title"
+						value={`${effectiveTitle.length} / ${TITLE_MAX}`}
+						tone={lengthTone(effectiveTitle.length, 30, TITLE_MAX)}
+					>
+						<VariableField
+							control={form.control}
+							name="title"
+							variant="text"
+							label="Title"
+							placeholder={defaults.title}
+							description="Leave empty to use the post-type title template."
+							variables={variables}
+						/>
+					</AccordionRow>
 
-						{name === "social" ? (
-							<div className="flex flex-col gap-8">
-								<SocialGroup
-									heading="Open Graph"
-									hint="Facebook, LinkedIn, and most link previews."
-									control={form.control}
-									titleName="og_title"
-									descName="og_description"
-									variables={variables}
-									titlePlaceholder={defaults.title}
-									descPlaceholder={defaults.description}
-									initialImageUrl={meta.og.image?.url}
-									onImageChange={(item) => setOgImage(item ? { id: item.id, url: item.url } : null)}
-								/>
+					<AccordionRow
+						id="description"
+						icon={TextAlignLeftIcon}
+						label="Meta description"
+						value={`${effectiveDescription.length} / ${DESC_MAX}`}
+						tone={lengthTone(effectiveDescription.length, 120, DESC_MAX)}
+					>
+						<VariableField
+							control={form.control}
+							label="Description"
+							name="description"
+							variant="textarea"
+							placeholder={defaults.description}
+							description="Shown in search results and social previews when set."
+							variables={variables}
+						/>
+					</AccordionRow>
 
-								<SocialGroup
-									heading="Twitter"
-									hint="X / Twitter cards. Falls back to the Open Graph values."
-									control={form.control}
-									titleName="twitter_title"
-									descName="twitter_description"
-									variables={variables}
-									titlePlaceholder={defaults.title}
-									descPlaceholder={defaults.description}
-									initialImageUrl={meta.twitter.image?.url}
-									onImageChange={(item) => setTwitterImage(item ? { id: item.id, url: item.url } : null)}
-								/>
-							</div>
-						) : null}
+					<AccordionRow
+						id="indexing"
+						icon={EyeIcon}
+						label="Search indexing"
+						value={indexable ? "Visible in search" : "Hidden from search"}
+						tone={indexable ? "good" : "bad"}
+					>
+						<SwitchField control={form.control} name="noindex" label="No index" description="Ask search engines not to index this post." />
+					</AccordionRow>
 
-						{name === "advanced" ? (
-							<div className="flex flex-col gap-7">
-								<TextInputField
-									control={form.control}
-									name="canonical"
-									label="Canonical URL"
-									placeholder={defaults.canonical}
-									description="Override the canonical link for this post."
-								/>
-								<SwitchField
-									control={form.control}
-									name="noindex"
-									label="No index"
-									description="Ask search engines not to index this post."
-								/>
-								<SwitchField
-									control={form.control}
-									name="nofollow"
-									label="No follow"
-									description="Ask search engines not to follow links on this post."
-								/>
-							</div>
-						) : null}
-					</div>
-				)}
-			</Tabs>
+					<AccordionRow
+						id="following"
+						icon={LinkIcon}
+						label="Link following"
+						value={values.nofollow ? "Links not followed" : "Links followed"}
+						tone={values.nofollow ? "warn" : "good"}
+					>
+						<SwitchField
+							control={form.control}
+							name="nofollow"
+							label="No follow"
+							description="Ask search engines not to follow links on this post."
+						/>
+					</AccordionRow>
+
+					<AccordionRow id="page-type" icon={BrowsersIcon} label="Page type" value={labelOf(webpageTypeOptions, values.webpage_type)}>
+						<PageTypeField
+							control={form.control}
+							label="Type"
+							name="webpage_type"
+							description="The Schema.org WebPage subtype. Preset to the post-type default; change it to override for this post."
+						/>
+					</AccordionRow>
+
+					<AccordionRow id="article-type" icon={ArticleIcon} label="Article type" value={labelOf(articleTypeOptions, values.article_type)}>
+						<ArticleTypeField
+							label="Type"
+							control={form.control}
+							name="article_type"
+							description="The Schema.org Article subtype. Preset to the post-type default; change it to override for this post."
+						/>
+					</AccordionRow>
+
+					<AccordionRow
+						id="social"
+						icon={PaperPlaneTiltIcon}
+						label="Social Appearance"
+						value={hasImage ? "Set" : "Not set"}
+						tone={hasImage ? "good" : "warn"}
+					>
+						<SocialGroup
+							control={form.control}
+							titleName="og_title"
+							descName="og_description"
+							variables={variables}
+							titlePlaceholder={defaults.title}
+							descPlaceholder={defaults.description}
+							initialImageUrl={meta.og.image?.url}
+							onImageChange={(item) => setOgImage(item ? { id: item.id, url: item.url } : null)}
+						/>
+					</AccordionRow>
+
+					<AccordionRow
+						id="twitter"
+						icon={XLogoIcon}
+						label="Twitter Appearance"
+						value={hasImage ? "Set" : "Not set"}
+						tone={hasImage ? "good" : "warn"}
+					>
+						<SocialGroup
+							control={form.control}
+							titleName="twitter_title"
+							descName="twitter_description"
+							variables={variables}
+							titlePlaceholder={defaults.title}
+							descPlaceholder={defaults.description}
+							initialImageUrl={meta.twitter.image?.url}
+							onImageChange={(item) => setTwitterImage(item ? { id: item.id, url: item.url } : null)}
+						/>
+					</AccordionRow>
+
+					<AccordionRow id="canonical" icon={GlobeIcon} label="Canonical URL" value={values.canonical.trim() ? "Custom" : "Default"}>
+						<TextInputField
+							control={form.control}
+							name="canonical"
+							label="Canonical URL"
+							placeholder={defaults.canonical}
+							description="Override the canonical link for this post."
+						/>
+					</AccordionRow>
+				</Accordion>
+			</div>
 		</div>
 	)
 }
 
 interface SocialGroupProps {
-	heading: string
-	hint: string
 	control: Control<SeoForm>
 	titleName: FieldPath<SeoForm>
 	descName: FieldPath<SeoForm>
@@ -202,8 +253,6 @@ interface SocialGroupProps {
 }
 
 function SocialGroup({
-	heading,
-	hint,
 	control,
 	titleName,
 	descName,
@@ -214,39 +263,37 @@ function SocialGroup({
 	onImageChange,
 }: SocialGroupProps) {
 	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<p className="font-medium text-sm">{heading}</p>
-				<p className="text-muted-foreground text-sm">{hint}</p>
-			</div>
-
-			<div className="flex flex-col gap-7">
-				<VariableField
-					control={control}
-					name={titleName}
-					variant="text"
-					label="Title"
-					placeholder={titlePlaceholder}
-					variables={variables}
-				/>
-				<VariableField
-					control={control}
-					name={descName}
-					variant="textarea"
-					label="Description"
-					placeholder={descPlaceholder}
-					variables={variables}
-				/>
-				<MediaPicker
-					type="image"
-					width={1200}
-					height={630}
-					label="Image"
-					url={initialImageUrl ?? undefined}
-					onValueChange={onImageChange}
-					desc="Recommended 1200×630. Falls back to the featured image."
-				/>
-			</div>
+		<div className="flex flex-col gap-7">
+			<VariableField control={control} name={titleName} variant="text" label="Title" placeholder={titlePlaceholder} variables={variables} />
+			<VariableField
+				control={control}
+				name={descName}
+				variant="textarea"
+				label="Description"
+				placeholder={descPlaceholder}
+				variables={variables}
+			/>
+			<MediaPicker
+				type="image"
+				width={1200}
+				height={630}
+				label="Image"
+				url={initialImageUrl ?? undefined}
+				onValueChange={onImageChange}
+				desc="Recommended 1200×630. Falls back to the featured image."
+			/>
 		</div>
 	)
+}
+
+// Red when missing or over the limit, amber when present but under the
+// recommended minimum, green inside the recommended window.
+function lengthTone(length: number, min: number, max: number): Tone {
+	if (length === 0 || length > max) return "bad"
+	if (length < min) return "warn"
+	return "good"
+}
+
+function labelOf(options: { value: string; label: string }[], value: string): string {
+	return options.find((option) => option.value === value)?.label.replace(" (default)", "") ?? value
 }

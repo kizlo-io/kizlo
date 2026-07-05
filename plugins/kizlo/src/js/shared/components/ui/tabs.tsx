@@ -17,12 +17,7 @@ export interface TabsProps {
 
 export function Tabs({ tabs, initialTab, onChange, children, className }: TabsProps) {
 	return (
-		<TabPanel
-			tabs={tabs}
-			initialTabName={initialTab}
-			onSelect={(name) => onChange?.(name)}
-			className={cn("[&_.components-button]:px-0 [&_.components-button]:font-semibold [&_div]:gap-6", className)}
-		>
+		<TabPanel tabs={tabs} initialTabName={initialTab} onSelect={(name) => onChange?.(name)} className={cn("", className)}>
 			{(tab) => <>{children?.(tab.name)}</>}
 		</TabPanel>
 	)

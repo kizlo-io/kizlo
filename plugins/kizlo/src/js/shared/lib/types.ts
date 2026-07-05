@@ -21,6 +21,12 @@ export interface NavGroup {
 
 export type NavNode = NavLink | NavGroup
 
+/** A labelled block of nav nodes, rendered with a heading and spacing in the sidebar. */
+export interface NavSection {
+	label: string
+	items: NavNode[]
+}
+
 // ====================================================
 // TYPES
 // ====================================================

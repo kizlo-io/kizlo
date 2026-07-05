@@ -1,5 +1,5 @@
 import { type Control, Controller, type FieldPath, type FieldValues } from "react-hook-form"
-import { NumberInput, TextInput } from "./ui/input"
+import { NumberInput, TextareaInput, TextInput } from "./ui/input"
 import { Combobox, MultiSelect, Select, type SelectOption } from "./ui/select"
 import { Toggle } from "./ui/toggle"
 
@@ -9,7 +9,7 @@ export type { SelectOption } from "./ui/select"
 // its own label + description (help) and surfaces validation errors below.
 
 export interface BaseFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues> {
-	label: string
+	label?: string
 	name: FieldPath<TFieldValues>
 	description?: React.ReactNode
 	control: Control<TFieldValues, TContext, TTransformedValues>
@@ -47,6 +47,43 @@ export function TextInputField<TFieldValues extends FieldValues = FieldValues, T
 					<TextInput
 						name={name}
 						type={type}
+						label={label}
+						desc={description}
+						placeholder={placeholder}
+						value={field.value ?? ""}
+						onChange={field.onChange}
+					/>
+					<FieldError message={fieldState.error?.message} />
+				</div>
+			)}
+		/>
+	)
+}
+
+// ====================================================
+// TEXTAREA
+// ====================================================
+
+interface TextareaInputFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
+	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
+	placeholder?: string
+}
+
+export function TextareaInputField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
+	control,
+	name,
+	label,
+	description,
+	placeholder,
+}: TextareaInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
+	return (
+		<Controller
+			name={name}
+			control={control}
+			render={({ field, fieldState }) => (
+				<div>
+					<TextareaInput
+						name={name}
 						label={label}
 						desc={description}
 						placeholder={placeholder}

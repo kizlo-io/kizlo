@@ -28,7 +28,12 @@ export function WebhookSettingsPage() {
 	}
 
 	return (
-		<SettingsForm isLoading={isLoading} isDirty={form.formState.isDirty} onSubmit={form.handleSubmit(onSubmit)}>
+		<SettingsForm
+			isLoading={isLoading}
+			isDirty={form.formState.isDirty}
+			onSubmit={form.handleSubmit(onSubmit)}
+			onCancel={() => form.reset()}
+		>
 			<SettingsSection
 				title="Webhook URLs"
 				desc="One or more endpoints that will receive a POST request when triggered content changes. Each URL must be publicly accessible."

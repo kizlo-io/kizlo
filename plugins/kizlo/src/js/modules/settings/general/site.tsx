@@ -31,7 +31,12 @@ export function SiteSettingsPage() {
 	}
 
 	return (
-		<SettingsForm isLoading={isLoading} isDirty={form.formState.isDirty} onSubmit={form.handleSubmit(onSubmit)}>
+		<SettingsForm
+			isLoading={isLoading}
+			isDirty={form.formState.isDirty}
+			onSubmit={form.handleSubmit(onSubmit)}
+			onCancel={() => form.reset()}
+		>
 			<SettingsSection
 				title="Site identity"
 				desc="Core settings that identify your site to Kizlo and secure communication between the plugin and Kizlo sdk."
