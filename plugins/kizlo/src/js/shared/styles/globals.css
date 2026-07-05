@@ -1,161 +1,26 @@
-@layer theme, base, components, utilities;
-
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/theme.css";
 @import "tailwindcss/utilities.css";
 
-@custom-variant dark (&:is(.dark *));
-
-#kizlo-root a,
-#kizlo-root a:hover,
-#kizlo-root a:focus,
-#kizlo-root a:focus-visible,
-#kizlo-root a:active {
-	color: inherit;
-	text-decoration: inherit;
-	outline: none;
-	box-shadow: none;
-}
-
-#kizlo-root input:focus,
-#kizlo-root input:focus-visible,
-#kizlo-root button:focus,
-#kizlo-root button:focus-visible,
-#kizlo-root select:focus,
-#kizlo-root textarea:focus {
-	outline: none;
-	box-shadow: none;
-}
-
-.wp-die-message,
-p {
-	@apply m-0;
-}
-
-input[type="date"],
-input[type="datetime-local"],
-input[type="datetime"],
-input[type="email"],
-input[type="month"],
-input[type="number"],
-input[type="password"],
-input[type="search"],
-input[type="tel"],
-input[type="text"],
-input[type="time"],
-input[type="url"],
-input[type="week"] {
-	@apply px-3 py-1 text-base md:text-sm min-h-9 border-none shadow-none bg-transparent;
-}
-
-/* Remove autofill background */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-textarea:-webkit-autofill,
-textarea:-webkit-autofill:hover,
-textarea:-webkit-autofill:focus,
-select:-webkit-autofill,
-select:-webkit-autofill:hover,
-select:-webkit-autofill:focus {
-	-webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
-	box-shadow: 0 0 0px 1000px transparent inset !important;
-	-webkit-text-fill-color: var(--foreground) !important;
-	transition: background-color 9999s ease-in-out 0s;
-}
-
-code,
-kbd {
-	padding: 1px 5px;
-	margin: 0 1px;
-	font-size: 11px;
-}
-
-:root {
-	--background: oklch(97.913% 0.00011 271.152);
-	--foreground: oklch(0% 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(43.495% 0.00005 271.152);
-	--accent: oklch(95% 0.0001 271.152);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	--destructive-foreground: oklch(0.985 0 0);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--radius: 0.625rem;
-	--sidebar: hsl(0 0% 98%);
-	--sidebar-foreground: hsl(240 5.3% 26.1%);
-	--sidebar-primary: hsl(240 5.9% 10%);
-	--sidebar-primary-foreground: hsl(0 0% 98%);
-	--sidebar-accent: hsl(240 4.8% 95.9%);
-	--sidebar-accent-foreground: hsl(240 5.9% 10%);
-	--sidebar-border: hsl(220 13% 91%);
-	--sidebar-ring: hsl(217.2 91.2% 59.8%);
-}
-
-@theme inline {
-	--color-background: var(--background);
-	--color-foreground: var(--foreground);
-	--color-primary: var(--primary);
-	--color-primary-foreground: var(--primary-foreground);
-	--color-secondary: var(--secondary);
-	--color-secondary-foreground: var(--secondary-foreground);
-	--color-muted: var(--muted);
-	--color-muted-foreground: var(--muted-foreground);
-	--color-accent: var(--accent);
-	--color-accent-foreground: var(--accent-foreground);
-	--color-destructive: var(--destructive);
-	--color-destructive-foreground: var(--destructive-foreground);
-	--color-border: var(--border);
-	--color-input: var(--input);
-	--color-ring: var(--ring);
-	--color-card: var(--card);
-	--color-card-foreground: var(--card-foreground);
-	--color-popover: var(--popover);
-	--color-popover-foreground: var(--popover-foreground);
-	--radius-sm: calc(var(--radius) - 4px);
-	--radius-md: calc(var(--radius) - 2px);
-	--radius-lg: var(--radius);
-	--color-sidebar-ring: var(--sidebar-ring);
-	--color-sidebar-border: var(--sidebar-border);
-	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-	--color-sidebar-accent: var(--sidebar-accent);
-	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-	--color-sidebar-primary: var(--sidebar-primary);
-	--color-sidebar-foreground: var(--sidebar-foreground);
-	--color-sidebar: var(--sidebar);
-}
-
-.dark {
-	--sidebar: hsl(240 5.9% 10%);
-	--sidebar-foreground: hsl(240 4.8% 95.9%);
-	--sidebar-primary: hsl(224.3 76.3% 48%);
-	--sidebar-primary-foreground: hsl(0 0% 100%);
-	--sidebar-accent: hsl(240 3.7% 15.9%);
-	--sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-	--sidebar-border: hsl(240 3.7% 15.9%);
-	--sidebar-ring: hsl(217.2 91.2% 59.8%);
+#kizlo-root *,
+#kizlo-root *::before,
+#kizlo-root *::after {
+	box-sizing: border-box;
 }
 
 body {
-	font-family:
-		ui-sans-serif,
-		system-ui,
-		sans-serif,
-		Apple Color Emoji,
-		Segoe UI Emoji,
-		Segoe UI Symbol,
-		Noto Color Emoji;
-	@apply bg-background;
+	--kizlo-primary: var(--wp-admin-theme-color);
+	--kizlo-primary-foreground: oklch(1 0 0);
+}
+
+@theme inline {
+	--color-primary: var(--kizlo-primary);
+	--color-primary-foreground: var(--kizlo-primary-foreground);
+}
+
+@utility wp-ring {
+	box-shadow:
+		0 0 0 currentColor inset,
+		0 0 0 var(--wp-admin-border-width-focus, 1.5px) var(--kizlo-primary) !important;
 }
 
 #wpcontent {
@@ -163,17 +28,52 @@ body {
 }
 
 #wpbody-content {
-	padding-bottom: 8px;
+	padding-bottom: 0px;
 }
 
 #wpfooter {
 	@apply hidden;
 }
 
-#kizlo-root {
-	@apply text-foreground w-full flex flex-col h-full;
+.kizlo-combobox {
+	--kizlo-popover-top: 100%;
+	--kizlo-popover-inset: -1px;
 }
 
-* {
-	@apply border-border outline-ring/50;
+.kizlo-multiselect {
+	--kizlo-popover-top: calc(100% - 1px);
+	--kizlo-popover-inset: 0;
+}
+
+/* Positioning context. */
+.kizlo-combobox .components-combobox-control__suggestions-container,
+.kizlo-multiselect .components-form-token-field {
+	position: relative;
+}
+
+/* Normalize the input box so its border-box matches the anchor width. */
+.kizlo-combobox .components-combobox-control__suggestions-container,
+.kizlo-multiselect .components-form-token-field__input-container {
+	box-sizing: border-box;
+}
+
+/* Shared popover. */
+.kizlo-combobox .components-form-token-field__suggestions-list,
+.kizlo-multiselect .components-form-token-field__suggestions-list {
+	position: absolute;
+	box-sizing: border-box;
+	top: var(--kizlo-popover-top);
+	inset-inline: var(--kizlo-popover-inset);
+	z-index: 50;
+	border-radius: 0px 2px 0px 2px;
+	box-shadow:
+		0 0 0 0.5px var(--wp-admin-theme-color),
+		0 4px 12px rgb(0 0 0 / 0.08);
+	background: #fff;
+	border: 1px solid var(--wp-admin-theme-color);
+	border-top-color: #949494;
+}
+
+.kizlo-combobox .components-form-token-field__input {
+	height: 100%;
 }

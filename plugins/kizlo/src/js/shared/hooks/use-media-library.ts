@@ -1,3 +1,4 @@
+import apiFetch from "@wordpress/api-fetch"
 import { useRef } from "react"
 
 export type MediaItem = {
@@ -6,6 +7,14 @@ export type MediaItem = {
 	title: string
 	alt?: string
 	mime: string
+}
+
+type WP_RestMedia = {
+	id: number
+	source_url: string
+	title: { rendered: string }
+	alt_text: string
+	mime_type: string
 }
 
 export type MediaType = "image" | "video" | "audio" | "application"
@@ -67,7 +76,34 @@ export function useMediaLibrary(options: UseMediaOptions = {}) {
 		})
 	}
 
-	return { open }
+	const upload = async (file: File): Promise<MediaItem> => {
+		const body = new FormData()
+		body.append("file", file, file.name)
+
+		const media = await apiFetch<WP_RestMedia>({
+			path: "/wp/v2/media",
+			method: "POST",
+			body,
+		})
+
+		return {
+			id: media.id,
+			url: media.source_url,
+			title: media.title?.rendered ?? file.name,
+			alt: media.alt_text,
+			mime: media.mime_type,
+		}
+	}
+
+	return { open, upload, maxUploadSize: getMaxUploadSize() }
+}
+
+// WP enqueues the media scripts (via wp_enqueue_media) which localise the site's
+// max upload size in bytes, e.g. "8388608b". Returns null when unavailable.
+function getMaxUploadSize(): number | null {
+	const raw = window._wpPluploadSettings?.defaults?.filters?.max_file_size
+	const bytes = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : NaN
+	return Number.isFinite(bytes) && bytes > 0 ? bytes : null
 }
 
 function mapMedia(file: any): MediaItem {

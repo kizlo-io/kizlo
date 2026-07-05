@@ -1,11 +1,28 @@
 import { useStore } from "@nanostores/react"
-import { FileText, Gear, Tag, WebhooksLogo } from "@phosphor-icons/react"
+import {
+	ArticleIcon,
+	FileIcon,
+	FileTextIcon,
+	FolderIcon,
+	GlobeIcon,
+	HashIcon,
+	type Icon,
+	IdentificationBadgeIcon,
+	ImageIcon,
+	RobotIcon,
+	TagIcon,
+	UsersIcon,
+	WebhooksLogoIcon,
+} from "@phosphor-icons/react"
 import apiFetch from "@wordpress/api-fetch"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import type { Settings, SettingsMap } from "./schema"
 import { $settings } from "./store"
-import type { Menu } from "./types"
+import type { NavNode } from "./types"
+
+const POST_TYPE_ICONS: Record<string, Icon> = { post: ArticleIcon, page: FileIcon, attachment: ImageIcon }
+const TAXONOMY_ICONS: Record<string, Icon> = { category: FolderIcon, post_tag: HashIcon }
 
 export type SettingsKeys = keyof Settings
 
@@ -67,63 +84,39 @@ export function useSettings() {
 	return { settings, update, isLoading }
 }
 
-export function useMenus() {
+export function useNav(): NavNode[] {
 	const { settings } = useSettings()
 
-	// TODO: Remove title and descriptions from menu items.
-	const menus = useMemo<Menu[]>(
+	return useMemo<NavNode[]>(
 		() => [
+			{ type: "link", name: "General", path: "/general/site", icon: GlobeIcon },
+			{ type: "link", name: "Identity", path: "/general/identity", icon: IdentificationBadgeIcon },
+			{ type: "link", name: "Authors", path: "/general/authors", icon: UsersIcon },
+			{ type: "link", name: "Crawling", path: "/general/crawling", icon: RobotIcon },
 			{
-				name: "General",
-				icon: Gear,
-				items: [
-					{
-						name: "Site",
-						path: "/general/site",
-					},
-					{
-						name: "Identity",
-						path: "/general/identity",
-					},
-					{
-						name: "Authors",
-						path: "/general/authors",
-					},
-					{
-						name: "Crawling",
-						path: "/general/crawling",
-					},
-				],
-			},
-			{
+				type: "group",
+				id: "post-types",
 				name: "Post Types",
-				icon: FileText,
+				icon: FileTextIcon,
 				items: (settings?.post_types ?? []).map((item) => ({
 					name: item.name,
 					path: `/post-types/${item.slug}`,
+					icon: POST_TYPE_ICONS[item.slug] ?? FileTextIcon,
 				})),
 			},
 			{
+				type: "group",
+				id: "taxonomies",
 				name: "Taxonomies",
-				icon: Tag,
+				icon: TagIcon,
 				items: (settings?.taxonomies ?? []).map((item) => ({
 					name: item.name,
 					path: `/taxonomies/${item.slug}`,
+					icon: TAXONOMY_ICONS[item.slug] ?? TagIcon,
 				})),
 			},
-			{
-				name: "Integrations",
-				icon: WebhooksLogo,
-				items: [
-					{
-						name: "Webhooks",
-						path: "/integration/webhooks",
-					},
-				],
-			},
+			{ type: "link", name: "Webhooks", path: "/integration/webhooks", icon: WebhooksLogoIcon },
 		],
-		[],
+		[settings],
 	)
-
-	return menus
 }

@@ -27,11 +27,7 @@ class PluginSettingsPage
     public function enqueueScripts(string $hook): void
     {
         if (str_contains($hook, 'kizlo')) {
-            wp_enqueue_style('kizlo-globals', KIZLO_URL . 'build/shared/globals.css', [], (string) time());
-
-            // Expose admin menu background as a CSS variable
-            $bg = $GLOBALS['_wp_admin_css_colors'][get_user_option('admin_color') ?: 'fresh']->colors[0] ?? '#1d2327';
-            wp_add_inline_style('kizlo-globals', ":root{--kizlo-admin-menu-bg:{$bg};}");
+            wp_enqueue_style('kizlo-styles', KIZLO_URL . 'build/shared/styles.css', [], (string) time());
         }
 
         if ($hook !== 'toplevel_page_' . KIZLO_SETTINGS_PAGE) return;

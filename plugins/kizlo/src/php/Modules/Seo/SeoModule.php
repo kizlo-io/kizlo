@@ -13,6 +13,8 @@ class SeoModule
     public function register()
     {
         $this->registerRoutes();
+
+        (new SeoMetaBox())->register();
     }
 
     public function registerRoutes()

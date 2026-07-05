@@ -14,6 +14,31 @@ class SeoBase
 {
     protected const SITEMAP_PER_PAGE = 1000;
 
+    /**
+     * Per-post SEO override fields mapped to their individual post meta keys.
+     * Each override lives in its own key (rather than a serialized blob) so it
+     * stays queryable — e.g. sitemaps exclude posts by `_kizlo_seo_noindex`.
+     * All keys are underscore-prefixed, keeping them internal (hidden from the
+     * custom fields UI and the REST API).
+     *
+     * @var array<string, string>
+     */
+    public const OVERRIDE_KEYS = [
+        'title'               => '_kizlo_seo_title',
+        'description'         => '_kizlo_seo_description',
+        'canonical'           => '_kizlo_seo_canonical',
+        'webpage_type'        => '_kizlo_seo_webpage_type',
+        'article_type'        => '_kizlo_seo_article_type',
+        'noindex'             => '_kizlo_seo_noindex',
+        'nofollow'            => '_kizlo_seo_nofollow',
+        'og_title'            => '_kizlo_seo_og_title',
+        'og_description'      => '_kizlo_seo_og_description',
+        'og_image_id'         => '_kizlo_seo_og_image',
+        'twitter_title'       => '_kizlo_seo_twitter_title',
+        'twitter_description' => '_kizlo_seo_twitter_description',
+        'twitter_image_id'    => '_kizlo_seo_twitter_image',
+    ];
+
     public function __construct(protected Settings $settings) {}
 
     // ====================================================
@@ -80,19 +105,25 @@ class SeoBase
 
         $show_on_front = get_option('show_on_front');
         $posts_page_id = (int) get_option('page_for_posts');
+        $front_page_id = (int) get_option('page_on_front');
+
+        $noindex_counts = $this->noindexedCountsByType();
 
         foreach ($this->settings->postTypes->all() as $post_type_slug => $post_type) {
             if (! $post_type->getSearchEngineVisibility()) continue;
 
-            $count = wp_count_posts($post_type_slug)->publish ?? 0;
+            // Count only indexable posts (published minus per-post noindex overrides)
+            // so a type whose posts are all noindexed drops out of the index instead
+            // of linking an empty sitemap.
+            $published = (int) (wp_count_posts($post_type_slug)->publish ?? 0);
+            $count     = max(0, $published - ($noindex_counts[$post_type_slug] ?? 0));
 
             // The blog's sitemaps carry an injected entry even with no posts of
-            // their own: the page sitemap always holds the homepage, and the
-            // post sitemap holds the blog index whenever one exists. Keep those
-            // groups so neither the homepage nor the blog index is ever dropped.
+            // their own: the page sitemap holds the homepage and the post sitemap
+            // holds the blog index — unless that front page is itself noindexed.
             $carries_front = match ($post_type_slug) {
-                'post'  => $show_on_front === 'posts' || $posts_page_id > 0,
-                'page'  => true,
+                'post'  => $show_on_front === 'posts' || ($posts_page_id > 0 && ! $this->isNoindexed($posts_page_id)),
+                'page'  => ! ($show_on_front === 'page' && $front_page_id > 0 && $this->isNoindexed($front_page_id)),
                 default => false,
             };
 
@@ -143,6 +174,45 @@ class SeoBase
         }
 
         return $entries;
+    }
+
+    /**
+     * Count published posts carrying a per-post noindex override, grouped by post
+     * type, in a single query. Used to derive the indexable count for the index.
+     *
+     * @return array<string, int>
+     */
+    protected function noindexedCountsByType(): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_results(
+            "SELECT p.post_type AS post_type, COUNT(*) AS total
+             FROM {$wpdb->postmeta} pm
+             INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+             WHERE pm.meta_key = '_kizlo_seo_noindex' AND pm.meta_value = '1' AND p.post_status = 'publish'
+             GROUP BY p.post_type",
+            ARRAY_A
+        );
+
+        $counts = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $counts[(string) $row['post_type']] = (int) $row['total'];
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Whether a post carries a per-post noindex override.
+     *
+     * @param int $post_id
+     *
+     * @return bool
+     */
+    protected function isNoindexed(int $post_id): bool
+    {
+        return get_post_meta($post_id, self::OVERRIDE_KEYS['noindex'], true) === '1';
     }
 
     /**
@@ -235,14 +305,15 @@ class SeoBase
      * Build robots meta tag values.
      *
      * @param bool $indexable Whether the page should be indexed.
+     * @param bool $nofollow  Whether links on the page should not be followed.
      *
      * @return array
      */
-    protected function buildRobots(bool $indexable): array
+    protected function buildRobots(bool $indexable, bool $nofollow = false): array
     {
         return [
             'index'             => $indexable ? 'index' : 'noindex',
-            'follow'            => 'follow',
+            'follow'            => $nofollow ? 'nofollow' : 'follow',
             'max-snippet'       => 'max-snippet:-1',
             'max-image-preview' => 'max-image-preview:large',
             'max-video-preview' => 'max-video-preview:-1',
@@ -332,6 +403,71 @@ class SeoBase
     }
 
     /**
+     * Resolve an attachment id into the image detail shape used by OG/Twitter.
+     *
+     * @param int|null $id
+     *
+     * @return array{url: string, width: int|null, height: int|null, type: string|null, alt: string|null}|null
+     */
+    protected function imageDetails(?int $id): ?array
+    {
+        if (empty($id)) return null;
+
+        $url = wp_get_attachment_url($id);
+        if (empty($url)) return null;
+
+        $metadata = wp_get_attachment_metadata($id);
+
+        return [
+            'url'    => $url,
+            'width'  => $metadata['width']  ?? null,
+            'height' => $metadata['height'] ?? null,
+            'type'   => get_post_mime_type($id) ?: null,
+            'alt'    => get_post_meta($id, '_wp_attachment_image_alt', true) ?: null,
+        ];
+    }
+
+    /**
+     * Resolve the effective Open Graph and Twitter values from the per-post
+     * overrides, layered over the base SEO title/description/image. Twitter
+     * falls back to Open Graph, which falls back to the base values.
+     *
+     * @param array                    $overrides      The `_kizlo_seo` override array.
+     * @param string                   $base_title     Resolved SEO title.
+     * @param string|null              $base_desc      Resolved SEO description.
+     * @param int|null                 $base_image_id  Fallback image (featured image or site fallback).
+     * @param callable(string): string $resolve        Resolves a title/description template string.
+     *
+     * @return array{
+     *     og: array{title: string, description: string|null, image: array|null},
+     *     twitter: array{title: string, description: string|null, image: array|null},
+     * }
+     */
+    protected function resolveSocial(array $overrides, string $base_title, ?string $base_desc, ?int $base_image_id, callable $resolve): array
+    {
+        $og_title    = !empty($overrides['og_title'])       ? $resolve($overrides['og_title'])       : $base_title;
+        $og_desc     = !empty($overrides['og_description']) ? $resolve($overrides['og_description']) : $base_desc;
+        $og_image_id = !empty($overrides['og_image_id'])    ? (int) $overrides['og_image_id']        : $base_image_id;
+
+        $tw_title    = !empty($overrides['twitter_title'])       ? $resolve($overrides['twitter_title'])       : $og_title;
+        $tw_desc     = !empty($overrides['twitter_description']) ? $resolve($overrides['twitter_description']) : $og_desc;
+        $tw_image_id = !empty($overrides['twitter_image_id'])    ? (int) $overrides['twitter_image_id']        : $og_image_id;
+
+        return [
+            'og' => [
+                'title'       => $og_title,
+                'description' => $og_desc,
+                'image'       => $this->imageDetails($og_image_id),
+            ],
+            'twitter' => [
+                'title'       => $tw_title,
+                'description' => $tw_desc,
+                'image'       => $this->imageDetails($tw_image_id),
+            ],
+        ];
+    }
+
+    /**
      * Build article meta tag values.
      *
      * @param array{
@@ -377,8 +513,124 @@ class SeoBase
     }
 
     // ====================================================
+    // SCHEMA TYPE OVERRIDES
+    // ====================================================
+
+    /**
+     * Read the per-post SEO overrides stored by the editor meta box.
+     *
+     * @param WP_Post $post
+     *
+     * @return array
+     */
+    protected function postSeoOverrides(WP_Post $post): array
+    {
+        $overrides = [];
+
+        foreach (self::OVERRIDE_KEYS as $field => $meta_key) {
+            $value = get_post_meta($post->ID, $meta_key, true);
+
+            // Only set fields are present; an absent key means "inherit default".
+            if ($value !== '' && $value !== false && $value !== null) {
+                $overrides[$field] = $value;
+            }
+        }
+
+        return $overrides;
+    }
+
+    /**
+     * The effective Schema.org WebPage subtype for a post: the per-post override
+     * if set, otherwise the post type's configured type.
+     */
+    protected function effectiveWebpageType(WP_Post $post): string
+    {
+        $override = $this->postSeoOverrides($post)['webpage_type'] ?? '';
+
+        return $override !== '' ? $override : $this->settings->postTypes->get($post->post_type)->getWebpageType();
+    }
+
+    /**
+     * The effective Schema.org Article subtype for a post: the per-post override
+     * if set, otherwise the post type's configured type.
+     */
+    protected function effectiveArticleType(WP_Post $post): ?string
+    {
+        $override = $this->postSeoOverrides($post)['article_type'] ?? '';
+
+        return $override !== '' ? $override : $this->settings->postTypes->get($post->post_type)->getArticleType();
+    }
+
+    // ====================================================
     // JSON LD
     // ====================================================
+
+    /**
+     * Build an Article JSON-LD piece for a post, anchored to an arbitrary page
+     * URL. Shared by regular posts (their own permalink) and a static front page
+     * (the site base URL). Callers guarantee $article_type is a real type (not
+     * empty or 'none').
+     *
+     * @param WP_Post $post
+     * @param string  $page_url      The trailing-slashed URL the article belongs to.
+     * @param string  $article_type  Resolved Schema.org Article subtype.
+     *
+     * @return array
+     */
+    protected function buildArticleLd(WP_Post $post, string $page_url, string $article_type): array
+    {
+        $post_type_settings = $this->settings->postTypes->get($post->post_type);
+
+        $data = [
+            '@type'            => $article_type !== 'Article' ? ['Article', $article_type] : 'Article',
+            '@id'              => $page_url . '#article',
+            'isPartOf'         => ['@id' => $page_url],
+            'mainEntityOfPage' => ['@id' => $page_url],
+            'headline'         => get_the_title($post),
+            'datePublished'    => get_the_date('c', $post),
+            'dateModified'     => get_the_modified_date('c', $post),
+            'wordCount'        => str_word_count(wp_strip_all_tags($post->post_content)),
+            'commentCount'     => (int) get_comments_number($post->ID),
+            'inLanguage'       => $this->language(),
+            'publisher'        => ['@id' => $this->publisherId()],
+            'copyrightYear'    => get_the_date('Y', $post),
+            'copyrightHolder'  => ['@id' => $this->publisherId()],
+        ];
+
+        $author = get_userdata((int) $post->post_author);
+        if ($author) {
+            $data['author'] = [
+                'name' => $author->display_name,
+                '@id'  => $this->schemaId('Person', md5($author->user_email)),
+            ];
+        }
+
+        $thumbnail_url = get_the_post_thumbnail_url($post, 'full');
+        if ($thumbnail_url) {
+            $data['image']        = ['@id' => $page_url . '#primaryimage'];
+            $data['thumbnailUrl'] = $thumbnail_url;
+        }
+
+        $tags = get_the_tags($post->ID);
+        if ($tags && !is_wp_error($tags)) {
+            $data['keywords'] = array_map(fn($tag) => $tag->name, $tags);
+        }
+
+        if (comments_open($post->ID) && !empty($post_type_settings->getCommentActionStructure())) {
+            $structure   = $post_type_settings->getCommentActionStructure();
+            $pathname    = trim(str_replace($this->settings->getBaseUrl(), '', $page_url), '/');
+            $resolved    = $this->resolvePostTemplate($structure, $post, ['pathname' => $pathname]);
+            $comment_url = untrailingslashit($this->resolveUrl($this->settings->getBaseUrl(), $resolved));
+
+            $data['potentialAction'] = [
+                '@type'  => 'CommentAction',
+                'name'   => 'Comment',
+                'target' => [$comment_url],
+            ];
+        }
+
+        return $data;
+    }
 
     /**
      * Wrap graph pieces into a JSON-LD graph object.

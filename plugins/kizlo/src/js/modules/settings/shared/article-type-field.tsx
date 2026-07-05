@@ -1,5 +1,5 @@
 import type { FieldValues } from "react-hook-form"
-import { type BaseFieldProps, ComboboxField, type SelectOption } from "./fields"
+import { type BaseFieldProps, ComboboxField, type SelectOption } from "@/shared/components/fields"
 
 export const articleTypeOptions: SelectOption[] = [
 	{ value: "Article", label: "Article (default)" },

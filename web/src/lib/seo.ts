@@ -69,7 +69,10 @@ export function toMetadata(head: SeoHead): Metadata {
 	].join(", ")
 
 	return {
-		title: head.title,
+		// Kizlo resolves the full title (it already includes the site name via
+		// its own template), so opt out of the root layout's `%s | site` template
+		// to avoid appending the site name a second time.
+		title: { absolute: head.title },
 		description: head.og.description || undefined,
 		alternates: { canonical: head.canonical },
 		robots,
