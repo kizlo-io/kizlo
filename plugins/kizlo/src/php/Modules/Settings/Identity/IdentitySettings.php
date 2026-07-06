@@ -21,7 +21,7 @@ class IdentitySettings extends SettingsAbstract
 
     public function __construct(array $data)
     {
-        parent::__construct(['type' => $data['type']]);
+        parent::__construct(['type' => $data['type'] ?? self::IDENTITY_TYPE_DEFAULT]);
         $this->person       = new PersonSettings($data['person'] ?? []);
         $this->organization = new OrganizationSettings($data['organization'] ?? []);
     }

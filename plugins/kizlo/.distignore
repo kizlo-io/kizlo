@@ -1,6 +1,7 @@
 node_modules
 src/js
 tests
+phpunit.xml.dist
 docs
 .git
 .github

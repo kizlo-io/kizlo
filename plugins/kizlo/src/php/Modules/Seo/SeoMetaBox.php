@@ -33,7 +33,7 @@ class SeoMetaBox
     public function addMetaBox(): void
     {
         foreach (array_keys(Utils::getSettings()->postTypes->all()) as $post_type) {
-            add_meta_box('kizlo-seo', 'Kizlo SEO', [$this, 'render'], $post_type, 'normal', 'high');
+            add_meta_box('kizlo-seo', 'SEO', [$this, 'render'], $post_type, 'normal', 'high');
         }
     }
 
