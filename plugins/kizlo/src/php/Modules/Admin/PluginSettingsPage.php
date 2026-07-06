@@ -62,10 +62,8 @@ class PluginSettingsPage
 
     private function menuIcon(): string
     {
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-25 -25 250 250" fill="none">'
-            . '<rect width="74.5101" height="199.867" fill="white"/>'
-            . '<rect width="74.3302" height="200.353" transform="matrix(0.752813 0.658235 -0.662376 0.749171 134.462 0.768482)" fill="white"/>'
-            . '<rect x="101.96" y="102.371" width="98.0396" height="97.496" rx="48.748" fill="white"/>'
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -20 190 190" fill="none">'
+            . '<path d="M0 0H50V150H0V0ZM50 50H100V100H50V50ZM100 0H150V50H100V0ZM100 100H150V150H100V100Z" fill="white"/>'
             . '</svg>';
 
         return 'data:image/svg+xml;base64,' . base64_encode($svg);

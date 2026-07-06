@@ -16,8 +16,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 	if (error) return createMetadata({ alternates: { canonical: "/" } })
 
-	console.log(data.head)
-
 	return toMetadata(data.head)
 }
 

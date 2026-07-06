@@ -17,10 +17,10 @@ export function Logo({
 	const navigate = useNavigate()
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: ignore
-		<div className={cn("flex w-max cursor-pointer items-center gap-2", className)} onClick={() => navigate("/general/site")} {...props}>
+		<div className={cn("flex w-max cursor-pointer items-center gap-3", className)} onClick={() => navigate("/general/site")} {...props}>
 			<img alt="Kizlo" src={LOGO_ICON_DARK} className={cn("size-6 object-contain", className)} {...props} />
 
-			{!iconOnly && <div className={cn("relative text-xl tracking-tight", textClassNames)}>kizlo</div>}
+			{!iconOnly && <div className={cn("font-semibold text-lg lowercase", textClassNames)}>kizlo</div>}
 		</div>
 	)
 }
