@@ -109,6 +109,34 @@ class TermSchemaTest extends SeoTestCase
         $this->assertSame('summary_large_image', $meta['twitter']['card']);
     }
 
+    public function test_social_image_falls_back_to_site_fallback_image(): void
+    {
+        $fallback = $this->createImage(['file' => '2026/07/fallback.jpg', 'alt' => 'Fallback']);
+        $settings = $this->seedSettings(['site' => ['fallback_image' => $fallback]]);
+        $term     = $this->category('News', 'news');
+
+        // A term has no featured image and no override here, so the base social
+        // image is the site fallback.
+        $meta = (new TermSchema($settings))->buildMeta($term);
+
+        $this->assertStringContainsString('fallback.jpg', $meta['og']['image']['url']);
+        $this->assertSame('summary_large_image', $meta['twitter']['card']);
+    }
+
+    public function test_per_term_og_image_override_beats_site_fallback(): void
+    {
+        $fallback = $this->createImage(['file' => '2026/07/fallback.jpg']);
+        $override = $this->createImage(['file' => '2026/07/override.jpg']);
+        $settings = $this->seedSettings(['site' => ['fallback_image' => $fallback]]);
+        $term     = $this->category('News', 'news');
+
+        $this->applyTermOverrides($term->term_id, ['og_image_id' => $override]);
+
+        $og = (new TermSchema($settings))->buildMeta($term)['og'];
+
+        $this->assertStringContainsString('override.jpg', $og['image']['url']);
+    }
+
     public function test_invisible_taxonomy_reports_noindex(): void
     {
         $settings = $this->seedSettings(['taxonomies' => ['category' => ['search_engine_visibility' => false]]]);

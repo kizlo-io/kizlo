@@ -94,13 +94,14 @@ class TermSchema extends SeoBase
         $nofollow  = !empty($overrides['nofollow']);
 
         // Open Graph and Twitter fall back to the SEO title/description; a term
-        // has no featured image, so the social image comes solely from an
-        // override (og/twitter image), with Twitter falling back to Open Graph.
+        // has no featured image, so the base social image is the site fallback
+        // image, with the og/twitter override layered on top and Twitter falling
+        // back to Open Graph.
         $social = $this->resolveSocial(
             $overrides,
             $title,
             $description,
-            null,
+            $this->settings->site->getFallbackImage() ?: null,
             fn(string $template) => $this->resolveTermTemplate($template, $term),
         );
 

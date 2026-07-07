@@ -181,8 +181,7 @@ class PostSchema extends SeoBase
         $post_type_settings = $this->settings->postTypes->get($post->post_type);
         $overrides          = $this->postSeoOverrides($post);
 
-        $url    = $this->resolvePostUrl($post, $post_type_settings);
-        $author = get_userdata((int) $post->post_author);
+        $url = $this->resolvePostUrl($post, $post_type_settings);
 
         $title       =  $this->getPostTitle($post, $post_type_settings);
         $description =  $this->getPostDescription($post, $post_type_settings);
@@ -192,17 +191,15 @@ class PostSchema extends SeoBase
         $nofollow  = !empty($overrides['nofollow']);
 
         // Open Graph and Twitter each fall back to the SEO title/description and
-        // the featured image, with per-network overrides layered on top.
+        // the base image, with per-network overrides layered on top. The base
+        // image is the featured image, falling back to the site fallback image.
         $social = $this->resolveSocial(
             $overrides,
             $title,
             $description,
-            get_post_thumbnail_id($post->ID) ?: null,
+            get_post_thumbnail_id($post->ID) ?: ($this->settings->site->getFallbackImage() ?: null),
             fn(string $template) => $this->resolvePostTemplate($template, $post),
         );
-
-        $tags    = get_the_tags($post->ID);
-        $section = get_the_category($post->ID)[0]->name ?? null;
 
         $article_type    = $this->effectiveArticleType($post);
         $is_article_type = !empty($article_type) && $article_type !== 'none';
@@ -224,14 +221,7 @@ class PostSchema extends SeoBase
                 'image'       => $social['twitter']['image']['url'] ?? null,
                 'image_alt'   => $social['twitter']['image']['alt'] ?? null,
             ]),
-            'article'   =>  $is_article_type ? $this->buildArticleMeta([
-                'published_time' => get_the_date('c', $post),
-                'modified_time'   => get_the_modified_date('c', $post),
-                'author'         => $author->display_name ?? null,
-                'author_url'     => $author ? $this->resolveAuthorUrl($author) : null,
-                'section'        => $section,
-                'tags'           => $tags && !is_wp_error($tags) ? array_map(fn($tag) => $tag->name, $tags) : [],
-            ]) : null,
+            'article'   =>  $is_article_type ? $this->articleMetaFor($post) : null,
         ];
     }
 

@@ -24,7 +24,7 @@ may encode current bugs).
 |-------|---------|-------|---------|
 | 0 | Settings resolution (foundation) | ☑ done | 2026-07-07 |
 | 1 | Robots | ☑ done | 2026-07-07 |
-| 2 | Head meta (og / twitter / article) | ☐ not started | — |
+| 2 | Head meta (og / twitter / article) | ☑ done | 2026-07-07 |
 | 3 | JSON-LD | ☐ not started | — |
 | 4 | Sitemap | ☐ not started | — |
 
@@ -124,12 +124,12 @@ Read: `buildOg()` (~L336), `buildTwitter()` (~L369), `buildArticleMeta()` (~L484
 `resolveSocial()` (~L446), `imageDetails()` (~L412), and each schema's `buildMeta()`.
 
 Checklist:
-- [ ] Title / description resolution matches Phase 0 per schema (home, post, term, author)
-- [ ] og:* fields correct (type, url, image w/ dimensions, site_name, locale)
-- [ ] twitter:* fields correct (card type, image, creator/site)
-- [ ] article:* only on article types; published/modified/author/section/tag correct
-- [ ] Image fallback chain correct (per-post → settings default → none)
-- [ ] Tests realigned: `MetaShapeTest`, `PostSchemaMetaTest`
+- [x] Title / description resolution matches Phase 0 per schema (home, post, term, author) — audited, correct as-is
+- [x] og:* fields correct (type, url, image w/ dimensions, site_name, locale) — home og:type now flips to `article` for an Article front page
+- [x] twitter:* fields correct (card type, image, creator/site) — audited, correct as-is
+- [x] article:* only on article types; published/modified/author/section/tag correct — hooked up the home article block (was always null)
+- [x] Image fallback chain correct — added the missing site-fallback layer for posts + terms (was per-post → none)
+- [x] Tests realigned + extended: `MetaShapeTest`, `PostSchemaMetaTest`, `HomeSchemaTest`, `TermSchemaTest`
 
 ---
 
@@ -171,6 +171,53 @@ Checklist:
 ## Session log
 
 Record findings, decisions, and bugs here as you go. Newest at top.
+
+### 2026-07-07 / Phase 2 — Head meta (og / twitter / article)
+
+- **What the code does:** `buildMeta()` per schema assembles the head envelope
+  (`title, canonical, robots, og, twitter, article`) from four primitives:
+  `buildOg` (locale/type/title/url/site_name + optional description/image),
+  `buildTwitter` (card summary vs summary_large_image, handle from identity social
+  profiles, optional description/image/image_alt), `buildArticleMeta` (omit-empty
+  block), and `resolveSocial` (the twitter → og → base cascade). Title/description
+  resolution matched Phase 0 exactly per schema; twitter and og field sets were
+  correct. og:type: post=article, home/term=website, author=profile.
+- **Bugs / gaps found:**
+  1. **Post/term social image had no site-fallback layer.** `site->getFallbackImage()`
+     was consulted only by `HomeSchema` (grep: 2 hits, both HomeSchema). A post with
+     no featured image and no per-network override emitted *no* `og:image`; a term
+     emitted none unless overridden. Yoast falls back to the site/org default here.
+     **User confirmed:** add the layer. Post chain is now override → featured image →
+     site fallback → none; term chain is override → site fallback → none.
+  2. **Home article meta was never hooked up.** A static front page opted into an
+     Article type produced an Article node in `jsonLd()` but the *head* stayed
+     `og:type=website` with `article: null` — head and JSON-LD diverged. **User
+     confirmed:** hook it up (the webpage_type/article_type home fields were kept for
+     rare cases but left unwired). Home head now flips `og:type` to `article` and
+     populates the article block from the front page when it has a real Article type.
+  3. **`$author->display_name ?? null` read a property on `false`** when
+     `get_userdata()` failed (invalid author) — a suppressed-but-emitted PHP warning.
+     Fixed as a side effect of the refactor below.
+  4. **Author og:image = avatar, no fallback** — confirmed correct (Phase 0 open
+     question closed; authors stay settings-only).
+- **Fixes made (code):**
+  - New shared `SeoBase::articleMetaFor(WP_Post)` — the article block builder, used by
+    both `PostSchema` (own permalink) and `HomeSchema` (static front page). Removes the
+    duplicated block and fixes the `false->display_name` warning (`$author ? ... : null`).
+  - `PostSchema::buildMeta`: base image = `get_post_thumbnail_id() ?: (fallback ?: null)`;
+    article block via `articleMetaFor`; dropped the now-unused `$author` local.
+  - `TermSchema::buildMeta`: base image = `site->getFallbackImage() ?: null` (was `null`).
+  - `HomeSchema::buildMeta`: compute `effectiveArticleType($front_page)`; `og:type` is
+    `article` when it's a real type; article block via `articleMetaFor($front_page)`.
+- **Fixes made (tests):** +2 `HomeSchemaTest` (article front page flips head to article;
+  plain page stays website), +2 `PostSchemaMetaTest` (fallback image when no featured;
+  featured beats fallback), +2 `TermSchemaTest` (fallback image base; og override beats
+  fallback). `MetaShapeTest` unchanged (its term-minimal case has no fallback image, so
+  the OG-without-image shape still holds). Full suite green (148 tests, was 142),
+  PHPStan clean.
+- **Open questions for next session (Phase 3 — JSON-LD):** none from head meta. Note for
+  Phase 3: the home now advertises `og:type=article`, so double-check the homepage
+  `@graph` Article node wiring stays consistent with that.
 
 ### 2026-07-07 / Phase 0 — Settings resolution (foundation)
 

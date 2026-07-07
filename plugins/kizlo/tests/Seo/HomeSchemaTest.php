@@ -93,6 +93,33 @@ class HomeSchemaTest extends SeoTestCase
         $this->assertSame('https://example.com/#article', $article['@id']);
     }
 
+    public function test_static_front_page_article_type_flips_head_to_article(): void
+    {
+        $settings = $this->seedSettings();
+        // A page defaults to article_type "none"; opting the front page into a real
+        // Article type makes the head mirror the JSON-LD Article node.
+        $this->useStaticFrontPage([], ['article_type' => 'Article']);
+
+        $meta = (new HomeSchema($settings))->buildMeta();
+
+        $this->assertSame('article', $meta['og']['type']);
+        $this->assertNotNull($meta['article']);
+        $this->assertNotEmpty($meta['article']['published_time']);
+    }
+
+    public function test_static_front_page_without_article_type_stays_website(): void
+    {
+        $settings = $this->seedSettings();
+        // A page's default article_type is "none", so the homepage stays a website
+        // with no article block.
+        $this->useStaticFrontPage();
+
+        $meta = (new HomeSchema($settings))->buildMeta();
+
+        $this->assertSame('website', $meta['og']['type']);
+        $this->assertNull($meta['article']);
+    }
+
     public function test_static_front_page_webpage_type_override_applies(): void
     {
         $settings = $this->seedSettings();

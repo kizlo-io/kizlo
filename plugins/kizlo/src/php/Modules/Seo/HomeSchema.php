@@ -24,6 +24,13 @@ class HomeSchema extends SeoBase
         $indexable   = empty($overrides['noindex']);
         $nofollow    = !empty($overrides['nofollow']);
 
+        // A static front page can opt into an Article type; when it does, the
+        // homepage head mirrors a post (og:type=article + an article block),
+        // matching the Article node jsonLd() emits. The latest-posts homepage
+        // has no underlying page, so it stays a plain website.
+        $article_type = $front_page ? $this->effectiveArticleType($front_page) : null;
+        $is_article   = !empty($article_type) && $article_type !== 'none';
+
         // On the homepage, OG/Twitter fall back to the site fallback image (not a
         // featured image). Template overrides resolve against the front page when
         // one exists; the latest-posts homepage never carries overrides.
@@ -40,7 +47,7 @@ class HomeSchema extends SeoBase
             'canonical' => $canonical,
             'robots'    => $this->buildRobots($indexable, $nofollow),
             'og'        => $this->buildOg([
-                'type'        => 'website',
+                'type'        => $is_article ? 'article' : 'website',
                 'title'       => $social['og']['title'],
                 'description' => $social['og']['description'],
                 'url'         => $this->settings->getBaseUrl(),
@@ -52,7 +59,7 @@ class HomeSchema extends SeoBase
                 'image'       => $social['twitter']['image']['url'] ?? null,
                 'image_alt'   => $social['twitter']['image']['alt'] ?? null,
             ]),
-            'article'   => null,
+            'article'   => $is_article ? $this->articleMetaFor($front_page) : null,
         ];
     }
 

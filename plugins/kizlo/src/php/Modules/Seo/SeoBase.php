@@ -541,6 +541,30 @@ class SeoBase
         return $data;
     }
 
+    /**
+     * Resolve the article meta block for a post. Shared by regular posts (their
+     * own head) and a static front page opted into an Article type (the homepage
+     * head). Callers gate this on the post having a real Article type.
+     *
+     * @param WP_Post $post
+     *
+     * @return array
+     */
+    protected function articleMetaFor(WP_Post $post): array
+    {
+        $author = get_userdata((int) $post->post_author);
+        $tags   = get_the_tags($post->ID);
+
+        return $this->buildArticleMeta([
+            'published_time' => get_the_date('c', $post),
+            'modified_time'  => get_the_modified_date('c', $post),
+            'author'         => $author ? $author->display_name : null,
+            'author_url'     => $author ? $this->resolveAuthorUrl($author) : null,
+            'section'        => get_the_category($post->ID)[0]->name ?? null,
+            'tags'           => $tags && !is_wp_error($tags) ? array_map(fn($tag) => $tag->name, $tags) : [],
+        ]);
+    }
+
     // ====================================================
     // SCHEMA TYPE OVERRIDES
     // ====================================================

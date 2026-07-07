@@ -94,6 +94,31 @@ class PostSchemaMetaTest extends SeoTestCase
         $this->assertSame(1200, $og['image']['width']);
     }
 
+    public function test_open_graph_falls_back_to_site_fallback_image_without_featured(): void
+    {
+        $fallback = $this->createImage(['file' => '2026/07/fallback.jpg', 'alt' => 'Fallback']);
+        $settings = $this->seedSettings(['site' => ['fallback_image' => $fallback]]);
+        $post     = $this->createPost(['post_title' => 'No Thumb']);
+
+        $og = (new PostSchema($settings))->buildMeta($post)['og'];
+
+        // No featured image and no override, so the base image is the site fallback.
+        $this->assertStringContainsString('fallback.jpg', $og['image']['url']);
+        $this->assertSame('summary_large_image', (new PostSchema($settings))->buildMeta($post)['twitter']['card']);
+    }
+
+    public function test_featured_image_beats_site_fallback_image(): void
+    {
+        $fallback = $this->createImage(['file' => '2026/07/fallback.jpg']);
+        $thumb    = $this->createImage(['file' => '2026/07/featured.jpg']);
+        $settings = $this->seedSettings(['site' => ['fallback_image' => $fallback]]);
+        $post     = $this->createPost(['thumbnail_id' => $thumb]);
+
+        $og = (new PostSchema($settings))->buildMeta($post)['og'];
+
+        $this->assertStringContainsString('featured.jpg', $og['image']['url']);
+    }
+
     public function test_twitter_falls_back_to_open_graph_then_base(): void
     {
         $settings = $this->seedSettings();
