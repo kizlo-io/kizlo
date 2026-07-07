@@ -47,6 +47,68 @@ class TermSchemaTest extends SeoTestCase
         $this->assertSame('All posts in Guides', $meta['og']['description']);
     }
 
+    public function test_per_term_overrides_win_over_taxonomy_templates(): void
+    {
+        $settings = $this->seedSettings([
+            'taxonomies' => ['category' => ['title_structure' => 'Browse {{title}}']],
+        ]);
+        $term = $this->category('News', 'news');
+
+        $this->applyTermOverrides($term->term_id, [
+            'title'       => 'Hand-written term title',
+            'description' => 'Hand-written term description',
+            'canonical'   => 'https://example.com/custom-news',
+        ]);
+
+        $meta = (new TermSchema($settings))->buildMeta($term);
+
+        $this->assertSame('Hand-written term title', $meta['title']);
+        $this->assertSame('Hand-written term description', $meta['og']['description']);
+        $this->assertSame('https://example.com/custom-news/', $meta['canonical']);
+    }
+
+    public function test_per_term_noindex_override_forces_noindex_on_visible_taxonomy(): void
+    {
+        $settings = $this->seedSettings();
+        $term     = $this->category('News', 'news');
+
+        $this->applyTermOverrides($term->term_id, ['noindex' => '1', 'nofollow' => '1']);
+
+        $robots = (new TermSchema($settings))->buildMeta($term)['robots'];
+
+        $this->assertSame('noindex', $robots['index']);
+        $this->assertSame('nofollow', $robots['follow']);
+    }
+
+    public function test_twitter_social_falls_back_through_open_graph_to_base(): void
+    {
+        $settings = $this->seedSettings();
+        $term     = $this->category('News', 'news');
+
+        // Only the og title is overridden; twitter has none, so it inherits og,
+        // which in turn seeds the base title/description.
+        $this->applyTermOverrides($term->term_id, ['og_title' => 'Shared social title']);
+
+        $meta = (new TermSchema($settings))->buildMeta($term);
+
+        $this->assertSame('Shared social title', $meta['og']['title']);
+        $this->assertSame('Shared social title', $meta['twitter']['title']);
+    }
+
+    public function test_per_term_og_image_override_sets_the_social_image(): void
+    {
+        $settings = $this->seedSettings();
+        $term     = $this->category('News', 'news');
+        $image    = $this->createImage(['alt' => 'Term social image']);
+
+        $this->applyTermOverrides($term->term_id, ['og_image_id' => $image]);
+
+        $meta = (new TermSchema($settings))->buildMeta($term);
+
+        $this->assertNotNull($meta['og']['image']);
+        $this->assertSame('summary_large_image', $meta['twitter']['card']);
+    }
+
     public function test_invisible_taxonomy_reports_noindex(): void
     {
         $settings = $this->seedSettings(['taxonomies' => ['category' => ['search_engine_visibility' => false]]]);

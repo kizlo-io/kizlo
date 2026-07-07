@@ -16,7 +16,12 @@ if (container && isPreview) {
 } else if (container && window.kizloSeo) {
 	createRoot(container).render(
 		<>
-			<MetaBox meta={window.kizloSeo.meta} defaults={window.kizloSeo.defaults} variables={window.kizloSeo.variables} />
+			<MetaBox
+				meta={window.kizloSeo.meta}
+				defaults={window.kizloSeo.defaults}
+				variables={window.kizloSeo.variables}
+				variant={window.kizloSeo.variant ?? "post"}
+			/>
 			<Toaster position="top-right" swipeDirections={["right"]} />
 		</>,
 	)

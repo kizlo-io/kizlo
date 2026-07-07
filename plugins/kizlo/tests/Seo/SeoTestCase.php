@@ -189,6 +189,19 @@ abstract class SeoTestCase extends TestCase
         }
     }
 
+    /**
+     * Persist per-term SEO overrides directly against their term meta keys.
+     *
+     * @param array<string, mixed> $overrides Keyed by OVERRIDE_KEYS field (e.g. 'noindex', 'title').
+     */
+    protected function applyTermOverrides(int $term_id, array $overrides): void
+    {
+        foreach ($overrides as $field => $value) {
+            $meta_key = \Kizlo\Modules\Seo\SeoBase::OVERRIDE_KEYS[$field];
+            update_term_meta($term_id, $meta_key, $value);
+        }
+    }
+
     /** Promote the current user to an administrator (needed for capability-gated paths). */
     protected function actingAsAdmin(): int
     {

@@ -569,6 +569,33 @@ class SeoBase
     }
 
     /**
+     * Read the per-term SEO overrides stored by the term editor.
+     *
+     * Terms reuse the same override keys as posts (stored in term meta, a
+     * separate table, so there is no collision). The term editor only writes the
+     * content/robots/social subset; `webpage_type`/`article_type` never apply.
+     *
+     * @param WP_Term $term
+     *
+     * @return array
+     */
+    protected function termSeoOverrides(WP_Term $term): array
+    {
+        $overrides = [];
+
+        foreach (self::OVERRIDE_KEYS as $field => $meta_key) {
+            $value = get_term_meta($term->term_id, $meta_key, true);
+
+            // Only set fields are present; an absent key means "inherit default".
+            if ($value !== '' && $value !== false && $value !== null) {
+                $overrides[$field] = $value;
+            }
+        }
+
+        return $overrides;
+    }
+
+    /**
      * The effective Schema.org WebPage subtype for a post: the per-post override
      * if set, otherwise the post type's configured type.
      */

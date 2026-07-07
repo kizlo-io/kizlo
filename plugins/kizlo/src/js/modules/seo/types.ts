@@ -51,12 +51,17 @@ export interface SeoOverrides {
 	twitter_image_id?: number
 }
 
+export type SeoVariant = "post" | "term"
+
 declare global {
 	interface Window {
 		kizloSeo: {
 			meta: SeoMeta
 			defaults: SeoDefaults
 			variables: Variable[]
+			// Absent on the post editor (defaults to "post"); "term" hides the
+			// schema-type/article fields that don't apply to taxonomy terms.
+			variant?: SeoVariant
 		}
 	}
 }

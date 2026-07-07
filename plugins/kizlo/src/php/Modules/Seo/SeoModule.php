@@ -15,6 +15,7 @@ class SeoModule
         $this->registerRoutes();
 
         (new SeoMetaBox())->register();
+        (new TermSeoMetaBox())->register();
     }
 
     public function registerRoutes()

@@ -83,27 +83,43 @@ class TermSchema extends SeoBase
     public function buildMeta(WP_Term $term): array
     {
         $taxonomy_settings = $this->settings->taxonomies->get($term->taxonomy);
+        $overrides         = $this->termSeoOverrides($term);
 
         $url         = $this->resolveTermUrl($term, $taxonomy_settings);
         $title       = $this->getTermTitle($term, $taxonomy_settings);
         $description = $this->getTermDescription($term, $taxonomy_settings);
 
+        $canonical = !empty($overrides['canonical']) ? trailingslashit($overrides['canonical']) : trailingslashit($url);
+        $indexable = $taxonomy_settings->getSearchEngineVisibility() && empty($overrides['noindex']);
+        $nofollow  = !empty($overrides['nofollow']);
+
+        // Open Graph and Twitter fall back to the SEO title/description; a term
+        // has no featured image, so the social image comes solely from an
+        // override (og/twitter image), with Twitter falling back to Open Graph.
+        $social = $this->resolveSocial(
+            $overrides,
+            $title,
+            $description,
+            null,
+            fn(string $template) => $this->resolveTermTemplate($template, $term),
+        );
+
         return [
             'title'     => $title,
-            'canonical' => trailingslashit($url),
-            'robots'    => $this->buildRobots($taxonomy_settings->getSearchEngineVisibility()),
+            'canonical' => $canonical,
+            'robots'    => $this->buildRobots($indexable, $nofollow),
             'og'        => $this->buildOg([
                 'type'        => 'website',
-                'title'       => $title,
-                'description' => $description,
+                'title'       => $social['og']['title'],
+                'description' => $social['og']['description'],
                 'url'         => trailingslashit($url),
-                'image'       => null,
+                'image'       => $social['og']['image'],
             ]),
             'twitter'   => $this->buildTwitter([
-                'title'       => $title,
-                'description' => $description,
-                'image'       => null,
-                'image_alt'   => null,
+                'title'       => $social['twitter']['title'],
+                'description' => $social['twitter']['description'],
+                'image'       => $social['twitter']['image']['url'] ?? null,
+                'image_alt'   => $social['twitter']['image']['alt'] ?? null,
             ]),
             'article'   => null,
         ];
@@ -215,10 +231,10 @@ class TermSchema extends SeoBase
      */
     private function getTermTitle(WP_Term $term, TaxonomySettings $taxonomy_settings): string
     {
-        return $this->resolveTermTemplate(
-            $taxonomy_settings->getTitleStructure() ?? Variables::DEFAULT_TAX_TITLE_TEMPLATE,
-            $term
-        );
+        $override = $this->termSeoOverrides($term)['title'] ?? '';
+        $template = $override !== '' ? $override : ($taxonomy_settings->getTitleStructure() ?? Variables::DEFAULT_TAX_TITLE_TEMPLATE);
+
+        return $this->resolveTermTemplate($template, $term);
     }
 
     /**
@@ -230,9 +246,41 @@ class TermSchema extends SeoBase
      */
     private function getTermDescription(WP_Term $term, TaxonomySettings $taxonomy_settings): ?string
     {
-        return $this->resolveTermTemplate(
+        $override = $this->termSeoOverrides($term)['description'] ?? '';
+        $template = $override !== '' ? $override : ($taxonomy_settings->getDescriptionStructure() ?? Variables::DEFAULT_TAX_DESC_TEMPLATE);
+
+        return $this->resolveTermTemplate($template, $term) ?: null;
+    }
+
+    /**
+     * Resolve the default (pre-override) SEO values for a term. Seeds the term
+     * editor's placeholders so editors see what each field falls back to.
+     *
+     * @param WP_Term $term
+     *
+     * @return array{title: string, description: string, canonical: string, indexable: bool, webpage_type: string, article_type: string, og_image: null}
+     */
+    public function seoDefaults(WP_Term $term): array
+    {
+        $taxonomy_settings = $this->settings->taxonomies->get($term->taxonomy);
+
+        $title = $this->resolveTermTemplate(
+            $taxonomy_settings->getTitleStructure() ?? Variables::DEFAULT_TAX_TITLE_TEMPLATE,
+            $term
+        );
+        $description = $this->resolveTermTemplate(
             $taxonomy_settings->getDescriptionStructure() ?? Variables::DEFAULT_TAX_DESC_TEMPLATE,
             $term
-        ) ?: null;
+        ) ?: '';
+
+        return [
+            'title'        => $title,
+            'description'  => $description,
+            'canonical'    => trailingslashit($this->resolveTermUrl($term, $taxonomy_settings)),
+            'indexable'    => (bool) $taxonomy_settings->getSearchEngineVisibility(),
+            'webpage_type' => '',
+            'article_type' => '',
+            'og_image'     => null,
+        ];
     }
 }

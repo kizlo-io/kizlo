@@ -7,5 +7,6 @@ class TaxonomyModule
     public function register(): void
     {
         (new TermListener())->register();
+        (new TermExtension())->register();
     }
 }

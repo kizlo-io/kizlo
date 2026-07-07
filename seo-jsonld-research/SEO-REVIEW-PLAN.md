@@ -22,7 +22,7 @@ may encode current bugs).
 
 | Phase | Feature | State | Session |
 |-------|---------|-------|---------|
-| 0 | Settings resolution (foundation) | ☐ not started | — |
+| 0 | Settings resolution (foundation) | ☑ done | 2026-07-07 |
 | 1 | Robots | ☑ done | 2026-07-07 |
 | 2 | Head meta (og / twitter / article) | ☐ not started | — |
 | 3 | JSON-LD | ☐ not started | — |
@@ -97,10 +97,10 @@ robots index/follow, og overrides, twitter overrides, article type) written into
 **Session log** below.
 
 Checklist:
-- [ ] `Settings` shape documented (which fields are per-post-type / per-taxonomy / global)
-- [ ] Per-post meta fields + their fallbacks documented
-- [ ] Precedence table complete for all fields above
-- [ ] Empty-string vs null vs missing behavior confirmed for each override
+- [x] `Settings` shape documented (which fields are per-post-type / per-taxonomy / global)
+- [x] Per-post meta fields + their fallbacks documented
+- [x] Precedence table complete for all fields above
+- [x] Empty-string vs null vs missing behavior confirmed for each override
 
 ---
 
@@ -171,6 +171,111 @@ Checklist:
 ## Session log
 
 Record findings, decisions, and bugs here as you go. Newest at top.
+
+### 2026-07-07 / Phase 0 — Settings resolution (foundation)
+
+Pure audit session: no code changed. Mapped the three-layer merge that every later
+phase depends on. Findings below; the precedence table is the deliverable.
+
+**The three layers (later wins):**
+
+1. **WP globals** — `get_bloginfo('name')`, `get_bloginfo('description')`, `get_option
+   ('show_on_front'/'page_on_front')`, `get_permalink`/`get_term_link`/`get_author_posts_url`,
+   featured image, dates. Only consulted as a *fallback* when Kizlo settings are unset.
+2. **Kizlo settings** (`Settings::cached()` → the `Settings` object). Scopes:
+   - `site` (global): `getName()`, `getTagline()`, `getUrl()`, `getFallbackImage()`,
+     `getDiscourageSearchEngines()`.
+   - `identity` (global): org-vs-person branch + social profiles (twitter handle).
+   - `authors` (global-for-all-authors): `getEnabled()`, `getSearchEngineVisibility()`,
+     `getTitleStructure()`, `getDescriptionStructure()`, `getPathnameStructure()`.
+   - `postTypes` (**per post type**): `getTitleStructure()`, `getDescriptionStructure()`,
+     `getWebpageType()`, `getArticleType()`, `getSearchEngineVisibility()`,
+     `getPathnameStructure()`.
+   - `taxonomies` (**per taxonomy**): same shape as postTypes minus article/webpage type.
+   - `crawling` (global): robots.txt custom rules + sitemap toggles (Phase 1/4).
+3. **Per-post meta** (`postSeoOverrides()`, keys in `SeoBase::OVERRIDE_KEYS`). **Posts only.**
+   13 keys: `title, description, canonical, webpage_type, article_type, noindex, nofollow,
+   og_title, og_description, og_image_id, twitter_title, twitter_description, twitter_image_id`.
+
+**Empty/null/missing semantics (confirmed):**
+- Write side (`SeoMetaBox::save`): every field sanitized, then `empty($value)` →
+  `delete_post_meta` (key removed), else `update_post_meta`. So `''`, `'0'`, `0` all delete.
+- Read side (`postSeoOverrides`): a key is included only when `!== '' && !== false && !== null`.
+  Absent key = "inherit". `noindex`/`nofollow` stored as `'1'`; read via `!empty()`.
+- Downstream every override is gated by `!empty(...)`, so a stored literal `"0"` would be
+  treated as unset (theoretical edge; the save side already strips it, so unreachable).
+
+**Per-field precedence table** (→ = "falls back to"):
+
+| Field | Home (static front page) | Home (latest posts) | Post | Term | Author |
+|-------|--------------------------|---------------------|------|------|--------|
+| **title** | override → post-type title tpl → site name | site name (`site->getName()` → `bloginfo`) | override → post-type title tpl → `DEFAULT_POST_TITLE_TEMPLATE` | taxonomy title tpl → `DEFAULT_TAX_TITLE_TEMPLATE` *(no per-term override)* | author title tpl → `DEFAULT_AUTHOR_TITLE_TEMPLATE` *(no override)* |
+| **description** | override → post-type desc tpl → tagline | tagline (`site->getTagline()` → `bloginfo`) | override → post-type desc tpl → default | taxonomy desc tpl → default *(no override)* | author desc tpl → default *(no override)* |
+| **canonical/url** | override canonical → `getBaseUrl()` | `getBaseUrl()` | override canonical → `resolvePostUrl` | `resolveTermUrl` *(no override)* | `resolveAuthorUrl` *(no override)* |
+| **image (og/tw base)** | override og/tw image → `site->getFallbackImage()` | same (front-page overrides empty) | override og/tw image → featured image (`get_post_thumbnail_id`) | none (`null`) | avatar (`get_avatar_url` 1200) *(no override)* |
+| **robots index** | `!override.noindex` (front page's meta) | always `index` | `postType.visibility && !override.noindex` | `taxonomy.visibility` | `authors.enabled && authors.visibility` |
+| **robots follow** | `!override.nofollow` | always `follow` | `!override.nofollow` | always `follow` | always `follow` |
+| **og:* overrides** | og_title/og_description/og_image → base title/desc/image | base only | og_* → base | base only (no og override) | base only |
+| **twitter:* overrides** | tw_* → og_* → base (see `resolveSocial`) | og→base | tw_* → og_* → base | base | base |
+| **webpage_type** | resolved for front page (`homeWebPageLd`) | `WebSite`/home type | override → `postType.getWebpageType()` | hardcoded `CollectionPage` | hardcoded `ProfilePage` |
+| **article_type** | front page: override → post-type article type (only if a real type) | none | override → `postType.getArticleType()`; `none`/empty ⇒ no Article | none | none |
+
+Global override sitting above everything: **`site->getDiscourageSearchEngines()`** forces
+`noindex` in `buildRobots()` regardless of the per-schema `indexable` flag (added in Phase 1).
+
+**Findings:**
+1. **Overrides were posts-only — a gap, now filled for terms.** Terms and authors had no
+   metabox, so their title/description/canonical/robots resolved straight from
+   taxonomy/author settings with no third layer. The term gap was intended to exist and
+   has now been closed (see follow-up below); the table's Term column gains a layer-3
+   override path. **Authors stay settings-only** (matches Yoast, which puts no SEO metabox
+   on the user profile — the extra author schema fields like honorific/birth date are
+   deferred). Phase 2/3 author tests must still not assume a per-author override path.
+2. **The static front page is a post**, so `homeOverrides()` reads that page's `_kizlo_seo_*`
+   meta. The homepage therefore *does* honor the per-post override layer; the latest-posts
+   homepage never does (no underlying post). The two home columns above differ for exactly
+   this reason.
+3. **`resolveSocial` twitter→og→base chain** is the only place a field cascades across two
+   override tiers; everything else is a single override-or-default. Flagged for Phase 2.
+4. **`!empty()` treats `"0"` as unset** everywhere overrides are consumed. Harmless today
+   (save side strips it) but worth a note if the metabox ever stops deleting empties.
+
+**Follow-up (same day) — term metabox built (Phase 0 gap fill):**
+- **New `TermSeoMetaBox`** (`Modules/Seo/`) mounts the same React root as the post box on
+  the edit-term screen of every managed taxonomy, via `{taxonomy}_edit_form_fields` +
+  `edited_{taxonomy}` (terms don't use `add_meta_boxes`). Registered in `SeoModule`.
+  Edit-term screen only (not the add-new quick form). Reuses the `seo` JS bundle (same
+  namespace segment, so `Asset::enqueue('kizlo-seo', self::class)` resolves to the same build).
+- **Storage** is term meta (`get_term_meta`/`update_term_meta`), reusing the shared
+  `OVERRIDE_KEYS` — a separate table from post meta, so no collision. New
+  `SeoBase::termSeoOverrides(WP_Term)` mirrors `postSeoOverrides`. Same empty/null/missing
+  semantics as posts (empty ⇒ `delete_term_meta` ⇒ inherit).
+- **Field subset:** title, description, canonical, noindex/nofollow, og/twitter
+  (title, desc, image). **No `webpage_type`** (terms are always `CollectionPage`) and **no
+  `article_type`** (N/A). The React `MetaBox` gained a `variant: "post" | "term"` prop that
+  hides those two accordions and swaps the post/term wording; term defaults send empty
+  schema-type values so nothing extra is persisted.
+- **Resolution:** `TermSchema::buildMeta` now layers overrides — title/description via the
+  override-or-template path (`getTermTitle`/`getTermDescription`), canonical via override,
+  robots via `visibility && !noindex` (+ `nofollow`), and social via the shared
+  `resolveSocial` (twitter → og → base). This answers one open question below: a term's
+  social **image** now has a source (the og/twitter override); base image stays `null`
+  (still no taxonomy default-image setting — intended).
+- **Delivery layer wired.** The editor stores + `TermSchema` resolves, but resolved term
+  SEO reached the frontend nowhere (posts go through `PostExtension` on `rest_prepare_post`;
+  terms had no equivalent — only sitemap entries). Added **`TermExtension`**
+  (`Modules/Taxonomy/`, registered in `TaxonomyModule`) hooking `rest_prepare_{taxonomy}` for
+  every managed taxonomy (same `settings->taxonomies->all()` set as the editor, so category /
+  post_tag / any included `show_in_rest` custom tax like product_cat all get it). Single-term
+  responses now carry `kizlo.seo.head` + `kizlo.seo.schema`; list + single carry a light term
+  base (id/name/slug/description/parent/count) + the `kizlo_extend_term(_list_item)` filter.
+- **Tests:** 5 new `TermSchemaTest` cases (override wins, noindex/nofollow force, twitter→og
+  fallback, og-image override) + `applyTermOverrides` helper in `SeoTestCase`; 3 new
+  `TermExtensionTest` cases (single carries head/schema, reflects overrides, list omits seo).
+  Full plugin suite green (142 tests), PHPStan clean, both TS projects typecheck, plugin JS builds.
+
+**Open questions for next session (Phase 2):** confirm author og image should be the avatar
+rather than the site fallback (authors remain settings-only, no override layer).
 
 ### 2026-07-07 / Phase 1 — Robots
 

@@ -18,9 +18,10 @@ import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { VariableField } from "@/shared/components/variable-field"
 import type { MediaItem } from "@/shared/hooks/use-media-library"
 import type { Variable } from "@/shared/lib/schema"
+import { cn } from "@/shared/lib/utils"
 import { Accordion, AccordionRow, type Tone } from "./accordion"
 import { Preview } from "./Preview"
-import type { SeoDefaults, SeoImage, SeoMeta } from "./types"
+import type { SeoDefaults, SeoImage, SeoMeta, SeoVariant } from "./types"
 
 interface SeoForm {
 	title: string
@@ -40,12 +41,19 @@ interface MetaBoxProps {
 	meta: SeoMeta
 	defaults: SeoDefaults
 	variables: Variable[]
+	variant?: SeoVariant
 }
 
 const TITLE_MAX = 60
 const DESC_MAX = 160
 
-export function MetaBox({ meta, defaults, variables }: MetaBoxProps) {
+export function MetaBox({ meta, defaults, variables, variant = "post" }: MetaBoxProps) {
+	// Terms are always a Schema.org CollectionPage with no featured image, so the
+	// page-type and article-type controls don't apply.
+	const isTerm = variant === "term"
+	const noun = isTerm ? "term" : "post"
+	const templateSource = isTerm ? "taxonomy" : "post-type"
+	const imageDesc = isTerm ? "Recommended 1200×630." : "Recommended 1200×630. Falls back to the featured image."
 	const form = useForm<SeoForm>({
 		defaultValues: {
 			title: meta.title,
@@ -97,79 +105,84 @@ export function MetaBox({ meta, defaults, variables }: MetaBoxProps) {
 	const hasImage = Boolean(ogImage?.url || defaults.og_image?.url)
 
 	return (
-		<div>
+		<div className={cn("flex flex-col", isTerm && "border border-neutral-300 bg-white shadow-[0_1px_1px_rgba(0,0,0,.04)]")}>
 			<input type="hidden" name="kizlo_seo" value={serialized} />
 
-			<div className="flex flex-col">
-				<Preview
-					title={effectiveTitle}
-					description={effectiveDescription}
-					url={values.canonical.trim() || defaults.canonical}
-					indexable={indexable}
-				/>
+			<Preview
+				title={effectiveTitle}
+				description={effectiveDescription}
+				url={values.canonical.trim() || defaults.canonical}
+				indexable={indexable}
+			/>
 
-				<Accordion defaultOpen={["title", "description"]}>
-					<AccordionRow
-						id="title"
-						icon={TextTIcon}
-						label="SEO title"
-						value={`${effectiveTitle.length} / ${TITLE_MAX}`}
-						tone={lengthTone(effectiveTitle.length, 30, TITLE_MAX)}
-					>
-						<VariableField
-							control={form.control}
-							name="title"
-							variant="text"
-							label="Title"
-							placeholder={defaults.title}
-							description="Leave empty to use the post-type title template."
-							variables={variables}
-						/>
-					</AccordionRow>
+			<Accordion>
+				<AccordionRow
+					id="title"
+					icon={TextTIcon}
+					label="SEO title"
+					value={`${effectiveTitle.length} / ${TITLE_MAX}`}
+					tone={lengthTone(effectiveTitle.length, 30, TITLE_MAX)}
+				>
+					<VariableField
+						control={form.control}
+						name="title"
+						variant="text"
+						label="Title"
+						placeholder={defaults.title}
+						description={`Leave empty to use the ${templateSource} title template.`}
+						variables={variables}
+					/>
+				</AccordionRow>
 
-					<AccordionRow
-						id="description"
-						icon={TextAlignLeftIcon}
-						label="Meta description"
-						value={`${effectiveDescription.length} / ${DESC_MAX}`}
-						tone={lengthTone(effectiveDescription.length, 120, DESC_MAX)}
-					>
-						<VariableField
-							control={form.control}
-							label="Description"
-							name="description"
-							variant="textarea"
-							placeholder={defaults.description}
-							description="Shown in search results and social previews when set."
-							variables={variables}
-						/>
-					</AccordionRow>
+				<AccordionRow
+					id="description"
+					icon={TextAlignLeftIcon}
+					label="Meta description"
+					value={`${effectiveDescription.length} / ${DESC_MAX}`}
+					tone={lengthTone(effectiveDescription.length, 120, DESC_MAX)}
+				>
+					<VariableField
+						control={form.control}
+						label="Description"
+						name="description"
+						variant="textarea"
+						placeholder={defaults.description}
+						description="Shown in search results and social previews when set."
+						variables={variables}
+					/>
+				</AccordionRow>
 
-					<AccordionRow
-						id="indexing"
-						icon={EyeIcon}
-						label="Search indexing"
-						value={indexable ? "Visible in search" : "Hidden from search"}
-						tone={indexable ? "good" : "bad"}
-					>
-						<SwitchField control={form.control} name="noindex" label="No index" description="Ask search engines not to index this post." />
-					</AccordionRow>
+				<AccordionRow
+					id="indexing"
+					icon={EyeIcon}
+					label="Search indexing"
+					value={indexable ? "Visible in search" : "Hidden from search"}
+					tone={indexable ? "good" : "bad"}
+				>
+					<SwitchField
+						control={form.control}
+						name="noindex"
+						label="No index"
+						description={`Ask search engines not to index this ${noun}.`}
+					/>
+				</AccordionRow>
 
-					<AccordionRow
-						id="following"
-						icon={LinkIcon}
-						label="Link following"
-						value={values.nofollow ? "Links not followed" : "Links followed"}
-						tone={values.nofollow ? "warn" : "good"}
-					>
-						<SwitchField
-							control={form.control}
-							name="nofollow"
-							label="No follow"
-							description="Ask search engines not to follow links on this post."
-						/>
-					</AccordionRow>
+				<AccordionRow
+					id="following"
+					icon={LinkIcon}
+					label="Link following"
+					value={values.nofollow ? "Links not followed" : "Links followed"}
+					tone={values.nofollow ? "warn" : "good"}
+				>
+					<SwitchField
+						control={form.control}
+						name="nofollow"
+						label="No follow"
+						description={`Ask search engines not to follow links on this ${noun}.`}
+					/>
+				</AccordionRow>
 
+				{!isTerm && (
 					<AccordionRow id="page-type" icon={BrowsersIcon} label="Page type" value={labelOf(webpageTypeOptions, values.webpage_type)}>
 						<PageTypeField
 							control={form.control}
@@ -178,7 +191,9 @@ export function MetaBox({ meta, defaults, variables }: MetaBoxProps) {
 							description="The Schema.org WebPage subtype. Preset to the post-type default; change it to override for this post."
 						/>
 					</AccordionRow>
+				)}
 
+				{!isTerm && (
 					<AccordionRow id="article-type" icon={ArticleIcon} label="Article type" value={labelOf(articleTypeOptions, values.article_type)}>
 						<ArticleTypeField
 							label="Type"
@@ -187,56 +202,58 @@ export function MetaBox({ meta, defaults, variables }: MetaBoxProps) {
 							description="The Schema.org Article subtype. Preset to the post-type default; change it to override for this post."
 						/>
 					</AccordionRow>
+				)}
 
-					<AccordionRow
-						id="social"
-						icon={PaperPlaneTiltIcon}
-						label="Social Appearance"
-						value={hasImage ? "Set" : "Not set"}
-						tone={hasImage ? "good" : "warn"}
-					>
-						<SocialGroup
-							control={form.control}
-							titleName="og_title"
-							descName="og_description"
-							variables={variables}
-							titlePlaceholder={defaults.title}
-							descPlaceholder={defaults.description}
-							initialImageUrl={meta.og.image?.url}
-							onImageChange={(item) => setOgImage(item ? { id: item.id, url: item.url } : null)}
-						/>
-					</AccordionRow>
+				<AccordionRow
+					id="social"
+					icon={PaperPlaneTiltIcon}
+					label="Social Appearance"
+					value={hasImage ? "Set" : "Not set"}
+					tone={hasImage ? "good" : "warn"}
+				>
+					<SocialGroup
+						control={form.control}
+						titleName="og_title"
+						descName="og_description"
+						variables={variables}
+						titlePlaceholder={defaults.title}
+						descPlaceholder={defaults.description}
+						imageDesc={imageDesc}
+						initialImageUrl={meta.og.image?.url}
+						onImageChange={(item) => setOgImage(item ? { id: item.id, url: item.url } : null)}
+					/>
+				</AccordionRow>
 
-					<AccordionRow
-						id="twitter"
-						icon={XLogoIcon}
-						label="Twitter Appearance"
-						value={hasImage ? "Set" : "Not set"}
-						tone={hasImage ? "good" : "warn"}
-					>
-						<SocialGroup
-							control={form.control}
-							titleName="twitter_title"
-							descName="twitter_description"
-							variables={variables}
-							titlePlaceholder={defaults.title}
-							descPlaceholder={defaults.description}
-							initialImageUrl={meta.twitter.image?.url}
-							onImageChange={(item) => setTwitterImage(item ? { id: item.id, url: item.url } : null)}
-						/>
-					</AccordionRow>
+				<AccordionRow
+					id="twitter"
+					icon={XLogoIcon}
+					label="Twitter Appearance"
+					value={hasImage ? "Set" : "Not set"}
+					tone={hasImage ? "good" : "warn"}
+				>
+					<SocialGroup
+						control={form.control}
+						titleName="twitter_title"
+						descName="twitter_description"
+						variables={variables}
+						titlePlaceholder={defaults.title}
+						descPlaceholder={defaults.description}
+						imageDesc={imageDesc}
+						initialImageUrl={meta.twitter.image?.url}
+						onImageChange={(item) => setTwitterImage(item ? { id: item.id, url: item.url } : null)}
+					/>
+				</AccordionRow>
 
-					<AccordionRow id="canonical" icon={GlobeIcon} label="Canonical URL" value={values.canonical.trim() ? "Custom" : "Default"}>
-						<TextInputField
-							control={form.control}
-							name="canonical"
-							label="Canonical URL"
-							placeholder={defaults.canonical}
-							description="Override the canonical link for this post."
-						/>
-					</AccordionRow>
-				</Accordion>
-			</div>
+				<AccordionRow id="canonical" icon={GlobeIcon} label="Canonical URL" value={values.canonical.trim() ? "Custom" : "Default"}>
+					<TextInputField
+						control={form.control}
+						name="canonical"
+						label="Canonical URL"
+						placeholder={defaults.canonical}
+						description="Override the canonical link for this post."
+					/>
+				</AccordionRow>
+			</Accordion>
 		</div>
 	)
 }
@@ -248,6 +265,7 @@ interface SocialGroupProps {
 	variables: Variable[]
 	titlePlaceholder: string
 	descPlaceholder: string
+	imageDesc: string
 	initialImageUrl?: string | null
 	onImageChange: (item: MediaItem | null) => void
 }
@@ -259,6 +277,7 @@ function SocialGroup({
 	variables,
 	titlePlaceholder,
 	descPlaceholder,
+	imageDesc,
 	initialImageUrl,
 	onImageChange,
 }: SocialGroupProps) {
@@ -280,7 +299,7 @@ function SocialGroup({
 				label="Image"
 				url={initialImageUrl ?? undefined}
 				onValueChange={onImageChange}
-				desc="Recommended 1200×630. Falls back to the featured image."
+				desc={imageDesc}
 			/>
 		</div>
 	)
