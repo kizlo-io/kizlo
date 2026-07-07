@@ -56,6 +56,14 @@ class MetaShapeTest extends SeoTestCase
         ], $this->callProtected($seo, 'buildRobots', [false, true]));
     }
 
+    /** The site-wide discourage toggle forces noindex even when the caller asks to index. */
+    public function test_robots_discourage_overrides_indexable_flag(): void
+    {
+        $seo = new SeoBase($this->seedSettings(['site' => ['discourage_search_engines' => true]]));
+
+        $this->assertSame('noindex', $this->callProtected($seo, 'buildRobots', [true, false])['index']);
+    }
+
     // ====================================================
     // OPEN GRAPH
     // ====================================================

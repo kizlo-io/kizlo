@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
-import { FieldError, TextInputField } from "@/shared/components/fields"
+import { FieldError, SwitchField, TextInputField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { SiteSettingsSchema, type SiteSettingsSchemaInput, type SiteSettingsSchemaOutput } from "@/shared/lib/schema"
@@ -22,6 +22,7 @@ export function SiteSettingsPage() {
 			title_separator: settings?.site.title_separator,
 			url: settings?.site.url ?? "",
 			backend_url: settings?.site.backend_url ?? "",
+			discourage_search_engines: settings?.site.discourage_search_engines ?? false,
 		},
 	})
 
@@ -171,6 +172,15 @@ export function SiteSettingsPage() {
 					control={form.control}
 					label="Search Results URL Template"
 					description="Use {{search_term_string}} as the user's query placeholder — for example https://yoursite.com/?s={{search_term_string}}."
+				/>
+			</SettingsSection>
+
+			<SettingsSection title="Search engine visibility" desc="Controls whether search engines are allowed to index your headless frontend.">
+				<SwitchField
+					name="discourage_search_engines"
+					control={form.control}
+					label="Discourage search engines from indexing this site"
+					description="When on, robots.txt blocks all crawlers and every page emits a noindex tag. This applies to your Kizlo frontend and is independent of WordPress's own setting. Leave off unless you want the frontend hidden from search."
 				/>
 			</SettingsSection>
 		</SettingsForm>

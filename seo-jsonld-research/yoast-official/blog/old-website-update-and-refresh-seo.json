@@ -1,0 +1,158 @@
+{
+	"@context": "https:\/\/schema.org",
+	"@graph": [
+		{
+			"@type": "Article",
+			"@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#article",
+			"isPartOf": { "@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/" },
+			"author": { "name": "Camille Cunningham", "@id": "https:\/\/yoast.com\/#\/schema\/person\/8b8390a302d3d96a18a2778d94d6ee4b" },
+			"headline": "Got an old website? Update it and refresh your SEO",
+			"datePublished": "2026-07-06T12:46:52+00:00",
+			"dateModified": "2026-07-06T12:46:55+00:00",
+			"mainEntityOfPage": { "@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/" },
+			"wordCount": 2168,
+			"commentCount": 0,
+			"publisher": { "@id": "https:\/\/yoast.com\/#organization" },
+			"image": { "@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#primaryimage" },
+			"thumbnailUrl": "https:\/\/yoast.com\/app\/uploads\/2021\/11\/fi_update_old_website.jpg",
+			"keywords": ["Technical SEO", "Website Maintenance"],
+			"inLanguage": "en-US",
+			"potentialAction": [
+				{ "@type": "CommentAction", "name": "Comment", "target": ["https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#respond"] }
+			],
+			"copyrightYear": "2026",
+			"copyrightHolder": { "@id": "https:\/\/yoast.com\/#organization" },
+			"accessibilityFeature": ["tableOfContents"]
+		},
+		{
+			"@type": "WebPage",
+			"@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/",
+			"url": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/",
+			"name": "Got an old website? Update it and refresh your SEO &#8226; Yoast",
+			"isPartOf": { "@id": "https:\/\/yoast.com\/#website" },
+			"primaryImageOfPage": { "@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#primaryimage" },
+			"image": { "@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#primaryimage" },
+			"thumbnailUrl": "https:\/\/yoast.com\/app\/uploads\/2021\/11\/fi_update_old_website.jpg",
+			"datePublished": "2026-07-06T12:46:52+00:00",
+			"dateModified": "2026-07-06T12:46:55+00:00",
+			"description": "Give your old site a refresh and update your SEO at the same time! In this post we'll explain where to start and what you should check.",
+			"breadcrumb": { "@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#breadcrumb" },
+			"inLanguage": "en-US",
+			"potentialAction": [{ "@type": "ReadAction", "target": ["https:\/\/yoast.com\/old-website-update-and-refresh-seo\/"] }]
+		},
+		{
+			"@type": "ImageObject",
+			"inLanguage": "en-US",
+			"@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#primaryimage",
+			"url": "https:\/\/yoast.com\/app\/uploads\/2021\/11\/fi_update_old_website.jpg",
+			"contentUrl": "https:\/\/yoast.com\/app\/uploads\/2021\/11\/fi_update_old_website.jpg",
+			"width": 2400,
+			"height": 1350,
+			"caption": "featured image showing an old computer"
+		},
+		{
+			"@type": "BreadcrumbList",
+			"@id": "https:\/\/yoast.com\/old-website-update-and-refresh-seo\/#breadcrumb",
+			"itemListElement": [
+				{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https:\/\/yoast.com\/" },
+				{ "@type": "ListItem", "position": 2, "name": "SEO blog", "item": "https:\/\/yoast.com\/seo-blog\/" },
+				{ "@type": "ListItem", "position": 3, "name": "Technical SEO", "item": "https:\/\/yoast.com\/tag\/technical-seo\/" },
+				{ "@type": "ListItem", "position": 4, "name": "Got an old website? Update it and refresh your SEO" }
+			]
+		},
+		{
+			"@type": "WebSite",
+			"@id": "https:\/\/yoast.com\/#website",
+			"url": "https:\/\/yoast.com\/",
+			"name": "Yoast",
+			"description": "SEO for everyone",
+			"publisher": { "@id": "https:\/\/yoast.com\/#organization" },
+			"potentialAction": [
+				{
+					"@type": "SearchAction",
+					"target": { "@type": "EntryPoint", "urlTemplate": "https:\/\/yoast.com\/?s={search_term_string}" },
+					"query-input": { "@type": "PropertyValueSpecification", "valueRequired": true, "valueName": "search_term_string" }
+				}
+			],
+			"inLanguage": "en-US",
+			"copyrightHolder": { "@id": "https:\/\/yoast.com\/#organization" }
+		},
+		{
+			"@type": ["Organization", "Brand"],
+			"@id": "https:\/\/yoast.com\/#organization",
+			"name": "Yoast",
+			"url": "https:\/\/yoast.com\/",
+			"logo": {
+				"@type": "ImageObject",
+				"inLanguage": "en-US",
+				"@id": "https:\/\/yoast.com\/#\/schema\/logo\/image\/",
+				"url": "https:\/\/yoast.com\/app\/uploads\/2020\/09\/Yoast_Icon_SocialMedia_500x500.png",
+				"contentUrl": "https:\/\/yoast.com\/app\/uploads\/2020\/09\/Yoast_Icon_SocialMedia_500x500.png",
+				"width": 500,
+				"height": 500,
+				"caption": "Yoast"
+			},
+			"image": { "@id": "https:\/\/yoast.com\/#\/schema\/logo\/image\/" },
+			"sameAs": [
+				"https:\/\/www.facebook.com\/yoast",
+				"https:\/\/x.com\/yoast",
+				"https:\/\/www.instagram.com\/yoast\/",
+				"https:\/\/www.linkedin.com\/company\/1414157\/",
+				"https:\/\/www.pinterest.com\/yoast\/",
+				"https:\/\/www.youtube.com\/yoast",
+				"https:\/\/en.wikipedia.org\/wiki\/Yoast",
+				"https:\/\/www.tiktok.com\/@yoastseo",
+				"https:\/\/g.co\/kgs\/4H5sG2",
+				"https:\/\/g.co\/kgs\/a9XfUu"
+			],
+			"numberOfEmployees": 86,
+			"founder": { "@type": "Person", "name": "Joost de Valk", "sameAs": "https:\/\/en.wikipedia.org\/wiki\/Joost_de_Valk" },
+			"foundingDate": "2010-05-01",
+			"slogan": "SEO for Everyone",
+			"description": "Yoast helps you with your website optimization, whether it be through our widely used SEO software or our online SEO courses: we&#039;re here to help.",
+			"legalName": "Yoast BV",
+			"parentOrganization": {
+				"@type": "Organization",
+				"name": "Newfold Digital",
+				"description": "Newfold Digital is a leading web presence solutions provider serving millions of small-to-medium businesses globally.",
+				"url": "https:\/\/newfold.com\/",
+				"sameAs": ["https:\/\/newfold.com\/"],
+				"logo": "https:\/\/yoast.com\/app\/uploads\/2022\/01\/newfold-logo.png"
+			},
+			"memberOf": {
+				"@type": "Organization",
+				"name": "World Wide Web Consortium (W3C)",
+				"description": "The World Wide Web Consortium (W3C) is an international community that develops open standards to ensure the long-term growth of the Web.",
+				"url": "https:\/\/w3.org\/",
+				"sameAs": ["https:\/\/w3.org\/"],
+				"logo": "https:\/\/www.w3.org\/Icons\/w3c_main.png"
+			}
+		},
+		{
+			"@type": "Person",
+			"@id": "https:\/\/yoast.com\/#\/schema\/person\/8b8390a302d3d96a18a2778d94d6ee4b",
+			"name": "Camille Cunningham",
+			"image": {
+				"@type": "ImageObject",
+				"inLanguage": "en-US",
+				"@id": "https:\/\/yoast.com\/app\/uploads\/2020\/09\/avatar_user_761170_1600084031-96x96.png",
+				"url": "https:\/\/yoast.com\/app\/uploads\/2020\/09\/avatar_user_761170_1600084031-96x96.png",
+				"contentUrl": "https:\/\/yoast.com\/app\/uploads\/2020\/09\/avatar_user_761170_1600084031-96x96.png",
+				"caption": "Camille Cunningham"
+			},
+			"description": "Camille is a content specialist at Yoast. As part of the Search team, she enjoys creating content that helps you master SEO.",
+			"sameAs": [
+				"https:\/\/www.linkedin.com\/in\/camille-cunningham-16b5162a",
+				"https:\/\/x.com\/CJosje",
+				"https:\/\/yoast.com\/about-us\/team\/camille-cunningham\/"
+			],
+			"honorificPrefix": "Ms",
+			"birthDate": "1989-06-17",
+			"gender": "female",
+			"knowsAbout": ["SEO copywriting"],
+			"knowsLanguage": ["English", "Dutch"],
+			"jobTitle": "Content specialist",
+			"worksFor": { "@id": "https:\/\/yoast.com\/#organization" }
+		}
+	]
+}

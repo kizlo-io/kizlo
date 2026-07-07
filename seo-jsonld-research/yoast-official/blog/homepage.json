@@ -1,0 +1,93 @@
+{
+	"@context": "https:\/\/schema.org",
+	"@graph": [
+		{
+			"@type": ["WebPage", "CollectionPage"],
+			"@id": "https:\/\/yoast.com\/seo-blog\/",
+			"url": "https:\/\/yoast.com\/seo-blog\/",
+			"name": "SEO blog &#8226; Yoast",
+			"isPartOf": { "@id": "https:\/\/yoast.com\/#website" },
+			"datePublished": "2015-09-14T08:01:55+00:00",
+			"dateModified": "2022-03-07T11:04:50+00:00",
+			"description": "On our popular SEO blog, you can find articles on how to use our plugins, plus posts on content SEO, technical SEO, WordPress, social media, and much more..",
+			"breadcrumb": { "@id": "https:\/\/yoast.com\/seo-blog\/#breadcrumb" },
+			"inLanguage": "en-US"
+		},
+		{
+			"@type": "BreadcrumbList",
+			"@id": "https:\/\/yoast.com\/seo-blog\/#breadcrumb",
+			"itemListElement": [
+				{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https:\/\/yoast.com\/" },
+				{ "@type": "ListItem", "position": 2, "name": "SEO blog" }
+			]
+		},
+		{
+			"@type": "WebSite",
+			"@id": "https:\/\/yoast.com\/#website",
+			"url": "https:\/\/yoast.com\/",
+			"name": "Yoast",
+			"description": "SEO for everyone",
+			"publisher": { "@id": "https:\/\/yoast.com\/#organization" },
+			"potentialAction": [
+				{
+					"@type": "SearchAction",
+					"target": { "@type": "EntryPoint", "urlTemplate": "https:\/\/yoast.com\/?s={search_term_string}" },
+					"query-input": { "@type": "PropertyValueSpecification", "valueRequired": true, "valueName": "search_term_string" }
+				}
+			],
+			"inLanguage": "en-US",
+			"copyrightHolder": { "@id": "https:\/\/yoast.com\/#organization" }
+		},
+		{
+			"@type": ["Organization", "Brand"],
+			"@id": "https:\/\/yoast.com\/#organization",
+			"name": "Yoast",
+			"url": "https:\/\/yoast.com\/",
+			"logo": {
+				"@type": "ImageObject",
+				"inLanguage": "en-US",
+				"@id": "https:\/\/yoast.com\/#\/schema\/logo\/image\/",
+				"url": "https:\/\/yoast.com\/app\/uploads\/2020\/09\/Yoast_Icon_SocialMedia_500x500.png",
+				"contentUrl": "https:\/\/yoast.com\/app\/uploads\/2020\/09\/Yoast_Icon_SocialMedia_500x500.png",
+				"width": 500,
+				"height": 500,
+				"caption": "Yoast"
+			},
+			"image": { "@id": "https:\/\/yoast.com\/#\/schema\/logo\/image\/" },
+			"sameAs": [
+				"https:\/\/www.facebook.com\/yoast",
+				"https:\/\/x.com\/yoast",
+				"https:\/\/www.instagram.com\/yoast\/",
+				"https:\/\/www.linkedin.com\/company\/1414157\/",
+				"https:\/\/www.pinterest.com\/yoast\/",
+				"https:\/\/www.youtube.com\/yoast",
+				"https:\/\/en.wikipedia.org\/wiki\/Yoast",
+				"https:\/\/www.tiktok.com\/@yoastseo",
+				"https:\/\/g.co\/kgs\/4H5sG2",
+				"https:\/\/g.co\/kgs\/a9XfUu"
+			],
+			"numberOfEmployees": 86,
+			"founder": { "@type": "Person", "name": "Joost de Valk", "sameAs": "https:\/\/en.wikipedia.org\/wiki\/Joost_de_Valk" },
+			"foundingDate": "2010-05-01",
+			"slogan": "SEO for Everyone",
+			"description": "Yoast helps you with your website optimization, whether it be through our widely used SEO software or our online SEO courses: we&#039;re here to help.",
+			"legalName": "Yoast BV",
+			"parentOrganization": {
+				"@type": "Organization",
+				"name": "Newfold Digital",
+				"description": "Newfold Digital is a leading web presence solutions provider serving millions of small-to-medium businesses globally.",
+				"url": "https:\/\/newfold.com\/",
+				"sameAs": ["https:\/\/newfold.com\/"],
+				"logo": "https:\/\/yoast.com\/app\/uploads\/2022\/01\/newfold-logo.png"
+			},
+			"memberOf": {
+				"@type": "Organization",
+				"name": "World Wide Web Consortium (W3C)",
+				"description": "The World Wide Web Consortium (W3C) is an international community that develops open standards to ensure the long-term growth of the Web.",
+				"url": "https:\/\/w3.org\/",
+				"sameAs": ["https:\/\/w3.org\/"],
+				"logo": "https:\/\/www.w3.org\/Icons\/w3c_main.png"
+			}
+		}
+	]
+}

@@ -29,6 +29,7 @@ class SiteSettings extends SettingsAbstract
         'title_separator'         => '|',
         'fallback_image'          => null,
         'search_action_structure' => null,
+        'discourage_search_engines' => false,
     ];
 
     protected function sanitize(string $key, mixed $value): mixed
@@ -45,6 +46,8 @@ class SiteSettings extends SettingsAbstract
             'title_separator'         => !empty($value) ? $value : static::DEFAULT_TITLE_SEPARATOR,
 
             'fallback_image'          => !empty($value) ? absint($value) : null,
+
+            'discourage_search_engines' => (bool) $value,
             default                   => $value,
         };
     }
@@ -216,6 +219,26 @@ class SiteSettings extends SettingsAbstract
     public function setSearchActionStructure(?string $value): static
     {
         $this->set('search_action_structure', $value);
+        return $this;
+    }
+
+    /**
+     * Whether to discourage search engines from indexing the headless frontend.
+     * When on, robots.txt disallows everything and every page emits a noindex
+     * robots tag. This is Kizlo's own toggle, independent of WordPress's
+     * `blog_public` option: `blog_public` governs the WordPress origin, which a
+     * headless setup typically hides anyway, whereas this governs the decoupled
+     * frontend. Defaults to false (the frontend is indexable).
+     */
+    public function getDiscourageSearchEngines(): bool
+    {
+        return (bool) $this->get('discourage_search_engines');
+    }
+
+    /** @param bool $value True to block indexing of the frontend, false to allow. */
+    public function setDiscourageSearchEngines(bool $value): static
+    {
+        $this->set('discourage_search_engines', $value);
         return $this;
     }
 }

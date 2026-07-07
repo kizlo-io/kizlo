@@ -30,9 +30,11 @@ class RobotsSettings extends SettingsAbstract
     }
 
     /**
-     * Custom disallow/allow rules for advanced use.
+     * Custom robots.txt directives for advanced use. Each entry is a single
+     * allow/disallow directive; `SeoBase::robots()` groups them by user agent
+     * into the emitted `{user_agent, allow[], disallow[]}` shape.
      *
-     * @return array<int, array{user_agent: string, allow: string[], disallow: string[]}>
+     * @return array<int, array{user_agent: string, rule: string, path: string}>
      */
     public function getCustomRules(): array
     {
@@ -40,7 +42,7 @@ class RobotsSettings extends SettingsAbstract
     }
 
     /**
-     * @param array<int, array{user_agent: string, allow: string[], disallow: string[]}> $value
+     * @param array<int, array{user_agent: string, rule: string, path: string}> $value
      */
     public function setCustomRules(array $value): static
     {

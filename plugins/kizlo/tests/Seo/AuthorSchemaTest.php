@@ -42,6 +42,14 @@ class AuthorSchemaTest extends SeoTestCase
         $this->assertSame('noindex', (new AuthorSchema($settings))->buildMeta($user)['robots']['index']);
     }
 
+    public function test_disabled_authors_report_noindex(): void
+    {
+        $settings = $this->seedSettings(['authors' => ['enabled' => false, 'search_engine_visibility' => true]]);
+        $user     = $this->author();
+
+        $this->assertSame('noindex', (new AuthorSchema($settings))->buildMeta($user)['robots']['index']);
+    }
+
     public function test_json_ld_webpage_is_a_profile_page(): void
     {
         $settings = $this->seedSettings(['authors' => ['enabled' => true]]);

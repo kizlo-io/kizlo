@@ -103,15 +103,15 @@ class SitemapIndexTest extends SeoTestCase
         $this->assertSame(['https://example.com/sitemap_index.xml'], $robots['sitemaps']);
     }
 
-    public function test_robots_disallows_invisible_post_type_pathname(): void
+    public function test_robots_does_not_disallow_hidden_collections(): void
     {
+        // Hidden collections are deindexed via per-URL noindex + sitemap omission,
+        // not a robots.txt path Disallow (which would over-block nested siblings).
         $settings = $this->seedSettings([
             'post_types' => ['post' => ['search_engine_visibility' => false, 'pathname_structure' => '/blog/{{slug}}']],
         ]);
 
-        $robots = (new SeoBase($settings))->robots();
-
-        $this->assertContains('/blog/{{slug}}', $robots['rules'][0]['disallow']);
+        $this->assertSame([], (new SeoBase($settings))->robots()['rules'][0]['disallow']);
     }
 
     public function test_robots_omits_sitemap_when_disabled(): void
@@ -128,7 +128,7 @@ class SitemapIndexTest extends SeoTestCase
 
         $rules = (new SeoBase($settings))->robots()['rules'];
 
-        $this->assertSame('Googlebot', $rules[0]['user_agent']);
-        $this->assertSame('/private', $rules[0]['path']);
+        // Custom rules are the complete ruleset; the default group is dropped.
+        $this->assertSame([['user_agent' => 'Googlebot', 'allow' => [], 'disallow' => ['/private']]], $rules);
     }
 }

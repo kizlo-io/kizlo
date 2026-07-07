@@ -1,16 +1,10 @@
 import type { MetadataRoute } from "next"
 import { client } from "@/lib/kizlo/server"
-import { siteUrl } from "@/lib/shared"
+
+export const dynamic = "force-dynamic"
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
-	const { data, error } = await client.seo.robots()
-
-	if (error) {
-		return {
-			rules: [{ userAgent: "*", allow: "/" }],
-			sitemap: `${siteUrl}/sitemap_index.xml`,
-		}
-	}
+	const data = await client.seo.robots.call()
 
 	return {
 		rules: data.rules.map((rule) => ({
@@ -18,6 +12,8 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
 			allow: rule.allow,
 			disallow: rule.disallow,
 		})),
-		sitemap: data.sitemaps.length > 0 ? data.sitemaps : `${siteUrl}/sitemap_index.xml`,
+		// The API omits sitemaps when "Include Sitemap" is off; honor that instead
+		// of re-adding a hardcoded one.
+		...(data.sitemaps.length > 0 ? { sitemap: data.sitemaps } : {}),
 	}
 }

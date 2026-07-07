@@ -30,6 +30,7 @@ export interface SiteSettings {
 	title_separator: string
 	fallback_image: Media | null
 	search_action_structure: string | null
+	discourage_search_engines: boolean
 }
 
 export interface PersonSettings {
@@ -231,6 +232,7 @@ export const SiteSettingsSchema = z.object({
 	title_separator: z.string(),
 	fallback_image: z.number().nullable(),
 	search_action_structure: createNulledPathnameStructureSchema("{{search_term_string}}"),
+	discourage_search_engines: z.boolean(),
 })
 export type SiteSettingsSchemaInput = z.input<typeof SiteSettingsSchema>
 export type SiteSettingsSchemaOutput = z.output<typeof SiteSettingsSchema>

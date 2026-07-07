@@ -1,0 +1,110 @@
+{
+	"@context": "https:\/\/schema.org",
+	"@graph": [
+		{
+			"@type": "WebPage",
+			"@id": "http:\/\/localhost:8080\/",
+			"url": "http:\/\/localhost:8080\/",
+			"name": "Home &#8212; Kizlo Dev",
+			"isPartOf": {
+				"@id": "http:\/\/localhost:8080\/#website"
+			},
+			"about": {
+				"@id": "http:\/\/localhost:8080\/#organization"
+			},
+			"datePublished": "2026-07-03T11:07:09+00:00",
+			"dateModified": "2026-07-06T09:22:26+00:00",
+			"breadcrumb": {
+				"@id": "http:\/\/localhost:8080\/#breadcrumb"
+			},
+			"inLanguage": "en-US",
+			"potentialAction": [
+				{
+					"@type": "ReadAction",
+					"target": ["http:\/\/localhost:8080\/"]
+				}
+			]
+		},
+		{
+			"@type": "BreadcrumbList",
+			"@id": "http:\/\/localhost:8080\/#breadcrumb",
+			"itemListElement": [
+				{
+					"@type": "ListItem",
+					"position": 1,
+					"name": "Home"
+				}
+			]
+		},
+		{
+			"@type": "WebSite",
+			"@id": "http:\/\/localhost:8080\/#website",
+			"url": "http:\/\/localhost:8080\/",
+			"name": "Kizlo",
+			"description": "this is my tagline",
+			"publisher": {
+				"@id": "http:\/\/localhost:8080\/#organization"
+			},
+			"alternateName": "Kizlo Alt",
+			"potentialAction": [
+				{
+					"@type": "SearchAction",
+					"target": {
+						"@type": "EntryPoint",
+						"urlTemplate": "http:\/\/localhost:8080\/?s={search_term_string}"
+					},
+					"query-input": {
+						"@type": "PropertyValueSpecification",
+						"valueRequired": true,
+						"valueName": "search_term_string"
+					}
+				}
+			],
+			"inLanguage": "en-US"
+		},
+		{
+			"@type": "Organization",
+			"@id": "http:\/\/localhost:8080\/#organization",
+			"name": "Kizlo Org",
+			"alternateName": "Kizlo Org Alt",
+			"url": "http:\/\/localhost:8080\/",
+			"logo": {
+				"@type": "ImageObject",
+				"inLanguage": "en-US",
+				"@id": "http:\/\/localhost:8080\/#\/schema\/logo\/image\/",
+				"url": "http:\/\/localhost:8080\/wp-content\/uploads\/2026\/07\/icon-dark-1.png",
+				"contentUrl": "http:\/\/localhost:8080\/wp-content\/uploads\/2026\/07\/icon-dark-1.png",
+				"width": 100,
+				"height": 100,
+				"caption": "Kizlo Org"
+			},
+			"image": {
+				"@id": "http:\/\/localhost:8080\/#\/schema\/logo\/image\/"
+			},
+			"sameAs": ["https:\/\/facebook.com\/kizlo", "https:\/\/x.com\/kizlo", "https:\/\/mastodon.com\/kizlo"],
+			"description": "this is a org description.",
+			"email": "org@kizlo.com",
+			"telephone": "07303995604",
+			"legalName": "Kizlo Legal",
+			"foundingDate": "2026-06-11",
+			"vatID": "3123123213123123123",
+			"taxID": "423423423423423423",
+			"iso6523Code": "435345345345",
+			"duns": "3536536356",
+			"leiCode": "3534545234234",
+			"naics": "3242453656",
+			"numberOfEmployees": {
+				"@type": "QuantitativeValue",
+				"minValue": "11",
+				"maxValue": "50"
+			},
+			"publishingPrinciples": "http:\/\/localhost:8080\/publishing-principles\/",
+			"ownershipFundingInfo": "http:\/\/localhost:8080\/ownership-funding-info\/",
+			"actionableFeedbackPolicy": "http:\/\/localhost:8080\/actionable-feedback-policy\/",
+			"correctionsPolicy": "http:\/\/localhost:8080\/corrections-policy\/",
+			"ethicsPolicy": "http:\/\/localhost:8080\/ethics-policy\/",
+			"diversityPolicy": "http:\/\/localhost:8080\/diversity-policy\/",
+			"diversityStaffingReport": "http:\/\/localhost:8080\/diversity-staffing-report\/"
+		}
+	]
+}

@@ -154,24 +154,14 @@ class SitemapShapeTest extends SeoTestCase
 
     public function test_robots_default_ruleset_is_full_object(): void
     {
-        // Authors are disabled by default, so their archive pathname is disallowed.
+        // The generated ruleset is a single allow-root group. Hidden collections
+        // are handled per-URL (noindex + sitemap omission), never as a Disallow.
         $robots = (new SeoBase($this->seedSettings()))->robots();
-
-        $this->assertSame([
-            'rules'    => [['user_agent' => '*', 'allow' => ['/'], 'disallow' => ['/author/{{slug}}']]],
-            'sitemaps' => ['https://example.com/sitemap_index.xml'],
-        ], $robots);
-    }
-
-    public function test_robots_clean_ruleset_when_everything_visible(): void
-    {
-        // Enabling + exposing authors clears the only default disallow entry.
-        $settings = $this->seedSettings(['authors' => ['enabled' => true, 'search_engine_visibility' => true]]);
 
         $this->assertSame([
             'rules'    => [['user_agent' => '*', 'allow' => ['/'], 'disallow' => []]],
             'sitemaps' => ['https://example.com/sitemap_index.xml'],
-        ], (new SeoBase($settings))->robots());
+        ], $robots);
     }
 
     public function test_robots_omits_sitemaps_when_disabled(): void
@@ -179,20 +169,53 @@ class SitemapShapeTest extends SeoTestCase
         $robots = (new SeoBase($this->seedSettings(['robots' => ['include_sitemap' => false]])))->robots();
 
         $this->assertSame([
-            'rules' => [['user_agent' => '*', 'allow' => ['/'], 'disallow' => ['/author/{{slug}}']]],
+            'rules' => [['user_agent' => '*', 'allow' => ['/'], 'disallow' => []]],
         ], $robots);
     }
 
     public function test_robots_custom_rules_replace_the_default_ruleset(): void
     {
-        $custom = [['user_agent' => 'Googlebot', 'rule' => 'disallow', 'path' => '/private']];
+        // "Allow only Googlebot, block everyone else" — only expressible when
+        // custom rules replace the default group (a baseline Allow: / merged into
+        // the `*` group would win ties and defeat the intended Disallow: /).
+        $custom = [
+            ['user_agent' => 'Googlebot', 'rule' => 'allow', 'path' => '/'],
+            ['user_agent' => '*', 'rule' => 'disallow', 'path' => '/'],
+        ];
 
         $robots = (new SeoBase($this->seedSettings(['robots' => ['custom_rules' => $custom]])))->robots();
 
-        // Custom rules replace the default ruleset entirely and pass through verbatim.
         $this->assertSame([
-            'rules'    => $custom,
+            'rules'    => [
+                ['user_agent' => 'Googlebot', 'allow' => ['/'], 'disallow' => []],
+                ['user_agent' => '*', 'allow' => [], 'disallow' => ['/']],
+            ],
             'sitemaps' => ['https://example.com/sitemap_index.xml'],
+        ], $robots);
+    }
+
+    public function test_robots_never_disallows_hidden_collections(): void
+    {
+        // Hiding every collection produces no Disallow lines — deindexing is a
+        // per-URL concern (noindex meta + sitemap omission), so the robots.txt
+        // ruleset stays a clean allow-root and never over-blocks by prefix.
+        $settings = $this->seedSettings([
+            'authors'    => ['enabled' => false, 'search_engine_visibility' => false],
+            'post_types' => ['post' => ['search_engine_visibility' => false, 'pathname_structure' => '/blog/{{slug}}']],
+            'taxonomies' => ['category' => ['search_engine_visibility' => false]],
+        ]);
+
+        $this->assertSame([], (new SeoBase($settings))->robots()['rules'][0]['disallow']);
+    }
+
+    public function test_robots_discourage_blocks_everything_and_drops_sitemap(): void
+    {
+        // The site-wide discourage toggle short-circuits to a blanket disallow
+        // and drops the sitemap reference, overriding every per-type rule.
+        $robots = (new SeoBase($this->seedSettings(['site' => ['discourage_search_engines' => true]])))->robots();
+
+        $this->assertSame([
+            'rules' => [['user_agent' => '*', 'allow' => [], 'disallow' => ['/']]],
         ], $robots);
     }
 }

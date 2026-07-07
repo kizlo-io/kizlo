@@ -84,7 +84,7 @@ class AuthorSchema extends SeoBase
         return [
             'title'     => $title,
             'canonical' => trailingslashit($url),
-            'robots'    => $this->buildRobots($this->settings->authors->getSearchEngineVisibility()),
+            'robots'    => $this->buildRobots($this->settings->authors->getEnabled() && $this->settings->authors->getSearchEngineVisibility()),
             'og'        => $this->buildOg([
                 'type'        => 'profile',
                 'title'       => $title,

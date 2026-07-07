@@ -47,36 +47,39 @@ class SeoBase
 
     public function robots(): array
     {
+        // A discouraged frontend blocks every crawler outright and drops the
+        // sitemap reference, overriding all per-type rules below.
+        if ($this->settings->site->getDiscourageSearchEngines()) {
+            return ['rules' => [[
+                'user_agent' => '*',
+                'allow'      => [],
+                'disallow'   => ['/'],
+            ]]];
+        }
+
+        // Hidden collections are NOT disallowed here. A robots.txt path Disallow
+        // is a blunt prefix tool that over-blocks nested siblings (e.g. blocking
+        // /blog/ would also block a still-visible /blog/category/) and, by
+        // stopping crawling, prevents crawlers from ever seeing the page's
+        // noindex tag. Deindexing is handled per-URL instead: each schema emits a
+        // noindex robots meta for hidden collections and they are dropped from the
+        // sitemap. This mirrors Yoast's behavior.
         $rules = [
             'user_agent' => '*',
             'allow'      => ['/'],
             'disallow'   => [],
         ];
 
-        // Post types
-        foreach ($this->settings->postTypes->all() as $postType) {
-            if (!$postType->getSearchEngineVisibility() && $postType->getPathnameStructure()) {
-                $rules['disallow'][] = $postType->getPathnameStructure();
-            }
-        }
-
-        // Taxonomies
-        foreach ($this->settings->taxonomies->all() as $taxonomy) {
-            if (!$taxonomy->getSearchEngineVisibility() && $taxonomy->getPathnameStructure()) {
-                $rules['disallow'][] = $taxonomy->getPathnameStructure();
-            }
-        }
-
-        // Authors
-        $authors = $this->settings->authors;
-        if ((!$authors->getEnabled() || !$authors->getSearchEngineVisibility()) && $authors->getPathnameStructure()) {
-            $rules['disallow'][] = $authors->getPathnameStructure();
-        }
-
-        // Custom rules
+        // Custom rules replace the generated ruleset outright: robots.txt groups
+        // don't stack (a crawler obeys one user-agent group), so a baseline
+        // `Allow: /` merged into a user's `*` group would win ties and defeat an
+        // intended `Disallow: /`. The default group is a no-op anyway (a group
+        // with no rules already allows everything), so replacing it loses
+        // nothing. Stored flat {user_agent, rule, path} directives are grouped
+        // by agent into the emitted {user_agent, allow[], disallow[]} shape.
         $customRules = $this->settings->crawling->robots->getCustomRules();
         if (!empty($customRules)) {
-            $result = ['rules' => $customRules];
+            $result = ['rules' => $this->groupCustomRules($customRules)];
         } else {
             $result = ['rules' => [$rules]];
         }
@@ -88,6 +91,28 @@ class SeoBase
         }
 
         return $result;
+    }
+
+    /**
+     * Group flat custom rules by user agent into the emitted robots.txt shape.
+     *
+     * @param array<int, array{user_agent: string, rule: string, path: string}> $customRules
+     *
+     * @return array<int, array{user_agent: string, allow: string[], disallow: string[]}>
+     */
+    private function groupCustomRules(array $customRules): array
+    {
+        $grouped = [];
+
+        foreach ($customRules as $rule) {
+            $agent = $rule['user_agent'];
+            $grouped[$agent] ??= ['user_agent' => $agent, 'allow' => [], 'disallow' => []];
+
+            $bucket = $rule['rule'] === 'allow' ? 'allow' : 'disallow';
+            $grouped[$agent][$bucket][] = $rule['path'];
+        }
+
+        return array_values($grouped);
     }
 
     // ====================================================
@@ -311,6 +336,10 @@ class SeoBase
      */
     protected function buildRobots(bool $indexable, bool $nofollow = false): array
     {
+        // A discouraged frontend is noindex everywhere, regardless of the
+        // per-page/per-type resolution the caller passed in.
+        $indexable = $indexable && !$this->settings->site->getDiscourageSearchEngines();
+
         return [
             'index'             => $indexable ? 'index' : 'noindex',
             'follow'            => $nofollow ? 'nofollow' : 'follow',
