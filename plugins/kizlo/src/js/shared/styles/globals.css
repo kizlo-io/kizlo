@@ -7,6 +7,10 @@
 	box-sizing: border-box;
 }
 
+html {
+	overscroll-behavior: none;
+}
+
 body {
 	--kizlo-primary: var(--wp-admin-theme-color);
 	--kizlo-primary-foreground: oklch(1 0 0);

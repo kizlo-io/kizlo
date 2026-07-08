@@ -21,10 +21,7 @@ class PostListener
 
         if ($new === 'publish') {
             $event = $old === 'publish' ? Webhook::POST_UPDATED_EVENT : Webhook::POST_CREATED_EVENT;
-            Webhook::sendEvent($event, [
-                'post_id'   => $post->ID,
-                'post_type' => $post->post_type,
-            ]);
+            Webhook::sendEvent($event, $this->_eventPayload($post));
         }
     }
 
@@ -33,20 +30,29 @@ class PostListener
         $post_type = get_post_type($post_id);
         if (! $this->_isWatched($post_type)) return;
 
-        Webhook::sendEvent(Webhook::POST_TRASHED_EVENT, [
-            'post_id'   => $post_id,
-            'post_type' => $post_type,
-        ]);
+        $post = get_post($post_id);
+
+        if ($post instanceof WP_Post) {
+            Webhook::sendEvent(Webhook::POST_TRASHED_EVENT, $this->_eventPayload($post));
+        }
     }
 
     public function onDeleted(int $post_id, WP_Post $post): void
     {
         if (! $this->_isWatched($post->post_type)) return;
 
-        Webhook::sendEvent(Webhook::POST_DELETED_EVENT, [
-            'post_id'   => $post_id,
+        Webhook::sendEvent(Webhook::POST_DELETED_EVENT, $this->_eventPayload($post));
+    }
+
+    private function _eventPayload(WP_Post $post): array
+    {
+        $settings = Utils::getSettings();
+
+        return [
+            'post_id'   => $post->ID,
             'post_type' => $post->post_type,
-        ]);
+            'url'       => $settings->resolvePostUrl($post, $settings->postTypes->get($post->post_type)),
+        ];
     }
 
     private function _isWatched(string $post_type): bool

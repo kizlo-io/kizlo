@@ -152,7 +152,13 @@ class Settings
     public function getOrigin(string $url): string
     {
         $parsed = parse_url($url);
-        return $parsed['scheme'] . '://' . $parsed['host'];
+        $origin = $parsed['scheme'] . '://' . $parsed['host'];
+
+        if (!empty($parsed['port'])) {
+            $origin .= ':' . $parsed['port'];
+        }
+
+        return $origin;
     }
 
     /**
