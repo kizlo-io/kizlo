@@ -1,4 +1,4 @@
-import type { Seo } from "./schema"
+import type { Seo, Sitemap, SitemapUrl } from "./schema"
 import type { WPK_Seo } from "./types"
 
 export function deserializeSeo(data: WPK_Seo): Seo {
@@ -42,4 +42,67 @@ export function deserializeSeo(data: WPK_Seo): Seo {
 		},
 		schema: data.schema,
 	}
+}
+
+export type SitemapIndexEntry = Pick<Sitemap, "key" | "pages" | "lastmod">
+
+// Slug scheme: page 1 is `/sitemaps/{key}.xml`, later pages are `/sitemaps/{key}-{n}.xml`.
+// The `-{n}` separator keeps parsing unambiguous (a bare numeric suffix lets a greedy
+// match swallow the page into the key). `parseSitemapSlug` is the inverse and the two
+// must stay in lockstep: the index `<loc>` entries are built by `sitemapEntryPath` and
+// read back through `parseSitemapSlug`.
+export function sitemapEntryPath(key: string, page: number): string {
+	return `/sitemaps/${key}${page > 1 ? `-${page}` : ""}.xml`
+}
+
+export function parseSitemapSlug(slug: string): { key: string; page: number } | null {
+	const match = /^(.+?)(?:-(\d+))?\.xml$/.exec(slug)
+
+	if (!match) return null
+
+	const [, key, rawPage] = match
+	const page = rawPage ? Number(rawPage) : 1
+
+	if (!key || !Number.isInteger(page) || page < 1) return null
+
+	return { key, page }
+}
+
+function escapeXml(value: string): string {
+	return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;")
+}
+
+export function renderSitemapIndex(sitemaps: readonly SitemapIndexEntry[], origin: string): string {
+	const entries = sitemaps.flatMap((sitemap) =>
+		Array.from({ length: sitemap.pages }, (_, index) => {
+			const loc = `${origin}${sitemapEntryPath(sitemap.key, index + 1)}`
+
+			return `\t<sitemap>\n\t\t<loc>${escapeXml(loc)}</loc>\n\t\t<lastmod>${escapeXml(sitemap.lastmod)}</lastmod>\n\t</sitemap>`
+		}),
+	)
+
+	return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</sitemapindex>\n`
+}
+
+export function renderUrlSet(urls: SitemapUrl[]): string {
+	const entries = urls.map((url) => {
+		const images = url.images
+			.map((image) => `\t\t<image:image>\n\t\t\t<image:loc>${escapeXml(image.loc)}</image:loc>\n\t\t</image:image>`)
+			.join("\n")
+
+		const imageBlock = images ? `\n${images}` : ""
+
+		return `\t<url>\n\t\t<loc>${escapeXml(url.loc)}</loc>\n\t\t<lastmod>${escapeXml(url.lastmod)}</lastmod>${imageBlock}\n\t</url>`
+	})
+
+	return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${entries.join("\n")}\n</urlset>\n`
+}
+
+export function xmlResponse(body: string): Response {
+	return new Response(body, {
+		headers: {
+			"Content-Type": "application/xml; charset=utf-8",
+			"Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+		},
+	})
 }

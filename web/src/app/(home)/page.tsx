@@ -1,3 +1,4 @@
+import { toMetadata } from "kizlo/nextjs"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { cache } from "react"
@@ -6,7 +7,6 @@ import { JsonLd } from "@/components/json-ld"
 import { ShaderBackdrop } from "@/components/shader-backdrop"
 import { client } from "@/lib/kizlo/server"
 import { createMetadata } from "@/lib/metadata"
-import { toMetadata } from "@/lib/seo"
 import { appName, docsRoute, socials } from "@/lib/shared"
 
 const getHomeSeo = cache(() => client.seo.homepage())

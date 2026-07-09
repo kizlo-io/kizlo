@@ -1,3 +1,5 @@
+import type { SitemapIndexEntry } from "./seo/utils"
+
 export * from "./adapters/auth"
 export * from "./adapters/captcha"
 export * from "./adapters/cookies"
@@ -9,6 +11,7 @@ export * from "./client"
 export * from "./context"
 export * from "./kizlo"
 export * from "./seo/schema"
+export * from "./seo/sitemap"
 export * from "./seo/types"
 export * from "./service"
 export * from "./settings/service"
@@ -26,3 +29,4 @@ export * from "./shared/serialize"
 export * from "./shared/types"
 export * from "./webhook/index"
 export * from "./wordpress"
+export type { SitemapIndexEntry }

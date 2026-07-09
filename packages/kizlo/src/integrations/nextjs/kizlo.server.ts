@@ -7,7 +7,11 @@ export type KizloServerOptions<TExts extends readonly AnyExtension[] = []> = Cre
 }
 
 export function createKizlo<TExts extends readonly AnyExtension[] = []>(options?: KizloServerOptions<TExts>): Kizlo<TExts> {
-	const extensions = [nextRevalidation(options?.revalidate), ...(options?.extensions ?? [])]
+	const revalidate = options?.revalidate
+	const extensions = [
+		...(revalidate === false ? [] : [nextRevalidation(typeof revalidate === "object" ? revalidate : undefined)]),
+		...(options?.extensions ?? []),
+	]
 
 	return new Kizlo(
 		resolveKizloConfig(
