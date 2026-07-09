@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form"
 import { useParams } from "react-router-dom"
 import { getContent } from "@/modules/settings/shared/content"
 import { NotFound } from "@/modules/settings/shared/not-found"
+import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
@@ -23,6 +24,7 @@ export function TaxonomySettingsPage() {
 			search_engine_visibility: taxonomy?.search_engine_visibility ?? false,
 			rest_api_enabled: taxonomy?.rest_api_enabled ?? false,
 			seo_enabled: taxonomy?.seo_enabled ?? false,
+			breadcrumbs: (taxonomy?.breadcrumbs ?? []).map(String),
 		},
 	})
 
@@ -89,6 +91,18 @@ export function TaxonomySettingsPage() {
 							control={form.control}
 							label={content.seo.visibility.label}
 							description={content.seo.visibility.description}
+						/>
+
+						<BreadcrumbsField
+							control={form.control}
+							name="breadcrumbs"
+							label="Breadcrumb trail"
+							description={
+								<>
+									The crumbs between <strong>Home</strong> and the current term. Add pages, or the dynamic <strong>Parent</strong> slot
+									(expands to parent terms). Order matters — reorder with the arrows. Leave empty for <strong>Home → current</strong>.
+								</>
+							}
 						/>
 					</>
 				) : null}

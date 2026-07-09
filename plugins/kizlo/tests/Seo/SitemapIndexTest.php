@@ -3,6 +3,7 @@
 namespace Kizlo\Tests\Seo;
 
 use Kizlo\Modules\Seo\SeoBase;
+use Kizlo\Modules\Seo\TermSchema;
 
 /**
  * The sitemap index (which top-level sitemaps exist and their page counts) and the
@@ -75,9 +76,40 @@ class SitemapIndexTest extends SeoTestCase
         $this->assertSame('taxonomy', $entries['category']['type']);
     }
 
+    public function test_taxonomy_drops_when_all_its_terms_are_noindexed(): void
+    {
+        // Per-term noindex overrides are excluded from the taxonomy count, mirroring
+        // per-post noindex: a taxonomy whose only term is noindexed drops out of the
+        // index rather than linking a sitemap that would list nothing.
+        $settings = $this->seedSettings();
+        $term     = get_term(self::factory()->category->create(['name' => 'Hidden', 'slug' => 'hidden']), 'category');
+        $post     = $this->createPost();
+        wp_set_post_terms($post->ID, [$term->term_id], 'category');
+        update_term_meta($term->term_id, SeoBase::OVERRIDE_KEYS['noindex'], '1');
+
+        $this->assertArrayNotHasKey('category', $this->indexByKey((new SeoBase($settings))->sitemapIndex()));
+    }
+
+    public function test_noindexed_terms_are_excluded_from_entries(): void
+    {
+        $settings = $this->seedSettings();
+        $visible  = get_term(self::factory()->category->create(['name' => 'Visible', 'slug' => 'visible']), 'category');
+        $hidden   = get_term(self::factory()->category->create(['name' => 'Hidden', 'slug' => 'hidden']), 'category');
+        $post     = $this->createPost();
+        wp_set_post_terms($post->ID, [$visible->term_id, $hidden->term_id], 'category');
+        update_term_meta($hidden->term_id, SeoBase::OVERRIDE_KEYS['noindex'], '1');
+
+        $locs = array_column((new TermSchema($settings))->sitemapEntries('category'), 'loc');
+
+        $this->assertContains('https://example.com/category/visible/', $locs);
+        $this->assertNotContains('https://example.com/category/hidden/', $locs);
+    }
+
     public function test_author_entry_present_when_enabled_and_visible(): void
     {
         $settings = $this->seedSettings(['authors' => ['enabled' => true, 'search_engine_visibility' => true]]);
+        $author   = self::factory()->user->create(['role' => 'author']);
+        $this->createPost(['post_author' => $author]);
 
         $entries = $this->indexByKey((new SeoBase($settings))->sitemapIndex());
 
@@ -88,6 +120,16 @@ class SitemapIndexTest extends SeoTestCase
     public function test_author_entry_absent_when_disabled(): void
     {
         $settings = $this->seedSettings(['authors' => ['enabled' => false]]);
+
+        $this->assertArrayNotHasKey('authors', $this->indexByKey((new SeoBase($settings))->sitemapIndex()));
+    }
+
+    public function test_author_entry_absent_when_no_author_has_published(): void
+    {
+        // The index counts only authors with published posts (the population the
+        // author sitemap lists) — a site of registered users with no posts has none.
+        $settings = $this->seedSettings(['authors' => ['enabled' => true, 'search_engine_visibility' => true]]);
+        self::factory()->user->create(['role' => 'subscriber']);
 
         $this->assertArrayNotHasKey('authors', $this->indexByKey((new SeoBase($settings))->sitemapIndex()));
     }

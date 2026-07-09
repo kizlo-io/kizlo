@@ -5,6 +5,7 @@ import { ArticleTypeField } from "@/modules/settings/shared/article-type-field"
 import { getContent } from "@/modules/settings/shared/content"
 import { NotFound } from "@/modules/settings/shared/not-found"
 import { PageTypeField } from "@/modules/settings/shared/page-type-field"
+import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
@@ -28,6 +29,7 @@ export function PostTypeSettingsPage() {
 			comment_action_structure: postType?.comment_action_structure ?? "",
 			rest_api_enabled: postType?.rest_api_enabled ?? false,
 			seo_enabled: postType?.seo_enabled ?? false,
+			breadcrumbs: (postType?.breadcrumbs ?? []).map(String),
 		},
 	})
 
@@ -112,6 +114,19 @@ export function PostTypeSettingsPage() {
 							control={form.control}
 							label={content.seo.visibility.label}
 							description={content.seo.visibility.description}
+						/>
+
+						<BreadcrumbsField
+							control={form.control}
+							name="breadcrumbs"
+							label="Breadcrumb trail"
+							description={
+								<>
+									The crumbs between <strong>Home</strong> and the current item. Add pages, or the dynamic <strong>Parent</strong> slot
+									(expands to the item's real parents). Order matters — reorder with the arrows. Leave empty for{" "}
+									<strong>Home → current</strong>.
+								</>
+							}
 						/>
 					</>
 				) : null}

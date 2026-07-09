@@ -72,6 +72,7 @@ class HomeSchema extends SeoBase
     {
         $graph   = $this->baseGraph();
         $graph[] = $this->homeWebPageLd();
+        $graph[] = $this->homeBreadcrumbLd();
 
         // When a static front page opts into an Article type, emit an Article
         // node anchored to the homepage URL, resolved from the front page post.
@@ -91,7 +92,7 @@ class HomeSchema extends SeoBase
                 $image['url'],
                 $image['width'],
                 $image['height'],
-                $image['alt'] ?? ($this->settings->site->getName() ?? get_bloginfo('name')),
+                $image['caption'],
             );
         }
 
@@ -116,7 +117,9 @@ class HomeSchema extends SeoBase
             'image_url'      => $image['url'] ?? null,
             'date_published' => null,
             'date_modified'  => null,
-            'breadcrumb_id'  => null,
+            'breadcrumb_id'  => trailingslashit($this->settings->getBaseUrl()) . '#breadcrumb',
+            // The front page is "about" the site's main entity (org or person).
+            'about'          => $this->publisherId(),
             // A static front page can override the WebPage subtype; the
             // latest-posts homepage stays a plain WebPage.
             'webpage_type'   => $front_page ? $this->effectiveWebpageType($front_page) : null,
@@ -125,12 +128,31 @@ class HomeSchema extends SeoBase
     }
 
     /**
+     * Generate the BreadcrumbList for the homepage: a single "Home" crumb (the
+     * front page is both the root and the current page, so it carries no link).
+     *
+     * @return array
+     */
+    protected function homeBreadcrumbLd(): array
+    {
+        return [
+            '@type'           => 'BreadcrumbList',
+            '@id'             => trailingslashit($this->settings->getBaseUrl()) . '#breadcrumb',
+            'itemListElement' => [[
+                '@type'    => 'ListItem',
+                'position' => 1,
+                'name'     => __('Home', 'kizlo'),
+            ]],
+        ];
+    }
+
+    /**
      * Resolve the homepage image details, preferring a per-page override before
      * the site fallback image.
      *
      * @param int|null $override_id Attachment id set on the front page's SEO meta box.
      *
-     * @return array{url: string, width: int|null, height: int|null, type: string|null, alt: string|null}|null
+     * @return array{url: string, width: int|null, height: int|null, type: string|null, alt: string|null, caption: string|null}|null
      */
     protected function homeImage(?int $override_id = null): ?array
     {
@@ -141,11 +163,12 @@ class HomeSchema extends SeoBase
         $metadata = wp_get_attachment_metadata($id);
 
         return [
-            'url'    => wp_get_attachment_url($id),
-            'width'  => $metadata['width']  ?? null,
-            'height' => $metadata['height'] ?? null,
-            'type'   => get_post_mime_type($id) ?: null,
-            'alt'    => get_post_meta($id, '_wp_attachment_image_alt', true) ?: null,
+            'url'     => wp_get_attachment_url($id),
+            'width'   => $metadata['width']  ?? null,
+            'height'  => $metadata['height'] ?? null,
+            'type'    => get_post_mime_type($id) ?: null,
+            'alt'     => get_post_meta($id, '_wp_attachment_image_alt', true) ?: null,
+            'caption' => $this->imageCaption($id),
         ];
     }
 

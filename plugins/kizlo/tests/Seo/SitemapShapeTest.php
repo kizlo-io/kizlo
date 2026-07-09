@@ -44,7 +44,8 @@ class SitemapShapeTest extends SeoTestCase
         $settings = $this->seedSettings(['authors' => ['enabled' => true, 'search_engine_visibility' => true]]);
         update_option('show_on_front', 'posts');
 
-        $post     = $this->createPost();
+        $author   = self::factory()->user->create(['role' => 'author']);
+        $post     = $this->createPost(['post_author' => $author]);
         $category = self::factory()->category->create(['name' => 'Used', 'slug' => 'used']);
         wp_set_post_terms($post->ID, [$category], 'category');
 

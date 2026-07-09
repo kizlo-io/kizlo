@@ -15,6 +15,14 @@ class SeoBase
     protected const SITEMAP_PER_PAGE = 1000;
 
     /**
+     * Reserved breadcrumb row that expands, in place, to the current item's real
+     * ancestor chain (page parents / parent terms). A page-ID row cannot collide
+     * with it since IDs are numeric. Mirrored as a literal in the settings
+     * sanitizers (HasBreadcrumbsSetting) and on the frontend.
+     */
+    public const BREADCRUMB_PARENT_TOKEN = '__parent__';
+
+    /**
      * Per-post SEO override fields mapped to their individual post meta keys.
      * Each override lives in its own key (rather than a serialized blob) so it
      * stays queryable — e.g. sitemaps exclude posts by `_kizlo_seo_noindex`.
@@ -144,11 +152,13 @@ class SeoBase
             $count     = max(0, $published - ($noindex_counts[$post_type_slug] ?? 0));
 
             // The blog's sitemaps carry an injected entry even with no posts of
-            // their own: the page sitemap holds the homepage and the post sitemap
-            // holds the blog index — unless that front page is itself noindexed.
+            // their own: the post sitemap holds the blog index and the page sitemap
+            // holds the homepage. The homepage lives in exactly one of them (Yoast
+            // issue #5428): the post sitemap on a latest-posts home, the page sitemap
+            // on a static home — and drops out if that front page is noindexed.
             $carries_front = match ($post_type_slug) {
                 'post'  => $show_on_front === 'posts' || ($posts_page_id > 0 && ! $this->isNoindexed($posts_page_id)),
-                'page'  => ! ($show_on_front === 'page' && $front_page_id > 0 && $this->isNoindexed($front_page_id)),
+                'page'  => $show_on_front === 'page' && $front_page_id > 0 && ! $this->isNoindexed($front_page_id),
                 default => false,
             };
 
@@ -168,7 +178,16 @@ class SeoBase
         foreach ($this->settings->taxonomies->all() as $taxonomy_slug => $taxonomy) {
             if (! $taxonomy->getSearchEngineVisibility()) continue;
 
-            $count = wp_count_terms(['taxonomy' => $taxonomy_slug, 'hide_empty' => true]);
+            // Exclude per-term noindex overrides so the count tracks indexable terms,
+            // mirroring how noindexed posts are dropped from the post type count.
+            $count = wp_count_terms([
+                'taxonomy'   => $taxonomy_slug,
+                'hide_empty' => true,
+                'meta_query' => [[
+                    'key'     => self::OVERRIDE_KEYS['noindex'],
+                    'compare' => 'NOT EXISTS',
+                ]],
+            ]);
             if (empty($count) || is_wp_error($count)) continue;
 
             $pages   = (int) ceil($count / self::SITEMAP_PER_PAGE);
@@ -183,7 +202,10 @@ class SeoBase
         }
 
         if ($this->settings->authors->getEnabled() && $this->settings->authors->getSearchEngineVisibility()) {
-            $count = count_users()['total_users'];
+            // Count only authors with published posts — the same population the
+            // author sitemap actually lists — not every registered user, so the
+            // page count and presence stay aligned with the entries.
+            $count = count(get_users(['has_published_posts' => true, 'fields' => 'ID']));
 
             if ($count > 0) {
                 $pages   = (int) ceil($count / self::SITEMAP_PER_PAGE);
@@ -668,20 +690,35 @@ class SeoBase
             'mainEntityOfPage' => ['@id' => $page_url],
             'headline'         => get_the_title($post),
             'datePublished'    => get_the_date('c', $post),
-            'dateModified'     => get_the_modified_date('c', $post),
-            'wordCount'        => str_word_count(wp_strip_all_tags($post->post_content)),
-            'commentCount'     => (int) get_comments_number($post->ID),
-            'inLanguage'       => $this->language(),
-            'publisher'        => ['@id' => $this->publisherId()],
-            'copyrightYear'    => get_the_date('Y', $post),
-            'copyrightHolder'  => ['@id' => $this->publisherId()],
         ];
+
+        // Yoast only emits dateModified when the post was actually edited after
+        // publishing, not for a freshly published post.
+        $published = get_the_date('c', $post);
+        $modified  = get_the_modified_date('c', $post);
+        if (strtotime($modified) > strtotime($published)) {
+            $data['dateModified'] = $modified;
+        }
+
+        $data['wordCount'] = str_word_count(wp_strip_all_tags($post->post_content));
+
+        // commentCount is only meaningful (and only emitted) when comments are open.
+        if (comments_open($post->ID)) {
+            $data['commentCount'] = (int) get_comments_number($post->ID);
+        }
+
+        $data['inLanguage'] = $this->language();
+
+        $publisher_id = $this->publisherId();
+        if ($publisher_id !== '') {
+            $data['publisher'] = ['@id' => $publisher_id];
+        }
 
         $author = get_userdata((int) $post->post_author);
         if ($author) {
             $data['author'] = [
                 'name' => $author->display_name,
-                '@id'  => $this->schemaId('Person', md5($author->user_email)),
+                '@id'  => $this->personId($author),
             ];
         }
 
@@ -691,9 +728,24 @@ class SeoBase
             $data['thumbnailUrl'] = $thumbnail_url;
         }
 
+        // Tags become keywords, categories become articleSection (matching Yoast).
+        // The auto-assigned default category ("Uncategorized") is not a real
+        // section, so it is excluded.
         $tags = get_the_tags($post->ID);
         if ($tags && !is_wp_error($tags)) {
             $data['keywords'] = array_map(fn($tag) => $tag->name, $tags);
+        }
+
+        $default_category = (int) get_option('default_category');
+        $categories       = get_the_category($post->ID);
+        if (!empty($categories)) {
+            $sections = [];
+            foreach ($categories as $category) {
+                if ((int) $category->term_id === $default_category) continue;
+                $sections[] = $category->name;
+            }
+
+            if (!empty($sections)) $data['articleSection'] = $sections;
         }
 
         if (comments_open($post->ID) && !empty($post_type_settings->getCommentActionStructure())) {
@@ -751,7 +803,7 @@ class SeoBase
     {
         $data = [
             '@type'      => 'WebSite',
-            '@id'        => $this->schemaId('WebSite'),
+            '@id'        => $this->webSiteId(),
             'url'        => $this->settings->getBaseUrl(),
             'name'       => $this->settings->site->getName() ?? get_bloginfo('name'),
             'inLanguage' => $this->language(),
@@ -765,8 +817,11 @@ class SeoBase
             $data['description'] = $this->settings->site->getTagline();
         }
 
-        $data['publisher']       = ['@id' => $this->publisherId()];
-        $data['copyrightHolder'] = ['@id' => $this->publisherId()];
+        $publisher_id = $this->publisherId();
+        if ($publisher_id !== '') {
+            $data['publisher']       = ['@id' => $publisher_id];
+            $data['copyrightHolder'] = ['@id' => $publisher_id];
+        }
 
         if (! empty($this->settings->site->getSearchActionStructure())) {
             $data['potentialAction'] = [
@@ -803,6 +858,7 @@ class SeoBase
      *     breadcrumb_id: string|null,
      *     webpage_type: string|null,
      *     article_type: string|null,
+     *     about?: string|null,
      * } $page
      *
      * @return array
@@ -818,9 +874,15 @@ class SeoBase
             '@id'        => $page_url,
             'url'        => $page_url,
             'name'       => $page['title'],
-            'isPartOf'   => ['@id' => $this->schemaId('WebSite')],
+            'isPartOf'   => ['@id' => $this->webSiteId()],
             'inLanguage' => $this->language(),
         ];
+
+        // The site's main entity (Organization / Person). Yoast sets this only on the
+        // front page, where the page is "about" whoever the site represents.
+        if (!empty($page['about'])) {
+            $data['about'] = ['@id' => $page['about']];
+        }
 
         if (!in_array($webpage_type, ['CollectionPage', 'SearchResultsPage', 'ProfilePage'])) {
             $data['potentialAction'] = [
@@ -908,6 +970,107 @@ class SeoBase
     }
 
     /**
+     * Build a BreadcrumbList from configured middle rows.
+     *
+     * Trail: Home → [rows] → current. A page-ID row resolves to that page's
+     * crumb; the {@see BREADCRUMB_PARENT_TOKEN} row expands, in place, to the
+     * current item's real ancestor chain (passed in pre-resolved, top-down). The
+     * current item is the final crumb and carries no link. An empty row list
+     * yields the always-safe Home → current.
+     *
+     * @param string $current_url  Trailing-slashed URL of the current item.
+     * @param string $current_name Display name of the current item.
+     * @param list<int|string> $rows Configured middle rows (page IDs / parent token).
+     * @param list<array{name: string, url: string}> $ancestors Real ancestors, top-down.
+     *
+     * @return array
+     */
+    protected function buildBreadcrumbLd(string $current_url, string $current_name, array $rows, array $ancestors): array
+    {
+        $current_url = trailingslashit($current_url);
+        $position    = 1;
+
+        $items = [[
+            '@type'    => 'ListItem',
+            'position' => $position++,
+            'name'     => __('Home', 'kizlo'),
+            'item'     => $this->settings->getBaseUrl(),
+        ]];
+
+        foreach ($rows as $row) {
+            if ($row === self::BREADCRUMB_PARENT_TOKEN) {
+                foreach ($ancestors as $ancestor) {
+                    $items[] = [
+                        '@type'    => 'ListItem',
+                        'position' => $position++,
+                        'name'     => $ancestor['name'],
+                        'item'     => $ancestor['url'],
+                    ];
+                }
+                continue;
+            }
+
+            $crumb = $this->pageCrumb((int) $row);
+            if ($crumb === null) continue;
+
+            $items[] = [
+                '@type'    => 'ListItem',
+                'position' => $position++,
+                'name'     => $crumb['name'],
+                'item'     => $crumb['url'],
+            ];
+        }
+
+        $items[] = [
+            '@type'    => 'ListItem',
+            'position' => $position,
+            'name'     => $current_name,
+        ];
+
+        return [
+            '@type'           => 'BreadcrumbList',
+            '@id'             => $current_url . '#breadcrumb',
+            'itemListElement' => $items,
+        ];
+    }
+
+    /**
+     * Resolve a page-ID breadcrumb row to its name + URL, or null when the page
+     * is missing or unpublished.
+     *
+     * @param int $page_id
+     *
+     * @return array{name: string, url: string}|null
+     */
+    protected function pageCrumb(int $page_id): ?array
+    {
+        $page = get_post($page_id);
+        if (!$page || $page->post_status !== 'publish') return null;
+
+        return [
+            'name' => get_the_title($page),
+            'url'  => trailingslashit($this->resolvePostUrl($page, $this->settings->postTypes->get($page->post_type))),
+        ];
+    }
+
+    /**
+     * Resolve an attachment's caption for an ImageObject: its WordPress caption,
+     * falling back to the alt text, and null when neither is set (matches Yoast).
+     *
+     * @param int $attachment_id
+     *
+     * @return string|null
+     */
+    protected function imageCaption(int $attachment_id): ?string
+    {
+        $caption = wp_get_attachment_caption($attachment_id);
+        if (!empty($caption)) return $caption;
+
+        $alt = get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+        return !empty($alt) ? $alt : null;
+    }
+
+    /**
      * Generate Organization JSON-LD piece for site identity.
      *
      * @return array
@@ -917,8 +1080,8 @@ class SeoBase
         $org = $this->settings->identity->organization;
 
         $data = [
-            '@type' => ['Organization', 'Brand'],
-            '@id'   => $this->schemaId('Organization'),
+            '@type' => 'Organization',
+            '@id'   => $this->organizationId(),
             'url'   => $this->settings->getBaseUrl(),
             'name'  => $org->getName(),
         ];
@@ -951,14 +1114,55 @@ class SeoBase
             $data['foundingDate'] = $org->getFoundingDate();
         }
 
-        if (!empty($org->getEmployees())) {
-            $data['numberOfEmployees'] = $org->getEmployees();
+        // Identifier and publishing-policy fields are flat schema.org properties
+        // emitted only when set; a setting-key → schema-key map keeps the builder
+        // from needing a typed getter per field.
+        $extra = $org->getData();
+
+        $identifier_map = [
+            'vat_id'       => 'vatID',
+            'tax_id'       => 'taxID',
+            'iso6523_code' => 'iso6523Code',
+            'duns'         => 'duns',
+            'lei_code'     => 'leiCode',
+            'naics'        => 'naics',
+        ];
+
+        foreach ($identifier_map as $setting_key => $schema_key) {
+            if (!empty($extra[$setting_key])) {
+                $data[$schema_key] = $extra[$setting_key];
+            }
+        }
+
+        $emp_min = $org->getEmployeesMin();
+        $emp_max = $org->getEmployeesMax();
+        if (!empty($emp_min) || !empty($emp_max)) {
+            $employees = ['@type' => 'QuantitativeValue'];
+            if (!empty($emp_min)) $employees['minValue'] = $emp_min;
+            if (!empty($emp_max)) $employees['maxValue'] = $emp_max;
+            $data['numberOfEmployees'] = $employees;
+        }
+
+        $policy_map = [
+            'publishing_principles'      => 'publishingPrinciples',
+            'ownership_funding_info'     => 'ownershipFundingInfo',
+            'actionable_feedback_policy' => 'actionableFeedbackPolicy',
+            'corrections_policy'         => 'correctionsPolicy',
+            'ethics_policy'              => 'ethicsPolicy',
+            'diversity_policy'           => 'diversityPolicy',
+            'diversity_staffing_report'  => 'diversityStaffingReport',
+        ];
+
+        foreach ($policy_map as $setting_key => $schema_key) {
+            if (!empty($extra[$setting_key])) {
+                $data[$schema_key] = $extra[$setting_key];
+            }
         }
 
         $logo_url = !empty($org->getLogo()) ? wp_get_attachment_url($org->getLogo()) : false;
 
         if (!empty($logo_url)) {
-            $logo_id = $this->schemaId('logo/image', md5((string) $org->getLogo()));
+            $logo_id = $this->logoImageId();
 
             $data['logo']  = $this->imageObjectLd($logo_id, $logo_url, ['caption' => $org->getName()]);
             $data['image'] = ['@id' => $logo_id];
@@ -983,23 +1187,39 @@ class SeoBase
     /**
      * Generate Person JSON-LD piece for site identity.
      *
+     * The site's representative person is a WordPress user; its identity (name,
+     * description, avatar) derives from that account, with the profile photo and
+     * social profiles from settings layered on top. Keyed by the same @id as the
+     * user's author node so the two merge when they coincide. Empty only if the
+     * configured user is missing/deleted (a user is required in settings).
+     *
      * @return array
      */
     protected function personIdentityLd(): array
     {
+        $user = $this->siteUser();
+        if (!$user) return [];
+
         $person = $this->settings->identity->person;
 
         $data = [
             '@type' => ['Person', 'Organization'],
-            '@id'   => $this->schemaId('Person'),
-            'name'  => $person->getName(),
+            '@id'   => $this->personId($user),
+            'name'  => $user->display_name,
         ];
 
-        $image_url = !empty($person->getImage()) ? wp_get_attachment_url($person->getImage()) : false;
+        // Profile photo from settings, falling back to the user's avatar.
+        $image_url = !empty($person->getImage())
+            ? wp_get_attachment_url($person->getImage())
+            : (get_avatar_url($user->ID, ['size' => 96]) ?: false);
 
         if (!empty($image_url)) {
-            $data['image'] = $this->imageObjectLd($image_url, $image_url, ['caption' => $person->getName()]);
+            $data['image'] = $this->imageObjectLd($image_url, $image_url, ['caption' => $user->display_name]);
             $data['logo']  = ['@id' => $image_url];
+        }
+
+        if (!empty($user->description)) {
+            $data['description'] = $user->description;
         }
 
         if (!empty($person->getSocialProfiles())) {
@@ -1012,15 +1232,20 @@ class SeoBase
     /**
      * Generate Person JSON-LD piece for a post author.
      *
-     * @param WP_User $user
+     * On an author archive the Person is the page's main entity, so callers pass
+     * the ProfilePage URL to emit `mainEntityOfPage`; a post byline omits it (the
+     * page's main entity there is the WebPage/Article, not the author).
+     *
+     * @param WP_User     $user
+     * @param string|null $main_entity_url ProfilePage URL, when this is an author archive.
      *
      * @return array
      */
-    public function personAuthorLd(WP_User $user): array
+    public function personAuthorLd(WP_User $user, ?string $main_entity_url = null): array
     {
         $data = [
             '@type' => 'Person',
-            '@id'   => $this->schemaId('Person', md5($user->user_email)),
+            '@id'   => $this->personId($user),
             'name'  => $user->display_name,
         ];
 
@@ -1035,6 +1260,10 @@ class SeoBase
 
         if (!empty($user->description)) {
             $data['description'] = $user->description;
+        }
+
+        if (!empty($main_entity_url)) {
+            $data['mainEntityOfPage'] = ['@id' => trailingslashit($main_entity_url)];
         }
 
         // TODO: Get social profiles from user metabox.
@@ -1087,27 +1316,96 @@ class SeoBase
     }
 
     /**
-     * Get the publisher @id based on identity type.
+     * The WordPress user the site is represented by, when identity is "person".
+     *
+     * @return WP_User|null
+     */
+    protected function siteUser(): ?WP_User
+    {
+        $user_id = $this->settings->identity->person->getUserId();
+        if (empty($user_id)) return null;
+
+        return get_userdata($user_id) ?: null;
+    }
+
+    /**
+     * Whether the given user is the site's representative person. Only true in
+     * person identity mode, and drives the author/identity node merge: when a
+     * post (or author archive) belongs to this user, the standalone identity
+     * node already represents them, so no separate author node is emitted.
+     *
+     * @param WP_User $user
+     *
+     * @return bool
+     */
+    protected function isSitePerson(WP_User $user): bool
+    {
+        if (!$this->settings->identity->isPerson()) return false;
+
+        $site_user = $this->siteUser();
+        return $site_user !== null && $site_user->ID === $user->ID;
+    }
+
+    /**
+     * Publisher @id: the Organization, or the person standing in for it in
+     * person mode. A user is required for person identity (enforced in settings),
+     * so an empty return only happens if that user is later deleted or missing —
+     * callers omit the ref rather than emit a dangling @id.
      *
      * @return string
      */
     protected function publisherId(): string
     {
-        return $this->settings->identity->isOrganization() ? $this->schemaId('Organization') : $this->schemaId('Person');
+        if ($this->settings->identity->isOrganization()) {
+            return $this->organizationId();
+        }
+
+        $user = $this->siteUser();
+        return $user ? $this->personId($user) : '';
     }
 
     /**
-     * Generate a schema @id URL.
-     *
-     * @param string     $type
-     * @param string|int $identifier
+     * @id for the WebSite node.
      *
      * @return string
      */
-    protected function schemaId(string $type, string|int $identifier = 1): string
+    protected function webSiteId(): string
     {
-        $id = $this->settings->getBaseUrl() . '#/schema/' . $type;
-        return empty($identifier) ? trailingslashit($id) : $id . '/' . $identifier;
+        return $this->settings->getBaseUrl() . '#website';
+    }
+
+    /**
+     * @id for the Organization identity node.
+     *
+     * @return string
+     */
+    protected function organizationId(): string
+    {
+        return $this->settings->getBaseUrl() . '#organization';
+    }
+
+    /**
+     * @id for the organization logo ImageObject (a singleton per site).
+     *
+     * @return string
+     */
+    protected function logoImageId(): string
+    {
+        return $this->settings->getBaseUrl() . '#/schema/logo/image/';
+    }
+
+    /**
+     * @id for a person node, keyed by the WordPress user so the site's
+     * representative person and a post's author collapse to a single node when
+     * they are the same account.
+     *
+     * @param WP_User $user
+     *
+     * @return string
+     */
+    protected function personId(WP_User $user): string
+    {
+        return $this->settings->getBaseUrl() . '#/schema/person/' . md5($user->user_login . $user->ID);
     }
 
     /**

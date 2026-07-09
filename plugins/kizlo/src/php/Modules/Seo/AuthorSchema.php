@@ -125,7 +125,25 @@ class AuthorSchema extends SeoBase
 
         $graph[] = $this->authorWebPageLd($user);
         $graph[] = $this->authorBreadcrumbLd($user);
-        $graph[] = $this->personAuthorLd($user);
+
+        // The Person is the main entity of its own ProfilePage.
+        $profile_url = trailingslashit($this->resolveAuthorUrl($user));
+
+        if ($this->isSitePerson($user)) {
+            // In person mode the identity node from baseGraph() already represents
+            // this author (same @id); mark that node as the page's main entity in
+            // place rather than emitting a duplicate.
+            $person_id = $this->personId($user);
+            foreach ($graph as &$node) {
+                if (($node['@id'] ?? null) === $person_id) {
+                    $node['mainEntityOfPage'] = ['@id' => $profile_url];
+                    break;
+                }
+            }
+            unset($node);
+        } else {
+            $graph[] = $this->personAuthorLd($user, $profile_url);
+        }
 
         return $this->toGraph($graph);
     }
@@ -163,25 +181,13 @@ class AuthorSchema extends SeoBase
      */
     public function authorBreadcrumbLd(WP_User $user): array
     {
-        $url = trailingslashit($this->resolveAuthorUrl($user));
-
-        return [
-            '@type'           => 'BreadcrumbList',
-            '@id'             => $url . '#breadcrumb',
-            'itemListElement' => [
-                [
-                    '@type'    => 'ListItem',
-                    'position' => 1,
-                    'name'     => 'Home',
-                    'item'     => $this->settings->getBaseUrl(),
-                ],
-                [
-                    '@type'    => 'ListItem',
-                    'position' => 2,
-                    'name'     => $user->display_name,
-                ],
-            ],
-        ];
+        // Author archives have no real ancestors; only configured rows apply.
+        return $this->buildBreadcrumbLd(
+            $this->resolveAuthorUrl($user),
+            $user->display_name,
+            $this->settings->authors->getBreadcrumbs(),
+            [],
+        );
     }
 
     /**

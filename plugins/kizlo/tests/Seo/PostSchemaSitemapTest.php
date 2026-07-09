@@ -72,6 +72,21 @@ class PostSchemaSitemapTest extends SeoTestCase
         $this->assertNotContains('https://example.com/blog/', $locs);
     }
 
+    public function test_page_sitemap_omits_homepage_on_latest_posts_home(): void
+    {
+        // On a latest-posts home the post sitemap owns "/" (the blog index); the
+        // page sitemap must not list it too, or the homepage appears twice across
+        // sitemaps (Yoast issue #5428). Regular pages still list normally.
+        $settings = $this->seedSettings();
+        update_option('show_on_front', 'posts');
+        $this->createPost(['post_type' => 'page', 'post_title' => 'About']);
+
+        $locs = $this->locs((new PostSchema($settings))->sitemapEntries('page'));
+
+        $this->assertNotContains('https://example.com/', $locs);
+        $this->assertContains('https://example.com/about/', $locs);
+    }
+
     public function test_noindexed_static_front_page_drops_the_homepage_entry(): void
     {
         $settings = $this->seedSettings();

@@ -62,6 +62,19 @@ class AuthorSchemaTest extends SeoTestCase
         $this->assertNotNull($this->findNode($graph, 'BreadcrumbList'));
     }
 
+    public function test_breadcrumb_uses_configured_rows(): void
+    {
+        // Authors have no ancestors, so only the configured page rows fill the middle.
+        $blog     = $this->createPost(['post_type' => 'page', 'post_title' => 'Blog']);
+        $settings = $this->seedSettings(['authors' => ['enabled' => true, 'breadcrumbs' => [$blog->ID]]]);
+        $user     = $this->author();
+
+        $crumb = $this->findNode((new AuthorSchema($settings))->jsonLd($user)['@graph'], 'BreadcrumbList');
+        $names = array_column($crumb['itemListElement'], 'name');
+
+        $this->assertSame(['Home', 'Blog', 'Ada Lovelace'], $names);
+    }
+
     public function test_person_node_carries_archive_url_when_authors_enabled(): void
     {
         $settings = $this->seedSettings(['authors' => ['enabled' => true]]);
@@ -74,6 +87,33 @@ class AuthorSchemaTest extends SeoTestCase
 
         $this->assertNotNull($person);
         $this->assertSame('https://example.com/author/ada/', $person['url']);
+    }
+
+    public function test_person_node_is_main_entity_of_its_profile_page(): void
+    {
+        $settings = $this->seedSettings(['authors' => ['enabled' => true]]);
+        $user     = $this->author();
+
+        $person = $this->findNode((new AuthorSchema($settings))->jsonLd($user)['@graph'], 'Person');
+
+        $this->assertSame(['@id' => 'https://example.com/author/ada/'], $person['mainEntityOfPage']);
+    }
+
+    public function test_merged_person_is_main_entity_on_own_archive(): void
+    {
+        // Person mode, archive of the site's representative user: the single merged
+        // [Person, Organization] node is marked as the profile's main entity.
+        $user     = new WP_User(self::factory()->user->create(['role' => 'author', 'display_name' => 'Jane', 'user_login' => 'jane']));
+        $settings = $this->seedSettings([
+            'authors'  => ['enabled' => true],
+            'identity' => ['type' => 'person'],
+            'person'   => ['user_id' => $user->ID],
+        ]);
+
+        $person = $this->findNode((new AuthorSchema($settings))->jsonLd($user)['@graph'], 'Person');
+
+        $this->assertSame(['Person', 'Organization'], $person['@type']);
+        $this->assertSame(['@id' => 'https://example.com/author/jane/'], $person['mainEntityOfPage']);
     }
 
     public function test_sitemap_entries_only_include_authors_with_published_posts(): void

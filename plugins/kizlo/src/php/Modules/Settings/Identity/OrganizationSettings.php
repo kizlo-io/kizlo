@@ -18,9 +18,27 @@ class OrganizationSettings extends SettingsAbstract
         'legal_name'      => null,
         'founding_date'   => null,
         'founder'         => null,
-        'employees'       => null,
+        'employees_min'   => null,
+        'employees_max'   => null,
         'logo'            => null,
         'social_profiles' => [],
+
+        // Business identifiers (flat schema.org string properties).
+        'vat_id'          => null,
+        'tax_id'          => null,
+        'iso6523_code'    => null,
+        'duns'            => null,
+        'lei_code'        => null,
+        'naics'           => null,
+
+        // Publishing / news policy URLs (Google News oriented).
+        'publishing_principles'      => null,
+        'ownership_funding_info'     => null,
+        'actionable_feedback_policy' => null,
+        'corrections_policy'         => null,
+        'ethics_policy'              => null,
+        'diversity_policy'           => null,
+        'diversity_staffing_report'  => null,
     ];
 
     /**
@@ -163,18 +181,19 @@ class OrganizationSettings extends SettingsAbstract
     }
 
     /**
-     * The approximate number of employees in the organization.
+     * Lower bound of the employee-count range (schema.org QuantitativeValue).
      */
-    public function getEmployees(): ?int
+    public function getEmployeesMin(): ?int
     {
-        return $this->get('employees');
+        return $this->get('employees_min');
     }
 
-    /** @param int|null $value */
-    public function setEmployees(?int $value): static
+    /**
+     * Upper bound of the employee-count range (schema.org QuantitativeValue).
+     */
+    public function getEmployeesMax(): ?int
     {
-        $this->set('employees', $value);
-        return $this;
+        return $this->get('employees_max');
     }
 
     /**
@@ -218,14 +237,28 @@ class OrganizationSettings extends SettingsAbstract
             'alternate_name',
             'slogan',
             'phone',
-            'legal_name'      => !empty($value) ? sanitize_text_field($value) : null,
+            'legal_name',
+            'vat_id',
+            'tax_id',
+            'iso6523_code',
+            'duns',
+            'lei_code',
+            'naics'           => !empty($value) ? sanitize_text_field($value) : null,
             'description'     => !empty($value) ? sanitize_textarea_field($value) : null,
             'email'           => !empty($value) ? sanitize_email($value) : null,
             'founding_date'   => !empty($value) ? sanitize_text_field($value) : null,
             'founder'         => $this->sanitizeFounder($value),
-            'employees'       => !empty($value) ? absint($value) : null,
+            'employees_min',
+            'employees_max'   => !empty($value) ? absint($value) : null,
             'logo'            => !empty($value) ? absint($value) : null,
             'social_profiles' => $this->sanitizeSocialProfiles($value),
+            'publishing_principles',
+            'ownership_funding_info',
+            'actionable_feedback_policy',
+            'corrections_policy',
+            'ethics_policy',
+            'diversity_policy',
+            'diversity_staffing_report' => !empty($value) ? esc_url_raw($value) : null,
             default           => $value,
         };
     }
@@ -235,9 +268,17 @@ class OrganizationSettings extends SettingsAbstract
         match ($key) {
             'email'           => $this->assertValidEmail($value),
             'founding_date'   => $this->assertValidDate($value),
-            'employees'       => $this->assertPositiveInt($value),
+            'employees_min',
+            'employees_max'   => $this->assertPositiveInt($value),
             'social_profiles' => $this->assertValidSocialProfiles($value),
             'founder'         => $this->assertValidFounder($value),
+            'publishing_principles',
+            'ownership_funding_info',
+            'actionable_feedback_policy',
+            'corrections_policy',
+            'ethics_policy',
+            'diversity_policy',
+            'diversity_staffing_report' => $this->assertValidUrl($key, $value),
             default           => null,
         };
     }

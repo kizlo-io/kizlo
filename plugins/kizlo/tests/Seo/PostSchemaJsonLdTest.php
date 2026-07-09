@@ -30,11 +30,13 @@ class PostSchemaJsonLdTest extends SeoTestCase
 
     public function test_person_identity_replaces_organization_when_configured(): void
     {
-        $settings = $this->seedSettings(['identity' => ['type' => 'person'], 'person' => ['name' => 'Jane Person']]);
+        $user     = self::factory()->user->create(['display_name' => 'Jane Person', 'user_login' => 'jane']);
+        $settings = $this->seedSettings(['identity' => ['type' => 'person'], 'person' => ['user_id' => $user]]);
         $ld       = (new PostSchema($settings))->jsonLd($this->createPost());
 
-        // The site identity Person node (@type ['Person','Organization']) is present;
-        // the author Person node is separate and keyed by email hash.
+        // The site identity Person node (@type ['Person','Organization']) is present
+        // and keyed by the site user. The default post has no author, so it stands
+        // alone rather than merging.
         $identity = null;
         foreach ($ld['@graph'] as $node) {
             if (($node['@type'] ?? null) === ['Person', 'Organization']) $identity = $node;
@@ -42,6 +44,55 @@ class PostSchemaJsonLdTest extends SeoTestCase
 
         $this->assertNotNull($identity);
         $this->assertSame('Jane Person', $identity['name']);
+        $this->assertSame($this->personId($user), $identity['@id']);
+    }
+
+    public function test_person_author_merges_into_identity_node(): void
+    {
+        // In person mode, a post written by the site's representative user gets no
+        // second Person node: the identity node already represents them, so author,
+        // publisher and identity all resolve to one @id (one merged node).
+        $user     = self::factory()->user->create(['display_name' => 'Jane Person', 'user_login' => 'jane']);
+        $settings = $this->seedSettings(['identity' => ['type' => 'person'], 'person' => ['user_id' => $user]]);
+        $post     = $this->createPost(['post_author' => $user]);
+
+        $graph = (new PostSchema($settings))->jsonLd($post)['@graph'];
+
+        // Exactly one person node, typed as the merged [Person, Organization].
+        $persons = array_values(array_filter($graph, fn($n) => in_array('Person', (array) ($n['@type'] ?? []), true)));
+        $this->assertCount(1, $persons);
+        $this->assertSame(['Person', 'Organization'], $persons[0]['@type']);
+        $this->assertSame($this->personId($user), $persons[0]['@id']);
+
+        // The Article points its author and publisher at that same node.
+        $article = $this->findNode($graph, 'Article');
+        $this->assertSame($this->personId($user), $article['author']['@id']);
+        $this->assertSame($this->personId($user), $article['publisher']['@id']);
+    }
+
+    public function test_person_identity_and_different_author_are_separate_nodes(): void
+    {
+        // A post by someone other than the site person keeps two Person nodes: the
+        // site identity ([Person, Organization]) and a lean author ([Person]).
+        $site_user = self::factory()->user->create(['display_name' => 'Jane Person', 'user_login' => 'jane']);
+        $author    = self::factory()->user->create(['role' => 'author', 'display_name' => 'Ada', 'user_login' => 'ada']);
+        $settings  = $this->seedSettings(['identity' => ['type' => 'person'], 'person' => ['user_id' => $site_user]]);
+        $post      = $this->createPost(['post_author' => $author]);
+
+        $graph = (new PostSchema($settings))->jsonLd($post)['@graph'];
+
+        $identity    = null;
+        $author_node = null;
+        foreach ($graph as $node) {
+            if (($node['@type'] ?? null) === ['Person', 'Organization']) $identity = $node;
+            if (($node['@type'] ?? null) === 'Person' && ($node['name'] ?? null) === 'Ada') $author_node = $node;
+        }
+
+        $this->assertNotNull($identity);
+        $this->assertNotNull($author_node);
+        $this->assertSame($this->personId($site_user), $identity['@id']);
+        $this->assertSame($this->personId($author), $author_node['@id']);
+        $this->assertNotSame($identity['@id'], $author_node['@id']);
     }
 
     public function test_webpage_node_anchors_to_trailing_slashed_url(): void
@@ -89,8 +140,8 @@ class PostSchemaJsonLdTest extends SeoTestCase
 
         $this->assertSame('https://example.com/article-post/#article', $article['@id']);
         $this->assertSame('Ada', $article['author']['name']);
-        // Author @id is derived from the email hash so it is stable + shared.
-        $this->assertSame('https://example.com#/schema/Person/' . md5('ada@example.com'), $article['author']['@id']);
+        // Author @id is keyed by the user so it is stable + shared with the author node.
+        $this->assertSame($this->personId($author), $article['author']['@id']);
         $this->assertEqualsCanonicalizing(['php', 'seo'], $article['keywords']);
     }
 
@@ -131,7 +182,7 @@ class PostSchemaJsonLdTest extends SeoTestCase
 
     public function test_breadcrumb_lists_home_ancestors_and_self(): void
     {
-        $settings = $this->seedSettings();
+        $settings = $this->seedSettings(['post_types' => ['page' => ['breadcrumbs' => ['__parent__']]]]);
         $parent   = $this->createPost(['post_type' => 'page', 'post_title' => 'Parent']);
         $child    = $this->createPost(['post_type' => 'page', 'post_title' => 'Child', 'post_parent' => $parent->ID]);
 
@@ -161,5 +212,22 @@ class PostSchemaJsonLdTest extends SeoTestCase
         }
 
         $this->assertNotNull($person);
+    }
+
+    public function test_post_author_person_is_not_main_entity_of_page(): void
+    {
+        // A byline author is not the main entity of the post's page (the WebPage /
+        // Article is), so no mainEntityOfPage on the author Person node.
+        $settings = $this->seedSettings();
+        $author   = self::factory()->user->create(['role' => 'author', 'display_name' => 'Grace']);
+        $post     = $this->createPost(['post_author' => $author]);
+
+        $person = null;
+        foreach ((new PostSchema($settings))->jsonLd($post)['@graph'] as $node) {
+            if (($node['@type'] ?? null) === 'Person' && ($node['name'] ?? null) === 'Grace') $person = $node;
+        }
+
+        $this->assertNotNull($person);
+        $this->assertArrayNotHasKey('mainEntityOfPage', $person);
     }
 }

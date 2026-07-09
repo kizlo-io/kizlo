@@ -82,7 +82,7 @@ class SeoModule
 
         $type = $request->get_param('type');
         $key = $request->get_param('key');
-        $page = $request->get_param('page') ?? 1;
+        $page = max(1, (int) ($request->get_param('page') ?? 1));
 
         return match ($type) {
             'post_type'  => new WP_REST_Response((new PostSchema($settings))->sitemapEntries($key, $page)),

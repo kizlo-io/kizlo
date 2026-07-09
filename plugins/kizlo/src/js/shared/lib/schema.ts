@@ -34,7 +34,7 @@ export interface SiteSettings {
 }
 
 export interface PersonSettings {
-	name: string
+	user_id: number | null
 	image: Media | null
 	social_profiles: SocialProfile[]
 }
@@ -54,9 +54,23 @@ export interface OrganizationSettings {
 	legal_name: string | null
 	founding_date: string | null
 	founder: OrganizationFounder | null
-	employees: number | null
+	employees_min: number | null
+	employees_max: number | null
 	logo: Media | null
 	social_profiles: SocialProfile[]
+	vat_id: string | null
+	tax_id: string | null
+	iso6523_code: string | null
+	duns: string | null
+	lei_code: string | null
+	naics: string | null
+	publishing_principles: string | null
+	ownership_funding_info: string | null
+	actionable_feedback_policy: string | null
+	corrections_policy: string | null
+	ethics_policy: string | null
+	diversity_policy: string | null
+	diversity_staffing_report: string | null
 }
 
 export interface BaseContentSettings {
@@ -65,6 +79,8 @@ export interface BaseContentSettings {
 	search_engine_visibility: boolean | null
 	webpage_type: string
 	article_type: string | null
+	// Ordered breadcrumb middle rows: page IDs and/or the reserved "__parent__" token.
+	breadcrumbs: (string | number)[]
 }
 
 export interface AuthorsSettings extends Omit<BaseContentSettings, "webpage_type" | "article_type"> {
@@ -237,9 +253,18 @@ export const SiteSettingsSchema = z.object({
 export type SiteSettingsSchemaInput = z.input<typeof SiteSettingsSchema>
 export type SiteSettingsSchemaOutput = z.output<typeof SiteSettingsSchema>
 
+// A user is required once the site represents a person: the person node, its
+// @id, the publisher, `about`, and the author-merge all key off it. An empty
+// combobox value fails validation rather than saving a person identity with no
+// user behind it.
+export const RequiredUserSchema: z.ZodType<number, string> = z.preprocess(
+	(val) => (val === "" || val == null ? undefined : Number(val)),
+	z.number({ error: "Select a user to represent this site." }).int().positive(),
+) as never
+
 export const PersonSettingsSchema = z.object({
+	user_id: RequiredUserSchema,
 	image: z.number().nullable(),
-	name: z.string().min(1, { error: "Name is required" }),
 	social_profiles: z.array(SocialProfileSchema),
 })
 export type PersonSettingsSchema = z.infer<typeof PersonSettingsSchema>
@@ -260,9 +285,23 @@ export const OrganizationSettingsSchema = z.object({
 	legal_name: NulledStringSchema,
 	founding_date: NulledStringSchema,
 	founder: OrganizationFounderSchema,
-	employees: z.coerce.number().nonnegative().int(),
+	employees_min: z.coerce.number().nonnegative().int(),
+	employees_max: z.coerce.number().nonnegative().int(),
 	logo: z.number().nullable(),
 	social_profiles: z.array(SocialProfileSchema),
+	vat_id: NulledStringSchema,
+	tax_id: NulledStringSchema,
+	iso6523_code: NulledStringSchema,
+	duns: NulledStringSchema,
+	lei_code: NulledStringSchema,
+	naics: NulledStringSchema,
+	publishing_principles: NulledUrlSchema,
+	ownership_funding_info: NulledUrlSchema,
+	actionable_feedback_policy: NulledUrlSchema,
+	corrections_policy: NulledUrlSchema,
+	ethics_policy: NulledUrlSchema,
+	diversity_policy: NulledUrlSchema,
+	diversity_staffing_report: NulledUrlSchema,
 })
 export type OrganizationSettingsSchema = z.infer<typeof OrganizationSettingsSchema>
 
@@ -289,6 +328,7 @@ export const AuthorSettingsSchema = z.object({
 	title_structure: NulledStringSchema,
 	description_structure: NulledStringSchema,
 	search_engine_visibility: z.boolean(),
+	breadcrumbs: z.array(z.string()),
 })
 export type AuthorSettingsInput = z.input<typeof AuthorSettingsSchema>
 export type AuthorSettingsOutput = z.output<typeof AuthorSettingsSchema>
@@ -329,6 +369,7 @@ export const PostTypeSettingsSchema = z.object({
 	comment_action_structure: createNulledPathnameStructureSchema(),
 	seo_enabled: z.boolean(),
 	rest_api_enabled: z.boolean(),
+	breadcrumbs: z.array(z.string()),
 })
 export type PostTypeSettingsInput = z.input<typeof PostTypeSettingsSchema>
 export type PostTypeSettingsOutput = z.output<typeof PostTypeSettingsSchema>
@@ -340,6 +381,7 @@ export const TaxonomySettingsSchema = z.object({
 	search_engine_visibility: z.boolean(),
 	seo_enabled: z.boolean(),
 	rest_api_enabled: z.boolean(),
+	breadcrumbs: z.array(z.string()),
 })
 export type TaxonomySettingsInput = z.input<typeof TaxonomySettingsSchema>
 export type TaxonomySettingsOutput = z.output<typeof TaxonomySettingsSchema>

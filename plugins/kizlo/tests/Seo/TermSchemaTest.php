@@ -158,7 +158,7 @@ class TermSchemaTest extends SeoTestCase
 
     public function test_breadcrumb_reflects_parent_hierarchy(): void
     {
-        $settings = $this->seedSettings();
+        $settings = $this->seedSettings(['taxonomies' => ['category' => ['breadcrumbs' => ['__parent__']]]]);
         $parent   = $this->category('Tech', 'tech');
         $child    = $this->category('Phones', 'phones', $parent->term_id);
 

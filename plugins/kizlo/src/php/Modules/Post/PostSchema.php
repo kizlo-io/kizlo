@@ -149,15 +149,20 @@ class PostSchema extends SeoBase
         }
 
         if ($post_type === 'page') {
-            // A noindexed static front page drops the homepage "/" from the sitemap,
-            // matching the noindex robots tag HomeSchema emits for it.
-            if ($show_on_front === 'page' && $front_page_id > 0 && $this->isNoindexed($front_page_id)) {
+            // The page sitemap only carries the homepage "/" when a static page is
+            // assigned as the front page. On a latest-posts home the post sitemap
+            // owns "/" and it must not appear here too (Yoast issue #5428).
+            if ($show_on_front !== 'page' || $front_page_id <= 0) {
                 return null;
             }
 
-            $home_last = ($show_on_front === 'page' && $front_page_id > 0)
-                ? (get_post_modified_time('c', true, $front_page_id) ?: $blog_last)
-                : $blog_last;
+            // A noindexed static front page drops the homepage "/" from the sitemap,
+            // matching the noindex robots tag HomeSchema emits for it.
+            if ($this->isNoindexed($front_page_id)) {
+                return null;
+            }
+
+            $home_last = get_post_modified_time('c', true, $front_page_id) ?: $blog_last;
 
             return ['loc' => $home, 'lastmod' => $home_last, 'images' => []];
         }
@@ -250,9 +255,12 @@ class PostSchema extends SeoBase
 
         $graph[] = $this->breadcrumbLd($post);
 
+        // When the author is the site's representative person, the identity node
+        // from baseGraph() already represents them (same @id), so no separate
+        // author node is emitted — the two merge into one.
         $author = get_userdata((int) $post->post_author);
 
-        if ($author) {
+        if ($author && !$this->isSitePerson($author)) {
             $graph[] = $this->personAuthorLd($author);
         }
 
@@ -361,38 +369,24 @@ class PostSchema extends SeoBase
     {
         $post_type_settings = $this->settings->postTypes->get($post->post_type);
 
-        $page_url = trailingslashit($this->resolvePostUrl($post, $post_type_settings));
-        $position = 1;
-
-        $items = [[
-            '@type'    => 'ListItem',
-            'position' => $position++,
-            'name'     => 'Home',
-            'item'     => $this->settings->getBaseUrl(),
-        ]];
-
+        // Real ancestors: the post's hierarchical parents (pages), top-down.
+        $ancestors = [];
         foreach (array_reverse(get_post_ancestors($post)) as $ancestor_id) {
-            $ancestor_post = get_post($ancestor_id);
+            $ancestor = get_post($ancestor_id);
+            if (!$ancestor) continue;
 
-            $items[] = [
-                '@type'    => 'ListItem',
-                'position' => $position++,
-                'name'     => get_the_title($ancestor_id),
-                'item'     => trailingslashit($this->resolvePostUrl($ancestor_post, $post_type_settings)),
+            $ancestors[] = [
+                'name' => get_the_title($ancestor),
+                'url'  => trailingslashit($this->resolvePostUrl($ancestor, $this->settings->postTypes->get($ancestor->post_type))),
             ];
         }
 
-        $items[] = [
-            '@type'    => 'ListItem',
-            'position' => $position,
-            'name'     => get_the_title($post),
-        ];
-
-        return [
-            '@type'           => 'BreadcrumbList',
-            '@id'             => $page_url . '#breadcrumb',
-            'itemListElement' => $items,
-        ];
+        return $this->buildBreadcrumbLd(
+            $this->resolvePostUrl($post, $post_type_settings),
+            get_the_title($post),
+            $post_type_settings->getBreadcrumbs(),
+            $ancestors,
+        );
     }
 
     /**
@@ -418,6 +412,7 @@ class PostSchema extends SeoBase
             $thumbnail_url,
             $metadata['width']  ?? null,
             $metadata['height'] ?? null,
+            $this->imageCaption($thumbnail_id),
         );
     }
 }

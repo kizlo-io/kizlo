@@ -58,6 +58,22 @@ class HomeSchemaTest extends SeoTestCase
         $this->assertNull($this->findNode($graph, 'Article'));
     }
 
+    public function test_home_webpage_about_points_at_the_main_entity(): void
+    {
+        // The front page is "about" whoever the site represents: the Organization
+        // in org mode, the person node in person mode.
+        $org = $this->seedSettings();
+        $this->useLatestPosts();
+        $org_home = $this->findNode((new HomeSchema($org))->jsonLd()['@graph'], 'WebPage');
+        $this->assertSame(['@id' => $this->orgId()], $org_home['about']);
+
+        $user   = self::factory()->user->create(['display_name' => 'Jane Person', 'user_login' => 'jane']);
+        $person = $this->seedSettings(['identity' => ['type' => 'person'], 'person' => ['user_id' => $user]]);
+        $this->useLatestPosts();
+        $person_home = $this->findNode((new HomeSchema($person))->jsonLd()['@graph'], 'WebPage');
+        $this->assertSame(['@id' => $this->personId($user)], $person_home['about']);
+    }
+
     public function test_static_front_page_resolves_title_from_its_structure(): void
     {
         $settings = $this->seedSettings();

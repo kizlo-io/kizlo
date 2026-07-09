@@ -24,12 +24,6 @@ use Kizlo\Modules\Post\PostSchema;
  */
 class JsonLdShapeTest extends SeoTestCase
 {
-    /** Rebuild a schema `@id` the way SeoBase::schemaId() does for the pinned base URL. */
-    private function sid(string $type, string $identifier = '1'): string
-    {
-        return self::BASE_URL . '#/schema/' . $type . '/' . $identifier;
-    }
-
     /** The site language, an environment passthrough (get_bloginfo('language')). */
     private function lang(): string
     {
@@ -63,7 +57,7 @@ class JsonLdShapeTest extends SeoTestCase
         // Base identity (WebSite + Organization), the page, its Article, the primary
         // image, the breadcrumb, and the author Person: seven nodes, no more, no less.
         $this->assertSame(
-            ['WebSite', 'Organization+Brand', 'WebPage', 'Article', 'ImageObject', 'BreadcrumbList', 'Person'],
+            ['WebSite', 'Organization', 'WebPage', 'Article', 'ImageObject', 'BreadcrumbList', 'Person'],
             $this->graphTypes($graph),
         );
     }
@@ -77,7 +71,7 @@ class JsonLdShapeTest extends SeoTestCase
         $graph = (new PostSchema($settings))->jsonLd($this->createPost())['@graph'];
 
         $this->assertSame(
-            ['WebSite', 'Organization+Brand', 'WebPage', 'BreadcrumbList'],
+            ['WebSite', 'Organization', 'WebPage', 'BreadcrumbList'],
             $this->graphTypes($graph),
         );
     }
@@ -90,7 +84,7 @@ class JsonLdShapeTest extends SeoTestCase
         $graph = (new TermSchema($settings))->jsonLd($term)['@graph'];
 
         $this->assertSame(
-            ['WebSite', 'Organization+Brand', 'WebPage+CollectionPage', 'BreadcrumbList'],
+            ['WebSite', 'Organization', 'WebPage+CollectionPage', 'BreadcrumbList'],
             $this->graphTypes($graph),
         );
     }
@@ -103,7 +97,7 @@ class JsonLdShapeTest extends SeoTestCase
         $graph = (new AuthorSchema($settings))->jsonLd($user)['@graph'];
 
         $this->assertSame(
-            ['WebSite', 'Organization+Brand', 'WebPage+ProfilePage', 'BreadcrumbList', 'Person'],
+            ['WebSite', 'Organization', 'WebPage+ProfilePage', 'BreadcrumbList', 'Person'],
             $this->graphTypes($graph),
         );
     }
@@ -116,9 +110,9 @@ class JsonLdShapeTest extends SeoTestCase
 
         $graph = (new HomeSchema($settings))->jsonLd()['@graph'];
 
-        // A latest-posts homepage is base identity plus a plain WebPage: no Article,
-        // no image, no breadcrumb.
-        $this->assertSame(['WebSite', 'Organization+Brand', 'WebPage'], $this->graphTypes($graph));
+        // A latest-posts homepage is base identity plus a plain WebPage and the
+        // single-item breadcrumb: no Article, no image.
+        $this->assertSame(['WebSite', 'Organization', 'WebPage', 'BreadcrumbList'], $this->graphTypes($graph));
     }
 
     // ====================================================
@@ -133,12 +127,12 @@ class JsonLdShapeTest extends SeoTestCase
 
         $this->assertSame([
             '@type'           => 'WebSite',
-            '@id'             => $this->sid('WebSite'),
+            '@id'             => $this->webSiteId(),
             'url'             => self::BASE_URL,
             'name'            => 'Example Site',
             'inLanguage'      => $this->lang(),
-            'publisher'       => ['@id' => $this->sid('Organization')],
-            'copyrightHolder' => ['@id' => $this->sid('Organization')],
+            'publisher'       => ['@id' => $this->orgId()],
+            'copyrightHolder' => ['@id' => $this->orgId()],
         ], $node);
     }
 
@@ -160,14 +154,14 @@ class JsonLdShapeTest extends SeoTestCase
 
         $this->assertSame([
             '@type'           => 'WebSite',
-            '@id'             => $this->sid('WebSite'),
+            '@id'             => $this->webSiteId(),
             'url'             => self::BASE_URL,
             'name'            => 'Example Site',
             'inLanguage'      => $this->lang(),
             'alternateName'   => 'Ex',
             'description'     => 'The example tagline',
-            'publisher'       => ['@id' => $this->sid('Organization')],
-            'copyrightHolder' => ['@id' => $this->sid('Organization')],
+            'publisher'       => ['@id' => $this->orgId()],
+            'copyrightHolder' => ['@id' => $this->orgId()],
             'potentialAction' => [
                 '@type'       => 'SearchAction',
                 'target'      => ['@type' => 'EntryPoint', 'urlTemplate' => $url_template],
@@ -187,8 +181,8 @@ class JsonLdShapeTest extends SeoTestCase
         $node = $this->findNode((new PostSchema($settings))->jsonLd($this->createPost())['@graph'], 'Organization');
 
         $this->assertSame([
-            '@type' => ['Organization', 'Brand'],
-            '@id'   => $this->sid('Organization'),
+            '@type' => 'Organization',
+            '@id'   => $this->orgId(),
             'url'   => self::BASE_URL,
             'name'  => 'Example Org',
         ], $node);
@@ -196,16 +190,29 @@ class JsonLdShapeTest extends SeoTestCase
 
     public function test_person_identity_is_full_object(): void
     {
-        // Flipping identity to a person swaps @type from [Organization, Brand] to
-        // [Person, Organization], drops the `url` key, and re-anchors @id.
-        $settings = $this->seedSettings(['identity' => ['type' => 'person'], 'person' => ['name' => 'Jane Person']]);
+        // Person identity is a WordPress user: @type is [Person, Organization],
+        // the name comes from the account, and @id is keyed by the user so it can
+        // merge with that user's author node. With no settings image the profile
+        // photo falls back to the user's avatar.
+        $user     = self::factory()->user->create(['display_name' => 'Jane Person', 'user_login' => 'jane']);
+        $settings = $this->seedSettings(['identity' => ['type' => 'person'], 'person' => ['user_id' => $user]]);
 
-        $node = $this->findNode((new PostSchema($settings))->jsonLd($this->createPost())['@graph'], 'Person');
+        $node   = $this->findNode((new PostSchema($settings))->jsonLd($this->createPost())['@graph'], 'Person');
+        $avatar = get_avatar_url($user, ['size' => 96]);
 
         $this->assertSame([
             '@type' => ['Person', 'Organization'],
-            '@id'   => $this->sid('Person'),
+            '@id'   => $this->personId($user),
             'name'  => 'Jane Person',
+            'image' => [
+                '@type'      => 'ImageObject',
+                '@id'        => $avatar,
+                'url'        => $avatar,
+                'contentUrl' => $avatar,
+                'inLanguage' => $this->lang(),
+                'caption'    => 'Jane Person',
+            ],
+            'logo'  => ['@id' => $avatar],
         ], $node);
     }
 
@@ -221,19 +228,33 @@ class JsonLdShapeTest extends SeoTestCase
             'phone'           => '+1 555 0100',
             'legal_name'      => 'Example Org LLC',
             'founding_date'   => '2010-01-01',
-            'employees'       => 42,
+            'employees_min'   => 11,
+            'employees_max'   => 50,
             'logo'            => $logo,
             'founder'         => ['name' => 'Jane', 'social_profiles' => [['platform' => 'x', 'url' => 'https://x.com/jane']]],
             'social_profiles' => [['platform' => 'x', 'url' => 'https://x.com/acme']],
+            'vat_id'          => 'GB123456789',
+            'tax_id'          => '12-3456789',
+            'iso6523_code'    => '0060:123456789',
+            'duns'            => '150483782',
+            'lei_code'        => '529900T8BM49AURSDO55',
+            'naics'           => '511210',
+            'publishing_principles'      => 'https://example.com/publishing-principles/',
+            'ownership_funding_info'     => 'https://example.com/ownership-funding/',
+            'actionable_feedback_policy' => 'https://example.com/feedback-policy/',
+            'corrections_policy'         => 'https://example.com/corrections-policy/',
+            'ethics_policy'              => 'https://example.com/ethics-policy/',
+            'diversity_policy'           => 'https://example.com/diversity-policy/',
+            'diversity_staffing_report'  => 'https://example.com/diversity-report/',
         ]]);
 
         $node    = $this->findNode((new PostSchema($settings))->jsonLd($this->createPost())['@graph'], 'Organization');
-        $logo_id = $this->sid('logo/image', md5((string) $logo));
+        $logo_id = $this->logoImageId();
         $logo_url = wp_get_attachment_url($logo);
 
         $this->assertSame([
-            '@type'             => ['Organization', 'Brand'],
-            '@id'               => $this->sid('Organization'),
+            '@type'             => 'Organization',
+            '@id'               => $this->orgId(),
             'url'               => self::BASE_URL,
             'name'              => 'Example Org',
             'alternateName'     => 'ExOrg',
@@ -243,7 +264,20 @@ class JsonLdShapeTest extends SeoTestCase
             'telephone'         => '+1 555 0100',
             'legalName'         => 'Example Org LLC',
             'foundingDate'      => '2010-01-01',
-            'numberOfEmployees' => 42,
+            'vatID'             => 'GB123456789',
+            'taxID'             => '12-3456789',
+            'iso6523Code'       => '0060:123456789',
+            'duns'              => '150483782',
+            'leiCode'           => '529900T8BM49AURSDO55',
+            'naics'             => '511210',
+            'numberOfEmployees' => ['@type' => 'QuantitativeValue', 'minValue' => 11, 'maxValue' => 50],
+            'publishingPrinciples'     => 'https://example.com/publishing-principles/',
+            'ownershipFundingInfo'     => 'https://example.com/ownership-funding/',
+            'actionableFeedbackPolicy' => 'https://example.com/feedback-policy/',
+            'correctionsPolicy'        => 'https://example.com/corrections-policy/',
+            'ethicsPolicy'             => 'https://example.com/ethics-policy/',
+            'diversityPolicy'          => 'https://example.com/diversity-policy/',
+            'diversityStaffingReport'  => 'https://example.com/diversity-report/',
             'logo'              => [
                 '@type'      => 'ImageObject',
                 '@id'        => $logo_id,
@@ -258,12 +292,35 @@ class JsonLdShapeTest extends SeoTestCase
         ], $node);
     }
 
+    public function test_organization_number_of_employees_partial_range(): void
+    {
+        // Only a lower bound: QuantitativeValue carries minValue and omits maxValue.
+        $min  = $this->seedSettings(['organization' => ['employees_min' => 11]]);
+        $node = $this->findNode((new PostSchema($min))->jsonLd($this->createPost())['@graph'], 'Organization');
+        $this->assertSame(['@type' => 'QuantitativeValue', 'minValue' => 11], $node['numberOfEmployees']);
+
+        // Only an upper bound: maxValue only.
+        $max  = $this->seedSettings(['organization' => ['employees_max' => 50]]);
+        $node = $this->findNode((new PostSchema($max))->jsonLd($this->createPost())['@graph'], 'Organization');
+        $this->assertSame(['@type' => 'QuantitativeValue', 'maxValue' => 50], $node['numberOfEmployees']);
+
+        // Neither bound set: the property is omitted entirely.
+        $none = $this->seedSettings();
+        $node = $this->findNode((new PostSchema($none))->jsonLd($this->createPost())['@graph'], 'Organization');
+        $this->assertArrayNotHasKey('numberOfEmployees', $node);
+    }
+
     public function test_person_identity_full_is_full_object(): void
     {
         $image    = $this->createImage(['file' => '2026/07/jane.jpg']);
+        $user     = self::factory()->user->create([
+            'display_name' => 'Jane Person',
+            'user_login'   => 'jane',
+            'description'  => 'A bio.',
+        ]);
         $settings = $this->seedSettings([
             'identity' => ['type' => 'person'],
-            'person'   => ['name' => 'Jane Person', 'image' => $image, 'social_profiles' => [['platform' => 'x', 'url' => 'https://x.com/jane']]],
+            'person'   => ['user_id' => $user, 'image' => $image, 'social_profiles' => [['platform' => 'x', 'url' => 'https://x.com/jane']]],
         ]);
 
         $node      = $this->findNode((new PostSchema($settings))->jsonLd($this->createPost())['@graph'], 'Person');
@@ -271,7 +328,7 @@ class JsonLdShapeTest extends SeoTestCase
 
         $this->assertSame([
             '@type' => ['Person', 'Organization'],
-            '@id'   => $this->sid('Person'),
+            '@id'   => $this->personId($user),
             'name'  => 'Jane Person',
             'image' => [
                 '@type'      => 'ImageObject',
@@ -281,8 +338,9 @@ class JsonLdShapeTest extends SeoTestCase
                 'inLanguage' => $this->lang(),
                 'caption'    => 'Jane Person',
             ],
-            'logo'   => ['@id' => $image_url],
-            'sameAs' => ['https://x.com/jane'],
+            'logo'        => ['@id' => $image_url],
+            'description' => 'A bio.',
+            'sameAs'      => ['https://x.com/jane'],
         ], $node);
     }
 
@@ -303,7 +361,7 @@ class JsonLdShapeTest extends SeoTestCase
             '@id'                => $page_url,
             'url'                => $page_url,
             'name'               => 'Full | Example Site',
-            'isPartOf'           => ['@id' => $this->sid('WebSite')],
+            'isPartOf'           => ['@id' => $this->webSiteId()],
             'inLanguage'         => $this->lang(),
             'potentialAction'    => [['@type' => 'ReadAction', 'target' => [$page_url]]],
             // Default description template resolves from post content, so embed it.
@@ -332,7 +390,7 @@ class JsonLdShapeTest extends SeoTestCase
             '@id'        => $page_url,
             'url'        => $page_url,
             'name'       => 'News | Example Site',
-            'isPartOf'   => ['@id' => $this->sid('WebSite')],
+            'isPartOf'   => ['@id' => $this->webSiteId()],
             'inLanguage' => $this->lang(),
             'breadcrumb' => ['@id' => $page_url . '#breadcrumb'],
         ], $node);
@@ -351,7 +409,7 @@ class JsonLdShapeTest extends SeoTestCase
             '@id'        => $page_url,
             'url'        => $page_url,
             'name'       => 'Ada Lovelace | Example Site',
-            'isPartOf'   => ['@id' => $this->sid('WebSite')],
+            'isPartOf'   => ['@id' => $this->webSiteId()],
             'inLanguage' => $this->lang(),
             'breadcrumb' => ['@id' => $page_url . '#breadcrumb'],
         ], $node);
@@ -371,10 +429,12 @@ class JsonLdShapeTest extends SeoTestCase
             '@id'             => $home,
             'url'             => $home,
             'name'            => 'Example Site',
-            'isPartOf'        => ['@id' => $this->sid('WebSite')],
+            'isPartOf'        => ['@id' => $this->webSiteId()],
             'inLanguage'      => $this->lang(),
+            'about'           => ['@id' => $this->orgId()],
             'potentialAction' => [['@type' => 'ReadAction', 'target' => [$home]]],
             'description'     => 'The example tagline',
+            'breadcrumb'      => ['@id' => $home . '#breadcrumb'],
         ], $node);
     }
 
@@ -384,9 +444,11 @@ class JsonLdShapeTest extends SeoTestCase
 
     public function test_article_node_minimal_is_full_object(): void
     {
-        // Default post: no author, no thumbnail, no tags, no comment action.
+        // Default post: no author, no thumbnail, no tags, comments closed, only the
+        // excluded default category. A freshly published post is not modified, so
+        // there is no dateModified, commentCount, or articleSection.
         $settings = $this->seedSettings();
-        $post     = $this->createPost();
+        $post     = $this->createPost(['comment_status' => 'closed']);
 
         $node     = $this->findNode((new PostSchema($settings))->jsonLd($post)['@graph'], 'Article');
         $page_url = 'https://example.com/hello-world/';
@@ -398,13 +460,9 @@ class JsonLdShapeTest extends SeoTestCase
             'mainEntityOfPage' => ['@id' => $page_url],
             'headline'         => 'Hello World',
             'datePublished'    => get_the_date('c', $post),
-            'dateModified'     => get_the_modified_date('c', $post),
             'wordCount'        => 2, // "Body content."
-            'commentCount'     => 0,
             'inLanguage'       => $this->lang(),
-            'publisher'        => ['@id' => $this->sid('Organization')],
-            'copyrightYear'    => get_the_date('Y', $post),
-            'copyrightHolder'  => ['@id' => $this->sid('Organization')],
+            'publisher'        => ['@id' => $this->orgId()],
         ], $node);
     }
 
@@ -421,6 +479,12 @@ class JsonLdShapeTest extends SeoTestCase
             'comment_status' => 'open',
         ]);
         wp_set_post_tags($post->ID, ['php', 'seo']);
+        wp_set_post_categories($post->ID, [self::factory()->category->create(['name' => 'News'])]);
+
+        // Backdate publication so the (now) modified time is strictly later,
+        // exercising the dateModified gate.
+        wp_update_post(['ID' => $post->ID, 'post_date' => '2020-01-01 08:00:00', 'post_date_gmt' => '2020-01-01 08:00:00']);
+        $post = get_post($post->ID);
 
         $node     = $this->findNode((new PostSchema($settings))->jsonLd($post)['@graph'], 'NewsArticle');
         $page_url = 'https://example.com/hello-world/';
@@ -443,15 +507,27 @@ class JsonLdShapeTest extends SeoTestCase
             'wordCount'        => 2,
             'commentCount'     => 0,
             'inLanguage'       => $this->lang(),
-            'publisher'        => ['@id' => $this->sid('Organization')],
-            'copyrightYear'    => get_the_date('Y', $post),
-            'copyrightHolder'  => ['@id' => $this->sid('Organization')],
-            'author'           => ['name' => 'Ada', '@id' => $this->sid('Person', md5('ada@example.com'))],
+            'publisher'        => ['@id' => $this->orgId()],
+            'author'           => ['name' => 'Ada', '@id' => $this->personId($author)],
             'image'            => ['@id' => $page_url . '#primaryimage'],
             'thumbnailUrl'     => get_the_post_thumbnail_url($post, 'full'),
             'keywords'         => $node['keywords'],
+            'articleSection'   => ['News'],
             'potentialAction'  => ['@type' => 'CommentAction', 'name' => 'Comment', 'target' => $comment_target],
         ], $node);
+    }
+
+    public function test_article_section_excludes_default_category(): void
+    {
+        // A post filed only under the auto-assigned default ("Uncategorized") has no
+        // real section, so articleSection is omitted entirely.
+        $settings = $this->seedSettings();
+        $post     = $this->createPost();
+        wp_set_post_categories($post->ID, [(int) get_option('default_category')]);
+
+        $node = $this->findNode((new PostSchema($settings))->jsonLd($post)['@graph'], 'Article');
+
+        $this->assertArrayNotHasKey('articleSection', $node);
     }
 
     // ====================================================
@@ -477,13 +553,37 @@ class JsonLdShapeTest extends SeoTestCase
         ], $node);
     }
 
+    public function test_primary_image_caption_comes_from_alt_text(): void
+    {
+        // With no WordPress caption set, the ImageObject caption falls back to the
+        // attachment's alt text (matching Yoast's image helper).
+        $settings = $this->seedSettings();
+        $post     = $this->createPost(['thumbnail_id' => $this->createImage(['alt' => 'A red bicycle'])]);
+
+        $node = $this->findNode((new PostSchema($settings))->jsonLd($post)['@graph'], 'ImageObject');
+
+        $this->assertSame('A red bicycle', $node['caption']);
+    }
+
+    public function test_primary_image_caption_prefers_wordpress_caption_over_alt(): void
+    {
+        $settings = $this->seedSettings();
+        $post     = $this->createPost(['thumbnail_id' => $this->createImage(['caption' => 'The caption', 'alt' => 'The alt'])]);
+
+        $node = $this->findNode((new PostSchema($settings))->jsonLd($post)['@graph'], 'ImageObject');
+
+        $this->assertSame('The caption', $node['caption']);
+    }
+
     // ====================================================
     // BREADCRUMB
     // ====================================================
 
     public function test_breadcrumb_node_is_full_object(): void
     {
-        $settings = $this->seedSettings();
+        // The 'page' type carries a single Parent row, so the child page's real
+        // ancestor chain (Parent) expands between Home and the current page.
+        $settings = $this->seedSettings(['post_types' => ['page' => ['breadcrumbs' => ['__parent__']]]]);
         $parent   = $this->createPost(['post_type' => 'page', 'post_title' => 'Parent']);
         $child    = $this->createPost(['post_type' => 'page', 'post_title' => 'Child', 'post_parent' => $parent->ID]);
 
@@ -498,6 +598,81 @@ class JsonLdShapeTest extends SeoTestCase
                 ['@type' => 'ListItem', 'position' => 3, 'name' => 'Child'],
             ],
         ], $node);
+    }
+
+    public function test_breadcrumb_default_is_home_and_current(): void
+    {
+        // No configured rows: the always-safe Home → current.
+        $settings = $this->seedSettings();
+        $post     = $this->createPost(['post_title' => 'Solo']);
+
+        $node = $this->findNode((new PostSchema($settings))->jsonLd($post)['@graph'], 'BreadcrumbList');
+
+        $this->assertSame([
+            ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => self::BASE_URL],
+            ['@type' => 'ListItem', 'position' => 2, 'name' => 'Solo'],
+        ], $node['itemListElement']);
+    }
+
+    public function test_breadcrumb_middle_rows_keep_configured_order(): void
+    {
+        // A picked page followed by the Parent token: Home → Blog → [real
+        // ancestors] → current, in exactly the configured order.
+        $blog     = $this->createPost(['post_type' => 'page', 'post_title' => 'Blog']);
+        $settings = $this->seedSettings(['post_types' => ['page' => ['breadcrumbs' => [$blog->ID, '__parent__']]]]);
+
+        $parent = $this->createPost(['post_type' => 'page', 'post_title' => 'Parent']);
+        $child  = $this->createPost(['post_type' => 'page', 'post_title' => 'Child', 'post_parent' => $parent->ID]);
+
+        $node  = $this->findNode((new PostSchema($settings))->jsonLd($child)['@graph'], 'BreadcrumbList');
+        $names = array_column($node['itemListElement'], 'name');
+
+        $this->assertSame(['Home', 'Blog', 'Parent', 'Child'], $names);
+    }
+
+    public function test_home_breadcrumb_is_single_home_item(): void
+    {
+        $settings = $this->seedSettings();
+        update_option('show_on_front', 'posts');
+        update_option('page_on_front', 0);
+
+        $node = $this->findNode((new HomeSchema($settings))->jsonLd()['@graph'], 'BreadcrumbList');
+
+        $this->assertSame([
+            '@type'           => 'BreadcrumbList',
+            '@id'             => self::BASE_URL . '/#breadcrumb',
+            'itemListElement' => [
+                ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home'],
+            ],
+        ], $node);
+    }
+
+    public function test_breadcrumb_skips_unpublished_page_row(): void
+    {
+        // A draft page configured as a crumb is dropped; only the published one shows.
+        $draft    = $this->createPost(['post_type' => 'page', 'post_title' => 'Draft', 'post_status' => 'draft']);
+        $live     = $this->createPost(['post_type' => 'page', 'post_title' => 'Live']);
+        $settings = $this->seedSettings(['post_types' => ['post' => ['breadcrumbs' => [$draft->ID, $live->ID]]]]);
+        $post     = $this->createPost(['post_title' => 'Solo']);
+
+        $node  = $this->findNode((new PostSchema($settings))->jsonLd($post)['@graph'], 'BreadcrumbList');
+        $names = array_column($node['itemListElement'], 'name');
+
+        $this->assertSame(['Home', 'Live', 'Solo'], $names);
+    }
+
+    public function test_breadcrumb_skips_invalid_page_rows(): void
+    {
+        // A zero and a non-existent ID resolve to nothing; the Parent token still
+        // expands the real ancestor chain.
+        $settings = $this->seedSettings(['post_types' => ['page' => ['breadcrumbs' => ['0', 999999, '__parent__']]]]);
+        $parent   = $this->createPost(['post_type' => 'page', 'post_title' => 'Parent']);
+        $child    = $this->createPost(['post_type' => 'page', 'post_title' => 'Child', 'post_parent' => $parent->ID]);
+
+        $node  = $this->findNode((new PostSchema($settings))->jsonLd($child)['@graph'], 'BreadcrumbList');
+        $names = array_column($node['itemListElement'], 'name');
+
+        $this->assertSame(['Home', 'Parent', 'Child'], $names);
     }
 
     // ====================================================
@@ -517,7 +692,7 @@ class JsonLdShapeTest extends SeoTestCase
 
         $this->assertSame([
             '@type'    => 'Person',
-            '@id'      => $this->sid('Person', md5('grace@example.com')),
+            '@id'      => $this->personId($author),
             'name'     => 'Grace',
             'image'    => [
                 '@type'      => 'ImageObject',
@@ -527,7 +702,7 @@ class JsonLdShapeTest extends SeoTestCase
                 'inLanguage' => $this->lang(),
                 'caption'    => 'Grace',
             ],
-            'worksFor' => ['@id' => $this->sid('Organization')],
+            'worksFor' => ['@id' => $this->orgId()],
         ], $node);
     }
 
@@ -549,7 +724,7 @@ class JsonLdShapeTest extends SeoTestCase
 
         $this->assertSame([
             '@type'       => 'Person',
-            '@id'         => $this->sid('Person', md5('grace@example.com')),
+            '@id'         => $this->personId($author),
             'name'        => 'Grace',
             'url'         => 'https://example.com/author/grace/',
             'image'       => [
@@ -562,7 +737,7 @@ class JsonLdShapeTest extends SeoTestCase
             ],
             'description' => 'A bio.',
             'sameAs'      => ['https://grace.example'],
-            'worksFor'    => ['@id' => $this->sid('Organization')],
+            'worksFor'    => ['@id' => $this->orgId()],
         ], $node);
     }
 

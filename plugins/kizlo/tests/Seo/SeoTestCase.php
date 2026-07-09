@@ -24,6 +24,32 @@ abstract class SeoTestCase extends TestCase
     /** Fixed canonical host so resolved URLs never depend on the test site domain. */
     protected const BASE_URL = 'https://example.com';
 
+    /** @id for the WebSite node, mirroring SeoBase::webSiteId(). */
+    protected function webSiteId(): string
+    {
+        return self::BASE_URL . '#website';
+    }
+
+    /** @id for the Organization identity node, mirroring SeoBase::organizationId(). */
+    protected function orgId(): string
+    {
+        return self::BASE_URL . '#organization';
+    }
+
+    /** @id for the organization logo ImageObject singleton, mirroring SeoBase::logoImageId(). */
+    protected function logoImageId(): string
+    {
+        return self::BASE_URL . '#/schema/logo/image/';
+    }
+
+    /** @id for a person node, keyed by the user the way SeoBase::personId() does. */
+    protected function personId(int $user_id): string
+    {
+        $user = get_userdata($user_id);
+
+        return self::BASE_URL . '#/schema/person/' . md5($user->user_login . $user->ID);
+    }
+
     /**
      * Seed plugin settings into their option keys and return a fresh Settings.
      *
@@ -47,7 +73,7 @@ abstract class SeoTestCase extends TestCase
 
         $identity     = array_merge(['type' => 'organization'], $overrides['identity'] ?? []);
         $organization = array_merge(['name' => 'Example Org'], $overrides['organization'] ?? []);
-        $person       = array_merge(['name' => 'Jane Person'], $overrides['person'] ?? []);
+        $person       = $overrides['person'] ?? [];
 
         $authors = array_merge([
             'enabled'                  => false,
@@ -123,9 +149,13 @@ abstract class SeoTestCase extends TestCase
     /**
      * Create an image attachment carrying the metadata the SEO code reads:
      * `_wp_attached_file` (so `wp_get_attachment_url()` resolves), width/height
-     * in the attachment metadata, and optional alt text.
+     * in the attachment metadata, and optional alt text / caption.
      *
-     * @param array{width?: int, height?: int, alt?: string, mime?: string, file?: string} $args
+     * The post factory injects a default `post_excerpt`, which WordPress treats as
+     * the attachment caption; it is cleared here (unless `caption` is passed) so a
+     * fixture image has no caption by default.
+     *
+     * @param array{width?: int, height?: int, alt?: string, caption?: string, mime?: string, file?: string} $args
      */
     protected function createImage(array $args = []): int
     {
@@ -135,6 +165,7 @@ abstract class SeoTestCase extends TestCase
             'post_type'      => 'attachment',
             'post_mime_type' => $args['mime'] ?? 'image/jpeg',
             'post_title'     => 'Example Image',
+            'post_excerpt'   => $args['caption'] ?? '',
             'post_status'    => 'inherit',
         ]);
 

@@ -35,6 +35,12 @@ class TermSchema extends SeoBase
             'offset'     => ($page - 1) * self::SITEMAP_PER_PAGE,
             'orderby'    => 'count',
             'order'      => 'DESC',
+            // Exclude per-term noindex overrides at the query level so page offsets
+            // and the index count stay aligned on indexable terms, mirroring posts.
+            'meta_query' => [[
+                'key'     => self::OVERRIDE_KEYS['noindex'],
+                'compare' => 'NOT EXISTS',
+            ]],
         ]);
 
         if (empty($terms) || is_wp_error($terms)) return [];
@@ -183,44 +189,29 @@ class TermSchema extends SeoBase
     {
         $taxonomy_settings = $this->settings->taxonomies->get($term->taxonomy);
 
-        $term_url = trailingslashit($this->resolveTermUrl($term, $taxonomy_settings));
-        $position = 1;
-
-        $items = [[
-            '@type'    => 'ListItem',
-            'position' => $position++,
-            'name'     => __('Home', 'kizlo'),
-            'item'     => $this->settings->getBaseUrl(),
-        ]];
-
-        $parent_id = $term->parent;
+        // Real ancestors: parent terms, top-down.
         $parents   = [];
+        $parent_id = $term->parent;
         while ($parent_id) {
             $parent    = get_term($parent_id, $term->taxonomy);
             $parents[] = $parent;
             $parent_id = $parent->parent;
         }
 
+        $ancestors = [];
         foreach (array_reverse($parents) as $parent) {
-            $items[] = [
-                '@type'    => 'ListItem',
-                'position' => $position++,
-                'name'     => $parent->name,
-                'item'     => trailingslashit($this->resolveTermUrl($parent, $taxonomy_settings)),
+            $ancestors[] = [
+                'name' => $parent->name,
+                'url'  => trailingslashit($this->resolveTermUrl($parent, $taxonomy_settings)),
             ];
         }
 
-        $items[] = [
-            '@type'    => 'ListItem',
-            'position' => $position,
-            'name'     => $term->name,
-        ];
-
-        return [
-            '@type'           => 'BreadcrumbList',
-            '@id'             => $term_url . '#breadcrumb',
-            'itemListElement' => $items,
-        ];
+        return $this->buildBreadcrumbLd(
+            $this->resolveTermUrl($term, $taxonomy_settings),
+            $term->name,
+            $taxonomy_settings->getBreadcrumbs(),
+            $ancestors,
+        );
     }
 
     /**

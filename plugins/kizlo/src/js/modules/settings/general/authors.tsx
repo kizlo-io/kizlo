@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { getContent } from "@/modules/settings/shared/content"
+import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
@@ -18,6 +19,7 @@ export function AuthorsSettingsPage() {
 			title_structure: settings?.authors.title_structure ?? "",
 			description_structure: settings?.authors.description_structure ?? "",
 			search_engine_visibility: settings?.authors.search_engine_visibility ?? false,
+			breadcrumbs: (settings?.authors.breadcrumbs ?? []).map(String),
 		},
 	})
 
@@ -81,6 +83,18 @@ export function AuthorsSettingsPage() {
 					control={form.control}
 					label={content.seo.visibility.label}
 					description={content.seo.visibility.description}
+				/>
+
+				<BreadcrumbsField
+					control={form.control}
+					name="breadcrumbs"
+					label="Breadcrumb trail"
+					description={
+						<>
+							The crumbs between <strong>Home</strong> and the author. Add pages, or the dynamic <strong>Parent</strong> slot. Order matters
+							— reorder with the arrows. Leave empty for <strong>Home → author</strong>.
+						</>
+					}
 				/>
 			</SettingsSection>
 		</SettingsForm>
