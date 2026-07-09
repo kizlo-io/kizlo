@@ -1,5 +1,16 @@
 # kizlo
 
+## 0.2.2
+
+### Patch Changes
+
+- [#24](https://github.com/kizlo-io/kizlo/pull/24) [`d00114b`](https://github.com/kizlo-io/kizlo/commit/d00114b9e5805c746370db65e91227fd01ecf08c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix the server-to-server client losing procedure output types. Calls like `client.posts.list()` and `client.seo.robots()` now resolve `data` to the procedure's real output type instead of `any`.
+
+- [#24](https://github.com/kizlo-io/kizlo/pull/24) [`d00114b`](https://github.com/kizlo-io/kizlo/commit/d00114b9e5805c746370db65e91227fd01ecf08c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a `seo.homepage` procedure that resolves the homepage SEO head and JSON-LD graph from the WordPress plugin's `/seo/homepage` endpoint.
+
+- Updated dependencies [[`d00114b`](https://github.com/kizlo-io/kizlo/commit/d00114b9e5805c746370db65e91227fd01ecf08c)]:
+  - @kizlo/shared@0.1.2
+
 ## 0.2.1
 
 ### Patch Changes
