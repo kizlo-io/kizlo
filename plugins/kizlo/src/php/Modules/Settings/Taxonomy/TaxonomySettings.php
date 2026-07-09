@@ -4,9 +4,12 @@ namespace Kizlo\Modules\Settings\Taxonomy;
 
 use WP_Taxonomy;
 use Kizlo\Modules\Settings\SettingsIndexedAbstract;
+use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
 
 class TaxonomySettings extends SettingsIndexedAbstract
 {
+    use HasBreadcrumbsSetting;
+
     protected const OPTION_KEY = 'kizlo_settings_taxonomies';
 
     protected array $data = [
@@ -16,6 +19,7 @@ class TaxonomySettings extends SettingsIndexedAbstract
         'search_engine_visibility' => null,
         'seo_enabled'              => null,
         'rest_api_enabled'         => true,
+        'breadcrumbs'              => [],
     ];
 
     protected const INTERNAL_TAXONOMIES = [
@@ -42,6 +46,8 @@ class TaxonomySettings extends SettingsIndexedAbstract
             'pathname_structure',
             'title_structure',
             'description_structure'    => !empty($value) ? sanitize_text_field($value) : null,
+
+            'breadcrumbs'              => $this->sanitizeBreadcrumbs($value),
 
             default                    => $value,
         };

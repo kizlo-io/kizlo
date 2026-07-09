@@ -1,6 +1,7 @@
 {
-	"extends": "../../tsconfig.base.json",
+	"extends": "@tooling/typescript/base.json",
 	"compilerOptions": {
+		"jsx": "react-jsx",
 		"paths": {
 			"@/*": ["./src/js/*"],
 			"@shared/*": ["./src/js/shared/*"]

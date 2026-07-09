@@ -1,16 +1,30 @@
+import { toMetadata } from "kizlo/nextjs"
+import type { Metadata } from "next"
 import Link from "next/link"
+import { cache } from "react"
 import { Command } from "@/components/command"
+import { JsonLd } from "@/components/json-ld"
 import { ShaderBackdrop } from "@/components/shader-backdrop"
+import { client } from "@/lib/kizlo/server"
 import { createMetadata } from "@/lib/metadata"
 import { appName, docsRoute, socials } from "@/lib/shared"
 
-export const metadata = createMetadata({
-	alternates: { canonical: "/" },
-})
+const getHomeSeo = cache(() => client.seo.homepage())
+
+export async function generateMetadata(): Promise<Metadata> {
+	const { data, error } = await getHomeSeo()
+
+	if (error) return createMetadata({ alternates: { canonical: "/" } })
+
+	return toMetadata(data.head)
+}
 
 export default async function HomePage() {
+	const { data } = await getHomeSeo()
+
 	return (
 		<main className="relative flex max-h-dvh flex-1 flex-col items-center justify-center overflow-hidden px-6 py-24 text-center">
+			{data && <JsonLd schema={data.schema} />}
 			<ShaderBackdrop />
 
 			<div className="relative mb-8">

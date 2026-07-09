@@ -22,6 +22,7 @@ export interface KizloSiteSettings {
 	title_separator: string
 	fallback_image: KizloMedia | null
 	search_action_structure: string | null
+	discourage_search_engines: boolean
 }
 
 export interface KizloPersonSettings {

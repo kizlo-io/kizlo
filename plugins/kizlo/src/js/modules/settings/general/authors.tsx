@@ -1,14 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { getContent } from "@/modules/settings/shared/content"
-import { SwitchField } from "@/modules/settings/shared/fields"
-import { SettingsGroup, SettingsSet } from "@/modules/settings/shared/settings"
-import { VariableField } from "@/modules/settings/shared/variable-field"
+import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
+import { SwitchField } from "@/shared/components/fields"
+import { SettingsForm, SettingsSection } from "@/shared/components/settings"
+import { VariableField } from "@/shared/components/variable-field"
 import { type AuthorSettingsInput, type AuthorSettingsOutput, AuthorSettingsSchema } from "@/shared/lib/schema"
 import { useSettings } from "@/shared/lib/settings"
-import { Card, CardContent } from "@/shared/ui/card"
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSeparator } from "@/shared/ui/field"
-import { Switch } from "@/shared/ui/switch"
+
 export function AuthorsSettingsPage() {
 	const { settings, update, isLoading } = useSettings()
 
@@ -20,128 +19,84 @@ export function AuthorsSettingsPage() {
 			title_structure: settings?.authors.title_structure ?? "",
 			description_structure: settings?.authors.description_structure ?? "",
 			search_engine_visibility: settings?.authors.search_engine_visibility ?? false,
+			breadcrumbs: (settings?.authors.breadcrumbs ?? []).map(String),
 		},
 	})
 
 	const content = getContent({ name: "Authors" })
 
-	function onSubmit(data: AuthorSettingsOutput) {
-		update("authors", data)
+	async function onSubmit(data: AuthorSettingsOutput) {
+		await update("authors", data)
+		form.reset(form.getValues())
 	}
 
-	const isSeoSupported = true
-
 	return (
-		<form onSubmit={form.handleSubmit(onSubmit)} className="relative">
-			<SettingsSet isLoading={isLoading}>
-				{/* ── Authors ── */}
-				<SettingsGroup
-					heading={<>Authors</>}
+		<SettingsForm
+			isLoading={isLoading}
+			isDirty={form.formState.isDirty}
+			onSubmit={form.handleSubmit(onSubmit)}
+			onCancel={() => form.reset()}
+		>
+			<SettingsSection
+				title="Authors"
+				desc="Manage the URL structure and SEO configuration for author archive pages, including title templates, meta descriptions, and search visibility."
+			>
+				<SwitchField
+					control={form.control}
+					name="enabled"
+					label="Enable author archives"
+					description="When disabled, author archive pages will redirect to the homepage and will not be indexed by search engines."
+				/>
+
+				<VariableField
+					control={form.control}
+					name="pathname_structure"
+					label={content.url.pathname.label}
+					variables={settings?.constants.author.path_variables ?? []}
+					description={content.url.pathname.description}
+				/>
+			</SettingsSection>
+
+			<SettingsSection title={content.seo.heading} desc={content.seo.description}>
+				<VariableField
+					control={form.control}
+					name="title_structure"
+					label={content.seo.title.label}
+					placeholder={settings?.constants.post_type.default_title_format}
+					description={content.seo.title.description}
+					variables={settings?.constants.post_type.content_variables ?? []}
+					variant="text"
+				/>
+
+				<VariableField
+					variant="textarea"
+					control={form.control}
+					name="description_structure"
+					label={content.seo.description_.label}
+					placeholder={settings?.constants.post_type.default_desc_format}
+					description={content.seo.description_.description}
+					variables={settings?.constants.post_type.content_variables ?? []}
+				/>
+
+				<SwitchField
+					name="search_engine_visibility"
+					control={form.control}
+					label={content.seo.visibility.label}
+					description={content.seo.visibility.description}
+				/>
+
+				<BreadcrumbsField
+					control={form.control}
+					name="breadcrumbs"
+					label="Breadcrumb trail"
 					description={
 						<>
-							Manage the URL structure and SEO configuration for author archive pages, including title templates, meta descriptions, and
-							search visibility.
+							The crumbs between <strong>Home</strong> and the author. Add pages, or the dynamic <strong>Parent</strong> slot. Order matters
+							— reorder with the arrows. Leave empty for <strong>Home → author</strong>.
 						</>
 					}
-				>
-					<Card>
-						<CardContent>
-							<Controller
-								name="enabled"
-								control={form.control}
-								render={({ field, fieldState }) => (
-									<Field orientation="horizontal" data-invalid={fieldState.invalid}>
-										<FieldContent>
-											<FieldLabel htmlFor="enabled">Enable author archives</FieldLabel>
-											<FieldDescription>
-												When disabled, author archive pages will redirect to the homepage and will not be indexed by search engines. Enable
-												this if you want each author to have a publicly accessible archive of their posts.
-											</FieldDescription>
-										</FieldContent>
-										<Switch id="enabled" checked={field.value} onCheckedChange={field.onChange} aria-invalid={fieldState.invalid} />
-										{fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-									</Field>
-								)}
-							/>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardContent>
-							<FieldGroup>
-								<VariableField
-									control={form.control}
-									name="pathname_structure"
-									label={content.url.pathname.label}
-									variables={settings?.constants.author.path_variables ?? []}
-									description={content.url.pathname.description}
-								/>
-							</FieldGroup>
-						</CardContent>
-					</Card>
-				</SettingsGroup>
-
-				<FieldSeparator />
-
-				{/* ── SEO ── */}
-				<SettingsGroup heading={content.seo.heading} description={content.seo.description}>
-					{/* <Card>
-						<CardContent>
-							<FieldGroup>
-								<SwitchField
-									control={form.control}
-									name="seo_enabled"
-									label={content.seo.enabled.label}
-									description={content.seo.enabled.description}
-								/>
-							</FieldGroup>
-						</CardContent>
-					</Card> */}
-
-					{isSeoSupported && (
-						<>
-							<Card>
-								<CardContent>
-									<FieldGroup>
-										<VariableField
-											control={form.control}
-											name="title_structure"
-											label={content.seo.title.label}
-											placeholder={settings?.constants.post_type.default_title_format}
-											description={content.seo.title.description}
-											variables={settings?.constants.post_type.content_variables ?? []}
-											variant="text"
-										/>
-
-										<VariableField
-											variant="textarea"
-											control={form.control}
-											name="description_structure"
-											label={content.seo.description_.label}
-											placeholder={settings?.constants.post_type.default_desc_format}
-											description={content.seo.description_.description}
-											variables={settings?.constants.post_type.content_variables ?? []}
-										/>
-									</FieldGroup>
-								</CardContent>
-							</Card>
-
-							<Card>
-								<CardContent>
-									<FieldGroup>
-										<SwitchField
-											name="search_engine_visibility"
-											control={form.control}
-											label={content.seo.visibility.label}
-											description={content.seo.visibility.description}
-										/>
-									</FieldGroup>
-								</CardContent>
-							</Card>
-						</>
-					)}
-				</SettingsGroup>
-			</SettingsSet>
-		</form>
+				/>
+			</SettingsSection>
+		</SettingsForm>
 	)
 }

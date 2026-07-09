@@ -4,9 +4,12 @@ namespace Kizlo\Modules\Settings\PostType;
 
 use WP_Post_Type;
 use Kizlo\Modules\Settings\SettingsIndexedAbstract;
+use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
 
 class PostTypeSettings extends SettingsIndexedAbstract
 {
+    use HasBreadcrumbsSetting;
+
     protected const OPTION_KEY = 'kizlo_settings_post_types';
 
     protected array $data = [
@@ -19,6 +22,7 @@ class PostTypeSettings extends SettingsIndexedAbstract
         'comment_action_structure' => null,
         'seo_enabled'              => null,
         'rest_api_enabled'         => true,
+        'breadcrumbs'              => [],
     ];
 
     protected const INTERNAL_POST_TYPES = [
@@ -76,6 +80,8 @@ class PostTypeSettings extends SettingsIndexedAbstract
             'pathname_structure',
             'description_structure',
             'comment_action_structure' => !empty($value) ? sanitize_text_field($value) : null,
+
+            'breadcrumbs'              => $this->sanitizeBreadcrumbs($value),
 
             default => $value,
         };

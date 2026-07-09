@@ -9,23 +9,25 @@ class PersonSettings extends SettingsAbstract
     protected const OPTION_KEY = 'kizlo_settings_identity_person';
 
     protected array $data = [
-        'name'            => null,
+        'user_id'         => null,
         'image'           => null,
         'social_profiles' => [],
     ];
 
     /**
-     * The full name of the person.
+     * WordPress user the site is represented by. The person node's name,
+     * description and identity derive from this account, letting it share an
+     * @id with (and merge into) the same user's author node.
      */
-    public function getName(): ?string
+    public function getUserId(): ?int
     {
-        return $this->get('name');
+        return $this->get('user_id');
     }
 
-    /** @param string|null $value */
-    public function setName(?string $value): static
+    /** @param int|null $value User ID or null to clear. */
+    public function setUserId(?int $value): static
     {
-        $this->set('name', $value);
+        $this->set('user_id', $value);
         return $this;
     }
 
@@ -66,7 +68,7 @@ class PersonSettings extends SettingsAbstract
     protected function sanitize(string $key, mixed $value): mixed
     {
         return match ($key) {
-            'name'            => !empty($value) ? sanitize_text_field($value) : null,
+            'user_id'         => !empty($value) ? absint($value) : null,
             'image'           => !empty($value) ? absint($value) : null,
             'social_profiles' => $this->sanitizeSocialProfiles($value),
             default           => $value,

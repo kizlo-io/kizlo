@@ -9,7 +9,7 @@ const moduleEntries = glob.sync("./src/js/modules/*/index.{ts,tsx}").reduce(
 		return acc
 	},
 	{
-		"shared/globals": "./src/js/shared/styles/globals.css",
+		"shared/styles": "./src/js/shared/styles/globals.css",
 	},
 )
 

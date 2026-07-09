@@ -1,17 +1,24 @@
 import { useStore } from "@nanostores/react"
-import { BookOpenIcon, CaretRight, DiscordLogoIcon, GithubLogoIcon, TextAlignJustifyIcon } from "@phosphor-icons/react"
-import type React from "react"
-import { useState } from "react"
-import { NavLink, Outlet, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom"
+import { BookOpenIcon, CaretRightIcon, DiscordLogoIcon, GithubLogoIcon, type Icon } from "@phosphor-icons/react"
+import { useEffect, useState } from "react"
+import { Outlet, Route, Routes, useLocation } from "react-router-dom"
 import { Logo } from "@/modules/settings/shared/logo"
 import { NotFound } from "@/modules/settings/shared/not-found"
-import { useMenus } from "@/shared/lib/settings"
+import { CommandMenu, CommandTrigger } from "@/shared/components/command-menu"
+import { Shell, ShellBody, ShellHeader, ShellMain, ShellSidebar } from "@/shared/components/shell"
+import {
+	SidebarBack,
+	SidebarButton,
+	SidebarDrillDown,
+	SidebarFooter,
+	SidebarHeader,
+	SidebarLink,
+	SidebarPanel,
+	SidebarSection,
+} from "@/shared/components/sidebar"
+import { ComponentGallery } from "@/shared/components/ui/gallery"
+import { useNav } from "@/shared/lib/settings"
 import { $sidebar } from "@/shared/lib/store"
-import type { Menu, MenuItem } from "@/shared/lib/types"
-import { cn } from "@/shared/lib/utils"
-import { Button } from "@/shared/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible"
-import { TooltipProvider } from "@/shared/ui/tooltip"
 import { AuthorsSettingsPage } from "./general/authors"
 import { CrawlingSettingsPage } from "./general/crawling"
 import { IdentitySettingsPage } from "./general/identity"
@@ -19,6 +26,12 @@ import { SiteSettingsPage } from "./general/site"
 import { WebhookSettingsPage } from "./integration/webhook"
 import { PostTypeSettingsPage } from "./post-type"
 import { TaxonomySettingsPage } from "./taxonomy"
+
+const HEADER_LINKS: { label: string; href: string; icon: Icon }[] = [
+	{ label: "Documentation", href: "https://kizlo.io/docs", icon: BookOpenIcon },
+	{ label: "Discord", href: "https://discord.com/invite/MjAUZamx5g", icon: DiscordLogoIcon },
+	{ label: "GitHub", href: "https://github.com/kizlo-io/kizlo", icon: GithubLogoIcon },
+]
 
 export default function App() {
 	return (
@@ -33,179 +46,139 @@ export default function App() {
 				<Route path="/taxonomies/:slug" element={<TaxonomySettingsPage />} />
 				<Route path="/integration/webhooks" element={<WebhookSettingsPage />} />
 
+				<Route path="/preview" element={<ComponentGallery />} />
+
 				<Route path="*" element={<NotFound />} />
 			</Route>
 		</Routes>
 	)
 }
 
-function Layout({ ...props }: React.HTMLAttributes<HTMLElement>) {
-	const menus = useMenus()
+function Layout() {
+	const sidebarOpen = useStore($sidebar)
 
 	return (
-		<div data-slot="layout" className="[--admin-bar-height:32px] [--kizlo-header-height:56px]">
-			<div className="relative flex">
-				<Menus menus={menus} />
+		<Shell>
+			<ShellSidebar open={sidebarOpen} onClose={() => $sidebar.set(false)}>
+				<Sidebar />
+			</ShellSidebar>
 
-				<div className="w-full">
-					<TooltipProvider>
-						<Header />
+			<ShellMain>
+				<ShellHeader>
+					<Logo className="md:hidden" />
 
-						<Outlet />
-					</TooltipProvider>
-				</div>
-			</div>
-		</div>
+					<div className="ml-auto flex items-center gap-0.5">
+						{HEADER_LINKS.map((link) => (
+							<a
+								key={link.href}
+								href={link.href}
+								target="_blank"
+								rel="noreferrer"
+								aria-label={link.label}
+								className="no-underline! flex size-8 items-center justify-center rounded-md text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+							>
+								<link.icon className="size-5" />
+							</a>
+						))}
+					</div>
+				</ShellHeader>
+
+				<ShellBody>
+					<Outlet />
+				</ShellBody>
+			</ShellMain>
+
+			<CommandMenu />
+		</Shell>
 	)
 }
 
-function Header({ ...props }: React.HTMLAttributes<HTMLElement>) {
-	return (
-		<header
-			data-slot="layout-header"
-			className={cn(
-				"sticky top-0 left-0 z-9999 flex h-(--kizlo-header-height) w-full items-center border-border border-t border-b bg-card px-4 md:top-8 md:px-6",
-			)}
-		>
-			<div className="grid w-full grid-cols-3 items-center gap-4">
-				<div className="flex items-center gap-2">
-					<Button variant={"outline"} onClick={() => $sidebar.set(true)} className="md:hidden">
-						<TextAlignJustifyIcon />
-					</Button>
-				</div>
+function Sidebar() {
+	const sections = useNav()
+	const { pathname } = useLocation()
+	const groups = sections.flatMap((section) => section.items).filter((node) => node.type === "group")
 
-				<div />
-
-				<div className="flex justify-end gap-1">
-					<Button asChild variant="ghost" size="icon">
-						<a href="https://kizlo.io/docs" target="_blank" rel="noreferrer" aria-label="Kizlo documentation">
-							<BookOpenIcon className="size-5" />
-							<span className="sr-only">Kizlo documentation</span>
-						</a>
-					</Button>
-
-					<Button asChild variant="ghost" size="icon">
-						<a href="https://discord.com/invite/MjAUZamx5g" target="_blank" rel="noreferrer" aria-label="Kizlo on Discord">
-							<DiscordLogoIcon className="size-5" />
-							<span className="sr-only">Kizlo on Discord</span>
-						</a>
-					</Button>
-
-					<Button asChild variant="ghost" size="icon">
-						<a href="https://github.com/kizlo-io/kizlo" target="_blank" rel="noreferrer" aria-label="Kizlo on GitHub">
-							<GithubLogoIcon className="size-5" />
-							<span className="sr-only">Kizlo on GitHub</span>
-						</a>
-					</Button>
-				</div>
-			</div>
-		</header>
+	const [active, setActive] = useState<string | null>(
+		() => groups.find((group) => group.items.some((item) => item.path === pathname))?.id ?? null,
 	)
-}
 
-interface MenusProps extends React.HTMLAttributes<HTMLElement> {
-	menus: Menu[]
-}
+	// Keep the drill-down in sync with the route so navigating from elsewhere
+	// (e.g. the command palette) opens the group panel that owns the target page,
+	// and dismiss the mobile drawer once the route settles.
+	useEffect(() => {
+		setActive(groups.find((group) => group.items.some((item) => item.path === pathname))?.id ?? null)
+		$sidebar.set(false)
+	}, [pathname])
 
-function Menus({ ...props }: MenusProps) {
-	const isOpen = useStore($sidebar)
+	const closeDrawer = () => $sidebar.set(false)
 
 	return (
 		<>
-			<div
-				className={cn("md:block! hidden h-full w-full max-w-60 border-r bg-card md:relative md:h-auto md:min-h-full md:pb-10", {
-					"md:relative! fixed top-0 left-0 z-999999 block md:z-99": isOpen,
-				})}
-			>
-				<div className="h-full space-y-1 overflow-y-auto md:sticky md:top-(--admin-bar-height) md:left-0 md:h-max">
-					<div className="m-0 flex h-(--kizlo-header-height) items-center border-b pl-4">
-						<Logo />
-					</div>
-
-					<div className="px-4 md:py-4">
-						{props.menus.map((menu) => (
-							<MenuGroup key={menu.name} menu={menu} />
-						))}
-					</div>
+			<SidebarHeader>
+				<div className="p-3">
+					<Logo />
 				</div>
-			</div>
 
-			{isOpen && (
-				<button type="button" className="fixed inset-0 z-99999 h-full w-full bg-black/50 md:hidden" onClick={() => $sidebar.set(false)} />
-			)}
-		</>
-	)
-}
+				<CommandTrigger />
+			</SidebarHeader>
 
-function MenuGroup({ ...props }: { menu: Menu }) {
-	const nav = useNavigate()
-	const location = useLocation()
+			<SidebarDrillDown>
+				<SidebarPanel root active={active}>
+					{sections.map((section) => (
+						<SidebarSection key={section.label} label={section.label}>
+							{section.items.map((node) =>
+								node.type === "link" ? (
+									<SidebarLink key={node.path} to={node.path} icon={node.icon} onClick={closeDrawer}>
+										{node.name}
+									</SidebarLink>
+								) : (
+									<SidebarButton
+										key={node.id}
+										icon={node.icon}
+										active={node.items.some((item) => item.path === pathname)}
+										trailing={<CaretRightIcon className="size-4 shrink-0" />}
+										onClick={() => setActive(node.id)}
+									>
+										{node.name}
+									</SidebarButton>
+								),
+							)}
+						</SidebarSection>
+					))}
+				</SidebarPanel>
 
-	const firstMenu = props.menu.items[0]
-	const isChildActive = props.menu.items.some((a) => a.path === location.pathname)
-	const [open, setOpen] = useState(isChildActive)
+				{groups.map((group) => (
+					<SidebarPanel key={group.id} id={group.id} active={active}>
+						<SidebarBack onClick={() => setActive(null)}>{group.name}</SidebarBack>
 
-	return (
-		<Collapsible open={open && !isChildActive ? false : open} onOpenChange={setOpen} className="h-max space-y-1">
-			<CollapsibleTrigger asChild>
-				<Button
-					variant="ghost"
-					data-active={isChildActive}
-					className="group w-full justify-start px-2! data-[active=true]:bg-accent data-[active=true]:text-foreground! data-[active=true]:hover:bg-accent"
-					onClick={(e) => {
-						if (isChildActive) return
-						nav(firstMenu.path)
-						window.scrollTo({ top: 0, behavior: "smooth" })
-						$sidebar.set(false)
-					}}
-					size={"lg"}
-				>
-					<props.menu.icon className="size-5" />
-					{props.menu.name}
-
-					<CaretRight
-						className="z-10 ml-auto text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
-						onClick={(e) => {
-							e.stopPropagation()
-						}}
-					/>
-				</Button>
-			</CollapsibleTrigger>
-
-			<CollapsibleContent className="space-y-1 pb-3 pl-5">
-				{props.menu.items.map((item) => (
-					<MenuGroupItem key={item.name} item={item} />
+						{group.items.map((item) => (
+							<SidebarLink key={item.path} to={item.path} icon={item.icon} onClick={closeDrawer}>
+								{item.name}
+							</SidebarLink>
+						))}
+					</SidebarPanel>
 				))}
-			</CollapsibleContent>
-		</Collapsible>
-	)
-}
+			</SidebarDrillDown>
 
-interface MenuGroupItemProps extends React.HTMLAttributes<HTMLElement> {
-	item: MenuItem
-}
+			<SidebarFooter>
+				<a
+					href="https://kizlo.io/docs"
+					target="_blank"
+					rel="noreferrer"
+					className="no-underline! group flex items-center gap-3 rounded-md border border-neutral-200 p-2.5 transition-colors hover:bg-neutral-50"
+				>
+					<div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-700 transition-colors group-hover:bg-neutral-200">
+						<BookOpenIcon className="size-4.5" />
+					</div>
 
-function MenuGroupItem({ ...props }: MenuGroupItemProps) {
-	const isActive = useMatch(props.item.path)
+					<div className="min-w-0 flex-1">
+						<div className="font-medium text-neutral-900 text-sm">Documentation</div>
+						<div className="truncate text-neutral-500 text-xs">Guides & API reference</div>
+					</div>
 
-	return (
-		<Button
-			asChild
-			variant={"ghost"}
-			data-active={!!isActive}
-			className={cn(
-				"group w-full justify-start text-muted-foreground! data-[active=true]:bg-accent/60 data-[active=false]:font-normal data-[active=true]:text-foreground! data-[active=true]:hover:bg-accent/60",
-			)}
-		>
-			<NavLink
-				to={props.item.path}
-				onClick={() => {
-					window.scrollTo({ top: 0, behavior: "smooth" })
-					$sidebar.set(false)
-				}}
-			>
-				{props.item.name}
-			</NavLink>
-		</Button>
+					<CaretRightIcon className="size-4 shrink-0 text-neutral-400" />
+				</a>
+			</SidebarFooter>
+		</>
 	)
 }

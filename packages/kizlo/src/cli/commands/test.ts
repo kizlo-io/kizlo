@@ -4,6 +4,7 @@ import { type ResolvedTestConfig, resolveTestConfig } from "../daemon/config"
 import { log } from "../daemon/logger"
 import { groupDefault, type PackageManager, pickStackPort, withSpinner } from "../utils"
 import { createStack, type DockerStack } from "../wp/docker"
+import { runPluginPhpunit } from "../wp/phpunit"
 import { isFree } from "../wp/ports"
 import { runSeeds } from "../wp/setup"
 import { testStack } from "../wp/stack"
@@ -98,7 +99,11 @@ async function runSuite({ args }: CommandContext<typeof runArgs>): Promise<void>
 	log.info(cfg.command ? `Running: ${cfg.command}` : `Running: ${testCommand(cfg.packageManager).join(" ")}`)
 	let code = 1
 	try {
-		code = await spawnTest(cfg.command, cfg.packageManager)
+		const jsCode = await spawnTest(cfg.command, cfg.packageManager)
+		// Fold the plugin PHP suite (phpunit-in-container) into the same run; a failure
+		// on either side fails `kizlo test`.
+		const phpCode = await runPluginPhpunit(cfg)
+		code = jsCode !== 0 ? jsCode : phpCode
 	} finally {
 		// Keep the stack up by default so reruns skip the slow container boot;
 		// `isSeeded` keeps the next run idempotent. Opt into a clean teardown.

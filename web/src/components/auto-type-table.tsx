@@ -64,13 +64,14 @@ function expandFunction(type: PropertyType) {
 	// Optional properties (`seed?: FixtureSeedFn`) arrive as `Fn | undefined` — a union with no call signatures
 	// of its own. Operate on the lone non-undefined member so optional functions expand too.
 	const members = type.isUnion() ? type.getUnionTypes().filter((member) => !member.isUndefined()) : [type]
-	if (members.length !== 1) return undefined
 	const fn = members[0]
+	if (members.length !== 1 || !fn) return undefined
 	const signatures = fn.getCallSignatures()
-	if (signatures.length !== 1 || fn.getProperties().length > 0) return undefined
-	const declaration = signatures[0].getDeclaration() as unknown as SignatureDeclLike
+	const signature = signatures[0]
+	if (signatures.length !== 1 || !signature || fn.getProperties().length > 0) return undefined
+	const declaration = signature.getDeclaration() as unknown as SignatureDeclLike
 	const params = declaration.getParameters?.().map((parameter) => parameter.getText()) ?? []
-	const returnType = declaration.getReturnTypeNode?.()?.getText() ?? signatures[0].getReturnType().getText()
+	const returnType = declaration.getReturnTypeNode?.()?.getText() ?? signature.getReturnType().getText()
 	return `(${params.join(", ")}) => ${returnType}`
 }
 

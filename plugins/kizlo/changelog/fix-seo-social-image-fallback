@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Posts and terms now fall back to the site fallback image for Open Graph and Twitter when no override or featured image is set.

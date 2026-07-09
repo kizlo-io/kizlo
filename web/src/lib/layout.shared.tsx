@@ -10,9 +10,7 @@ export function baseOptions(): BaseLayoutProps {
 					<img src="https://cdn.kizlo.io/logo/icon-light.svg" alt="" aria-hidden className="hidden h-4.5 w-4.5 dark:block" />
 					{/* biome-ignore lint/performance/noImgElement: remote SVG; next/image needs dangerouslyAllowSVG (XSS risk) */}
 					<img src="https://cdn.kizlo.io/logo/icon-dark.svg" alt="" aria-hidden className="h-4.5 w-4.5 dark:hidden" />
-					<div>
-						kizlo / <span className="text-fd-muted-foreground">docs</span>
-					</div>
+					<div>Docs</div>
 				</div>
 			),
 		},

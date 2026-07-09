@@ -1,0 +1,4 @@
+Significance: patch
+Type: added
+
+Add a `seo.homepage` endpoint returning the homepage SEO head and JSON-LD.

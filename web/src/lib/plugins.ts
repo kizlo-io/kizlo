@@ -60,12 +60,14 @@ export const PLUGIN_RELEASES_TAG = "plugin-releases"
 // Compares two semvers (a > b → 1). A prerelease sorts below the release of the
 // same x.y.z (1.0.0-beta < 1.0.0), matching semver precedence.
 function compareSemver(a: string, b: string): number {
-	const [acore, apre] = a.split("-")
-	const [bcore, bpre] = b.split("-")
+	const [acore = "", apre] = a.split("-")
+	const [bcore = "", bpre] = b.split("-")
 	const an = acore.split(".").map(Number)
 	const bn = bcore.split(".").map(Number)
 	for (let i = 0; i < 3; i++) {
-		if (an[i] !== bn[i]) return an[i] > bn[i] ? 1 : -1
+		const ai = an[i] ?? 0
+		const bi = bn[i] ?? 0
+		if (ai !== bi) return ai > bi ? 1 : -1
 	}
 	if (apre === bpre) return 0
 	if (!apre) return 1

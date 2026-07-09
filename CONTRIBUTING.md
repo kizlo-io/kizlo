@@ -38,7 +38,9 @@ CI doesn't build `web/` — the deployed site is built by Vercel on every PR.
 
 ```
 packages/   Published libraries (kizlo, @kizlo/*)
+plugins/    WordPress plugins (kizlo, kizlo-cf7, kizlo-woocommerce) — released by tag, not npm
 tooling/    Internal config: TypeScript bases, GitHub Actions, WordPress dev stack
+web/        The kizlo.io site (a live Kizlo server; deployed by Vercel, not published)
 ```
 
 This is a [Turborepo](https://turbo.build/) + pnpm workspace. Most commands run
@@ -126,11 +128,22 @@ A few project conventions to be aware of:
 - WordPress REST types use the `WP_` prefix; WooCommerce admin API types use
   `WC_`, and the Store API uses `WCS_`.
 
-## Changesets
+## Changelogs & versioning
 
-We use [Changesets](https://github.com/changesets/changesets) to version and
-publish the public packages. **If your change affects a published package, add a
-changeset:**
+Two release tracks live in this repo, and they use **different** changelog
+tools. Pick by what you changed:
+
+| You changed…                        | Use            | Released by            |
+| ----------------------------------- | -------------- | ---------------------- |
+| A published package (`packages/*`)  | Changesets     | npm, automated from `main` |
+| A WordPress plugin (`plugins/*`)    | changelogger   | GitHub release, by pushing a `<plugin>-v<version>` tag |
+
+Changes that only touch tooling, tests, docs, or `web/` don't need either.
+
+### Published packages → Changesets
+
+We use [Changesets](https://github.com/changesets/changesets) for the public
+npm packages. **If your change affects a published package, add a changeset:**
 
 ```bash
 pnpm changeset
@@ -138,9 +151,31 @@ pnpm changeset
 
 Pick the affected packages and a semver bump (the project is currently in
 `alpha` pre-release mode), and commit the generated file in `.changeset/`
-alongside your changes. Releases to npm are automated from `main`.
+alongside your changes.
 
-Changes that only touch tooling, tests, or docs don't need a changeset.
+> Changesets **ignores** `web`, `@kizlo/plugin-*`, and `@tooling/*` (see
+> `.changeset/config.json`). Adding a changeset for a plugin does nothing — use
+> changelogger below.
+
+### WordPress plugins → changelogger
+
+The plugins are versioned with
+[jetpack-changelogger](https://github.com/Automattic/jetpack-changelogger)
+(configured under `extra.changelogger` in each plugin's `composer.json`), **not**
+Changesets. **If your change affects a plugin, add a change fragment from that
+plugin's directory:**
+
+```bash
+cd plugins/kizlo            # or plugins/kizlo-cf7, plugins/kizlo-woocommerce
+composer changelog add     # prompts for significance (patch/minor/major), type, and entry
+```
+
+This writes a small file to `plugins/<plugin>/changelog/`. Commit it with your
+change. **Do not hand-edit `CHANGELOG.md`** — it's generated from these fragments
+at release time, when the fragments are compiled and the version is bumped across
+the plugin's `kizlo.php` header, `KIZLO_VERSION` define, `readme.txt`, and
+`package.json` (kept in sync by `scripts/check-versions.mjs`). Releasing is
+triggered by pushing a `<plugin>-v<version>` tag (see `.github/workflows/plugin-release.yml`).
 
 ## Commit messages & pull requests
 

@@ -20,6 +20,13 @@ export default defineConfig({
 		testTimeout: 15_000,
 		// Seeding is an explicit CLI lifecycle now; tests only read the artifact
 		// written by `kizlo test up`, resolved relative to the root `kizlo.config.ts`.
+		typecheck: {
+			// Compile-time inference tests (`*.test-d.ts`) guard the public builder
+			// surfaces so a refactor can't silently widen or collapse a type.
+			enabled: true,
+			include: ["src/**/*.test-d.ts"],
+			tsconfig: "./tsconfig.json",
+		},
 	},
 	resolve: { alias: WORKSPACE_ALIASES },
 })

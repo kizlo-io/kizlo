@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Fix sitemap, canonical, and author URLs dropping the port on sites running a non-standard port.

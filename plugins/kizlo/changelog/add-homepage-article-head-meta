@@ -1,0 +1,4 @@
+Significance: patch
+Type: added
+
+Homepages set to an Article type now output article Open Graph tags (published/modified time, author, section, tags).

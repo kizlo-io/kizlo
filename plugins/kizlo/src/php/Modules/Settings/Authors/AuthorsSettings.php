@@ -3,9 +3,12 @@
 namespace Kizlo\Modules\Settings\Authors;
 
 use Kizlo\Modules\Settings\SettingsAbstract;
+use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
 
 class AuthorsSettings extends SettingsAbstract
 {
+    use HasBreadcrumbsSetting;
+
     protected const OPTION_KEY = 'kizlo_settings_authors';
 
     protected array $data = [
@@ -14,6 +17,7 @@ class AuthorsSettings extends SettingsAbstract
         'title_structure'          => null,
         'description_structure'    => null,
         'search_engine_visibility' => true,
+        'breadcrumbs'              => [],
     ];
 
     protected function sanitize(string $key, mixed $value): mixed
@@ -24,6 +28,7 @@ class AuthorsSettings extends SettingsAbstract
             'description_structure'    => !empty($value) ? sanitize_text_field($value) : null,
             'enabled',
             'search_engine_visibility' => (bool) $value,
+            'breadcrumbs'              => $this->sanitizeBreadcrumbs($value),
             default                    => $value,
         };
     }

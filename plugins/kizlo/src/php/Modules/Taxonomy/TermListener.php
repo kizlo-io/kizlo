@@ -20,16 +20,14 @@ class TermListener
         if (!$tax) return;
         if (! $this->_isWatched($taxonomy)) return;
 
-        $count = $update ? get_term($term_id)->count : 0;
+        $term = get_term($term_id, $taxonomy);
+        if (! $term instanceof WP_Term) return;
+
+        $count = $update ? $term->count : 0;
 
         $event_type = ($update ? Webhook::TERM_UPDATED_EVENT : Webhook::TERM_CREATED_EVENT);
 
-        Webhook::sendEvent($event_type, [
-            'term_id'   => $term_id,
-            'taxonomy' => $taxonomy,
-            'post_types' => $tax->object_type,
-            'count'     => $count
-        ]);
+        Webhook::sendEvent($event_type, $this->_eventPayload($term, $tax->object_type, $count));
     }
 
     public function onDeleted(int $term_id, int $tt_id, string $taxonomy, WP_Term $deleted_term, array $object_ids)
@@ -38,12 +36,20 @@ class TermListener
         if (!$tax) return;
         if (! $this->_isWatched($taxonomy)) return;
 
-        Webhook::sendEvent(Webhook::TERM_DELETED_EVENT, [
-            'term_id'   => $term_id,
-            'taxonomy' => $taxonomy,
-            'post_types' => $tax->object_type,
-            'count'     => $deleted_term->count
-        ]);
+        Webhook::sendEvent(Webhook::TERM_DELETED_EVENT, $this->_eventPayload($deleted_term, $tax->object_type, $deleted_term->count));
+    }
+
+    private function _eventPayload(WP_Term $term, array $post_types, int $count): array
+    {
+        $settings = Utils::getSettings();
+
+        return [
+            'term_id'   => $term->term_id,
+            'taxonomy' => $term->taxonomy,
+            'post_types' => $post_types,
+            'count'     => $count,
+            'url'       => $settings->resolveTermUrl($term, $settings->taxonomies->get($term->taxonomy)),
+        ];
     }
 
     private function _isWatched(string $taxonomy): bool

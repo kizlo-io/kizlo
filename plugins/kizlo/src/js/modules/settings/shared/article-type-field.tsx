@@ -1,5 +1,5 @@
 import type { FieldValues } from "react-hook-form"
-import { type BaseFieldProps, ComboboxField, type SelectOption } from "./fields"
+import { type BaseFieldProps, ComboboxField, type SelectOption } from "@/shared/components/fields"
 
 export const articleTypeOptions: SelectOption[] = [
 	{ value: "Article", label: "Article (default)" },
@@ -15,12 +15,17 @@ export const articleTypeOptions: SelectOption[] = [
 ]
 
 interface ArticleTypeFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
-	extends Omit<BaseFieldProps<TFieldValues, TContext, TTransformedValues>, "label" | "placeholder"> {}
+	extends Omit<BaseFieldProps<TFieldValues, TContext, TTransformedValues>, "label" | "placeholder"> {
+	label?: string
+}
 
 export function ArticleTypeField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
+	label,
 	control,
 	name,
 	description,
 }: ArticleTypeFieldProps<TFieldValues, TContext, TTransformedValues>) {
-	return <ComboboxField control={control} name={name} label="Article Type" options={articleTypeOptions} description={description} />
+	return (
+		<ComboboxField control={control} name={name} label={label ?? "Article Type"} options={articleTypeOptions} description={description} />
+	)
 }

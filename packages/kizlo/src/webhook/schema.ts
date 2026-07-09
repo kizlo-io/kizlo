@@ -27,6 +27,7 @@ export type EventType = z.infer<typeof EventType>
 export const PostEventData = z.object({
 	post_id: z.number(),
 	post_type: z.string(),
+	url: z.string().optional(),
 })
 export type PostEventData = z.infer<typeof PostEventData>
 
@@ -42,25 +43,12 @@ export const TermEventData = z.object({
 	taxonomy: z.string(),
 	post_types: z.array(z.string()),
 	count: z.number().nonnegative(),
+	url: z.string().optional(),
 })
 export type TermEventData = z.infer<typeof TermEventData>
 
 export const TermEvent = z.object({ type: TermEventType, data: TermEventData })
 export type TermEvent = z.infer<typeof TermEvent>
-
-// ====================================================
-// PAYMENT
-// ====================================================
-
-export const PaymentEventData = z.object({
-	transaction_id: z.nullable(z.string()),
-	payment_method_id: z.string(),
-	payment_session_id: z.string(),
-})
-export type PaymentEventData = z.infer<typeof PaymentEventData>
-
-export const PaymentEvent = z.object({ type: PaymentEventType, data: PaymentEventData })
-export type PaymentEvent = z.infer<typeof PaymentEvent>
 
 // ====================================================
 // SETTINGS
@@ -76,7 +64,7 @@ export type SettingsEvent = z.infer<typeof SettingsEvent>
 // EVENT
 // ====================================================
 
-export const KizloEvent = z.union([PostEvent, TermEvent, PaymentEvent, SettingsEvent])
+export const KizloEvent = z.union([PostEvent, TermEvent, SettingsEvent])
 export type KizloEvent = z.infer<typeof KizloEvent>
 
 export const AnyEvent = z.object({ type: z.string(), data: z.unknown() })
