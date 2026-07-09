@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-07-09
+### Fixed
+- Change default sitemap path to /sitemaps/index.xml and relax pathname validation to allow any .xml filename
+
 ## [0.2.2] - 2026-07-09
 ### Added
 - Add a per-post SEO meta box to override title, description, canonical, robots, and social image in the editor. Empty fields fall back to the defaults.
@@ -27,6 +31,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.2.3]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.2...kizlo-v0.2.3
 [0.2.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.1...kizlo-v0.2.2
 [0.2.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.0...kizlo-v0.2.1
 [0.2.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.1.0...kizlo-v0.2.0
