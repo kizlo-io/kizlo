@@ -1,4 +1,4 @@
 Significance: patch
 Type: added
 
-Sitemaps now follow the Reading settings for the homepage and blog index: the page sitemap always lists the homepage as the site root "/" and drops the selected static homepage and Posts page so neither is listed under its own pathname, the post sitemap leads with the blog index (the homepage when it lists posts, otherwise the Posts page such as /blog), and both survive on an empty blog.
+Sitemaps now follow your Reading settings: the homepage is listed as the site root and the blog index leads the post sitemap.

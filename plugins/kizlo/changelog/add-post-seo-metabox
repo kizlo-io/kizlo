@@ -1,4 +1,4 @@
 Significance: patch
 Type: added
 
-Add a per-post SEO meta box in the editor that lets authors override the title, description, canonical, robots, and social image Kizlo otherwise resolves from post-type templates; empty fields fall back to the resolved defaults and only populated overrides are persisted.
+Add a per-post SEO meta box to override title, description, canonical, robots, and social image in the editor. Empty fields fall back to the defaults.

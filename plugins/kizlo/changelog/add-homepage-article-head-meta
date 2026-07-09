@@ -1,4 +1,4 @@
 Significance: patch
 Type: added
 
-When a static front page opts into an Article type, the homepage head now advertises og:type=article and emits the article meta block (published/modified time, author, section, tags), matching the Article node already present in its JSON-LD.
+Homepages set to an Article type now output article Open Graph tags (published/modified time, author, section, tags).

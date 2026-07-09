@@ -1,4 +1,4 @@
 Significance: patch
 Type: fixed
 
-Posts and taxonomy terms now fall back to the site fallback image for their Open Graph and Twitter image when no per-network override or featured image is set, instead of emitting no social image at all. The post chain is override then featured image then site fallback; the term chain is override then site fallback.
+Posts and terms now fall back to the site fallback image for Open Graph and Twitter when no override or featured image is set.

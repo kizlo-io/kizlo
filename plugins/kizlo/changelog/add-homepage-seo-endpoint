@@ -1,4 +1,4 @@
 Significance: patch
 Type: added
 
-Add a seo.homepage that provides the homepage SEO head (title, canonical, robots, Open Graph, Twitter) and its JSON-LD graph.
+Add a `seo.homepage` endpoint returning the homepage SEO head and JSON-LD.
