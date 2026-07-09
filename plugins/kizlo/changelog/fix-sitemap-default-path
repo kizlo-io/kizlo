@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Change default sitemap path to /sitemaps/index.xml and relax pathname validation to allow any .xml filename

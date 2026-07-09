@@ -52,8 +52,8 @@ export function CrawlingSettingsPage() {
 					control={form.control}
 					name="sitemaps.pathname_structure"
 					label="Sitemap Pathname"
-					description="The pathname for your sitemap index. Defaults to /sitemap_index.xml if left blank."
-					placeholder="/sitemap_index.xml"
+					description="The pathname for your sitemap index. Defaults to /sitemaps/index.xml if left blank."
+					placeholder="/sitemaps/index.xml"
 				/>
 			</SettingsSection>
 

@@ -161,7 +161,7 @@ class SitemapShapeTest extends SeoTestCase
 
         $this->assertSame([
             'rules'    => [['user_agent' => '*', 'allow' => ['/'], 'disallow' => []]],
-            'sitemaps' => ['https://example.com/sitemap_index.xml'],
+            'sitemaps' => ['https://example.com/sitemaps/index.xml'],
         ], $robots);
     }
 
@@ -191,7 +191,7 @@ class SitemapShapeTest extends SeoTestCase
                 ['user_agent' => 'Googlebot', 'allow' => ['/'], 'disallow' => []],
                 ['user_agent' => '*', 'allow' => [], 'disallow' => ['/']],
             ],
-            'sitemaps' => ['https://example.com/sitemap_index.xml'],
+            'sitemaps' => ['https://example.com/sitemaps/index.xml'],
         ], $robots);
     }
 
