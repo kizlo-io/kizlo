@@ -45,7 +45,7 @@ class SeoModuleRouteTest extends SeoTestCase
         $data = (new SeoModule())->getRobots($this->request())->get_data();
 
         $this->assertArrayHasKey('rules', $data);
-        $this->assertSame(['https://example.com/sitemap_index.xml'], $data['sitemaps']);
+        $this->assertSame(['https://example.com/sitemaps/index.xml'], $data['sitemaps']);
     }
 
     public function test_sitemap_index_endpoint_returns_entries(): void

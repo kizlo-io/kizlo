@@ -226,8 +226,8 @@ export const NulledStringSchema: z.ZodType<string | null, string> = z
 export const NulledSitemapPathSchema: z.ZodType<string | null, string> = z
 	.preprocess(
 		(val) => val ?? "",
-		z.string().refine((val) => val === "" || /^(\/[^\s/]+)*\/[^\s/]+_index\.xml$/.test(val), {
-			message: "Pathname must be a valid path ending with a _index.xml filename (e.g. /sitemap_index.xml)",
+		z.string().refine((val) => val === "" || /^(\/[^\s/]+)*\/[^\s/]+\.xml$/.test(val), {
+			message: "Pathname must be a valid path ending with a .xml filename (e.g. /sitemaps/index.xml)",
 		}),
 	)
 	.transform((val) => (val === "" ? null : val)) as never

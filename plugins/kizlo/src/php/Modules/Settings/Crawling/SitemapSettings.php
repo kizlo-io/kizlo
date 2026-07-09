@@ -13,12 +13,12 @@ class SitemapSettings extends SettingsAbstract
     ];
 
     /**
-     * The pathname structure for the sitemap index (e.g. /sitemap_index.xml).
-     * Defaults to /sitemap_index.xml if not set.
+     * The pathname structure for the sitemap index (e.g. /sitemaps/index.xml).
+     * Defaults to /sitemaps/index.xml if not set.
      */
     public function getPathnameStructure(): string
     {
-        return $this->get('pathname_structure') ?? '/sitemap_index.xml';
+        return $this->get('pathname_structure') ?? '/sitemaps/index.xml';
     }
 
     /** @param string|null $value Pathname or null to reset to default. */

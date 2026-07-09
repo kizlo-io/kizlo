@@ -112,7 +112,7 @@ abstract class SeoTestCase extends TestCase
         ], $overrides['taxonomies'] ?? []);
 
         $robots  = array_merge(['include_sitemap' => true, 'custom_rules' => []], $overrides['robots'] ?? []);
-        $sitemap = array_merge(['pathname_structure' => '/sitemap_index.xml'], $overrides['sitemap'] ?? []);
+        $sitemap = array_merge(['pathname_structure' => '/sitemaps/index.xml'], $overrides['sitemap'] ?? []);
 
         update_option('kizlo_settings_site', $site);
         update_option('kizlo_settings_identity', $identity);

@@ -142,7 +142,7 @@ class SitemapIndexTest extends SeoTestCase
 
         $this->assertSame('*', $robots['rules'][0]['user_agent']);
         $this->assertSame(['/'], $robots['rules'][0]['allow']);
-        $this->assertSame(['https://example.com/sitemap_index.xml'], $robots['sitemaps']);
+        $this->assertSame(['https://example.com/sitemaps/index.xml'], $robots['sitemaps']);
     }
 
     public function test_robots_does_not_disallow_hidden_collections(): void
