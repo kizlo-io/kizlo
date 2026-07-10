@@ -4,8 +4,11 @@ import { type CreateSitemapRouteOptions, createSitemapRoute as createCoreSitemap
 /**
  * The Next route the sitemap handler is mounted at: a single dynamic segment named
  * `[sitemap]`. It is fixed (not configurable) so that one `revalidatePath(SITEMAP_ROUTE,
- * "page")` refreshes the index and every generated sitemap at once. `[sitemap]` is Next's
- * file-routing convention, which is why it lives in this integration and not in core.
+ * "layout")` refreshes the index and every generated sitemap at once. A `layout`
+ * revalidation (not `page`) is required because the route has no `generateStaticParams`,
+ * so its slugs are generated on-demand and only a subtree invalidation reaches them.
+ * `[sitemap]` is Next's file-routing convention, which is why it lives in this integration
+ * and not in core.
  */
 export const SITEMAP_ROUTE = `${SITEMAP_BASE}/[sitemap]` as const
 
@@ -18,7 +21,7 @@ interface NextRouteContext {
  * Next wrapper around the framework-agnostic {@link createCoreSitemapRoute}. It serves the
  * same sitemap index and collection pages, and additionally asserts the route is mounted at
  * {@link SITEMAP_ROUTE}: if the dynamic segment is not named `[sitemap]`, `params.sitemap`
- * is missing and a wrong mount would silently break `revalidatePath(SITEMAP_ROUTE, "page")`,
+ * is missing and a wrong mount would silently break `revalidatePath(SITEMAP_ROUTE, "layout")`,
  * so it throws loudly on the first request instead.
  */
 export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitemapRouteOptions) {

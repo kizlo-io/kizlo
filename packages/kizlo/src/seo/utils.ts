@@ -1,4 +1,4 @@
-import type { Seo, Sitemap, SitemapUrl } from "./schema"
+import type { Robots, Seo, Sitemap, SitemapUrl } from "./schema"
 import type { WPK_Seo } from "./types"
 
 export function deserializeSeo(data: WPK_Seo): Seo {
@@ -102,6 +102,29 @@ export function xmlResponse(body: string): Response {
 	return new Response(body, {
 		headers: {
 			"Content-Type": "application/xml; charset=utf-8",
+			"Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+		},
+	})
+}
+
+export function renderRobots(robots: Robots): string {
+	const groups = robots.rules.map((rule) => {
+		const lines = [`User-agent: ${rule.userAgent}`]
+		for (const path of rule.allow) lines.push(`Allow: ${path}`)
+		for (const path of rule.disallow) lines.push(`Disallow: ${path}`)
+		return lines.join("\n")
+	})
+
+	const sitemaps = robots.sitemaps.map((url) => `Sitemap: ${url}`).join("\n")
+	const blocks = [groups.join("\n\n"), sitemaps].filter(Boolean)
+
+	return `${blocks.join("\n\n")}\n`
+}
+
+export function textResponse(body: string): Response {
+	return new Response(body, {
+		headers: {
+			"Content-Type": "text/plain; charset=utf-8",
 			"Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
 		},
 	})

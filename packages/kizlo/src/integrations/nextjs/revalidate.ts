@@ -1,4 +1,5 @@
 import type { Pathname } from "@kizlo/shared"
+import { ROBOTS_ROUTE } from "../../seo/robots"
 import { createExtension } from "../../shared/extension"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
@@ -9,13 +10,17 @@ export type RevalidatePathFn = (path: string, type?: "layout" | "page") => void
 /** A path to revalidate, optionally with the Next `type` a dynamic route needs (e.g. `"page"`). */
 export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "page" }
 
-// robots.txt always lives at `/robots.txt` (the spec fixes it regardless of how it is
-// served), so its revalidation target is a constant rather than an option.
-const ROBOTS_PATH = "/robots.txt"
+// robots.txt always lives at `/robots.txt` (the spec fixes it), and `createRobotsRoute`
+// serves it there, so `revalidatePath(ROBOTS_ROUTE)` reaches that route file.
+const ROBOTS_PATH = ROBOTS_ROUTE
 
 // The sitemap defaults to the route `createSitemapRoute` serves, revalidated as a
-// dynamic page so every generated sitemap refreshes at once.
-const DEFAULT_SITEMAP_TARGET: RevalidateTarget = { path: SITEMAP_ROUTE, type: "page" }
+// `layout` (not a `page`). The route has no `generateStaticParams`, so every slug
+// (`index.xml`, each `{key}.xml`, `-{n}` pages) is generated purely on-demand; a `page`
+// revalidation of the `[sitemap]` pattern doesn't reach those concrete on-demand entries,
+// whereas a `layout` revalidation invalidates the whole `/sitemaps` subtree and refreshes
+// them all at once.
+const DEFAULT_SITEMAP_TARGET: RevalidateTarget = { path: SITEMAP_ROUTE, type: "layout" }
 
 export interface NextRevalidateOptions {
 	revalidatePath?: RevalidatePathFn
@@ -23,9 +28,9 @@ export interface NextRevalidateOptions {
 	paths?: (event: KizloEvent) => Pathname[] | Promise<Pathname[]>
 	/**
 	 * How to revalidate the sitemap. Defaults to the route `createSitemapRoute` serves
-	 * (`/sitemaps/[sitemap]`, revalidated as a dynamic page). Override this only if you
-	 * serve sitemaps from your own route(s) instead of `createSitemapRoute`; pass `false`
-	 * to skip sitemap revalidation.
+	 * (`/sitemaps/[sitemap]`, revalidated as a `layout` so the whole on-demand subtree
+	 * refreshes at once). Override this only if you serve sitemaps from your own route(s)
+	 * instead of `createSitemapRoute`; pass `false` to skip sitemap revalidation.
 	 */
 	sitemap?: false | RevalidateTarget | RevalidateTarget[]
 }
