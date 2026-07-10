@@ -1,5 +1,4 @@
 import type { Pathname } from "@kizlo/shared"
-import { ROBOTS_ROUTE } from "../../seo/robots"
 import { createExtension } from "../../shared/extension"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
@@ -9,16 +8,6 @@ export type RevalidatePathFn = (path: string, type?: "layout" | "page") => void
 
 /** A path to revalidate, optionally with the Next `type` a dynamic route needs (e.g. `"page"`). */
 export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "page" }
-
-// robots.txt always lives at `/robots.txt` (the spec fixes it), and `createRobotsRoute`
-// serves it there. For this revalidation to actually take effect in production, the route
-// must not be a frozen build asset: a literal path with no dynamic segment prerenders at
-// build into an immutable `revalidate: false` route with no regeneration function, so on
-// Vercel the purge has nothing to regenerate against and the stale copy keeps serving until
-// a redeploy. The app's robots route sets a numeric `revalidate` (ISR) so it stays cached
-// but regenerable. We still target it as a `layout` because the route emits a `/route` (not
-// `/page`) cache tag, so a `page` revalidation would not match. See vercel/next.js#60641.
-const ROBOTS_PATH = ROBOTS_ROUTE
 
 // The sitemap defaults to the route `createSitemapRoute` serves, revalidated as a
 // `layout` (not a `page`). The route has no `generateStaticParams`, so every slug
@@ -49,13 +38,13 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 				createEventHandler(async (event) => {
 					if (!event) return
 
+					const revalidateTag = (await import("next/cache")).revalidateTag
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
 
 					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : [])]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
 
-					// robots.txt is a route handler, not a page, so it needs a `layout` revalidation (see ROBOTS_PATH).
-					revalidatePath(ROBOTS_PATH, "layout")
+					revalidateTag("robots", "max")
 
 					for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
 				}),

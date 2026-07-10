@@ -16,15 +16,23 @@ import { renderRobots, textResponse } from "./utils"
 export const ROBOTS_ROUTE = "/robots.txt" as const
 
 /**
+ * Fetches and renders the `robots.txt` body from the WordPress plugin's `/seo/robots`
+ * endpoint, returning it as a plain string (empty when the endpoint has no data). Exposed
+ * so framework integrations can wrap the render in their own caching before it becomes a
+ * `Response` (e.g. Next's `unstable_cache`), rather than caching an opaque `Response`.
+ */
+export async function renderRobotsBody(client: S2SClient<[]>): Promise<string> {
+	const { data } = await client.seo.robots()
+	return data ? renderRobots(data) : ""
+}
+
+/**
  * Builds a Web `Request` -> `Response` handler that serves `robots.txt` as `text/plain`,
  * rendering the rules and sitemap links from the WordPress plugin's `/seo/robots` endpoint.
  * Framework-agnostic: it ignores the request and runs as-is on any web-standard server.
  */
 export function createRobotsRoute(client: S2SClient<[]>) {
 	return async function GET(_request: Request): Promise<Response> {
-		const { data } = await client.seo.robots()
-		if (!data) return textResponse("")
-
-		return textResponse(renderRobots(data))
+		return textResponse(await renderRobotsBody(client))
 	}
 }
