@@ -37,7 +37,6 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 			events: [
 				createEventHandler(async (event) => {
 					if (!event) return
-					if (event.type.startsWith("settings")) return
 
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
 
