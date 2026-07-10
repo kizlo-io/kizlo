@@ -11,10 +11,13 @@ export type RevalidatePathFn = (path: string, type?: "layout" | "page") => void
 export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "page" }
 
 // robots.txt always lives at `/robots.txt` (the spec fixes it), and `createRobotsRoute`
-// serves it there. Like the sitemap, it is a `force-static` route handler, not a page, so
-// it must be revalidated as a `layout`: `type: "page"` does not purge a route handler in
-// production's persistent route cache (it only appears to work in dev, where there is no
-// such cache), whereas a `layout` revalidation invalidates the route segment itself.
+// serves it there. For this revalidation to actually take effect in production, the route
+// must not be a frozen build asset: a literal path with no dynamic segment prerenders at
+// build into an immutable `revalidate: false` route with no regeneration function, so on
+// Vercel the purge has nothing to regenerate against and the stale copy keeps serving until
+// a redeploy. The app's robots route sets a numeric `revalidate` (ISR) so it stays cached
+// but regenerable. We still target it as a `layout` because the route emits a `/route` (not
+// `/page`) cache tag, so a `page` revalidation would not match. See vercel/next.js#60641.
 const ROBOTS_PATH = ROBOTS_ROUTE
 
 // The sitemap defaults to the route `createSitemapRoute` serves, revalidated as a

@@ -6,6 +6,12 @@ import { renderRobots, textResponse } from "./utils"
  * from a route handler (rather than Next's `robots.ts` metadata convention) is deliberate:
  * `revalidatePath("/robots.txt")` only reaches a real route file, so this is what lets the
  * revalidation extension refresh robots.txt on content and settings changes.
+ *
+ * One caveat when mounting this route: give it a numeric `revalidate` (ISR) rather than
+ * leaving it fully static. A literal path prerenders at build into an immutable
+ * `revalidate: false` asset with no regeneration function, so on Vercel the revalidation
+ * purges the edge cache but has nothing to regenerate against and the stale copy keeps
+ * serving until a redeploy. See vercel/next.js#60641.
  */
 export const ROBOTS_ROUTE = "/robots.txt" as const
 
