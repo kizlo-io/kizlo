@@ -121,11 +121,15 @@ export function renderRobots(robots: Robots): string {
 	return `${blocks.join("\n\n")}\n`
 }
 
-export function textResponse(body: string): Response {
+// Default lets a shared CDN cache the response for an hour (with SWR). Pass an explicit
+// `cacheControl` when the caller owns invalidation itself (e.g. Next's `revalidateTag`),
+// since a CDN entry minted by `s-maxage` cannot be purged by tag revalidation and would
+// keep serving stale until its TTL expires. See the Next robots wrapper.
+export function textResponse(body: string, cacheControl = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400"): Response {
 	return new Response(body, {
 		headers: {
 			"Content-Type": "text/plain; charset=utf-8",
-			"Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
+			"Cache-Control": cacheControl,
 		},
 	})
 }
