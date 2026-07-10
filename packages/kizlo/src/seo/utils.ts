@@ -102,7 +102,6 @@ export function xmlResponse(body: string): Response {
 	return new Response(body, {
 		headers: {
 			"Content-Type": "application/xml; charset=utf-8",
-			"Cache-Control": "public, max-age=0, must-revalidate",
 		},
 	})
 }
@@ -129,7 +128,6 @@ export function textResponse(body: string): Response {
 	return new Response(body, {
 		headers: {
 			"Content-Type": "text/plain; charset=utf-8",
-			"Cache-Control": "public, max-age=0, must-revalidate",
 		},
 	})
 }
