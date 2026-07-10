@@ -58,6 +58,16 @@ class SeoModuleRouteTest extends SeoTestCase
         $this->assertContains('post', $keys);
     }
 
+    public function test_sitemap_urls_dispatch_index_returns_origin_and_entries(): void
+    {
+        $this->createPost();
+
+        $data = (new SeoModule())->getSitemapsUrls($this->request(['type' => 'index']))->get_data();
+
+        $this->assertSame('https://example.com', $data['origin']);
+        $this->assertContains('post', array_column($data['sitemaps'], 'key'));
+    }
+
     public function test_sitemap_urls_dispatch_post_type(): void
     {
         $this->createPost(['post_title' => 'Routed']);

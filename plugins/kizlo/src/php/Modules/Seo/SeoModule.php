@@ -7,6 +7,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\Support\Utils;
 use Kizlo\Modules\Post\PostSchema;
+use Kizlo\Modules\Settings\Settings;
 
 class SeoModule
 {
@@ -85,10 +86,31 @@ class SeoModule
         $page = max(1, (int) ($request->get_param('page') ?? 1));
 
         return match ($type) {
+            // `index` is a reserved pseudo-type: it returns the index entries plus the
+            // canonical origin (from the Kizlo site URL) so callers never build sitemap
+            // `<loc>`s from the request host. It is never a real content type.
+            'index'  => new WP_REST_Response($this->sitemapIndexPayload($settings)),
             'post_type'  => new WP_REST_Response((new PostSchema($settings))->sitemapEntries($key, $page)),
             'taxonomy'  => new WP_REST_Response((new TermSchema($settings))->sitemapEntries($key, $page)),
             'author'  => new WP_REST_Response((new AuthorSchema($settings))->sitemapEntries($page)),
             default => new WP_REST_Response(null, 400)
         };
+    }
+
+    /**
+     * The sitemap index payload: the entry list plus the canonical origin, so the frontend
+     * builds absolute index `<loc>`s from the Kizlo site URL rather than the request host.
+     *
+     * @param  Settings $settings
+     * @return array{origin: string, sitemaps: array<int, array<string, mixed>>}
+     */
+    private function sitemapIndexPayload(Settings $settings): array
+    {
+        $seo = new SeoBase($settings);
+
+        return [
+            'origin'   => $seo->siteOrigin(),
+            'sitemaps' => $seo->sitemapIndex(),
+        ];
     }
 }

@@ -224,6 +224,17 @@ class SeoBase
     }
 
     /**
+     * Canonical public origin (scheme + host) derived from the configured Kizlo site URL.
+     * Used to build absolute sitemap `<loc>`s so callers never fall back to the request host.
+     *
+     * @return string
+     */
+    public function siteOrigin(): string
+    {
+        return $this->getOrigin($this->settings->getBaseUrl());
+    }
+
+    /**
      * Count published posts carrying a per-post noindex override, grouped by post
      * type, in a single query. Used to derive the indexable count for the index.
      *

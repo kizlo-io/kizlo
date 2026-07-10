@@ -44,12 +44,10 @@ export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitema
 		const slug = lastPathSegment(url)
 		if (!slug) return notFound()
 
-		const { origin } = url
-
 		if (slug === SITEMAP_INDEX_SLUG) {
-			const { data } = await client.seo.sitemaps()
-			const entries = [...(data ?? []), ...extra.map((item) => item.entry)]
-			return xmlResponse(renderSitemapIndex(entries, origin))
+			const { data } = await client.seo.sitemaps.index()
+			const entries = [...(data?.sitemaps ?? []), ...extra.map((item) => item.entry)]
+			return xmlResponse(renderSitemapIndex(entries, data?.origin ?? url.origin))
 		}
 
 		const parsed = parseSitemapSlug(slug)
@@ -58,10 +56,13 @@ export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitema
 		const custom = extra.find((item) => item.entry.key === parsed.key)
 		if (custom) {
 			if (parsed.page > custom.entry.pages) return notFound()
-			return xmlResponse(renderUrlSet(await custom.urls(origin, parsed.page)))
+			// The origin comes from WordPress (the Kizlo site URL), not the request, so the
+			// `extra` URLs stay canonical even when the route is served as a prebuilt static file.
+			const { data } = await client.seo.sitemaps.index()
+			return xmlResponse(renderUrlSet(await custom.urls(data?.origin ?? url.origin, parsed.page)))
 		}
 
-		const { data: sitemaps } = await client.seo.sitemaps()
+		const { data: sitemaps } = await client.seo.sitemaps.list()
 		if (!sitemaps) return notFound()
 
 		const entry = sitemaps.find((item) => item.key === parsed.key)
