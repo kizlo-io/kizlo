@@ -11,7 +11,10 @@ export type RevalidatePathFn = (path: string, type?: "layout" | "page") => void
 export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "page" }
 
 // robots.txt always lives at `/robots.txt` (the spec fixes it), and `createRobotsRoute`
-// serves it there, so `revalidatePath(ROBOTS_ROUTE)` reaches that route file.
+// serves it there. Like the sitemap, it is a `force-static` route handler, not a page, so
+// it must be revalidated as a `layout`: `type: "page"` does not purge a route handler in
+// production's persistent route cache (it only appears to work in dev, where there is no
+// such cache), whereas a `layout` revalidation invalidates the route segment itself.
 const ROBOTS_PATH = ROBOTS_ROUTE
 
 // The sitemap defaults to the route `createSitemapRoute` serves, revalidated as a
@@ -45,12 +48,11 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
 
-					const paths = [
-						...(await Promise.resolve(options?.paths?.(event) ?? [])),
-						...(event.data?.url ? [event.data.url] : []),
-						ROBOTS_PATH,
-					]
+					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : [])]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
+
+					// robots.txt is a route handler, not a page, so it needs a `layout` revalidation (see ROBOTS_PATH).
+					revalidatePath(ROBOTS_PATH, "layout")
 
 					for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
 				}),
