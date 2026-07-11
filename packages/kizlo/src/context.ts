@@ -152,9 +152,9 @@ export class Context {
 			if (Date.now() > data.payload.expires * 1000) return null
 
 			const payloadStr = `${data.payload.id}.${data.payload.parent}.${data.payload.expires}`
-			const expected = hmac(this.config.siteSecret ?? "", payloadStr)
+			const expected = await hmac(this.config.siteSecret ?? "", payloadStr)
 
-			const isValid = compare(expected, data.hash)
+			const isValid = await compare(expected, data.hash)
 			if (!isValid) return null
 
 			return data.payload
