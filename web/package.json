@@ -3,11 +3,12 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"build": "next build",
-		"dev": "next dev --webpack",
+		"build": "pnpm docs:sitemap && next build",
+		"dev": "pnpm docs:sitemap && next dev --webpack",
 		"start": "next start",
+		"docs:sitemap": "node scripts/generate-docs-sitemap.mjs",
 		"postinstall": "fumadocs-mdx",
-		"typecheck": "fumadocs-mdx && next typegen && tsc --noEmit"
+		"typecheck": "pnpm docs:sitemap && fumadocs-mdx && next typegen && tsc --noEmit"
 	},
 	"dependencies": {
 		"@paper-design/shaders-react": "^0.0.76",
