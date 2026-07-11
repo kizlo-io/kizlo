@@ -5,6 +5,11 @@ import { textResponse } from "../../seo/utils"
 
 export function createRobotsRoute(client: S2SClient<[]>) {
 	return async function GET(_request: Request): Promise<Response> {
-		return textResponse(await unstable_cache(() => renderRobotsBody(client), ["robots"])())
+		return textResponse(
+			await unstable_cache(() => {
+				console.log("renderRobotsBody")
+				return renderRobotsBody(client)
+			}, ["robots"])(),
+		)
 	}
 }

@@ -1,5 +1,4 @@
 import type { Pathname } from "@kizlo/shared"
-import { ROBOTS_ROUTE } from "../../seo/robots"
 import { createExtension } from "../../shared/extension"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
