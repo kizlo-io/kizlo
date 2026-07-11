@@ -1,4 +1,4 @@
-import type { Robots, Seo, Sitemap, SitemapUrl } from "./schema"
+import type { Seo, Sitemap, SitemapUrl } from "./schema"
 import type { WPK_Seo } from "./types"
 
 export function deserializeSeo(data: WPK_Seo): Seo {
@@ -102,32 +102,6 @@ export function xmlResponse(body: string): Response {
 	return new Response(body, {
 		headers: {
 			"Content-Type": "application/xml; charset=utf-8",
-		},
-	})
-}
-
-export function renderRobots(robots: Robots): string {
-	const groups = robots.rules.map((rule) => {
-		const lines = [`User-agent: ${rule.userAgent}`]
-		for (const path of rule.allow) lines.push(`Allow: ${path}`)
-		for (const path of rule.disallow) lines.push(`Disallow: ${path}`)
-		return lines.join("\n")
-	})
-
-	const sitemaps = robots.sitemaps.map((url) => `Sitemap: ${url}`).join("\n")
-	const blocks = [groups.join("\n\n"), sitemaps].filter(Boolean)
-
-	return `${blocks.join("\n\n")}\n`
-}
-
-// Default lets a shared CDN cache the response for an hour (with SWR). Pass an explicit
-// `cacheControl` when the caller owns invalidation itself (e.g. Next's `revalidateTag`),
-// since a CDN entry minted by `s-maxage` cannot be purged by tag revalidation and would
-// keep serving stale until its TTL expires. See the Next robots wrapper.
-export function textResponse(body: string): Response {
-	return new Response(body, {
-		headers: {
-			"Content-Type": "text/plain; charset=utf-8",
 		},
 	})
 }

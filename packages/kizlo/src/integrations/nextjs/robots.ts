@@ -1,15 +1,6 @@
-import { unstable_cache } from "next/cache"
 import type { S2SClient } from "../../kizlo"
-import { renderRobotsBody } from "../../seo/robots"
-import { textResponse } from "../../seo/utils"
+import { createRobotsRoute as createCoreRobotsRoute } from "../../seo/robots"
 
 export function createRobotsRoute(client: S2SClient<[]>) {
-	return async function GET(_request: Request): Promise<Response> {
-		return textResponse(
-			await unstable_cache(() => {
-				console.log("renderRobotsBody")
-				return renderRobotsBody(client)
-			}, ["robots"])(),
-		)
-	}
+	return createCoreRobotsRoute(client)
 }
