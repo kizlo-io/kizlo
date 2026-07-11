@@ -70,5 +70,8 @@ jobs:
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: |
-          curl -fsS -X POST "https://kizlo.io/api/revalidate?tag=plugin-releases" \
+          # Canonical host (www): the apex 308-redirects to it, and curl without -L
+          # wouldn't follow, so the POST never reached /api/revalidate and the tag was
+          # never busted. -L is kept as a safety net (a 308 preserves the POST).
+          curl -fsSL -X POST "https://www.kizlo.io/api/revalidate?tag=plugin-releases" \
             -H "Authorization: Bearer $REVALIDATE_SECRET"
