@@ -2,6 +2,7 @@ import type { Pathname } from "@kizlo/shared"
 import { createExtension } from "../../shared/extension"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
+import { POST_EVENT_TYPES, TERM_EVENT_TYPES } from "../../webhook/schema"
 import { ROBOTS_CACHE_TAG } from "./robots"
 import { SITEMAP_ROUTE } from "./sitemap"
 
@@ -13,9 +14,12 @@ export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "p
 
 const DEFAULT_SITEMAP_TARGET: RevalidateTarget = { path: SITEMAP_ROUTE, type: "layout" }
 
+// The sitemap is a list of content URLs, so only content events change it. Settings never do.
+const CONTENT_EVENT_TYPES = new Set<KizloEvent["type"]>([...POST_EVENT_TYPES, ...TERM_EVENT_TYPES])
+
 export interface NextRevalidateOptions {
-	revalidatePath?: RevalidatePathFn
 	revalidateTag?: RevalidateTagFn
+	revalidatePath?: RevalidatePathFn
 	/** Return extra paths to revalidate for a given event, on top of the event's own URL. */
 	paths?: (event: KizloEvent) => Pathname[] | Promise<Pathname[]>
 	/**
@@ -41,11 +45,11 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : []), "/post"]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
 
-					// `{ expire: 0 }` purges the tag immediately (Next 16 requires the profile arg);
-					// a webhook fires precisely because the content changed, so there is no stale window to keep.
-					revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
+					if (event.type === "settings.saved") revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
 
-					for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
+					if (CONTENT_EVENT_TYPES.has(event.type)) {
+						for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
+					}
 				}),
 			],
 		}),
