@@ -46,12 +46,6 @@ export async function hash(key: string): Promise<string> {
  * Create an HMAC-SHA256 hex digest using the Web Crypto API.
  */
 export async function hmac(key: string, value: string): Promise<string> {
-	const cryptoKey = await crypto.subtle.importKey(
-		"raw",
-		encoder.encode(key),
-		{ name: "HMAC", hash: "SHA-256" },
-		false,
-		["sign"],
-	)
+	const cryptoKey = await crypto.subtle.importKey("raw", encoder.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
 	return toHex(await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(value)))
 }
