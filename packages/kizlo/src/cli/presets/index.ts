@@ -2,7 +2,7 @@ import { base } from "./base"
 import { nextjs } from "./nextjs"
 import type { InitContext, Preset } from "./types"
 
-export type { InitContext, PackageJson, Preset, RouteFile, ScaffoldContext } from "./types"
+export type { InitContext, PackageJson, Preset, ScaffoldContext, ScaffoldFile } from "./types"
 
 /** Framework presets, in declaration order. `base` always matches last. */
 export const PRESETS: readonly Preset[] = [nextjs, base]

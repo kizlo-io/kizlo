@@ -28,7 +28,10 @@ export class WordPressService {
 	private readonly defaultTimeout: Duration
 
 	constructor(context: { credentials: WordPressCredentials; timeout?: Duration }) {
-		const encoded = Buffer.from(`${context.credentials.username}:${context.credentials.password}`, "utf8").toString("base64")
+		const credentialBytes = new TextEncoder().encode(`${context.credentials.username}:${context.credentials.password}`)
+		let binary = ""
+		for (const byte of credentialBytes) binary += String.fromCharCode(byte)
+		const encoded = btoa(binary)
 		this.authHeader = `${WP_AUTH_TYPE} ${encoded}`
 		this.siteBase = context.credentials.url.endsWith("/") ? context.credentials.url : `${context.credentials.url}/`
 		this.defaultTimeout = context.timeout ?? SAFE_REQUEST_TIMEOUT

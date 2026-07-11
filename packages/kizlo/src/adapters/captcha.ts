@@ -1,3 +1,5 @@
+import { hash, hmac, type ShaAlgorithm } from "../shared/crypto"
+
 export type CaptchaAdapter = (input: { token: string; ip: string }) => Promise<boolean>
 
 /** Author a custom captcha adapter — types your verify function against the {@link CaptchaAdapter} contract. */
@@ -90,21 +92,28 @@ export function arkose(opts: { privateKey: string }): CaptchaAdapter {
 	}
 }
 
+const ALTCHA_ALGORITHMS: Record<string, ShaAlgorithm> = {
+	"SHA-256": "SHA-256",
+	"SHA-384": "SHA-384",
+	"SHA-512": "SHA-512",
+}
+
 export function altcha(opts: { hmacKey: string }): CaptchaAdapter {
 	return async ({ token }) => {
 		try {
-			const payload = JSON.parse(Buffer.from(token, "base64").toString("utf-8")) as {
+			const json = new TextDecoder().decode(Uint8Array.from(atob(token), (c) => c.charCodeAt(0)))
+			const payload = JSON.parse(json) as {
 				algorithm: string
 				challenge: string
 				number: number
 				salt: string
 				signature: string
 			}
-			const { createHmac, createHash } = await import("node:crypto")
-			const algo = payload.algorithm.toLowerCase().replace("-", "")
-			const check = createHash(algo).update(`${payload.salt}${payload.number}`).digest("hex")
+			const algo = ALTCHA_ALGORITHMS[payload.algorithm.toUpperCase()]
+			if (!algo) return false
+			const check = await hash(`${payload.salt}${payload.number}`, algo)
 			if (check !== payload.challenge) return false
-			const sig = createHmac(algo, opts.hmacKey).update(payload.challenge).digest("hex")
+			const sig = await hmac(opts.hmacKey, payload.challenge, algo)
 			return sig === payload.signature
 		} catch {
 			return false

@@ -1,5 +1,8 @@
 const encoder = new TextEncoder()
 
+/** SHA family accepted by the Web Crypto API. */
+export type ShaAlgorithm = "SHA-256" | "SHA-384" | "SHA-512"
+
 function toHex(buffer: ArrayBuffer): string {
 	let hex = ""
 	for (const byte of new Uint8Array(buffer)) hex += byte.toString(16).padStart(2, "0")
@@ -38,14 +41,14 @@ export async function compare(a: string, b: string): Promise<boolean> {
  * @param key - The raw secret API key to hash.
  * @returns A SHA-256 hex string suitable for database storage.
  */
-export async function hash(key: string): Promise<string> {
-	return toHex(await crypto.subtle.digest("SHA-256", encoder.encode(key)))
+export async function hash(key: string, algorithm: ShaAlgorithm = "SHA-256"): Promise<string> {
+	return toHex(await crypto.subtle.digest(algorithm, encoder.encode(key)))
 }
 
 /**
- * Create an HMAC-SHA256 hex digest using the Web Crypto API.
+ * Create an HMAC hex digest using the Web Crypto API. Defaults to SHA-256.
  */
-export async function hmac(key: string, value: string): Promise<string> {
-	const cryptoKey = await crypto.subtle.importKey("raw", encoder.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+export async function hmac(key: string, value: string, algorithm: ShaAlgorithm = "SHA-256"): Promise<string> {
+	const cryptoKey = await crypto.subtle.importKey("raw", encoder.encode(key), { name: "HMAC", hash: algorithm }, false, ["sign"])
 	return toHex(await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(value)))
 }

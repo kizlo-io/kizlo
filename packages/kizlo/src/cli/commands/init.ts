@@ -7,7 +7,7 @@ import z from "zod/v4"
 import { printBanner } from "../banner"
 import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName } from "../daemon/config"
 import { CONTRACT_BARREL } from "../daemon/generate"
-import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldContext } from "../presets"
+import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldContext, type ScaffoldFile } from "../presets"
 import {
 	addDependencyArgs,
 	detectImportAlias,
@@ -172,6 +172,39 @@ function orCancel<T>(value: T | symbol): T {
 	return value as T
 }
 
+type ScaffoldResult = "created" | "overwritten" | "kept"
+
+/**
+ * The single overwrite policy for every scaffolded file: create it when absent, overwrite on
+ * `--force`, and otherwise ask before clobbering an existing file (keeping it when the user
+ * declines or when running non-interactively with `--yes`). Every scaffolded file routes through
+ * here rather than deciding for itself, so new files inherit the same behavior for free.
+ */
+async function scaffoldFile(cwd: string, file: ScaffoldFile, opts: { force: boolean; yes: boolean }): Promise<ScaffoldResult> {
+	const absPath = path.join(cwd, file.relPath)
+	const existed = fs.existsSync(absPath)
+	if (existed) {
+		let overwrite = opts.force
+		if (!opts.force && !opts.yes) {
+			p.log.warn(`${file.label} already exists at ${file.relPath}`)
+			overwrite = orCancel(await p.confirm({ message: "Overwrite it?", initialValue: true }))
+		}
+		if (!overwrite) return "kept"
+	}
+	fs.mkdirSync(path.dirname(absPath), { recursive: true })
+	fs.writeFileSync(absPath, file.contents)
+	return existed ? "overwritten" : "created"
+}
+
+/** Report a {@link scaffoldFile} outcome in init's usual voice. */
+function reportScaffold(file: ScaffoldFile, result: ScaffoldResult, yes: boolean): void {
+	if (result === "kept") {
+		p.log.info(`Kept existing ${file.label} (${file.relPath})${yes ? " — pass --force to overwrite" : ""}`)
+	} else {
+		p.log.success(`${result === "overwritten" ? "Overwrote" : "Created"} ${file.label} (${file.relPath})`)
+	}
+}
+
 async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }): Promise<Setup> {
 	// The site/frontend URL is asked first — it's the one thing we can never derive. How the backend
 	// URL follows depends on the preset: a framework mounts the handler at a known sub-path, so we
@@ -239,9 +272,10 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; pres
 
 	const dir = orCancel(await p.text({ message: "Kizlo directory", initialValue: defaultDir(ctx.hasSrcDir), validate: validate(dirPath) }))
 
-	// Only relevant when the preset scaffolds imports (e.g. the API route).
+	// Only relevant when the preset scaffolds files that import the server (framework routes); those
+	// presets mount at an apiPath, so its presence is the signal that an import alias is worth asking for.
 	let alias = ""
-	if (ctx.preset.routeHandler) {
+	if (ctx.preset.apiPath) {
 		const serverDir = path.join(dir.replace(/^\.\//, "").replace(/\/+$/, ""), "server")
 		const detected = detectImportAlias(ctx.cwd, serverDir)?.prefix
 		const answer = orCancel(
@@ -273,7 +307,7 @@ function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }
 		wpUsername: process.env.KIZLO_WORDPRESS_USERNAME?.trim() ?? "",
 		wpPassword: process.env.KIZLO_WORDPRESS_APPLICATION_PASSWORD?.trim() ?? "",
 		dir,
-		alias: ctx.preset.routeHandler ? aliasWithSlash(detectImportAlias(ctx.cwd, path.join(dir, "server"))?.prefix) : "",
+		alias: ctx.preset.apiPath ? aliasWithSlash(detectImportAlias(ctx.cwd, path.join(dir, "server"))?.prefix) : "",
 	}
 }
 
@@ -507,32 +541,10 @@ export const init = defineCommand({
 		const exampleBody = `${exampleEnv}\n# Point the app at a local dev stack (managed by \`kizlo dev\`) instead of the keys above:\n# KIZLO_TARGET=dev\n`
 		const exampleCreated = writeFileIfAbsent(path.join(cwd, ".env.example"), exampleBody)
 
-		// kizlo.config.ts — the daemon (`kizlo watch`/`generate`) reads dir from here
 		const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
-		const configCreated = writeFileIfAbsent(path.join(cwd, "kizlo.config.ts"), kizloConfigTemplate(dirRel, setup.alias, setup.devPath))
 
 		// Kizlo owns the layout under dir: server/, client.ts, server/generated/
 		const serverDirRel = path.join(dirRel, "server")
-
-		// Server entry — keep existing config unless explicitly overwritten
-		const serverEntryRel = path.join(serverDirRel, "index.ts")
-		const serverPath = path.join(cwd, serverEntryRel)
-		const serverExisted = fs.existsSync(serverPath)
-		let wroteServer = !serverExisted || force
-		if (serverExisted && !force && !yes) {
-			p.log.warn(`A Kizlo server instance already exists at ${serverEntryRel}`)
-			wroteServer = orCancel(await p.confirm({ message: "Overwrite it?", initialValue: true }))
-		}
-		if (wroteServer) {
-			fs.mkdirSync(path.dirname(serverPath), { recursive: true })
-			fs.writeFileSync(serverPath, preset.serverEntry())
-		}
-
-		// Generated contract stub so the client typechecks before the first
-		// `kizlo watch`; the daemon overwrites it on run.
-		const generatedDirRel = path.join(serverDirRel, "generated")
-		writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")
-		writeFileIfAbsent(path.join(cwd, generatedDirRel, "index.ts"), CONTRACT_BARREL)
 
 		// Base preset only: inline the backend URL into the client when it's on a different origin than
 		// the site (a split deployment). Same-origin base — and every framework preset (siteUrl unset) —
@@ -541,23 +553,30 @@ export const init = defineCommand({
 
 		const scaffold: ScaffoldContext = {
 			serverDirName: path.basename(serverDirRel),
+			serverEntryPath: path.join(serverDirRel, "index.ts"),
+			clientPath: path.join(dirRel, "client.ts"),
 			appDir: detectAppDir(cwd, hasSrcDir),
 			serverImport: (fromDir) => resolveModuleImport(cwd, serverDirRel, fromDir, setup.alias),
 			clientUrl,
 		}
 
-		// Browser client — at the Kizlo home root
-		const clientRel = path.join(dirRel, "client.ts")
-		const clientCreated = writeFileIfAbsent(path.join(cwd, clientRel), preset.clientEntry(scaffold))
+		// Every scaffolded source file the user owns and edits flows through one list so they share
+		// the same overwrite policy (see scaffoldFile). init contributes the preset-agnostic config;
+		// the preset contributes everything else (server entry, client, and any framework routes).
+		const files: ScaffoldFile[] = [
+			{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.devPath) },
+			...preset.scaffolds(scaffold),
+		]
 
-		// API route handler — supported frameworks only
-		let routeRel: string | undefined
-		let routeCreated = false
-		if (preset.routeHandler) {
-			const route = preset.routeHandler(scaffold)
-			routeRel = route.path
-			routeCreated = writeFileIfAbsent(path.join(cwd, route.path), route.contents)
-		}
+		const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
+		for (const file of files) scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force, yes }) })
+
+		// Generated contract stub so the client typechecks before the first `kizlo watch`. The daemon
+		// owns and overwrites it on every run, so it writes-if-absent and never prompts — it isn't a
+		// file the user edits.
+		const generatedDirRel = path.join(serverDirRel, "generated")
+		writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")
+		writeFileIfAbsent(path.join(cwd, generatedDirRel, "index.ts"), CONTRACT_BARREL)
 
 		const gitignore = ensureGitignored(cwd, ".env")
 
@@ -569,11 +588,7 @@ export const init = defineCommand({
 			p.log.info("Left .env unchanged")
 		}
 		p.log.success(exampleCreated ? "Created .env.example" : "Skipped .env.example (exists)")
-		p.log.success(configCreated ? "Created kizlo.config.ts" : "Skipped kizlo.config.ts (exists)")
-		if (wroteServer) p.log.success(`${serverExisted ? "Overwrote" : "Created"} Kizlo server instance (${serverEntryRel})`)
-		else p.log.info(`Kept existing Kizlo server instance (${serverEntryRel})${yes ? " — pass --force to overwrite" : ""}`)
-		p.log.success(clientCreated ? `Created browser client (${clientRel})` : "Skipped browser client (exists)")
-		if (routeRel) p.log.success(routeCreated ? `Created API route (${routeRel})` : "Skipped API route (exists)")
+		for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
 		if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)
 
 		if (setup.mode === "local") {

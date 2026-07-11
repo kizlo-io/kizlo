@@ -1,11 +1,13 @@
 import type { Pathname } from "@kizlo/shared"
-import { ROBOTS_ROUTE } from "../../seo/robots"
 import { createExtension } from "../../shared/extension"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
+import { ROBOTS_CACHE_TAG } from "./robots"
 import { SITEMAP_ROUTE } from "./sitemap"
 
 export type RevalidatePathFn = (path: string, type?: "layout" | "page") => void
+
+export type RevalidateTagFn = (tag: string, profile: string | { expire?: number }) => void
 
 export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "page" }
 
@@ -13,6 +15,7 @@ const DEFAULT_SITEMAP_TARGET: RevalidateTarget = { path: SITEMAP_ROUTE, type: "l
 
 export interface NextRevalidateOptions {
 	revalidatePath?: RevalidatePathFn
+	revalidateTag?: RevalidateTagFn
 	/** Return extra paths to revalidate for a given event, on top of the event's own URL. */
 	paths?: (event: KizloEvent) => Pathname[] | Promise<Pathname[]>
 	/**
@@ -33,14 +36,14 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 					if (!event) return
 
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
+					const revalidateTag = options?.revalidateTag ?? (await import("next/cache")).revalidateTag
 
-					const paths = [
-						...(await Promise.resolve(options?.paths?.(event) ?? [])),
-						...(event.data?.url ? [event.data.url] : []),
-						ROBOTS_ROUTE,
-						"/post",
-					]
+					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : []), "/post"]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
+
+					// `{ expire: 0 }` purges the tag immediately (Next 16 requires the profile arg);
+					// a webhook fires precisely because the content changed, so there is no stale window to keep.
+					revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
 
 					for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
 				}),
