@@ -39,12 +39,13 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 				createEventHandler(async (event) => {
 					if (!event) return
 
+					const revalidateTag = (await import("next/cache")).revalidateTag
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
 
 					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : [])]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
 
-					revalidatePath(ROBOTS_ROUTE)
+					revalidateTag("robots", "max")
 
 					for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
 				}),
