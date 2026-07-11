@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-11
+### Added
+- Return the canonical site origin alongside the entries from the sitemap index endpoint (GET /seo/sitemaps/index), so the frontend builds absolute sitemap URLs from the Kizlo site URL instead of the request host
+
 ## [0.2.3] - 2026-07-09
 ### Fixed
 - Change default sitemap path to /sitemaps/index.xml and relax pathname validation to allow any .xml filename
@@ -31,6 +35,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.3.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.3...kizlo-v0.3.0
 [0.2.3]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.2...kizlo-v0.2.3
 [0.2.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.1...kizlo-v0.2.2
 [0.2.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.0...kizlo-v0.2.1

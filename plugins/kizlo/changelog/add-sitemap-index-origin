@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Return the canonical site origin alongside the entries from the sitemap index endpoint (GET /seo/sitemaps/index), so the frontend builds absolute sitemap URLs from the Kizlo site URL instead of the request host
