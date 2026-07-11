@@ -16,6 +16,10 @@ export interface InitContext {
 export interface ScaffoldContext {
 	/** Last segment of the server directory, e.g. `server`. */
 	serverDirName: string
+	/** Server entry path relative to cwd (`<dir>/server/index.ts`); where the server file is written. */
+	serverEntryPath: string
+	/** Browser client path relative to cwd (`<dir>/client.ts`); where the client file is written. */
+	clientPath: string
 	/** App Router directory, `app` or `src/app`. */
 	appDir: string
 	/** Import specifier for the server entry from `fromDir` (tsconfig alias or relative). */
@@ -28,9 +32,11 @@ export interface ScaffoldContext {
 	clientUrl?: string
 }
 
-export interface RouteFile {
+export interface ScaffoldFile {
+	/** Human label used in prompts and logs, e.g. `API route`. */
+	label: string
 	/** Path relative to cwd. */
-	path: string
+	relPath: string
 	contents: string
 }
 
@@ -43,10 +49,11 @@ export interface Preset {
 	baseUrlEnvKey: string
 	/** Path the API handler mounts at (e.g. `/api/kizlo`); appended to the base URL. */
 	apiPath?: string
-	/** Contents of the server entry (`<dir>/server/index.ts`). */
-	serverEntry(): string
-	/** Contents of the browser client (`<dir>/client.ts`). */
-	clientEntry(ctx: ScaffoldContext): string
-	/** The API route file to mount the handler — supported frameworks only. */
-	routeHandler?(ctx: ScaffoldContext): RouteFile
+	/**
+	 * Every file this preset scaffolds, each a labeled {@link ScaffoldFile} with its own path. Always
+	 * includes the server entry and browser client; frameworks add the API route and SEO routes. Paths
+	 * for the server/client come from the context (they live under the user-chosen dir); framework
+	 * routes set their own fixed paths. init runs every file through the shared overwrite policy.
+	 */
+	scaffolds(ctx: ScaffoldContext): ScaffoldFile[]
 }

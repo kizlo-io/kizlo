@@ -1,6 +1,5 @@
 packages:
   - web
-  - playground
   - packages/*
   - tooling/*
   - plugins/*

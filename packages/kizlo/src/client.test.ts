@@ -30,10 +30,10 @@ test("server-side error response surfaces in the envelope with the typed Kizlo c
 test("internal-scoped procedure is rejected client-side before any network call", async () => {
 	const seo = (
 		instance.client as unknown as {
-			seo: { sitemaps: () => Promise<{ success: boolean; error?: { message: string } }> }
+			seo: { sitemaps: { index: () => Promise<{ success: boolean; error?: { message: string } }> } }
 		}
 	).seo
-	const result = await seo.sitemaps()
+	const result = await seo.sitemaps.index()
 	expect(result.success).toBe(false)
 	expect(result.error?.message).toMatch(/internal procedure/i)
 })

@@ -61,7 +61,7 @@ export const POST_ROUTER_MAP = {
 			const data = response.data
 
 			if (input.query?.password && data.password) {
-				const match = compare(input.query.password, data.password)
+				const match = await compare(input.query.password, data.password)
 				if (!match) throw errors.POST_PASSWORD_INVALID()
 
 				return deserializePost({ ...data, password: "" })

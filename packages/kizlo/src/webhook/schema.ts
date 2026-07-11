@@ -8,15 +8,11 @@ export const POST_EVENT_TYPES = ["post.created", "post.updated", "post.trashed",
 export const PostEventType = z.enum(POST_EVENT_TYPES)
 export type PostEventType = z.infer<typeof PostEventType>
 
-export const PAYMENT_EVENT_TYPES = ["payment.status_requested"] as const
-export const PaymentEventType = z.enum(PAYMENT_EVENT_TYPES)
-export type PaymentEventType = z.infer<typeof PaymentEventType>
-
 export const SETTINGS_EVENT_TYPES = ["settings.saved"] as const
 export const SettingsEventType = z.enum(SETTINGS_EVENT_TYPES)
 export type SettingsEventType = z.infer<typeof SettingsEventType>
 
-export const EVENT_TYPES = [...TERM_EVENT_TYPES, ...POST_EVENT_TYPES, ...PAYMENT_EVENT_TYPES, ...SETTINGS_EVENT_TYPES] as const
+export const EVENT_TYPES = [...TERM_EVENT_TYPES, ...POST_EVENT_TYPES, ...SETTINGS_EVENT_TYPES] as const
 export const EventType = z.enum(EVENT_TYPES)
 export type EventType = z.infer<typeof EventType>
 

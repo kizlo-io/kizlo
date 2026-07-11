@@ -12,7 +12,18 @@
 		"source.fixAll.biome": "explicit",
 		"source.organizeImports.biome": "explicit"
 	},
-	"cSpell.words": ["bacs", "dangurousload", "healthcheck", "mysqladmin", "Retruningprocedure", "rootpass", "uroot", "wppass"],
+	"cSpell.words": [
+		"bacs",
+		"dangurousload",
+		"healthcheck",
+		"mysqladmin",
+		"prerender",
+		"prerenders",
+		"Retruningprocedure",
+		"rootpass",
+		"uroot",
+		"wppass"
+	],
 	"intelephense.stubs": [
 		"Core",
 		"standard",

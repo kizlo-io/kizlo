@@ -1,28 +1,24 @@
 import type { Pathname } from "@kizlo/shared"
-import { ROBOTS_ROUTE } from "../../seo/robots"
 import { createExtension } from "../../shared/extension"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
+import { POST_EVENT_TYPES, TERM_EVENT_TYPES } from "../../webhook/schema"
+import { ROBOTS_CACHE_TAG } from "./robots"
 import { SITEMAP_ROUTE } from "./sitemap"
 
 export type RevalidatePathFn = (path: string, type?: "layout" | "page") => void
 
-/** A path to revalidate, optionally with the Next `type` a dynamic route needs (e.g. `"page"`). */
+export type RevalidateTagFn = (tag: string, profile: string | { expire?: number }) => void
+
 export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "page" }
 
-// robots.txt always lives at `/robots.txt` (the spec fixes it), and `createRobotsRoute`
-// serves it there, so `revalidatePath(ROBOTS_ROUTE)` reaches that route file.
-const ROBOTS_PATH = ROBOTS_ROUTE
-
-// The sitemap defaults to the route `createSitemapRoute` serves, revalidated as a
-// `layout` (not a `page`). The route has no `generateStaticParams`, so every slug
-// (`index.xml`, each `{key}.xml`, `-{n}` pages) is generated purely on-demand; a `page`
-// revalidation of the `[sitemap]` pattern doesn't reach those concrete on-demand entries,
-// whereas a `layout` revalidation invalidates the whole `/sitemaps` subtree and refreshes
-// them all at once.
 const DEFAULT_SITEMAP_TARGET: RevalidateTarget = { path: SITEMAP_ROUTE, type: "layout" }
 
+// The sitemap is a list of content URLs, so only content events change it. Settings never do.
+const CONTENT_EVENT_TYPES = new Set<KizloEvent["type"]>([...POST_EVENT_TYPES, ...TERM_EVENT_TYPES])
+
 export interface NextRevalidateOptions {
+	revalidateTag?: RevalidateTagFn
 	revalidatePath?: RevalidatePathFn
 	/** Return extra paths to revalidate for a given event, on top of the event's own URL. */
 	paths?: (event: KizloEvent) => Pathname[] | Promise<Pathname[]>
@@ -44,15 +40,16 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 					if (!event) return
 
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
+					const revalidateTag = options?.revalidateTag ?? (await import("next/cache")).revalidateTag
 
-					const paths = [
-						...(await Promise.resolve(options?.paths?.(event) ?? [])),
-						...(event.data?.url ? [event.data.url] : []),
-						ROBOTS_PATH,
-					]
+					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : []), "/post"]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
 
-					for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
+					if (event.type === "settings.saved") revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
+
+					if (CONTENT_EVENT_TYPES.has(event.type)) {
+						for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
+					}
 				}),
 			],
 		}),

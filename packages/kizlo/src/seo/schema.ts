@@ -75,6 +75,15 @@ export type Sitemap = z.infer<typeof Sitemap>
 export const SitemapList = z.array(Sitemap)
 export type SitemapList = z.infer<typeof SitemapList>
 
+// The sitemap index bundles the entry list with the canonical public origin resolved from
+// the Kizlo site URL setting, so the index `<loc>`s never fall back to the request host
+// (which is `localhost` when the route is built as a static file).
+export const SitemapIndex = z.object({
+	origin: z.string(),
+	sitemaps: SitemapList,
+})
+export type SitemapIndex = z.infer<typeof SitemapIndex>
+
 export const SitemapUrlImage = z.object({
 	loc: z.string(),
 	title: z.string(),

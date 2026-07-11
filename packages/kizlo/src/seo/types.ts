@@ -66,6 +66,11 @@ export interface WPK_Sitemap {
 	lastmod: string
 }
 
+export interface WPK_SitemapIndex {
+	origin: string
+	sitemaps: WPK_Sitemap[]
+}
+
 export interface WPK_SitemapUrlImage {
 	loc: string
 	title: string

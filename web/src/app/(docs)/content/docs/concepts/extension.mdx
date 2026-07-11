@@ -359,7 +359,7 @@ The Kizlo plugin ships these events out of the box:
 | --- | --- |
 | `post.created` `post.updated` `post.trashed` `post.deleted` | `{ post_id, post_type }` |
 | `term.created` `term.updated` `term.deleted` | `{ term_id, taxonomy, post_types, count }` |
-| `payment.status_requested` | `{ transaction_id, payment_method_id, payment_session_id }` |
+| `{ transaction_id, payment_method_id, payment_session_id }` |
 | `settings.saved` | `null` |
 
 <Callout>

@@ -1,8 +1,8 @@
 import { createProcedure } from "../shared/procedure"
 import type { WP_CommonErrorCode } from "../wordpress"
 import { WP_KIZLO_BASE } from "../wordpress"
-import { ListSitemapUrlInput, Robots, Seo, SitemapList, SitemapUrlList } from "./schema"
-import type { WPK_Robots, WPK_Seo, WPK_Sitemap, WPK_SitemapUrl } from "./types"
+import { ListSitemapUrlInput, Robots, Seo, SitemapIndex, SitemapList, SitemapUrlList } from "./schema"
+import type { WPK_Robots, WPK_Seo, WPK_Sitemap, WPK_SitemapIndex, WPK_SitemapUrl } from "./types"
 
 export const SEO_ROUTER_MAP = {
 	homepage: createProcedure(
@@ -63,24 +63,51 @@ export const SEO_ROUTER_MAP = {
 		},
 	),
 
-	sitemaps: createProcedure(
-		{
-			scope: "internal",
-			output: SitemapList,
-		},
-		async ({ context, errors }) => {
-			const response = await context.service.wordpress.get<WPK_Sitemap[], WP_CommonErrorCode>("/seo/sitemaps", {
-				base: WP_KIZLO_BASE,
-			})
+	sitemaps: {
+		list: createProcedure(
+			{
+				scope: "internal",
+				output: SitemapList,
+			},
+			async ({ context, errors }) => {
+				const response = await context.service.wordpress.get<WPK_Sitemap[], WP_CommonErrorCode>("/seo/sitemaps", {
+					base: WP_KIZLO_BASE,
+				})
 
-			if (response.error) {
-				context.logger.error("List sitemaps unhandled error", response.error)
-				throw errors.INTERNAL_SERVER_ERROR()
-			}
+				if (response.error) {
+					context.logger.error("List sitemaps unhandled error", response.error)
+					throw errors.INTERNAL_SERVER_ERROR()
+				}
 
-			return response.data
-		},
-	),
+				return response.data
+			},
+		),
+
+		// `index` reuses the `/seo/sitemaps/:type` route with the reserved type `index`, which
+		// returns the entry list plus the canonical origin resolved from the Kizlo site URL
+		// setting (never a real content type, so there is no collision with `post_type` etc.).
+		index: createProcedure(
+			{
+				scope: "internal",
+				output: SitemapIndex,
+			},
+			async ({ context, errors }) => {
+				const response = await context.service.wordpress.get<WPK_SitemapIndex, WP_CommonErrorCode>("/seo/sitemaps/index", {
+					base: WP_KIZLO_BASE,
+				})
+
+				if (response.error) {
+					context.logger.error("Get sitemap index unhandled error", response.error)
+					throw errors.INTERNAL_SERVER_ERROR()
+				}
+
+				return {
+					origin: response.data.origin,
+					sitemaps: response.data.sitemaps,
+				}
+			},
+		),
+	},
 
 	robots: createProcedure(
 		{
