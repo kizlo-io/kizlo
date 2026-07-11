@@ -4,7 +4,7 @@ import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
 import { POST_EVENT_TYPES, TERM_EVENT_TYPES } from "../../webhook/schema"
 import { ROBOTS_CACHE_TAG } from "./robots"
-import { SITEMAP_ROUTE } from "./sitemap"
+import { SITEMAP_CACHE_TAG, SITEMAP_ROUTE } from "./sitemap"
 
 export type RevalidatePathFn = (path: string, type?: "layout" | "page") => void
 
@@ -48,6 +48,8 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 					if (event.type === "settings.saved") revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
 
 					if (CONTENT_EVENT_TYPES.has(event.type)) {
+						revalidateTag(SITEMAP_CACHE_TAG, { expire: 0 })
+
 						for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
 					}
 				}),

@@ -1,11 +1,6 @@
 import type { S2SClient } from "../../kizlo"
 import { createRobotsRoute as createCoreRobotsRoute } from "../../seo/robots"
 
-/**
- * Cache tag for the cached robots.txt body. The Next revalidation extension calls
- * `revalidateTag(ROBOTS_CACHE_TAG)` on every webhook event so the route refreshes
- * on-demand instead of on every request.
- */
 export const ROBOTS_CACHE_TAG = "kizlo:robots"
 
 export function createRobotsRoute(client: S2SClient<[]>) {
