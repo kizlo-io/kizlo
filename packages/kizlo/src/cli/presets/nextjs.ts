@@ -70,6 +70,9 @@ export const GET = createRobotsRoute(client)
 				contents: `import { createSitemapRoute } from "kizlo/nextjs/server"
 import { client } from "${ctx.serverImport(sitemapDir)}"
 
+// Run on the edge: cheaper and faster than Node for a response this small.
+export const runtime = "edge"
+
 // Like robots.txt, Vercel bakes sitemap routes into immutable Edge CDN assets at build time,
 // bypassing ISR and on-demand revalidatePath. The index gets frozen with whatever WordPress
 // returned at build (often nothing, since the self-referential backend isn't reachable yet),
