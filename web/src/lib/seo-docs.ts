@@ -1,5 +1,5 @@
 import type { SitemapIndexEntry, SitemapUrl } from "kizlo"
-import { source } from "@/lib/source"
+import docsSitemap from "./docs-sitemap.generated.json"
 
 export const DOCS_SITEMAP_KEY = "docs"
 
@@ -10,8 +10,8 @@ export function docsSitemapEntry(): SitemapIndexEntry {
 }
 
 export function docsSitemapUrls(origin: string): SitemapUrl[] {
-	return source.getPages().map((page) => ({
-		loc: `${origin}${page.url}`,
+	return docsSitemap.paths.map((path) => ({
+		loc: `${origin}${path}`,
 		lastmod,
 		images: [],
 	}))
