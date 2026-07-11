@@ -1,5 +1,23 @@
 # kizlo
 
+## 0.3.0
+
+### Minor Changes
+
+- [#29](https://github.com/kizlo-io/kizlo/pull/29) [`0e38b02`](https://github.com/kizlo-io/kizlo/commit/0e38b022529cdd121d3a5d853171f592a518747d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add `createRobotsRoute` (from `kizlo/nextjs/server`) to serve `robots.txt` from a route handler instead of Next's `robots.ts` metadata convention, which `revalidatePath("/robots.txt")` cannot reach. Mirrors `createSitemapRoute`.
+
+  `nextRevalidation` now also revalidates SEO surfaces on `settings.*` events, so settings changes refresh `/robots.txt` and the sitemap.
+
+  Fix sitemap revalidation: revalidate the `[sitemap]` route as a `layout` instead of a `page`, so on-demand slugs (no `generateStaticParams`) actually refresh.
+
+- [#30](https://github.com/kizlo-io/kizlo/pull/30) [`eb56383`](https://github.com/kizlo-io/kizlo/commit/eb563839c0dadc22e9b80397e8aea5f08575d26c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix `localhost` URLs in the sitemap index. The index `<loc>`s were built from the request origin, which resolves to `localhost` when the route is served as a prebuilt static file (`dynamic = "force-static"`), so the deployed sitemap pointed at localhost. The origin now comes from WordPress via a new `client.seo.sitemaps.index()` (the entry list plus the canonical origin resolved from the Kizlo site URL), so both the index and any `extra` sitemap URLs stay canonical. `client.seo.sitemaps()` is now `client.seo.sitemaps.list()`.
+
+### Patch Changes
+
+- [#30](https://github.com/kizlo-io/kizlo/pull/30) [`eb56383`](https://github.com/kizlo-io/kizlo/commit/eb563839c0dadc22e9b80397e8aea5f08575d26c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Make the runtime edge-compatible. Dropped `node:crypto` and `Buffer` from the package barrel (the `altcha` adapter and the WordPress auth header now use Web Crypto and `btoa`/`atob`), so `kizlo` builds and runs on Node, edge, and other serverless runtimes.
+
+- [#30](https://github.com/kizlo-io/kizlo/pull/30) [`eb56383`](https://github.com/kizlo-io/kizlo/commit/eb563839c0dadc22e9b80397e8aea5f08575d26c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix robots.txt revalidation in production: `nextRevalidation` now revalidates `/robots.txt` as a `layout` instead of a `page`. `createRobotsRoute` is a `force-static` route handler, and a `page` revalidation never purges a route handler in production's persistent route cache, so the stale robots.txt kept serving (it only appeared to work in dev). Mirrors the existing sitemap fix.
+
 ## 0.2.2
 
 ### Patch Changes
