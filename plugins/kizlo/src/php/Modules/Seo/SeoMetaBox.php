@@ -69,7 +69,7 @@ class SeoMetaBox
             'window.kizloSeo = ' . wp_json_encode([
                 'meta'      => $this->getMeta($post),
                 'defaults'  => $seo->seoDefaults($post),
-                'variables' => Variables::toJSON('post_type_content'),
+                'variables' => Variables::forPostType($post->post_type),
             ]) . ';',
             'before'
         );

@@ -235,4 +235,28 @@ class Variables
             'description' => $data[$variable]['description'],
         ], $variables);
     }
+
+    /**
+     * Post type content variables filtered to what the post type can actually
+     * resolve. Excerpt and author are gated on post-type feature support, and
+     * category on the post type being attached to the `category` taxonomy, so
+     * the editor never offers a variable that resolves to nothing (e.g.
+     * {{excerpt}} on pages).
+     *
+     * @param string $post_type
+     *
+     * @return array
+     */
+    public static function forPostType(string $post_type): array
+    {
+        return array_values(array_filter(
+            self::toJSON('post_type_content'),
+            static fn(array $variable): bool => match ($variable['value']) {
+                self::EXCERPT  => post_type_supports($post_type, 'excerpt'),
+                self::AUTHOR   => post_type_supports($post_type, 'author'),
+                self::CATEGORY => is_object_in_taxonomy($post_type, 'category'),
+                default        => true,
+            }
+        ));
+    }
 }

@@ -4,6 +4,7 @@ namespace Kizlo\Modules\Settings\PostType;
 
 use WP_REST_Request;
 use WP_REST_Response;
+use Kizlo\Support\Variables;
 
 class PostTypeSettingsService
 {
@@ -52,6 +53,7 @@ class PostTypeSettingsService
                     'publicly_queryable' => $post_type->publicly_queryable,
                     'supports'           => PostTypeSettings::getSupports($post_type->name),
                     'internal'           => PostTypeSettings::checkInternal($post_type->name),
+                    'content_variables'  => Variables::forPostType($post_type->name),
                 ],
                 $settings->getData()
             );
