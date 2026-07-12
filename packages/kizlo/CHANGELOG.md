@@ -1,5 +1,13 @@
 # kizlo
 
+## 0.3.1
+
+### Patch Changes
+
+- [#33](https://github.com/kizlo-io/kizlo/pull/33) [`5b51f36`](https://github.com/kizlo-io/kizlo/commit/5b51f36fe952ddaa5d0d980159b0258817661727) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Run the scaffolded sitemap route on the edge. The Next.js CLI preset now emits `export const runtime = "edge"` for `/sitemaps/[sitemap]`, matching the robots.txt route, so both special-file responses run on the cheaper, faster edge runtime instead of Node.
+
+- [#31](https://github.com/kizlo-io/kizlo/pull/31) [`cafdf6d`](https://github.com/kizlo-io/kizlo/commit/cafdf6d93283471d610fdf5f9626ba8c705c5f66) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Improve sitemap route caching to match the robots.txt approach. `createSitemapRoute` (Next integration) now caches its WordPress-backed bodies with `unstable_cache` under a `kizlo:sitemap` tag, keyed per slug, and `nextRevalidation` refreshes that tag on content events. The scaffolded route is `force-dynamic`, so Vercel does not bake `/sitemaps/index.xml` into an immutable Edge CDN asset that on-demand `revalidatePath` cannot reach. Requests stay cheap (the WordPress calls are cached) while the index and collection sitemaps stay current on content changes.
+
 ## 0.3.0
 
 ### Minor Changes
