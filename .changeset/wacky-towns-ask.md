@@ -1,5 +1,0 @@
----
-"kizlo": patch
----
-
-Bug fixes.
