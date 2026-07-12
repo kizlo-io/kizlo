@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.3.2
+
+### Patch Changes
+
+- [#34](https://github.com/kizlo-io/kizlo/pull/34) [`2a7b07f`](https://github.com/kizlo-io/kizlo/commit/2a7b07fbb8d10251b721a964a953ecff48f12203) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Bug fixes.
+
 ## 0.3.1
 
 ### Patch Changes
