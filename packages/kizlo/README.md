@@ -1,4 +1,4 @@
-<a href="https://payloadcms.com"><img width="100%" src="https://cdn.kizlo.io/images/github-banner.png" alt="Kizlo headless CMS Admin panel built with React" /></a>
+<a href="https://www.kizlo.io"><img width="100%" src="https://cdn.kizlo.io/images/github-kizlo-banner.png" alt="Kizlo headless CMS Admin panel built with React" /></a>
 <br />
 
 <p align="center">
