@@ -53,12 +53,28 @@ export interface SeoOverrides {
 
 export type SeoVariant = "post" | "term"
 
+// Raw title/description templates for the current context, so the preview can
+// re-resolve them live instead of using the server-frozen `defaults`.
+export interface SeoTemplates {
+	title: string
+	description: string
+	// Full canonical URL with path tokens (e.g. {{slug}}) left in, so the preview
+	// URL can be rebuilt live from the editor's slug.
+	canonical: string
+}
+
 declare global {
 	interface Window {
 		kizloSeo: {
 			meta: SeoMeta
 			defaults: SeoDefaults
 			variables: Variable[]
+			// Post editor only; absent for the term meta box, which keeps the
+			// frozen `defaults`.
+			templates?: SeoTemplates
+			// Server-resolved token -> value baseline. The editor overlays live
+			// values on top for the fields an author can edit.
+			context?: Record<string, string>
 			// Absent on the post editor (defaults to "post"); "term" hides the
 			// schema-type/article fields that don't apply to taxonomy terms.
 			variant?: SeoVariant

@@ -20,6 +20,8 @@ if (container && isPreview) {
 				meta={window.kizloSeo.meta}
 				defaults={window.kizloSeo.defaults}
 				variables={window.kizloSeo.variables}
+				templates={window.kizloSeo.templates}
+				context={window.kizloSeo.context}
 				variant={window.kizloSeo.variant ?? "post"}
 			/>
 			<Toaster position="top-right" swipeDirections={["right"]} />
