@@ -275,4 +275,54 @@ class TermSchema extends SeoBase
             'og_image'     => null,
         ];
     }
+
+    /**
+     * Token => current value map for the term meta box preview. Mirrors the
+     * context resolveTermTemplate feeds Variables::resolve (plus the site tokens
+     * it reads from SiteSettings), so the editor can re-resolve templates live.
+     * The editor overlays live values for the name/slug/description fields; the
+     * rest stay at these server values until save.
+     *
+     * @param WP_Term $term
+     *
+     * @return array<string, string>
+     */
+    public function previewContext(WP_Term $term): array
+    {
+        $site = $this->settings->site;
+
+        return [
+            'title'       => $term->name,
+            'slug'        => $term->slug,
+            'id'          => (string) $term->term_id,
+            'description' => $term->description ?: '',
+            'separator'   => $site->getTitleSeparator(),
+            'site_name'   => $site->getName() ?? '',
+            'tagline'     => $site->getTagline() ?? '',
+        ];
+    }
+
+    /**
+     * Full canonical URL as a template, so the preview can rebuild it live from
+     * the editor's slug. Uses the taxonomy's pathname structure when set;
+     * otherwise re-tokenizes the slug in the resolved term link.
+     *
+     * @param WP_Term $term
+     *
+     * @return string
+     */
+    public function canonicalTemplate(WP_Term $term): string
+    {
+        $taxonomy_settings = $this->settings->taxonomies->get($term->taxonomy);
+        $structure         = $taxonomy_settings->getPathnameStructure();
+
+        if ($structure) {
+            return trailingslashit($this->resolveUrl($this->settings->getBaseUrl(), $structure));
+        }
+
+        $resolved = trailingslashit($this->resolveTermUrl($term, $taxonomy_settings));
+        $slug     = $term->slug;
+
+        return $slug !== '' ? str_replace('/' . $slug . '/', '/{{slug}}/', $resolved) : $resolved;
+    }
 }

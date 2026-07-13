@@ -338,6 +338,66 @@ class PostSchema extends SeoBase
     }
 
     /**
+     * Token => current value map for the meta box preview. Mirrors the context
+     * resolvePostTemplate feeds Variables::resolve (plus the site tokens it reads
+     * from SiteSettings), so the editor can re-resolve templates client-side.
+     * The editor overlays live values for the fields an author can edit; the rest
+     * (separator, dates, etc.) stay at these server values until save.
+     *
+     * @param WP_Post $post
+     *
+     * @return array<string, string>
+     */
+    public function previewContext(WP_Post $post): array
+    {
+        $author = get_userdata((int) $post->post_author);
+        $site   = $this->settings->site;
+
+        return [
+            'title'         => get_the_title($post),
+            'slug'          => $post->post_name,
+            'id'            => (string) $post->ID,
+            'date'          => get_the_date('', $post),
+            'modified_date' => get_the_modified_date('', $post),
+            'year'          => get_the_date('Y', $post),
+            'month'         => get_the_date('m', $post),
+            'day'           => get_the_date('d', $post),
+            'author'        => $author->display_name ?? '',
+            'excerpt'       => $post->post_excerpt,
+            'content'       => wp_trim_excerpt('', $post),
+            'category'      => get_the_category($post->ID)[0]->name ?? '',
+            'separator'     => $site->getTitleSeparator(),
+            'site_name'     => $site->getName() ?? '',
+            'tagline'       => $site->getTagline() ?? '',
+        ];
+    }
+
+    /**
+     * Full canonical URL as a template, so the preview can rebuild it live from
+     * the editor's slug (and other path tokens). Uses the post type's pathname
+     * structure when set; otherwise re-tokenizes the slug in the resolved
+     * permalink so a slug edit still previews without a configured structure.
+     *
+     * @param WP_Post $post
+     *
+     * @return string
+     */
+    public function canonicalTemplate(WP_Post $post): string
+    {
+        $post_type_settings = $this->settings->postTypes->get($post->post_type);
+        $structure          = $post_type_settings->getPathnameStructure();
+
+        if ($structure) {
+            return trailingslashit($this->resolveUrl($this->settings->getBaseUrl(), $structure));
+        }
+
+        $resolved = trailingslashit($this->resolvePostUrl($post, $post_type_settings));
+        $slug     = $post->post_name;
+
+        return $slug !== '' ? str_replace('/' . $slug . '/', '/{{slug}}/', $resolved) : $resolved;
+    }
+
+    /**
      * Generate Article JSON-LD piece for a post.
      *
      * @param WP_Post $post

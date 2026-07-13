@@ -33,7 +33,7 @@ class SeoMetaBox
     public function addMetaBox(): void
     {
         foreach (array_keys(Utils::getSettings()->postTypes->all()) as $post_type) {
-            add_meta_box('kizlo-seo', 'SEO', [$this, 'render'], $post_type, 'normal', 'high');
+            add_meta_box('kizlo-seo', 'SEO Settings', [$this, 'render'], $post_type, 'normal', 'high');
         }
     }
 
@@ -60,7 +60,9 @@ class SeoMetaBox
      */
     public function render(WP_Post $post): void
     {
-        $seo = new PostSchema(Utils::getSettings());
+        $settings           = Utils::getSettings();
+        $seo                = new PostSchema($settings);
+        $post_type_settings = $settings->postTypes->get($post->post_type);
 
         wp_nonce_field(self::ACTION, self::NONCE);
 
@@ -70,6 +72,15 @@ class SeoMetaBox
                 'meta'      => $this->getMeta($post),
                 'defaults'  => $seo->seoDefaults($post),
                 'variables' => Variables::forPostType($post->post_type),
+                // Raw templates + baseline token values so the preview can
+                // re-resolve variables live as the editor's fields change,
+                // rather than showing the server-frozen defaults.
+                'templates' => [
+                    'title'       => $post_type_settings->getTitleStructure() ?? Variables::DEFAULT_POST_TITLE_TEMPLATE,
+                    'description' => $post_type_settings->getDescriptionStructure() ?? Variables::DEFAULT_POST_DESC_TEMPLATE,
+                    'canonical'   => $seo->canonicalTemplate($post),
+                ],
+                'context'   => $seo->previewContext($post),
             ]) . ';',
             'before'
         );
