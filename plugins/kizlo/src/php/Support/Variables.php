@@ -19,6 +19,7 @@ class Variables
     const MODIFIED_DATE    = '{{modified_date}}';
     const AUTHOR           = '{{author}}';
     const EXCERPT          = '{{excerpt}}';
+    const CONTENT          = '{{content}}';
     const DESCRIPTION      = '{{description}}';
     const SLUG             = '{{slug}}';
     const ID               = '{{id}}';
@@ -40,7 +41,7 @@ class Variables
     // ====================================================
 
     const DEFAULT_POST_TITLE_TEMPLATE = '{{title}} {{separator}} {{site_name}}';
-    const DEFAULT_POST_DESC_TEMPLATE  = '{{excerpt}} — Published on {{date}} by {{author}}';
+    const DEFAULT_POST_DESC_TEMPLATE  = '{{content}}';
 
     const POST_TYPE_PATH_VARIABLES = [
         self::SLUG,
@@ -74,6 +75,7 @@ class Variables
         self::MODIFIED_DATE,
         self::AUTHOR,
         self::EXCERPT,
+        self::CONTENT,
     ];
 
     private const POST_TYPE_CONTENT_LABELS = [
@@ -85,7 +87,8 @@ class Variables
         self::DATE             => ['label' => 'Date',             'description' => 'The post\'s published date'],
         self::MODIFIED_DATE    => ['label' => 'Modified Date',    'description' => 'The post\'s last modified date'],
         self::AUTHOR           => ['label' => 'Author',           'description' => 'The post author\'s display name'],
-        self::EXCERPT          => ['label' => 'Excerpt',          'description' => 'A short excerpt of the post content'],
+        self::EXCERPT          => ['label' => 'Excerpt',          'description' => 'The manually written excerpt (blank when the post has none)'],
+        self::CONTENT          => ['label' => 'Content',          'description' => 'A short summary trimmed from the post content'],
     ];
 
     // ====================================================
@@ -187,6 +190,7 @@ class Variables
             self::MODIFIED_DATE    => $context['modified_date']            ?? '',
             self::AUTHOR           => $context['author']                  ?? '',
             self::EXCERPT          => $context['excerpt']                 ?? '',
+            self::CONTENT          => $context['content']                 ?? '',
             self::DESCRIPTION      => $context['description']             ?? '',
             self::NAME             => $context['name']                    ?? '',
             self::FIRST_NAME       => $context['first_name']               ?? '',
@@ -238,10 +242,11 @@ class Variables
 
     /**
      * Post type content variables filtered to what the post type can actually
-     * resolve. Excerpt and author are gated on post-type feature support, and
-     * category on the post type being attached to the `category` taxonomy, so
-     * the editor never offers a variable that resolves to nothing (e.g.
-     * {{excerpt}} on pages).
+     * resolve. Excerpt (the manual field) and author are gated on post-type
+     * feature support, content on editor support, and category on the post type
+     * being attached to the `category` taxonomy, so the editor never offers a
+     * variable that resolves to nothing (e.g. {{excerpt}} on pages, which have no
+     * excerpt field — {{content}} covers them instead).
      *
      * @param string $post_type
      *
@@ -253,6 +258,7 @@ class Variables
             self::toJSON('post_type_content'),
             static fn(array $variable): bool => match ($variable['value']) {
                 self::EXCERPT  => post_type_supports($post_type, 'excerpt'),
+                self::CONTENT  => post_type_supports($post_type, 'editor'),
                 self::AUTHOR   => post_type_supports($post_type, 'author'),
                 self::CATEGORY => is_object_in_taxonomy($post_type, 'category'),
                 default        => true,

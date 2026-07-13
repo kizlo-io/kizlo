@@ -38,23 +38,26 @@ class VariablesTest extends TestCase
 
     public function test_for_post_type_keeps_support_backed_variables_for_posts(): void
     {
-        // The built-in `post` supports excerpt + author and is attached to the
-        // `category` taxonomy, so all three content variables are offered.
+        // The built-in `post` supports excerpt + author + editor and is attached
+        // to the `category` taxonomy, so every gated content variable is offered.
         $tokens = $this->tokens(Variables::forPostType('post'));
 
         $this->assertContains(Variables::EXCERPT, $tokens);
+        $this->assertContains(Variables::CONTENT, $tokens);
         $this->assertContains(Variables::AUTHOR, $tokens);
         $this->assertContains(Variables::CATEGORY, $tokens);
     }
 
     public function test_for_post_type_drops_excerpt_and_category_for_pages(): void
     {
-        // The reported bug: a `page` has no excerpt support and no `category`
-        // taxonomy, so those tokens must not be offered. Author support remains.
+        // A `page` has no excerpt field and no `category` taxonomy, so those tokens
+        // must not be offered. Content (editor) and author support remain, so
+        // {{content}} still covers a page's description.
         $tokens = $this->tokens(Variables::forPostType('page'));
 
         $this->assertNotContains(Variables::EXCERPT, $tokens);
         $this->assertNotContains(Variables::CATEGORY, $tokens);
+        $this->assertContains(Variables::CONTENT, $tokens);
         $this->assertContains(Variables::AUTHOR, $tokens);
 
         // Support-independent variables are untouched.
@@ -75,9 +78,30 @@ class VariablesTest extends TestCase
             $this->assertNotContains(Variables::AUTHOR, $tokens);
             $this->assertNotContains(Variables::EXCERPT, $tokens);
             $this->assertNotContains(Variables::CATEGORY, $tokens);
+            // Editor support is present, so content is still offered.
+            $this->assertContains(Variables::CONTENT, $tokens);
             $this->assertContains(Variables::TITLE, $tokens);
         } finally {
             unregister_post_type('kizlo_no_author');
+        }
+    }
+
+    public function test_for_post_type_drops_content_without_editor_support(): void
+    {
+        register_post_type('kizlo_no_editor', [
+            'public'   => true,
+            'supports' => ['title'],
+        ]);
+
+        try {
+            $tokens = $this->tokens(Variables::forPostType('kizlo_no_editor'));
+
+            // No editor means no content to summarise.
+            $this->assertNotContains(Variables::CONTENT, $tokens);
+            $this->assertNotContains(Variables::EXCERPT, $tokens);
+            $this->assertContains(Variables::TITLE, $tokens);
+        } finally {
+            unregister_post_type('kizlo_no_editor');
         }
     }
 }

@@ -65,7 +65,8 @@ class VariableResolutionTest extends SeoTestCase
 
         $post = $this->createPost([
             'post_title'    => 'Hello World',
-            'post_excerpt'  => 'A short summary.',
+            'post_excerpt'  => 'A hand-written excerpt.',
+            'post_content'  => 'The body content of the post.',
             'post_author'   => $author,
             'post_category' => [$category],
         ]);
@@ -81,7 +82,10 @@ class VariableResolutionTest extends SeoTestCase
         // Pin the values that carry real meaning.
         $this->assertSame('Hello World', $resolve(Variables::TITLE));
         $this->assertSame('Ada Lovelace', $resolve(Variables::AUTHOR));
-        $this->assertSame('A short summary.', $resolve(Variables::EXCERPT));
+        // {{excerpt}} is the manual field only; {{content}} is derived from the body.
+        $this->assertSame('A hand-written excerpt.', $resolve(Variables::EXCERPT));
+        $this->assertStringContainsString('body content of the post', $resolve(Variables::CONTENT));
+        $this->assertStringNotContainsString('hand-written excerpt', $resolve(Variables::CONTENT));
         $this->assertSame('Science', $resolve(Variables::CATEGORY));
         $this->assertSame('hello-world', $resolve(Variables::SLUG));
         $this->assertSame('Example Site', $resolve(Variables::SITE_NAME));
@@ -91,7 +95,11 @@ class VariableResolutionTest extends SeoTestCase
 
     public function test_every_page_variable_resolves(): void
     {
-        $page = $this->createPost(['post_type' => 'page', 'post_title' => 'About Us']);
+        $page = $this->createPost([
+            'post_type'    => 'page',
+            'post_title'   => 'About Us',
+            'post_content' => 'Everything about our company.',
+        ]);
 
         $resolve = fn(string $template): string => $this->callProtected($this->seo, 'resolvePostTemplate', [$template, $page]);
 
@@ -103,6 +111,8 @@ class VariableResolutionTest extends SeoTestCase
 
         $this->assertSame('About Us', $resolve(Variables::TITLE));
         $this->assertSame('about-us', $resolve(Variables::SLUG));
+        // A page has no excerpt field, but {{content}} still summarises its body.
+        $this->assertStringContainsString('about our company', $resolve(Variables::CONTENT));
     }
 
     // ====================================================

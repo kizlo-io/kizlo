@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Added a {{content}} variable that inserts a trimmed summary of the post body, available on any post type with an editor. {{excerpt}} now means the manually written excerpt only, and the default post description uses {{content}} so pages and posts without a hand-written excerpt still get a description.
