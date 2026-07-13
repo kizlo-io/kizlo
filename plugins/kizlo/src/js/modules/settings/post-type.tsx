@@ -78,7 +78,7 @@ export function PostTypeSettingsPage() {
 							label={content.seo.title.label}
 							placeholder={settings?.constants.post_type.default_title_format}
 							description={content.seo.title.description}
-							variables={settings?.constants.post_type.content_variables ?? []}
+							variables={postType.content_variables}
 							variant="text"
 						/>
 
@@ -89,7 +89,7 @@ export function PostTypeSettingsPage() {
 							label={content.seo.description_.label}
 							placeholder={settings?.constants.post_type.default_desc_format}
 							description={content.seo.description_.description}
-							variables={settings?.constants.post_type.content_variables ?? []}
+							variables={postType.content_variables}
 						/>
 
 						<PageTypeField control={form.control} name="webpage_type" description={content.seo.pageType.description} />

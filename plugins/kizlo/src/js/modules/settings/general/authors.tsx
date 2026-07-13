@@ -62,9 +62,9 @@ export function AuthorsSettingsPage() {
 					control={form.control}
 					name="title_structure"
 					label={content.seo.title.label}
-					placeholder={settings?.constants.post_type.default_title_format}
+					placeholder={settings?.constants.author.default_title_format}
 					description={content.seo.title.description}
-					variables={settings?.constants.post_type.content_variables ?? []}
+					variables={settings?.constants.author.content_variables ?? []}
 					variant="text"
 				/>
 
@@ -73,9 +73,9 @@ export function AuthorsSettingsPage() {
 					control={form.control}
 					name="description_structure"
 					label={content.seo.description_.label}
-					placeholder={settings?.constants.post_type.default_desc_format}
+					placeholder={settings?.constants.author.default_desc_format}
 					description={content.seo.description_.description}
-					variables={settings?.constants.post_type.content_variables ?? []}
+					variables={settings?.constants.author.content_variables ?? []}
 				/>
 
 				<SwitchField

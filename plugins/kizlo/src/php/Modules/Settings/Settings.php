@@ -199,7 +199,8 @@ class Settings
             'month'         => get_the_date('m', $post),
             'day'           => get_the_date('d', $post),
             'author'        => $author->display_name ?? '',
-            'excerpt'       => get_the_excerpt($post) ?: '',
+            'excerpt'       => $post->post_excerpt,
+            'content'       => wp_trim_excerpt('', $post),
             'category'      => get_the_category($post->ID)[0]->name ?? '',
         ]), $this->site);
     }

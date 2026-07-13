@@ -51,7 +51,7 @@ export function TaxonomySettingsPage() {
 					name="pathname_structure"
 					label={content.url.pathname.label}
 					control={form.control}
-					variables={settings?.constants.post_type.path_variables ?? []}
+					variables={settings?.constants.taxonomy.path_variables ?? []}
 					description={content.url.pathname.description}
 				/>
 			</SettingsSection>
@@ -70,9 +70,9 @@ export function TaxonomySettingsPage() {
 							control={form.control}
 							name="title_structure"
 							label={content.seo.title.label}
-							placeholder={settings?.constants.post_type.default_title_format}
+							placeholder={settings?.constants.taxonomy.default_title_format}
 							description={content.seo.title.description}
-							variables={settings?.constants.post_type.content_variables ?? []}
+							variables={settings?.constants.taxonomy.content_variables ?? []}
 							variant="text"
 						/>
 
@@ -81,9 +81,9 @@ export function TaxonomySettingsPage() {
 							control={form.control}
 							name="description_structure"
 							label={content.seo.description_.label}
-							placeholder={settings?.constants.post_type.default_desc_format}
+							placeholder={settings?.constants.taxonomy.default_desc_format}
 							description={content.seo.description_.description}
-							variables={settings?.constants.post_type.content_variables ?? []}
+							variables={settings?.constants.taxonomy.content_variables ?? []}
 						/>
 
 						<SwitchField

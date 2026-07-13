@@ -97,6 +97,7 @@ export interface PostTypeSettings extends BaseContentSettings {
 	rest_api_enabled: boolean
 	internal: boolean
 	publicly_queryable: boolean
+	content_variables: Variable[]
 	supports: {
 		title: boolean
 		editor: boolean
