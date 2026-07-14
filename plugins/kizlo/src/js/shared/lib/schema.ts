@@ -1,187 +1,39 @@
+import type { Settings as ApiSettings, SettingsConstants } from "@kizlo/shared"
 import z from "zod"
 
 // ====================================================
 // INTERFACE
+//
+// The settings response shape is defined once in @kizlo/shared
+// and re-exported here so the admin UI and the server client
+// stay 1:1. Only the Zod form schemas below are admin-specific.
 // ====================================================
 
-export interface Media {
-	id: number
-	url: string
-}
+export type {
+	AuthorsSettings,
+	BaseContentSettings,
+	BrandSettings,
+	CrawlingSettings,
+	IdentitySettings,
+	Media,
+	OrganizationFounder,
+	OrganizationSettings,
+	PersonSettings,
+	PostStatus,
+	PostTypeSettings,
+	PostTypeSupports,
+	SettingsConstants,
+	SiteSettings,
+	SocialProfile,
+	TaxonomySettings,
+	Variable,
+	WebhookSettings,
+} from "@kizlo/shared"
 
-export interface Variable {
-	value: string
-	label: string
-	description: string
-}
-
-export interface SocialProfile {
-	url: string
-	platform: string
-}
-
-export interface SiteSettings {
-	url: string | null
-	backend_url: string | null
-	secret: string | null
-	name: string | null
-	alternate_name: string | null
-	tagline: string | null
-	title_separator: string
-	fallback_image: Media | null
-	search_action_structure: string | null
-	discourage_search_engines: boolean
-}
-
-export interface PersonSettings {
-	user_id: number | null
-	image: Media | null
-	social_profiles: SocialProfile[]
-}
-
-export interface OrganizationFounder {
-	name: string
-	social_profiles: SocialProfile[]
-}
-
-export interface OrganizationSettings {
-	name: string
-	alternate_name: string | null
-	slogan: string | null
-	description: string | null
-	email: string | null
-	phone: string | null
-	legal_name: string | null
-	founding_date: string | null
-	founder: OrganizationFounder | null
-	employees_min: number | null
-	employees_max: number | null
-	logo: Media | null
-	social_profiles: SocialProfile[]
-	vat_id: string | null
-	tax_id: string | null
-	iso6523_code: string | null
-	duns: string | null
-	lei_code: string | null
-	naics: string | null
-	publishing_principles: string | null
-	ownership_funding_info: string | null
-	actionable_feedback_policy: string | null
-	corrections_policy: string | null
-	ethics_policy: string | null
-	diversity_policy: string | null
-	diversity_staffing_report: string | null
-}
-
-export interface BaseContentSettings {
-	title_structure: string | null
-	description_structure: string | null
-	search_engine_visibility: boolean | null
-	webpage_type: string
-	article_type: string | null
-	// Ordered breadcrumb middle rows: page IDs and/or the reserved "__parent__" token.
-	breadcrumbs: (string | number)[]
-}
-
-export interface AuthorsSettings extends Omit<BaseContentSettings, "webpage_type" | "article_type"> {
-	enabled: boolean
-	pathname_structure: string | null
-}
-
-export interface PostTypeSettings extends BaseContentSettings {
-	name: string
-	slug: string
-	seo_enabled: boolean
-	pathname_structure: string | null
-	comment_action_structure: string | null
-	rest_api_enabled: boolean
-	internal: boolean
-	publicly_queryable: boolean
-	content_variables: Variable[]
-	supports: {
-		title: boolean
-		editor: boolean
-		author: boolean
-		thumbnail: boolean
-		excerpt: boolean
-		trackbacks: boolean
-		"custom-fields": boolean
-		comments: boolean
-		revisions: boolean
-		"page-attributes": false
-		"post-formats": boolean
-	}
-}
-
-export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_type" | "article_type"> {
-	name: string
-	slug: string
-	seo_enabled: boolean
-	pathname_structure: string | null
-	rest_api_enabled: boolean
-	internal: boolean
-	publicly_queryable: boolean
-}
-
-export interface IdentitySettings {
-	type: "person" | "organization"
-	person: PersonSettings | null
-	organization: OrganizationSettings | null
-}
-
-export interface CrawlingSettings {
-	sitemaps: {
-		pathname_structure: string
-	}
-	robots: {
-		include_sitemap: boolean
-		custom_rules: {
-			user_agent: string
-			rule: "allow" | "disallow"
-			path: string
-		}[]
-	}
-}
-
-export interface WebhookSettings {
-	post_types: string[]
-	taxonomies: string[]
-	webhook_urls: string[]
-}
-
-export interface Settings {
-	site: SiteSettings
-	identity: IdentitySettings
-	authors: AuthorsSettings
-	post_types: PostTypeSettings[]
-	taxonomies: TaxonomySettings[]
-	webhook: WebhookSettings
-	crawling: CrawlingSettings
-	post_statuses: { label: string; slug: string; public: boolean }[]
-	constants: {
-		site: {
-			title_separators: string[]
-			default_title_separator: string
-		}
-		taxonomy: {
-			path_variables: Variable[]
-			content_variables: Variable[]
-			default_title_format: string
-			default_desc_format: string
-		}
-		post_type: {
-			path_variables: Variable[]
-			content_variables: Variable[]
-			default_title_format: string
-			default_desc_format: string
-		}
-		author: {
-			path_variables: Variable[]
-			content_variables: Variable[]
-			default_title_format: string
-			default_desc_format: string
-		}
-	}
+// The admin bootstraps window.kizlo with the full API response plus the
+// constants block (variable pickers, title separators) the editor UI needs.
+export interface Settings extends ApiSettings {
+	constants: SettingsConstants
 }
 
 // ====================================================
@@ -253,6 +105,20 @@ export const SiteSettingsSchema = z.object({
 })
 export type SiteSettingsSchemaInput = z.input<typeof SiteSettingsSchema>
 export type SiteSettingsSchemaOutput = z.output<typeof SiteSettingsSchema>
+
+export const BrandSettingsSchema = z.object({
+	logo: z.number().nullable(),
+	logo_dark: z.number().nullable(),
+	logo_icon: z.number().nullable(),
+	logo_icon_dark: z.number().nullable(),
+	logo_wordmark: z.number().nullable(),
+	logo_wordmark_dark: z.number().nullable(),
+	favicon: z.number().nullable(),
+	favicon_dark: z.number().nullable(),
+	apple_touch_icon: z.number().nullable(),
+})
+export type BrandSettingsSchemaInput = z.input<typeof BrandSettingsSchema>
+export type BrandSettingsSchemaOutput = z.output<typeof BrandSettingsSchema>
 
 // A user is required once the site represents a person: the person node, its
 // @id, the publisher, `about`, and the author-merge all key off it. An empty
@@ -401,6 +267,7 @@ export type WebhookSettingsOutput = z.output<typeof WebhookSettingsSchema>
 
 export interface SettingsMap {
 	site: SiteSettingsSchemaOutput
+	brand: BrandSettingsSchemaOutput
 	identity: IdentitySettingsOutput
 	authors: AuthorSettingsOutput
 	post_types: PostTypeSettingsOutput

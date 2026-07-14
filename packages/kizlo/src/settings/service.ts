@@ -2,6 +2,7 @@ import type { Service } from "../service"
 import { WP_KIZLO_BASE } from "../wordpress"
 import type {
 	KizloAuthorsSettingsInput,
+	KizloBrandSettingsInput,
 	KizloCrawlingSettingsInput,
 	KizloIdentitySettingsInput,
 	KizloPostTypeSettingsInput,
@@ -27,6 +28,10 @@ export class KizloSettingsService {
 
 	public async updateSite(input: KizloSiteSettingsInput) {
 		return this.update("/settings/site", input)
+	}
+
+	public async updateBrand(input: KizloBrandSettingsInput) {
+		return this.update("/settings/brand", input)
 	}
 
 	public async updateWebhook(input: KizloWebhookSettingsInput) {

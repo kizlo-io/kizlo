@@ -3,7 +3,6 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { type MediaItem, type MediaType, useMediaLibrary } from "@/shared/hooks/use-media-library"
 import { cn } from "@/shared/lib/utils"
-import { Button } from "./button"
 
 const TYPE_ICON: Record<MediaType, Icon> = {
 	image: ImageIcon,
@@ -19,7 +18,6 @@ const TYPE_LABEL: Record<MediaType, string> = {
 	application: "file",
 }
 
-// Phrasing (with article) used in the "wrong file dropped" message.
 const TYPE_ACCEPT: Record<MediaType, string> = {
 	image: "an image",
 	video: "a video",
@@ -29,15 +27,13 @@ const TYPE_ACCEPT: Record<MediaType, string> = {
 
 export interface MediaInputProps extends React.HTMLAttributes<HTMLElement> {
 	url?: string
-	width?: number
-	height?: number
 	type: MediaType
-	label?: string
+	label: string
 	desc?: React.ReactNode
 	onValueChange?: (item: MediaItem | null) => void
 }
 
-export function MediaPicker({ label, desc, width = 1, height = 1, ...props }: MediaInputProps) {
+export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 	const [item, setItem] = useState<MediaItem | null>(props.url ? { id: 0, url: props.url, title: "", mime: "" } : null)
 	const [isDragging, setDragging] = useState(false)
 	const [isUploading, setUploading] = useState(false)
@@ -46,7 +42,6 @@ export function MediaPicker({ label, desc, width = 1, height = 1, ...props }: Me
 	const TypeIcon = TYPE_ICON[props.type]
 	const typeLabel = TYPE_LABEL[props.type]
 	const hasPreview = props.type === "image" || props.type === "video"
-	const hasDimensions = width > 1 || height > 1
 
 	const setSelected = (selected: MediaItem) => {
 		setItem(selected)
@@ -56,7 +51,13 @@ export function MediaPicker({ label, desc, width = 1, height = 1, ...props }: Me
 	const onSelect = async () => {
 		if (isUploading) return
 
+		// WP's media modal toggles `overflow: hidden` on <body> while open and
+		// resets the window scroll position when it closes, jumping the settings
+		// page to the top. Capture and restore the offset around the modal.
+		const scrollY = window.scrollY
 		const selected = (await media.open())[0]
+		requestAnimationFrame(() => window.scrollTo(0, scrollY))
+
 		if (selected) setSelected(selected)
 	}
 
@@ -108,60 +109,71 @@ export function MediaPicker({ label, desc, width = 1, height = 1, ...props }: Me
 	}
 
 	return (
-		<div className={cn("flex flex-col gap-3", props.className)}>
-			{label ? <span className="font-medium text-neutral-900 text-sm">{label}</span> : null}
+		<div className={cn("", props.className)}>
+			<div className="mb-2 text-[11px] uppercase">{label}</div>
 
 			{hasPreview ? (
-				<button
-					type="button"
-					onClick={onSelect}
-					{...dragProps}
-					style={{ aspectRatio: width / height }}
-					className={cn(
-						"group relative flex w-full max-w-sm cursor-pointer items-center justify-center overflow-clip rounded-lg border border-neutral-300 border-dashed bg-transparent hover:border-primary",
-						{
-							"border-neutral-300 border-solid": item,
-							"p-2": item && props.type === "image",
-							"border-primary border-solid": isDragging,
-						},
-					)}
-				>
-					{isUploading ? <UploadingOverlay /> : null}
+				<div>
+					{!item ? (
+						<div
+							role="button"
+							tabIndex={0}
+							{...dragProps}
+							onClick={onSelect}
+							data-dragging={isDragging}
+							className="group flex w-full cursor-pointer items-center gap-4"
+						>
+							<div
+								className={cn(
+									"relative flex size-16 shrink-0 cursor-pointer flex-col items-center justify-center overflow-clip rounded-lg border border-dashed bg-transparent p-0 text-center group-hover:border-primary group-data-[dragging=true]:border-primary group-data-[dragging=true]:border-solid",
+								)}
+							>
+								{isUploading ? <UploadingOverlay /> : null}
 
-					{item && props.type === "image" ? (
-						<img
-							alt={item.alt ?? ""}
-							src={item.url}
-							className="pointer-events-none h-full w-full rounded-md object-cover object-center transition-all duration-300"
-						/>
-					) : item ? (
-						<div className="flex flex-col items-center gap-3 p-6 text-center">
-							<TypeIcon className="size-9 text-neutral-500" weight="thin" />
-							<p className="w-full break-all text-neutral-900 text-sm">{item.title || `Selected ${typeLabel}`}</p>
+								<TypeIcon className="size-6 text-neutral-400" weight="thin" />
+							</div>
+
+							<div>
+								<div className="mb-1 font-medium group-hover:text-primary">Select or Drag & Drop</div>
+								{desc ? <p className="m-0 text-neutral-500 text-xs leading-relaxed">{desc}</p> : null}
+							</div>
 						</div>
 					) : (
-						<div className="flex flex-col items-center p-6 text-center">
-							<TypeIcon className="size-9 text-neutral-400" weight="thin" />
-							{hasDimensions ? (
-								<p className="text-neutral-500 text-sm leading-relaxed">
-									Recommended size:{" "}
-									<span className="text-neutral-900">
-										{width}x{height}px
-									</span>
-								</p>
+						<div className="w-full overflow-clip rounded-lg border border-neutral-300 bg-neutral-100">
+							{props.type === "image" ? (
+								<div className="h-28 md:h-40">
+									<img
+										alt={item.alt ?? ""}
+										src={item.url}
+										className="pointer-events-none h-full w-full rounded-md object-contain transition-all duration-300"
+									/>
+								</div>
 							) : (
-								<p className="mt-2 text-neutral-500 text-sm capitalize leading-relaxed">Select {TYPE_ACCEPT[props.type]}</p>
+								<div className="flex h-40 flex-col items-center gap-3 p-6 text-center">
+									<TypeIcon className="size-9 text-neutral-500" weight="thin" />
+									<p className="w-full break-all text-neutral-900 text-sm">{item.title || `Selected ${typeLabel}`}</p>
+								</div>
 							)}
+
+							<div className="flex items-center border-neutral-300 border-t [&>button]:flex-1 [&>button]:cursor-pointer [&>button]:border-0 [&>button]:bg-white [&>button]:p-2 [&>button]:text-neutral-700 [&>button]:shadow-none [&>button]:outline-none [&>button]:hover:bg-neutral-200">
+								<button type="button" onClick={onSelect} className="border-neutral-300 border-r!">
+									Change
+								</button>
+
+								<button type="button" onClick={onRemove}>
+									Remove
+								</button>
+							</div>
 						</div>
 					)}
-				</button>
+				</div>
 			) : (
 				<button
 					type="button"
 					onClick={onSelect}
 					{...dragProps}
 					className={cn(
-						"flex h-10 w-full max-w-sm cursor-pointer items-center gap-2 rounded-md border border-neutral-300 border-dashed bg-transparent px-3 text-left hover:border-primary",
+						"flex h-10 w-full cursor-pointer items-center gap-2 rounded-xs border border-neutral-400 bg-transparent px-3 text-left hover:border-primary",
 						isDragging && "border-primary border-solid",
 					)}
 				>
@@ -174,26 +186,14 @@ export function MediaPicker({ label, desc, width = 1, height = 1, ...props }: Me
 						<>
 							<TypeIcon className="size-5 shrink-0 text-neutral-400" weight="thin" />
 							<span className={cn("truncate text-sm", item ? "text-neutral-900" : "text-neutral-500")}>
-								{item ? item.title || `Selected ${typeLabel}` : `Select a ${typeLabel}`}
+								{item ? item.title || `Selected ${typeLabel}` : `Select or Drag & Drop`}
 							</span>
 						</>
 					)}
 				</button>
 			)}
 
-			<div className="flex items-center gap-2">
-				<Button type="button" variant="secondary" size="sm" onClick={onSelect} className="capitalize">
-					{item ? "Replace" : "Select"} {typeLabel}
-				</Button>
-
-				{item ? (
-					<Button type="button" variant="ghost" size="sm" onClick={onRemove}>
-						Remove
-					</Button>
-				) : null}
-			</div>
-
-			{desc ? <p className="text-neutral-500 text-sm leading-relaxed">{desc}</p> : null}
+			{item && desc ? <p className="mt-2 mb-0 text-neutral-500 text-xs leading-relaxed">{desc}</p> : null}
 		</div>
 	)
 }
@@ -207,7 +207,6 @@ function UploadingOverlay() {
 	return (
 		<div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg bg-white/80 text-neutral-500 text-sm">
 			<SpinnerGapIcon className="size-6 animate-spin" />
-			Uploading…
 		</div>
 	)
 }

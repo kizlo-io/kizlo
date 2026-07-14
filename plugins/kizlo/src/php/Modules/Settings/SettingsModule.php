@@ -6,6 +6,7 @@ use WP_REST_Response;
 use Kizlo\Modules\Settings\Site\SiteSettings;
 use Kizlo\Support\Variables;
 use Kizlo\Modules\Settings\Site\SiteSettingsService;
+use Kizlo\Modules\Settings\Brand\BrandSettingsService;
 use Kizlo\Modules\Settings\Authors\AuthorsSettingsService;
 use Kizlo\Modules\Settings\Crawling\CrawlingSettingsService;
 use Kizlo\Modules\Settings\Identity\IdentitySettingsService;
@@ -18,6 +19,7 @@ use Kizlo\Support\Utils;
 class SettingsModule
 {
     private SiteSettingsService $site;
+    private BrandSettingsService $brand;
     private IdentitySettingsService $identity;
     private PostTypeSettingsService $postType;
     private AuthorsSettingsService $authors;
@@ -28,6 +30,7 @@ class SettingsModule
     public function __construct()
     {
         $this->site        = new SiteSettingsService();
+        $this->brand       = new BrandSettingsService();
         $this->identity    = new IdentitySettingsService();
         $this->postType    = new PostTypeSettingsService();
         $this->taxonomy    = new TaxonomySettingsService();
@@ -42,6 +45,7 @@ class SettingsModule
     public function register(): void
     {
         $this->site->register();
+        $this->brand->register();
         $this->identity->register();
         $this->postType->register();
         $this->authors->register();
@@ -78,6 +82,7 @@ class SettingsModule
         return array_merge(
             [
                 'site'             => $this->site->toResponse($settings->site),
+                'brand'            => $this->brand->toResponse($settings->brand),
                 'identity'         => $this->identity->toResponse($settings->identity),
                 'authors'          => $this->authors->toResponse($settings->authors),
                 'post_types'       => $this->postType->toResponse($settings->postTypes),
