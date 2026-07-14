@@ -132,7 +132,7 @@ if (dryRun) {
 }
 
 sh(`git add -A ${filesToAdd.join(" ")}`)
-sh(`git commit -m "release(${plugin}): v${version}"`)
+sh(`git commit --no-verify -m "release(${plugin}): v${version}"`)
 sh(`git tag ${tag}`)
 
 console.log(`\nPushing commit + tag…`)
