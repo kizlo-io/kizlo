@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-The SEO meta box search preview now resolves variables live. On the post editor, editing the title, slug, excerpt, or content updates the preview immediately; on the edit-term screen, the name, slug, and description do the same. The preview URL also tracks the slug live. This works whether a variable is typed into the SEO fields or the fields are left empty and inherit the post-type or taxonomy template. Tokens that aren't editable fields (separator, site name, dates) come from the current record and settings. Supported in both the block and classic editors.

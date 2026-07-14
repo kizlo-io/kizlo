@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Added a Branding settings screen for the site's visual identity: primary logo, icon, wordmark, favicon, and iOS app icon, each with an optional dark variant. These feed the SEO and social previews and are exposed on the settings API so the frontend can render them.

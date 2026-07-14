@@ -4,7 +4,7 @@
  * Plugin Name: Kizlo
  * Plugin URI: https://kizlo.io/plugins/kizlo
  * Description: A plugin that connects your WordPress with Kizlo toolkit, headlessly.
- * Version: 0.3.0
+ * Version: 0.4.0
  * Author: Kizlo Developers
  * Author URI: https://kizlo.io
  * License: GPL v2 or later
@@ -17,7 +17,7 @@
 
 defined('ABSPATH') || exit;
 
-define('KIZLO_VERSION', '0.3.0');
+define('KIZLO_VERSION', '0.4.0');
 define('KIZLO_FILE', __FILE__);
 define('KIZLO_PATH', plugin_dir_path(__FILE__));
 define('KIZLO_URL', plugin_dir_url(__FILE__));

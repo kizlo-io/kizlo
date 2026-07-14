@@ -4,6 +4,15 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-14
+### Added
+- Added a Branding settings screen for the site's visual identity: primary logo, icon, wordmark, favicon, and iOS app icon, each with an optional dark variant. These feed the SEO and social previews and are exposed on the settings API so the frontend can render them.
+- Added a {{content}} variable that inserts a trimmed summary of the post body, available on any post type with an editor. {{excerpt}} now means the manually written excerpt only, and the default post description uses {{content}} so pages and posts without a hand-written excerpt still get a description.
+- The SEO meta box search preview now resolves variables live. On the post editor, editing the title, slug, excerpt, or content updates the preview immediately; on the edit-term screen, the name, slug, and description do the same. The preview URL also tracks the slug live. This works whether a variable is typed into the SEO fields or the fields are left empty and inherit the post-type or taxonomy template. Tokens that aren't editable fields (separator, site name, dates) come from the current record and settings. Supported in both the block and classic editors.
+
+### Fixed
+- SEO variable pickers now only offer variables each context can actually resolve. Pages no longer show {{excerpt}} or {{category}}, and the taxonomy and author settings screens use their own variables instead of the post ones.
+
 ## [0.3.0] - 2026-07-11
 ### Added
 - Return the canonical site origin alongside the entries from the sitemap index endpoint (GET /seo/sitemaps/index), so the frontend builds absolute sitemap URLs from the Kizlo site URL instead of the request host
@@ -35,6 +44,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.4.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.3.0...kizlo-v0.4.0
 [0.3.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.3...kizlo-v0.3.0
 [0.2.3]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.2...kizlo-v0.2.3
 [0.2.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.1...kizlo-v0.2.2

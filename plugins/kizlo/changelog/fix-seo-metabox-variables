@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-SEO variable pickers now only offer variables each context can actually resolve. Pages no longer show {{excerpt}} or {{category}}, and the taxonomy and author settings screens use their own variables instead of the post ones.
