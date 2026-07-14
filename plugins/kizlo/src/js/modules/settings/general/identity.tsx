@@ -109,8 +109,6 @@ export function IdentitySettingsPage() {
 						render={({ field }) => (
 							<MediaPicker
 								type="image"
-								width={400}
-								height={400}
 								label="Profile Photo"
 								desc={
 									<>
@@ -184,8 +182,6 @@ export function IdentitySettingsPage() {
 							render={({ field }) => (
 								<MediaPicker
 									type="image"
-									width={600}
-									height={200}
 									label="Logo"
 									desc={
 										<>

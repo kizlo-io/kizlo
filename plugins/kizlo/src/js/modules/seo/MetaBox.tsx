@@ -308,15 +308,7 @@ function SocialGroup({
 				placeholder={descPlaceholder}
 				variables={variables}
 			/>
-			<MediaPicker
-				type="image"
-				width={1200}
-				height={630}
-				label="Image"
-				url={initialImageUrl ?? undefined}
-				onValueChange={onImageChange}
-				desc={imageDesc}
-			/>
+			<MediaPicker type="image" label="Image" url={initialImageUrl ?? undefined} onValueChange={onImageChange} desc={imageDesc} />
 		</div>
 	)
 }

@@ -1,10 +1,11 @@
 import { useStore } from "@nanostores/react"
 import { BookOpenIcon, CaretRightIcon, DiscordLogoIcon, GithubLogoIcon, type Icon } from "@phosphor-icons/react"
 import { useEffect, useState } from "react"
-import { Outlet, Route, Routes, useLocation } from "react-router-dom"
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom"
 import { Logo } from "@/modules/settings/shared/logo"
 import { NotFound } from "@/modules/settings/shared/not-found"
 import { CommandMenu, CommandTrigger } from "@/shared/components/command-menu"
+import { ScrollToTop } from "@/shared/components/scroll-to-top"
 import { Shell, ShellBody, ShellHeader, ShellMain, ShellSidebar } from "@/shared/components/shell"
 import {
 	SidebarBack,
@@ -20,6 +21,7 @@ import { ComponentGallery } from "@/shared/components/ui/gallery"
 import { useNav } from "@/shared/lib/settings"
 import { $sidebar } from "@/shared/lib/store"
 import { AuthorsSettingsPage } from "./general/authors"
+import { BrandSettingsPage } from "./general/brand"
 import { CrawlingSettingsPage } from "./general/crawling"
 import { IdentitySettingsPage } from "./general/identity"
 import { SiteSettingsPage } from "./general/site"
@@ -37,8 +39,9 @@ export default function App() {
 	return (
 		<Routes>
 			<Route path="/" element={<Layout />}>
-				<Route index element={<SiteSettingsPage />} />
+				<Route index element={<Navigate to="/general/site" replace />} />
 				<Route path="/general/site" element={<SiteSettingsPage />} />
+				<Route path="/general/branding" element={<BrandSettingsPage />} />
 				<Route path="/general/identity" element={<IdentitySettingsPage />} />
 				<Route path="/general/authors" element={<AuthorsSettingsPage />} />
 				<Route path="/general/crawling" element={<CrawlingSettingsPage />} />
@@ -59,6 +62,8 @@ function Layout() {
 
 	return (
 		<Shell>
+			<ScrollToTop />
+
 			<ShellSidebar open={sidebarOpen} onClose={() => $sidebar.set(false)}>
 				<Sidebar />
 			</ShellSidebar>

@@ -49,11 +49,8 @@ export function SidebarPanel({ root, id, active, className, ...props }: SidebarP
 	)
 }
 
-// Reset first: this app ships Tailwind utilities without Preflight, so bare
-// <button>s inherit native/WP-admin chrome (border, background, padding) unless
-// explicitly cleared here.
 const rowClasses =
-	"flex w-full cursor-pointer appearance-none items-center gap-2 rounded-xs border-0 bg-transparent pl-3 pr-1.5 py-1.5 text-left font-medium font-[inherit] text-neutral-600 text-sm no-underline! shadow-none transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:shadow-none focus:outline-none"
+	"flex w-full cursor-pointer appearance-none items-center gap-2 rounded-xs border-0 bg-transparent pl-3 pr-1.5 py-1.5 text-left font-medium font-[inherit] text-neutral-700 text-sm no-underline! shadow-none transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:shadow-none focus:outline-none"
 
 interface SidebarLinkProps extends React.HTMLAttributes<HTMLAnchorElement> {
 	to: string

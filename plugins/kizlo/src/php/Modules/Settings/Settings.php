@@ -7,6 +7,7 @@ use WP_Term;
 use WP_User;
 use Kizlo\Support\Variables;
 use Kizlo\Modules\Settings\Site\SiteSettings;
+use Kizlo\Modules\Settings\Brand\BrandSettings;
 use Kizlo\Modules\Settings\Identity\IdentitySettings;
 use Kizlo\Modules\Settings\Authors\AuthorsSettings;
 use Kizlo\Modules\Settings\Crawling\CrawlingSettings;
@@ -19,6 +20,7 @@ use Kizlo\Modules\Settings\Integration\WebhookSettings;
 class Settings
 {
     public readonly SiteSettings               $site;
+    public readonly BrandSettings              $brand;
     public readonly IdentitySettings           $identity;
     public readonly AuthorsSettings            $authors;
     public readonly PostTypeSettingsCollection $postTypes;
@@ -28,6 +30,7 @@ class Settings
 
     private function __construct(
         SiteSettings               $site,
+        BrandSettings              $brand,
         IdentitySettings           $identity,
         AuthorsSettings            $authors,
         PostTypeSettingsCollection $postTypes,
@@ -36,6 +39,7 @@ class Settings
         WebhookSettings            $webhook,
     ) {
         $this->site       = $site;
+        $this->brand      = $brand;
         $this->identity   = $identity;
         $this->authors    = $authors;
         $this->postTypes  = $postTypes;
@@ -62,6 +66,7 @@ class Settings
         // @phpstan-ignore new.static
         return new static(
             site: SiteSettings::load(),
+            brand: BrandSettings::load(),
             identity: IdentitySettings::load(),
             authors: AuthorsSettings::load(),
             postTypes: new PostTypeSettingsCollection($post_types),
@@ -86,6 +91,7 @@ class Settings
             // @phpstan-ignore new.static
             return new static(
                 site: new SiteSettings($cache['site']),
+                brand: new BrandSettings($cache['brand'] ?? []),
                 identity: new IdentitySettings($cache['identity']),
                 authors: new AuthorsSettings($cache['authors']),
                 postTypes: new PostTypeSettingsCollection($post_types),
@@ -108,6 +114,7 @@ class Settings
     {
         SettingsCache::set([
             'site'       => $this->site->getData(),
+            'brand'      => $this->brand->getData(),
             'identity' => [
                 'type'         => $this->identity->getType(),
                 'person'       => $this->identity->person->getData(),

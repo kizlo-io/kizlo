@@ -9,6 +9,7 @@ import {
 	type Icon,
 	IdentificationBadgeIcon,
 	ImageIcon,
+	PaletteIcon,
 	RobotIcon,
 	TagIcon,
 	UsersIcon,
@@ -60,6 +61,10 @@ export function useSettings() {
 				// TODO: remove any
 				$settings.set({ ...existing, site: { ...existing.site, ...(data as any) } })
 				break
+			case "brand":
+				// TODO: remove any
+				$settings.set({ ...existing, brand: { ...existing.brand, ...(data as any) } })
+				break
 			case "identity":
 				$settings.set({ ...existing, identity: { ...existing.identity, ...(data as any) } })
 				break
@@ -94,6 +99,7 @@ export function useNav(): NavSection[] {
 				items: [
 					{ type: "link", name: "Site", path: "/general/site", icon: GlobeIcon },
 					{ type: "link", name: "Identity", path: "/general/identity", icon: IdentificationBadgeIcon },
+					{ type: "link", name: "Branding", path: "/general/branding", icon: PaletteIcon },
 					{ type: "link", name: "Authors", path: "/general/authors", icon: UsersIcon },
 					{ type: "link", name: "Crawling", path: "/general/crawling", icon: RobotIcon },
 				],

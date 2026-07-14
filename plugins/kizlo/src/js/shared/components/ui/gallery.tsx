@@ -243,21 +243,13 @@ export function ComponentGallery() {
 			>
 				<MediaPicker
 					type="image"
-					width={1200}
-					height={675}
 					label="Site image"
 					desc="This image is used as a fallback for posts/pages that don't have any images set."
 				/>
 
 				<MediaPicker type="application" label="Downloadable file" desc="Attach a PDF or document for visitors to download." />
 
-				<MediaPicker
-					type="video"
-					width={1920}
-					height={1080}
-					label="Downloadable file"
-					desc="Attach a PDF or document for visitors to download."
-				/>
+				<MediaPicker type="video" label="Downloadable file" desc="Attach a PDF or document for visitors to download." />
 			</SettingsSection>
 
 			<SettingsSection title="Tabs" desc="Horizontal navigation that swaps the panel below on selection.">

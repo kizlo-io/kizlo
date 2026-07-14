@@ -108,8 +108,6 @@ export function SiteSettingsPage() {
 						<div>
 							<MediaPicker
 								type="image"
-								height={630}
-								width={1200}
 								label="Default Social Image"
 								desc={
 									<>
