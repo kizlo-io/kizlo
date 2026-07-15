@@ -115,7 +115,8 @@ export function SiteSettingsPage() {
 										<strong>1200 × 630 px</strong>.
 									</>
 								}
-								url={settings?.site.fallback_image?.url}
+								url={settings?.site.fallback_image?.src}
+								value={typeof field.value === "number" ? field.value : null}
 								onValueChange={(item) => field.onChange(item?.id ?? null)}
 							/>
 							<FieldError message={fieldState.error?.message} />

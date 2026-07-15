@@ -54,6 +54,26 @@ export const NumberLike = z.union([z.string(), z.number()]).pipe(z.coerce.number
 export const BooleanLike = z.union([z.boolean(), z.stringbool()])
 
 // ====================================================
+// MEDIA
+// ====================================================
+
+// A resolved media attachment. `mime` is only populated by sources that carry
+// it (e.g. the settings response); content sources omit it, so it is optional.
+export const Media = z.object({
+	id: z.number(),
+	name: z.string(),
+	alt: z.string(),
+	src: z.string(),
+	mime: z.string().optional(),
+	width: z.number().optional(),
+	height: z.number().optional(),
+	// WordPress-generated resized renditions of a raster source, so consumers can
+	// pick a real size (e.g. 192/512 for manifest icons) instead of scaling one.
+	variants: z.array(z.object({ src: z.string(), width: z.number(), height: z.number() })).optional(),
+})
+export type Media = z.infer<typeof Media>
+
+// ====================================================
 // COOKIE
 // ====================================================
 

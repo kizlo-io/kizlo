@@ -27,13 +27,7 @@ export const CurrencyFormat = z.object({
 })
 export type CurrencyFormat = z.infer<typeof CurrencyFormat>
 
-export const Media = z.object({
-	id: z.number(),
-	name: z.string(),
-	alt: z.string(),
-	src: z.string(),
-})
-export type Media = z.infer<typeof Media>
+export { Media } from "@kizlo/shared"
 
 export const IdentifierInput = z.union([NumberLike, z.string()])
 export type IdentifierInput = z.output<typeof IdentifierInput>

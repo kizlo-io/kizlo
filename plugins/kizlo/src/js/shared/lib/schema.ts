@@ -19,7 +19,7 @@ export type {
 	OrganizationFounder,
 	OrganizationSettings,
 	PersonSettings,
-	PostStatus,
+	PostStatusDefinition,
 	PostTypeSettings,
 	PostTypeSupports,
 	SettingsConstants,
@@ -106,6 +106,14 @@ export const SiteSettingsSchema = z.object({
 export type SiteSettingsSchemaInput = z.input<typeof SiteSettingsSchema>
 export type SiteSettingsSchemaOutput = z.output<typeof SiteSettingsSchema>
 
+// 3- or 6-digit hex color, `#` prefixed. The picker only emits this shape;
+// validating here surfaces a bad manual value in the UI instead of silently
+// dropping it to null on save (PHP's sanitize_hex_color rejects it).
+const HexColor = z
+	.string()
+	.regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Enter a valid hex color, e.g. #1a2b3c.")
+	.nullable()
+
 export const BrandSettingsSchema = z.object({
 	logo: z.number().nullable(),
 	logo_dark: z.number().nullable(),
@@ -115,7 +123,11 @@ export const BrandSettingsSchema = z.object({
 	logo_wordmark_dark: z.number().nullable(),
 	favicon: z.number().nullable(),
 	favicon_dark: z.number().nullable(),
-	apple_touch_icon: z.number().nullable(),
+	ios_app_icon: z.number().nullable(),
+	android_app_icon: z.number().nullable(),
+	theme_color: HexColor,
+	theme_color_dark: HexColor,
+	background_color: HexColor,
 })
 export type BrandSettingsSchemaInput = z.input<typeof BrandSettingsSchema>
 export type BrandSettingsSchemaOutput = z.output<typeof BrandSettingsSchema>

@@ -1,76 +1,52 @@
-// ====================================================
-// READ — GET /kizlo/v1/settings
-//
-// The response shape is defined once in @kizlo/shared and
-// re-exported here under the server client's Kizlo* names so the
-// plugin admin and this client can never drift apart. Do not
-// redeclare these shapes locally.
-// ====================================================
-
 import type {
 	AuthorsSettings,
 	BrandSettings,
 	CrawlingSettings,
 	IdentitySettings,
-	Media,
-	OrganizationFounder,
 	OrganizationSettings,
 	PersonSettings,
-	PostStatus,
 	PostTypeSettings,
-	Settings,
 	SiteSettings,
-	SocialProfile,
 	TaxonomySettings,
 	WebhookSettings,
 } from "@kizlo/shared"
 
+export type { OrganizationFounder, PostStatusDefinition, Settings, SocialProfile } from "@kizlo/shared"
+
 export type {
-	AuthorsSettings as KizloAuthorsSettings,
-	BrandSettings as KizloBrandSettings,
-	CrawlingSettings as KizloCrawlingSettings,
-	IdentitySettings as KizloIdentitySettings,
-	Media as KizloMedia,
-	OrganizationFounder as KizloOrganizationFounder,
-	OrganizationSettings as KizloOrganizationSettings,
-	PersonSettings as KizloPersonSettings,
-	PostStatus as KizloPostStatus,
-	PostTypeSettings as KizloPostTypeSettings,
-	Settings as KizloSettings,
-	SiteSettings as KizloSiteSettings,
-	SocialProfile as KizloSocialProfile,
-	TaxonomySettings as KizloTaxonomySettings,
-	WebhookSettings as KizloWebhookSettings,
+	AuthorsSettings,
+	BrandSettings,
+	CrawlingSettings,
+	IdentitySettings,
+	OrganizationSettings,
+	PersonSettings,
+	PostTypeSettings,
+	SiteSettings,
+	TaxonomySettings,
+	WebhookSettings,
 }
 
-// ====================================================
-// WRITE — PUT /kizlo/v1/settings/<section>
-//
-// Every field is optional; only the keys you send are changed. Media fields
-// take an attachment id (number) rather than the resolved media object.
-// ====================================================
+export type SiteSettingsInput = Partial<Omit<SiteSettings, "fallback_image"> & { fallback_image: number | null }>
 
-export type KizloSiteSettingsInput = Partial<Omit<SiteSettings, "fallback_image"> & { fallback_image: number | null }>
+export type BrandSettingsInput = Partial<Record<keyof BrandSettings, number | null>>
 
-export type KizloBrandSettingsInput = Partial<Record<keyof BrandSettings, number | null>>
+export type WebhookSettingsInput = Partial<WebhookSettings>
 
-export type KizloWebhookSettingsInput = Partial<WebhookSettings>
+export type PersonSettingsInput = Partial<Omit<PersonSettings, "image"> & { image: number | null }>
 
-export type KizloPersonSettingsInput = Partial<Omit<PersonSettings, "image"> & { image: number | null }>
+export type OrganizationSettingsInput = Partial<Omit<OrganizationSettings, "logo"> & { logo: number | null }>
 
-export type KizloOrganizationSettingsInput = Partial<Omit<OrganizationSettings, "logo"> & { logo: number | null }>
-
-export type KizloIdentitySettingsInput = Partial<{
+export type IdentitySettingsInput = Partial<{
 	type: IdentitySettings["type"]
-	person: KizloPersonSettingsInput | null
-	organization: KizloOrganizationSettingsInput | null
+	person: PersonSettingsInput | null
+	organization: OrganizationSettingsInput | null
 }>
 
-export type KizloAuthorsSettingsInput = Partial<AuthorsSettings>
+export type AuthorsSettingsInput = Partial<AuthorsSettings>
 
-export type KizloCrawlingSettingsInput = Partial<CrawlingSettings>
+export type CrawlingSettingsInput = Partial<CrawlingSettings>
 
-export type KizloPostTypeSettingsInput = Partial<
+export type PostTypeSettingsInput = Partial<
 	Pick<
 		PostTypeSettings,
 		| "title_structure"
@@ -87,7 +63,7 @@ export type KizloPostTypeSettingsInput = Partial<
 	>
 >
 
-export type KizloTaxonomySettingsInput = Partial<
+export type TaxonomySettingsInput = Partial<
 	Pick<
 		TaxonomySettings,
 		| "title_structure"

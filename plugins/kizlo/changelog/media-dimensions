@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Media assets returned by the settings API now include pixel dimensions (width and height) for raster sources, so the frontend can declare each brand icon at its true size.
