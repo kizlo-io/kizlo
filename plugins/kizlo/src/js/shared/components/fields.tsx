@@ -1,4 +1,5 @@
 import { type Control, Controller, type FieldPath, type FieldValues } from "react-hook-form"
+import { ColorInput } from "./ui/color"
 import { NumberInput, TextareaInput, TextInput } from "./ui/input"
 import { Combobox, MultiSelect, Select, type SelectOption } from "./ui/select"
 import { Toggle } from "./ui/toggle"
@@ -252,6 +253,43 @@ export function SwitchField<TFieldValues extends FieldValues = FieldValues, TCon
 			render={({ field, fieldState }) => (
 				<div>
 					<Toggle name={name} label={label} desc={description} checked={field.value ?? false} onChange={field.onChange} />
+					<FieldError message={fieldState.error?.message} />
+				</div>
+			)}
+		/>
+	)
+}
+
+// ====================================================
+// COLOR
+// ====================================================
+
+interface ColorFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
+	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
+	placeholder?: string
+}
+
+export function ColorField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
+	control,
+	name,
+	label,
+	description,
+	placeholder,
+}: ColorFieldProps<TFieldValues, TContext, TTransformedValues>) {
+	return (
+		<Controller
+			name={name}
+			control={control}
+			render={({ field, fieldState }) => (
+				<div>
+					<ColorInput
+						name={name}
+						label={label}
+						desc={description}
+						placeholder={placeholder}
+						value={field.value ?? ""}
+						onChange={(value) => field.onChange(value || null)}
+					/>
 					<FieldError message={fieldState.error?.message} />
 				</div>
 			)}

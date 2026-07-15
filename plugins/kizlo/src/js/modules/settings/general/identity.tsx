@@ -116,7 +116,7 @@ export function IdentitySettingsPage() {
 										<strong>400 × 400 px</strong>.
 									</>
 								}
-								url={settings?.identity.person?.image?.url}
+								url={settings?.identity.person?.image?.src}
 								onValueChange={(item) => field.onChange(item?.id ?? null)}
 							/>
 						)}
@@ -189,7 +189,7 @@ export function IdentitySettingsPage() {
 											and 1920px wide.
 										</>
 									}
-									url={settings?.identity.organization?.logo?.url}
+									url={settings?.identity.organization?.logo?.src}
 									onValueChange={(item) => field.onChange(item?.id ?? null)}
 								/>
 							)}

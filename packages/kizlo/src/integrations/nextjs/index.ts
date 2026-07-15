@@ -1,2 +1,2 @@
 export * from "./kizlo.client"
-export { toMetadata } from "./seo"
+export { createPageMetadata } from "./metadata"

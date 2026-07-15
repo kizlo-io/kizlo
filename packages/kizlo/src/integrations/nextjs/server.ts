@@ -1,3 +1,5 @@
 export * from "./kizlo.server"
+export { createManifestRoute, MANIFEST_CACHE_TAG, WEB_MANIFEST_ROUTE } from "./manifest"
+export { createRootMetadata, createRootViewport } from "./metadata"
 export { createRobotsRoute } from "./robots"
 export * from "./sitemap"

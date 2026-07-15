@@ -82,4 +82,21 @@ abstract class SettingsAbstract extends DataAbstract
             throw new InvalidArgumentException("{$key} must be a valid URL.");
         }
     }
+
+    /**
+     * Assert that a value is either a valid hex color (3/6 digit, `#` prefixed)
+     * or empty.
+     *
+     * @param  string $key   Field name used in the exception message.
+     * @param  mixed  $value
+     * @throws InvalidArgumentException
+     */
+    protected function assertValidHexColor(string $key, mixed $value): void
+    {
+        if (empty($value)) return;
+
+        if (!is_string($value) || sanitize_hex_color($value) === null) {
+            throw new InvalidArgumentException("{$key} must be a valid hex color.");
+        }
+    }
 }

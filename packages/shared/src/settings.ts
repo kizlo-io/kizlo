@@ -8,10 +8,7 @@
 // and each section's getData() defaults 1:1 — keep them in sync.
 // ====================================================
 
-export interface Media {
-	id: number
-	url: string
-}
+import type { Media } from "./schema"
 
 export interface Variable {
 	value: string
@@ -46,7 +43,11 @@ export interface BrandSettings {
 	logo_wordmark_dark: Media | null
 	favicon: Media | null
 	favicon_dark: Media | null
-	apple_touch_icon: Media | null
+	ios_app_icon: Media | null
+	android_app_icon: Media | null
+	theme_color: string | null
+	theme_color_dark: string | null
+	background_color: string | null
 }
 
 export interface PersonSettings {
@@ -169,7 +170,7 @@ export interface WebhookSettings {
 	webhook_urls: string[]
 }
 
-export interface PostStatus {
+export interface PostStatusDefinition {
 	label: string
 	slug: string
 	public: boolean
@@ -187,7 +188,7 @@ export interface Settings {
 	taxonomies: TaxonomySettings[]
 	crawling: CrawlingSettings
 	webhook: WebhookSettings
-	statuses: PostStatus[]
+	statuses: PostStatusDefinition[]
 	plain_permalinks: boolean
 }
 

@@ -13,6 +13,7 @@ export const nextjs: Preset = {
 		const apiDir = `${ctx.appDir}/api/kizlo/[[...rest]]`
 		const robotsDir = `${ctx.appDir}/robots.txt`
 		const sitemapDir = `${ctx.appDir}/sitemaps/[sitemap]`
+		const manifestDir = `${ctx.appDir}/site.webmanifest`
 		return [
 			{
 				label: "Kizlo server instance",
@@ -83,6 +84,24 @@ export const runtime = "edge"
 export const dynamic = "force-dynamic"
 
 export const GET = createSitemapRoute(client)
+`,
+			},
+			{
+				label: "web manifest route",
+				relPath: `${manifestDir}/route.ts`,
+				contents: `import { createManifestRoute } from "kizlo/nextjs/server"
+import { client } from "${ctx.serverImport(manifestDir)}"
+
+// Run on the edge: cheaper and faster than Node for a response this small.
+export const runtime = "edge"
+
+// Like robots.txt, Vercel bakes this route into an immutable Edge CDN asset at build time,
+// bypassing ISR and on-demand revalidatePath. force-dynamic opts out of that static treatment
+// so brand-settings edits show up; createManifestRoute caches the WordPress call, so requests
+// stay cheap.
+export const dynamic = "force-dynamic"
+
+export const GET = createManifestRoute(client)
 `,
 			},
 		]

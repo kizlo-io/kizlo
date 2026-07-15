@@ -27,7 +27,11 @@ class BrandSettings extends SettingsAbstract
         'logo_wordmark_dark' => null,
         'favicon'            => null,
         'favicon_dark'       => null,
-        'apple_touch_icon'   => null,
+        'ios_app_icon'       => null,
+        'android_app_icon'   => null,
+        'theme_color'            => null,
+        'theme_color_dark'       => null,
+        'background_color'       => null,
     ];
 
     protected function sanitize(string $key, mixed $value): mixed
@@ -41,7 +45,12 @@ class BrandSettings extends SettingsAbstract
             'logo_wordmark_dark',
             'favicon',
             'favicon_dark',
-            'apple_touch_icon'   => !empty($value) ? absint($value) : null,
+            'ios_app_icon',
+            'android_app_icon'   => !empty($value) ? absint($value) : null,
+
+            'theme_color',
+            'theme_color_dark',
+            'background_color'   => !empty($value) ? sanitize_hex_color($value) : null,
 
             default              => $value,
         };
@@ -58,7 +67,12 @@ class BrandSettings extends SettingsAbstract
             'logo_wordmark_dark',
             'favicon',
             'favicon_dark',
-            'apple_touch_icon'   => $this->assertValidMediaId($key, $value),
+            'ios_app_icon',
+            'android_app_icon'   => $this->assertValidMediaId($key, $value),
+
+            'theme_color',
+            'theme_color_dark',
+            'background_color'   => $this->assertValidHexColor($key, $value),
             default              => null,
         };
     }
@@ -188,17 +202,82 @@ class BrandSettings extends SettingsAbstract
     }
 
     /**
-     * WordPress media attachment ID for the iOS home-screen (Apple touch) icon.
+     * WordPress media attachment ID for the iOS home-screen icon
+     * (`apple-touch-icon`). Full-bleed, opaque; iOS masks the corners itself.
      */
-    public function getAppleTouchIcon(): ?int
+    public function getIosAppIcon(): ?int
     {
-        return $this->get('apple_touch_icon');
+        return $this->get('ios_app_icon');
     }
 
     /** @param int|null $value Attachment ID or null to clear. */
-    public function setAppleTouchIcon(?int $value): static
+    public function setIosAppIcon(?int $value): static
     {
-        $this->set('apple_touch_icon', $value);
+        $this->set('ios_app_icon', $value);
+        return $this;
+    }
+
+    /**
+     * WordPress media attachment ID for the Android/PWA maskable icon. Needs a
+     * padded safe zone so the launcher can crop it to any adaptive shape.
+     */
+    public function getAndroidAppIcon(): ?int
+    {
+        return $this->get('android_app_icon');
+    }
+
+    /** @param int|null $value Attachment ID or null to clear. */
+    public function setAndroidAppIcon(?int $value): static
+    {
+        $this->set('android_app_icon', $value);
+        return $this;
+    }
+
+    /**
+     * Brand theme color (hex), light scheme. Feeds the web-manifest `theme_color`
+     * and the light `<meta name="theme-color">`.
+     */
+    public function getThemeColor(): ?string
+    {
+        return $this->get('theme_color');
+    }
+
+    /** @param string|null $value Hex color or null to clear. */
+    public function setThemeColor(?string $value): static
+    {
+        $this->set('theme_color', $value);
+        return $this;
+    }
+
+    /**
+     * Brand theme color (hex), dark scheme. Feeds the dark-scheme
+     * `<meta name="theme-color">` variant.
+     */
+    public function getThemeColorDark(): ?string
+    {
+        return $this->get('theme_color_dark');
+    }
+
+    /** @param string|null $value Hex color or null to clear. */
+    public function setThemeColorDark(?string $value): static
+    {
+        $this->set('theme_color_dark', $value);
+        return $this;
+    }
+
+    /**
+     * Brand background color (hex), light scheme. Feeds the web-manifest
+     * `background_color` (the install/splash surface).
+     */
+    public function getBackgroundColor(): ?string
+    {
+        return $this->get('background_color');
+    }
+
+    /** @param string|null $value Hex color or null to clear. */
+    public function setBackgroundColor(?string $value): static
+    {
+        $this->set('background_color', $value);
         return $this;
     }
 }

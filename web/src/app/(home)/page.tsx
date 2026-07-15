@@ -1,4 +1,4 @@
-import { toMetadata } from "kizlo/nextjs"
+import { createPageMetadata } from "kizlo/nextjs"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { cache } from "react"
@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 	if (error) return createMetadata({ alternates: { canonical: "/" } })
 
-	return toMetadata(data.head)
+	return createPageMetadata(data.head)
 }
 
 export default async function HomePage() {

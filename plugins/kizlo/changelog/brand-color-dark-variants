@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Brand gains a dark-scheme theme color. The color inputs validate hex format in the admin, and the dark theme color drives a prefers-color-scheme dark meta theme-color on the frontend.

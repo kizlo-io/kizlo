@@ -221,18 +221,49 @@ function kizlo_apply_extend_filter(string $name, $arg = []): array
 }
 
 /**
- * Resolve a WordPress media attachment ID to its id and URL.
+ * Resolve a WordPress media attachment ID to the shared Media shape.
  * Used when returning media data in API responses.
  *
  * @param  int $id Attachment ID.
- * @return array{id: int, url: string}
+ * @return array{id: int, name: string, alt: string, src: string, mime: string, width?: int, height?: int, variants?: array<int, array{src: string, width: int, height: int}>}
  */
 function kizlo_ensure_media_data(int $id): array
 {
-    return [
-        'id'  => $id,
-        'url' => wp_get_attachment_url($id),
+    $data = [
+        'id'   => $id,
+        'name' => get_the_title($id),
+        'alt'  => get_post_meta($id, '_wp_attachment_image_alt', true) ?: '',
+        'src'  => wp_get_attachment_url($id),
+        'mime' => get_post_mime_type($id) ?: '',
     ];
+
+    // Raster attachments carry pixel dimensions; SVGs and other scalable
+    // sources do not, so these stay absent rather than null.
+    $metadata = wp_get_attachment_metadata($id);
+    if (!empty($metadata['width']) && !empty($metadata['height'])) {
+        $data['width']  = (int) $metadata['width'];
+        $data['height'] = (int) $metadata['height'];
+    }
+
+    // WordPress auto-generates resized copies of every raster upload. Expose them
+    // so consumers (e.g. the web-manifest icon set) can pick a real 192/512-ish
+    // source instead of guessing. Scalable sources have no generated sizes.
+    if (!empty($metadata['sizes'])) {
+        $variants = [];
+        foreach (array_keys($metadata['sizes']) as $size) {
+            $rendition = wp_get_attachment_image_src($id, $size);
+            if (is_array($rendition)) {
+                $variants[] = [
+                    'src'    => $rendition[0],
+                    'width'  => (int) $rendition[1],
+                    'height' => (int) $rendition[2],
+                ];
+            }
+        }
+        if ($variants) $data['variants'] = $variants;
+    }
+
+    return $data;
 }
 
 /**

@@ -1,29 +1,14 @@
 import "./global.css"
 import { RootProvider } from "fumadocs-ui/provider/next"
-import type { Metadata } from "next"
+import { createRootMetadata, createRootViewport } from "kizlo/nextjs/server"
 import { Geist } from "next/font/google"
-import { createMetadata } from "@/lib/metadata"
-import { appName, siteUrl } from "@/lib/shared"
+import { client } from "@/lib/kizlo/server"
 import { cn } from "@/lib/utils"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
-export const metadata: Metadata = {
-	...createMetadata(),
-	metadataBase: new URL(siteUrl),
-	title: {
-		default: `${appName} — The toolkit for headless WordPress`,
-		template: `%s | ${appName}`,
-	},
-	applicationName: appName,
-	keywords: ["headless WordPress", "WordPress toolkit", "WordPress REST API", "WooCommerce", "TypeScript", "Next.js"],
-	icons: {
-		icon: [
-			{ url: "/favicon-light.ico", media: "(prefers-color-scheme: light)" },
-			{ url: "/favicon-dark.ico", media: "(prefers-color-scheme: dark)" },
-		],
-	},
-}
+export const generateMetadata = createRootMetadata(client)
+export const generateViewport = createRootViewport(client)
 
 export default function Layout({ children }: LayoutProps<"/">) {
 	return (
