@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Media in settings responses now includes WordPress's generated resized renditions (variants), so the frontend can select real icon sizes (e.g. 192/512 for the web manifest) instead of scaling one source.

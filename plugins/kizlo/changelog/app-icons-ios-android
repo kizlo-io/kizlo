@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Split the single App icon brand setting into separate iOS and Android app icons. The iOS icon feeds the full-bleed apple-touch-icon; the Android icon feeds a maskable web-manifest entry with a padded safe zone. Existing square icon and favicon are still used as fallbacks.

@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Added theme color and background color settings to Brand. They drive the web app manifest's theme_color and background_color used on the install and splash surfaces.

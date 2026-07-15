@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Media assets returned by the settings API now include the file's mime type, so the frontend can render each brand asset (logos, favicons, icons) by its actual format.
