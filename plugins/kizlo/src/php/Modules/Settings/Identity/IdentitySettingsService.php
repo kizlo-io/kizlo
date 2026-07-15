@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Settings\Identity;
 
+use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -40,6 +41,8 @@ class IdentitySettingsService
                 if ($identity->isOrganization() && isset($data['organization'])) {
                     OrganizationSettings::load()->setData($data['organization'])->save();
                 }
+
+                Webhook::sendEvent(Webhook::SETTINGS_IDENTITY_UPDATED_EVENT);
 
                 return new WP_REST_Response(null, 204);
             },

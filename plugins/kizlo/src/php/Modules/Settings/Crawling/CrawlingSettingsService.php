@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Settings\Crawling;
 
+use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -29,6 +30,8 @@ class CrawlingSettingsService
                 $crawling = CrawlingSettings::load();
                 $crawling->robots->setData($data['robots'])->save();
                 $crawling->sitemaps->setData($data['sitemaps'])->save();
+
+                Webhook::sendEvent(Webhook::SETTINGS_CRAWLING_UPDATED_EVENT);
 
                 return new WP_REST_Response(null, 204);
             },

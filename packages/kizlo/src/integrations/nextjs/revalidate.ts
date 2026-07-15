@@ -42,10 +42,14 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
 					const revalidateTag = options?.revalidateTag ?? (await import("next/cache")).revalidateTag
 
-					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : []), "/post"]
+					const eventUrl = event.data && "url" in event.data ? event.data.url : undefined
+					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(eventUrl ? [eventUrl] : []), "/post"]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
 
-					if (event.type === "settings.saved") revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
+					// robots.txt is built from crawling (rules, sitemap) and site (discourage search engines, base URL) settings.
+					if (event.type === "settings.crawling.updated" || event.type === "settings.site.updated") {
+						revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
+					}
 
 					if (CONTENT_EVENT_TYPES.has(event.type)) {
 						revalidateTag(SITEMAP_CACHE_TAG, { expire: 0 })

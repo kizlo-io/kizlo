@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Settings\Authors;
 
+use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -27,6 +28,8 @@ class AuthorsSettingsService
                 $settings = AuthorsSettings::load();
                 $settings->setData($request->get_json_params());
                 $settings->save();
+
+                Webhook::sendEvent(Webhook::SETTINGS_AUTHORS_UPDATED_EVENT);
 
                 return new WP_REST_Response(null, 204);
             },

@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Settings\Taxonomy;
 
+use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -28,6 +29,8 @@ class TaxonomySettingsService
                 $settings = TaxonomySettings::load($slug);
                 $settings->setData($request->get_json_params());
                 $settings->save($slug);
+
+                Webhook::sendEvent(Webhook::SETTINGS_TAXONOMY_UPDATED_EVENT, ['key' => $slug]);
 
                 return new WP_REST_Response(null, 204);
             },

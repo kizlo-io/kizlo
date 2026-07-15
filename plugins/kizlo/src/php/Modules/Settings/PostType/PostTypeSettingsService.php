@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Settings\PostType;
 
+use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\Support\Variables;
@@ -29,6 +30,8 @@ class PostTypeSettingsService
                 $settings = PostTypeSettings::load($slug);
                 $settings->setData($request->get_json_params());
                 $settings->save($slug);
+
+                Webhook::sendEvent(Webhook::SETTINGS_POST_TYPE_UPDATED_EVENT, ['key' => $slug]);
 
                 return new WP_REST_Response(null, 204);
             },
