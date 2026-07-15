@@ -55,17 +55,17 @@ export interface ResolvedIcons {
 	manifestIcons: ManifestIcon[]
 }
 
-function isRaster(media: Media | null): media is Media {
-	return media !== null && media.mime !== undefined && RASTER_MIMES.has(media.mime)
+function isRaster(media: Media | null | undefined): media is Media {
+	return media != null && media.mime !== undefined && RASTER_MIMES.has(media.mime)
 }
 
 /** Return the media only when it is a raster the target can render; otherwise null. */
-function raster(media: Media | null): Media | null {
+function raster(media: Media | null | undefined): Media | null {
 	return isRaster(media) ? media : null
 }
 
 /** Return the media only when a web manifest can render it (raster or SVG). */
-function manifestSource(media: Media | null): Media | null {
+function manifestSource(media: Media | null | undefined): Media | null {
 	return media?.mime && MANIFEST_MIMES.has(media.mime) ? media : null
 }
 

@@ -32,6 +32,14 @@ describe("resolveIcons", () => {
 		expect(resolveIcons(EMPTY)).toEqual({ icon: [], appleTouch: [], manifestIcons: [] })
 	})
 
+	test("tolerates absent slots delivered as undefined rather than null", () => {
+		// The response type claims `Media | null`, but a slot missing from the JSON
+		// arrives as `undefined`; the raster/manifest guards must not read `.mime` off it.
+		const sparse = { ...EMPTY, ios_app_icon: undefined, favicon: undefined } as unknown as BrandSettings
+		expect(() => resolveIcons(sparse)).not.toThrow()
+		expect(resolveIcons(sparse)).toEqual({ icon: [], appleTouch: [], manifestIcons: [] })
+	})
+
 	test("carries the real mime as `type` and tags scalable sources with sizes=any", () => {
 		const { icon } = resolveIcons(brand({ favicon: media("image/svg+xml") }))
 		expect(icon[0]).toMatchObject({ type: "image/svg+xml", sizes: "any" })
