@@ -1,5 +1,12 @@
 # @kizlo/cf7
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`0bea4c6`](https://github.com/kizlo-io/kizlo/commit/0bea4c68b3a912b90394fdbb4df5b185c32cc001)]:
+  - @kizlo/shared@0.3.0
+
 ## 0.1.3
 
 ### Patch Changes
