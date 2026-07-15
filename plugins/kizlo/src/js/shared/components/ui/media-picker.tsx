@@ -27,6 +27,13 @@ const TYPE_ACCEPT: Record<MediaType, string> = {
 
 export interface MediaInputProps extends React.HTMLAttributes<HTMLElement> {
 	url?: string
+	/**
+	 * The currently committed media id when the picker is driven by a form field.
+	 * Passing it makes the preview follow the form value, so a reset (Cancel)
+	 * restores the saved media even after the user removed it. Omit it to let the
+	 * picker manage its own state.
+	 */
+	value?: number | null
 	type: MediaType
 	label: string
 	desc?: React.ReactNode
@@ -34,7 +41,9 @@ export interface MediaInputProps extends React.HTMLAttributes<HTMLElement> {
 }
 
 export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
-	const [item, setItem] = useState<MediaItem | null>(props.url ? { id: 0, url: props.url, title: "", mime: "" } : null)
+	// Locally remembered pick, so a freshly selected item can render its preview
+	// before the parent commits it. Seeded from `url` for uncontrolled callers.
+	const [picked, setPicked] = useState<MediaItem | null>(props.url ? { id: 0, url: props.url, title: "", mime: "" } : null)
 	const [isDragging, setDragging] = useState(false)
 	const [isUploading, setUploading] = useState(false)
 	const media = useMediaLibrary({ type: props.type })
@@ -43,8 +52,22 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 	const typeLabel = TYPE_LABEL[props.type]
 	const hasPreview = props.type === "image" || props.type === "video"
 
+	// In controlled mode the form owns the value (a media id): the preview follows
+	// it, falling back to `url` for the saved media and to the local pick while a
+	// new selection is still uncommitted. Otherwise the local pick drives it.
+	const item: MediaItem | null =
+		props.value === undefined
+			? picked
+			: props.value === null
+				? null
+				: picked?.id === props.value
+					? picked
+					: props.url
+						? { id: props.value, url: props.url, title: "", mime: "" }
+						: null
+
 	const setSelected = (selected: MediaItem) => {
-		setItem(selected)
+		setPicked(selected)
 		props.onValueChange?.(selected)
 	}
 
@@ -62,7 +85,7 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 	}
 
 	const onRemove = () => {
-		setItem(null)
+		setPicked(null)
 		props.onValueChange?.(null)
 	}
 

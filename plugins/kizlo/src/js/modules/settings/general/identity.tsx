@@ -117,6 +117,7 @@ export function IdentitySettingsPage() {
 									</>
 								}
 								url={settings?.identity.person?.image?.src}
+								value={typeof field.value === "number" ? field.value : null}
 								onValueChange={(item) => field.onChange(item?.id ?? null)}
 							/>
 						)}
@@ -190,6 +191,7 @@ export function IdentitySettingsPage() {
 										</>
 									}
 									url={settings?.identity.organization?.logo?.src}
+									value={typeof field.value === "number" ? field.value : null}
 									onValueChange={(item) => field.onChange(item?.id ?? null)}
 								/>
 							)}

@@ -26,7 +26,14 @@ function MediaField({ control, label, name, url, width, height, desc }: MediaFie
 			name={name}
 			render={({ field, fieldState }) => (
 				<div>
-					<MediaPicker label={label} type="image" desc={desc} url={url} onValueChange={(item) => field.onChange(item?.id ?? null)} />
+					<MediaPicker
+						label={label}
+						type="image"
+						desc={desc}
+						url={url}
+						value={typeof field.value === "number" ? field.value : null}
+						onValueChange={(item) => field.onChange(item?.id ?? null)}
+					/>
 					<FieldError message={fieldState.error?.message} />
 				</div>
 			)}
