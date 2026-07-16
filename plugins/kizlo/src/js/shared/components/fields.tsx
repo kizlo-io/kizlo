@@ -1,6 +1,6 @@
 import { type Control, Controller, type FieldPath, type FieldValues } from "react-hook-form"
 import { ColorInput } from "./ui/color"
-import { NumberInput, TextareaInput, TextInput } from "./ui/input"
+import { NumberInput, PasswordInput, TextareaInput, TextInput } from "./ui/input"
 import { Combobox, MultiSelect, Select, type SelectOption } from "./ui/select"
 import { Toggle } from "./ui/toggle"
 
@@ -48,6 +48,43 @@ export function TextInputField<TFieldValues extends FieldValues = FieldValues, T
 					<TextInput
 						name={name}
 						type={type}
+						label={label}
+						desc={description}
+						placeholder={placeholder}
+						value={field.value ?? ""}
+						onChange={field.onChange}
+					/>
+					<FieldError message={fieldState.error?.message} />
+				</div>
+			)}
+		/>
+	)
+}
+
+// ====================================================
+// PASSWORD
+// ====================================================
+
+interface PasswordInputFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
+	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
+	placeholder?: string
+}
+
+export function PasswordInputField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
+	control,
+	name,
+	label,
+	description,
+	placeholder,
+}: PasswordInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
+	return (
+		<Controller
+			name={name}
+			control={control}
+			render={({ field, fieldState }) => (
+				<div>
+					<PasswordInput
+						name={name}
 						label={label}
 						desc={description}
 						placeholder={placeholder}
