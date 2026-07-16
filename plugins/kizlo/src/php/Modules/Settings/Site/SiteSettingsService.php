@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\Settings\Site;
 
 use Kizlo\Modules\Settings\Settings;
+use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -28,6 +29,8 @@ class SiteSettingsService
                 $settings = SiteSettings::load();
                 $settings->setData($request->get_json_params());
                 $settings->save();
+
+                Webhook::sendEvent(Webhook::SETTINGS_SITE_UPDATED_EVENT);
 
                 return new WP_REST_Response(null, 204);
             },

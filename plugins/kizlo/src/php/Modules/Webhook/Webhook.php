@@ -16,7 +16,14 @@ class Webhook
     const TERM_UPDATED_EVENT = 'term.updated';
     const TERM_DELETED_EVENT = 'term.deleted';
 
-    const SETTINGS_SAVED_EVENT = 'settings.saved';
+    const SETTINGS_SITE_UPDATED_EVENT = 'settings.site.updated';
+    const SETTINGS_BRAND_UPDATED_EVENT = 'settings.brand.updated';
+    const SETTINGS_IDENTITY_UPDATED_EVENT = 'settings.identity.updated';
+    const SETTINGS_AUTHORS_UPDATED_EVENT = 'settings.authors.updated';
+    const SETTINGS_CRAWLING_UPDATED_EVENT = 'settings.crawling.updated';
+    const SETTINGS_POST_TYPE_UPDATED_EVENT = 'settings.post_type.updated';
+    const SETTINGS_TAXONOMY_UPDATED_EVENT = 'settings.taxonomy.updated';
+    const SETTINGS_INTEGRATION_UPDATED_EVENT = 'settings.integration.updated';
 
     const WEBHOOK_PATH = '/webhooks';
 

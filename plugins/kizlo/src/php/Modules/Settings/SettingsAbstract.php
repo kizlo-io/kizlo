@@ -2,7 +2,6 @@
 
 namespace Kizlo\Modules\Settings;
 
-use Kizlo\Modules\Webhook\Webhook;
 use InvalidArgumentException;
 use Kizlo\Support\DataAbstract;
 
@@ -46,10 +45,6 @@ abstract class SettingsAbstract extends DataAbstract
     {
         $result = update_option(static::OPTION_KEY, $this->data);
         if ($result) SettingsCache::invalidate();
-
-        Webhook::sendEvent(Webhook::SETTINGS_SAVED_EVENT);
-
-        Webhook::sendEvent('data.saved', ['data' => 'test']);
 
         return $result;
     }

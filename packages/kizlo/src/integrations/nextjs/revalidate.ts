@@ -2,7 +2,7 @@ import type { Pathname } from "@kizlo/shared"
 import { createExtension } from "../../shared/extension"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
-import { POST_EVENT_TYPES, TERM_EVENT_TYPES } from "../../webhook/schema"
+import { POST_EVENT_TYPES, SETTINGS_EVENT_TYPES, TERM_EVENT_TYPES } from "../../webhook/schema"
 import { ROBOTS_CACHE_TAG } from "./robots"
 import { SITEMAP_CACHE_TAG, SITEMAP_ROUTE } from "./sitemap"
 
@@ -14,8 +14,12 @@ export type RevalidateTarget = Pathname | { path: Pathname; type?: "layout" | "p
 
 const DEFAULT_SITEMAP_TARGET: RevalidateTarget = { path: SITEMAP_ROUTE, type: "layout" }
 
-// The sitemap is a list of content URLs, so only content events change it. Settings never do.
 const CONTENT_EVENT_TYPES = new Set<KizloEvent["type"]>([...POST_EVENT_TYPES, ...TERM_EVENT_TYPES])
+
+const NON_FRONTEND_SETTINGS_EVENT_TYPES = new Set<KizloEvent["type"]>(["settings.crawling.updated", "settings.integration.updated"])
+const FRONTEND_SETTINGS_EVENT_TYPES = new Set<KizloEvent["type"]>(
+	SETTINGS_EVENT_TYPES.filter((type) => !NON_FRONTEND_SETTINGS_EVENT_TYPES.has(type)),
+)
 
 export interface NextRevalidateOptions {
 	revalidateTag?: RevalidateTagFn
@@ -42,10 +46,15 @@ export function nextRevalidation(options?: NextRevalidateOptions) {
 					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
 					const revalidateTag = options?.revalidateTag ?? (await import("next/cache")).revalidateTag
 
-					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(event.data?.url ? [event.data.url] : []), "/post"]
+					const eventUrl = event.data && "url" in event.data ? event.data.url : undefined
+					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(eventUrl ? [eventUrl] : []), "/post"]
 					for (const path of normalizePaths(paths)) revalidatePath(path)
 
-					if (event.type === "settings.saved") revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
+					if (event.type === "settings.crawling.updated" || event.type === "settings.site.updated") {
+						revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
+					}
+
+					if (FRONTEND_SETTINGS_EVENT_TYPES.has(event.type)) revalidatePath("/", "layout")
 
 					if (CONTENT_EVENT_TYPES.has(event.type)) {
 						revalidateTag(SITEMAP_CACHE_TAG, { expire: 0 })

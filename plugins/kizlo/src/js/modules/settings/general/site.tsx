@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
-import { FieldError, SwitchField, TextInputField } from "@/shared/components/fields"
+import { FieldError, PasswordInputField, SwitchField, TextInputField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { SiteSettingsSchema, type SiteSettingsSchemaInput, type SiteSettingsSchemaOutput } from "@/shared/lib/schema"
@@ -58,10 +58,9 @@ export function SiteSettingsPage() {
 					placeholder="https://example.com/api/kizlo"
 				/>
 
-				<TextInputField
+				<PasswordInputField
 					control={form.control}
 					name="secret"
-					type="password"
 					label="Site Secret"
 					placeholder="••••••••••••••••"
 					description="Shared secret used to sign preview tokens and verify webhook payloads. Keep this private — anyone with this value can issue valid requests on behalf of your site."

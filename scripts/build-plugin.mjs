@@ -47,6 +47,9 @@ const excludes = fs.existsSync(distignorePath)
 	: []
 
 function isExcluded(relPath) {
+	// Always skip the build output directory so a re-run doesn't try to package
+	// a previous build's dist/ into the new one.
+	if (relPath === "dist" || relPath.startsWith("dist/")) return true
 	return excludes.some((pattern) => relPath === pattern || relPath.startsWith(`${pattern}/`))
 }
 
