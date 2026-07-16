@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add Uploads settings to allow extra file types (SVG, ICO) with automatic SVG sanitization on upload
