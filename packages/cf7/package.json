@@ -13,6 +13,7 @@
 	],
 	"license": "MIT",
 	"author": "Kizlo",
+	"sideEffects": false,
 	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/cf7#readme",
 	"bugs": "https://github.com/kizlo-io/kizlo/issues",
 	"repository": {

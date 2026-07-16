@@ -16,10 +16,3 @@ export const SubmitFormResult = z.object({
 	),
 })
 export type SubmitFormResult = z.infer<typeof SubmitFormResult>
-
-export const SubmitFormInput = z.object({
-	formId: z.coerce.number(),
-	fields: z.record(z.string(), z.unknown()),
-	captchaToken: z.string(),
-})
-export type SubmitFormInput = z.infer<typeof SubmitFormInput>
