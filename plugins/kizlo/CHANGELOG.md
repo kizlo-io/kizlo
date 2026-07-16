@@ -4,6 +4,13 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-16
+### Added
+- Add Uploads settings to allow custom file types by extension and MIME type (SVG and ICO enabled by default), with automatic SVG sanitization and a block list for executable/script types
+
+### Changed
+- Move Webhooks settings into the System menu group as a standalone settings module
+
 ## [0.6.0] - 2026-07-16
 ### Changed
 - Emit a per-group webhook event when settings are saved instead of a single settings.saved event. Each settings section fires settings.<group>.updated once per save, and the post type and taxonomy sections include the changed entry key in the payload.
@@ -60,6 +67,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.7.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.6.0...kizlo-v0.7.0
 [0.6.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.5.0...kizlo-v0.6.0
 [0.5.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.4.0...kizlo-v0.5.0
 [0.4.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.3.0...kizlo-v0.4.0
