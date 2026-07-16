@@ -163,8 +163,13 @@ export interface WebhookSettings {
 	webhook_urls: string[]
 }
 
+export interface UploadMime {
+	ext: string
+	mime: string
+}
+
 export interface UploadsSettings {
-	allowed_mimes: string[]
+	allowed_mimes: UploadMime[]
 }
 
 export interface PostStatusDefinition {
@@ -201,19 +206,10 @@ export interface SettingsVariableGroup {
 	default_desc_format: string
 }
 
-export interface SupportedMime {
-	value: string
-	label: string
-	mime: string
-}
-
 export interface SettingsConstants {
 	site: {
 		title_separators: string[]
 		default_title_separator: string
-	}
-	uploads: {
-		supported_mimes: SupportedMime[]
 	}
 	taxonomy: SettingsVariableGroup
 	post_type: SettingsVariableGroup

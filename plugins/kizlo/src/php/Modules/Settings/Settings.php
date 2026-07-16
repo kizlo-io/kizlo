@@ -15,7 +15,7 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\Modules\Settings\PostType\PostTypeSettingsCollection;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettings;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettingsCollection;
-use Kizlo\Modules\Settings\Integration\WebhookSettings;
+use Kizlo\Modules\Settings\Webhook\WebhookSettings;
 use Kizlo\Modules\Settings\Uploads\UploadsSettings;
 
 class Settings

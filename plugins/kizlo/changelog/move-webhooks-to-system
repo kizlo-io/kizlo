@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Move Webhooks settings into the System menu group as a standalone settings module

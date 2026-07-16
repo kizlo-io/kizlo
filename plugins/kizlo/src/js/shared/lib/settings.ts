@@ -175,12 +175,11 @@ export function useNav(): NavSection[] {
 				],
 			},
 			{
-				label: "Integrations",
-				items: [{ type: "link", name: "Webhooks", path: "/integration/webhooks", icon: WebhooksLogoIcon }],
-			},
-			{
 				label: "System",
-				items: [{ type: "link", name: "Uploads", path: "/system/uploads", icon: UploadSimpleIcon }],
+				items: [
+					{ type: "link", name: "Uploads", path: "/system/uploads", icon: UploadSimpleIcon },
+					{ type: "link", name: "Webhooks", path: "/system/webhooks", icon: WebhooksLogoIcon },
+				],
 			},
 		],
 		[settings],
