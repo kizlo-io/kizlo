@@ -38,8 +38,8 @@ export const Duration = z
  * isValidTimestampSec(100); // false (too old - 1970)
  */
 export const isValidTimestampSec = (value: number): boolean => {
-	const MIN_TIMESTAMP_SEC = 946684800 // Year 2000
-	const MAX_TIMESTAMP_SEC = 4102444800 // Year 2100
+	const MIN_TIMESTAMP_SEC = 946684800
+	const MAX_TIMESTAMP_SEC = 4102444800
 	return Number.isFinite(value) && value >= MIN_TIMESTAMP_SEC && value <= MAX_TIMESTAMP_SEC
 }
 
@@ -54,8 +54,8 @@ export const isValidTimestampSec = (value: number): boolean => {
  * isValidTimestampMs(100000); // false (too old - 1970)
  */
 export const isValidTimestampMs = (value: number): boolean => {
-	const MIN_TIMESTAMP_MS = 946684800000 // Year 2000
-	const MAX_TIMESTAMP_MS = 4102444800000 // Year 2100
+	const MIN_TIMESTAMP_MS = 946684800000
+	const MAX_TIMESTAMP_MS = 4102444800000
 	return Number.isFinite(value) && value >= MIN_TIMESTAMP_MS && value <= MAX_TIMESTAMP_MS
 }
 

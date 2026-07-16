@@ -35,6 +35,7 @@
 	"files": [
 		"dist"
 	],
+	"sideEffects": false,
 	"publishConfig": {
 		"access": "public"
 	},
@@ -58,10 +59,8 @@
 	},
 	"devDependencies": {
 		"@tooling/typescript": "workspace:*",
-		"@types/js-cookie": "^3.0.6",
 		"@types/node": "catalog:",
 		"@types/qs": "^6.15.0",
-		"html-entities": "^2.6.0",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"

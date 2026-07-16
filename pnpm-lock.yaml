@@ -213,18 +213,12 @@ importers:
       '@tooling/typescript':
         specifier: workspace:*
         version: link:../../tooling/typescript
-      '@types/js-cookie':
-        specifier: ^3.0.6
-        version: 3.0.6
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.21
       '@types/qs':
         specifier: ^6.15.0
         version: 6.15.1
-      html-entities:
-        specifier: ^2.6.0
-        version: 2.6.0
       tsdown:
         specifier: 'catalog:'
         version: 0.15.12(@emnapi/core@1.10.0)(@emnapi/runtime@1.11.1)(typescript@5.9.3)
@@ -4054,9 +4048,6 @@ packages:
 
   '@types/jquery@4.0.1':
     resolution: {integrity: sha512-9a59A/tycXgYuPABcp6/3spSShn0NT2UOM4EfHvMumjYi4lJWTsK5SZWjhx3yRm9IHGCeWXdV2YfNsrWrft/CA==}
-
-  '@types/js-cookie@3.0.6':
-    resolution: {integrity: sha512-wkw9yd1kEXOPnvEeEV1Go1MmxtBJL0RR79aOTAApecWFVu7w0NNXNqhcWgvw2YgZDYadliXkl14pa3WXw5jlCQ==}
 
   '@types/jsdom@21.1.7':
     resolution: {integrity: sha512-yOriVnggzrnQ3a9OKOCxaVuSug3w3/SbOj5i7VwXWZEyUNl3bLF9V3MfxGbZKuwqJOQyRfqXyROBB1CoZLFWzA==}
@@ -14995,8 +14986,6 @@ snapshots:
       '@types/istanbul-lib-report': 3.0.3
 
   '@types/jquery@4.0.1': {}
-
-  '@types/js-cookie@3.0.6': {}
 
   '@types/jsdom@21.1.7':
     dependencies:
