@@ -33,8 +33,6 @@ describe("resolveIcons", () => {
 	})
 
 	test("tolerates absent slots delivered as undefined rather than null", () => {
-		// The response type claims `Media | null`, but a slot missing from the JSON
-		// arrives as `undefined`; the raster/manifest guards must not read `.mime` off it.
 		const sparse = { ...EMPTY, ios_app_icon: undefined, favicon: undefined } as unknown as BrandSettings
 		expect(() => resolveIcons(sparse)).not.toThrow()
 		expect(resolveIcons(sparse)).toEqual({ icon: [], appleTouch: [], manifestIcons: [] })

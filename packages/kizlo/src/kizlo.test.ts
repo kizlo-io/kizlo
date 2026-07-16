@@ -29,7 +29,6 @@ const DEV = {
 
 const saved: Record<string, string | undefined> = {}
 
-// baseUrl is passed as an option so the resolver never needs the framework's base-URL env var.
 const resolve = (options?: Parameters<typeof resolveKizloConfig>[0]) =>
 	resolveKizloConfig({ baseUrl: "https://app.example.com", ...options }, { baseUrlEnvKey: "KIZLO_BACKEND_URL" })
 

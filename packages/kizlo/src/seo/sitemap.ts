@@ -56,8 +56,6 @@ export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitema
 		const custom = extra.find((item) => item.entry.key === parsed.key)
 		if (custom) {
 			if (parsed.page > custom.entry.pages) return notFound()
-			// The origin comes from WordPress (the Kizlo site URL), not the request, so the
-			// `extra` URLs stay canonical even when the route is served as a prebuilt static file.
 			const { data } = await client.seo.sitemaps.index()
 			return xmlResponse(renderUrlSet(await custom.urls(data?.origin ?? url.origin, parsed.page)))
 		}

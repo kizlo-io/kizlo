@@ -30,7 +30,6 @@ export function extractSlugFromUrl(url: string): string {
 
 	const trimmed = url.trim()
 
-	// Extract pathname part (works for both full URLs and paths)
 	let pathname: string
 
 	if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
@@ -43,8 +42,7 @@ export function extractSlugFromUrl(url: string): string {
 		pathname = trimmed
 	}
 
-	// Clean and extract slug
-	const cleanPath = pathname.replace(/^\/+|\/+$/g, "") // Remove leading/trailing slashes
+	const cleanPath = pathname.replace(/^\/+|\/+$/g, "")
 
 	if (!cleanPath) return "/"
 

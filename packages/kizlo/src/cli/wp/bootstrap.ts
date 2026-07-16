@@ -60,18 +60,12 @@ export async function bootstrapWp(config: BootstrapConfig): Promise<TestCredenti
 
 	await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
 
-	// Install the wp.org / zip dependencies (kizlo core + each fixture's), then activate
-	// any bind-mounted local plugins the test fixtures carry — same handling as `kizlo dev`.
 	await ensurePlugins([...DEFAULT_PLUGINS, ...(config.fixtures?.flatMap((f) => f.plugins ?? []) ?? [])])
 
 	const adminId = Number(await wpCli(["user", "get", TEST_ADMIN.username, "--field=ID"]))
 	const userId = await seedUsers()
 	const appPassword = await createAdminAppPassword()
 
-	// Final step: stamp the DB so `isSeeded` can detect a completed bootstrap.
-	// `option update` errors when the value is unchanged, which breaks reseeds where
-	// the marker survived (e.g. credentials artifact deleted but DB volume intact), so
-	// delete-then-add to keep the stamp idempotent.
 	await wpCli(["option", "delete", SEED_MARKER_OPTION]).catch(() => {})
 	await wpCli(["option", "add", SEED_MARKER_OPTION, SEED_VERSION, "--autoload=no"])
 

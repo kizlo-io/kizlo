@@ -24,8 +24,6 @@ interface SettingsOverrides {
 	brand?: Partial<BrandSettings>
 }
 
-// Only the fields buildWebManifest reads are populated; the rest are irrelevant
-// to the manifest and stubbed via the cast.
 function settings({ site, identity, brand }: SettingsOverrides = {}): Settings {
 	return {
 		site: { name: null, alternate_name: null, url: null, ...site },

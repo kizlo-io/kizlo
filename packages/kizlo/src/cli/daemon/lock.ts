@@ -26,7 +26,5 @@ export function acquire(file: string): void {
 export function release(file: string): void {
 	try {
 		fs.rmSync(file, { force: true })
-	} catch {
-		// best effort — a stale lock is detected and reclaimed on next start
-	}
+	} catch {}
 }

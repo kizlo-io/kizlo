@@ -1,4 +1,4 @@
-import { createPageMetadata } from "kizlo/nextjs"
+import { createPageMetadata } from "kizlo/nextjs/server"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { cache } from "react"

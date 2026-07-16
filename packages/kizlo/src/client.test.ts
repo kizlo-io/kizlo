@@ -21,8 +21,6 @@ test("server-side error response surfaces in the envelope with the typed Kizlo c
 	expect(result.success).toBe(false)
 	if (result.success) throw new Error("unreachable")
 	expect(result.error.status).toBe(404)
-	// The orpc-level error.code is the generic "NOT_FOUND"; the typed Kizlo
-	// code is preserved in the response body.
 	const body = (result.error as unknown as { data?: { body?: { code?: string } } }).data?.body
 	expect(body?.code).toBe("POST_NOT_FOUND")
 })

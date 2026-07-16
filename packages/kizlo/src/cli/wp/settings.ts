@@ -67,8 +67,6 @@ export async function syncSiteSettings(
 ): Promise<{ ok: boolean; error?: string }> {
 	const body: Record<string, string> = {}
 	if (settings.secret) body.secret = settings.secret
-	// `url` is the public origin (browser-facing), derived from the original backend URL; `backend_url`
-	// is what the (possibly dockerized) WordPress site POSTs to, so only it gets the host rewrite.
 	const url = settings.siteUrl ?? (settings.backendUrl ? originOf(settings.backendUrl) : undefined)
 	if (settings.backendUrl) body.backend_url = settings.containerized ? toContainerHostUrl(settings.backendUrl) : settings.backendUrl
 	if (url) body.url = url

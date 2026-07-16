@@ -102,9 +102,6 @@ describe("createProcedure — internal scope", () => {
 	})
 
 	it("resolves input to an empty object when no input schema is given", () => {
-		// Pins current behavior: an internal procedure without an `input` schema
-		// has no typed input fields (`{}`). `NonNullable<unknown>` is `{}` without
-		// tripping the banned-empty-object lint rule.
 		const proc = createProcedure({ scope: "internal", output: z.object({ ok: z.boolean() }) }, async () => ({ ok: true }))
 
 		expectTypeOf<InputOf<typeof proc>>().toEqualTypeOf<NonNullable<unknown>>()
@@ -126,13 +123,11 @@ describe("createProcedure — errors", () => {
 			},
 			async ({ errors }) => {
 				expectTypeOf(errors.POST_NOT_FOUND).toBeFunction()
-				// Common HTTP errors are always present alongside declared ones.
 				expectTypeOf(errors.NOT_FOUND).toBeFunction()
 				return { ok: true }
 			},
 		)
 
-		// `defineErrorMap`'s `const` inference keeps the map readonly and literal.
 		expectTypeOf<ErrorsOf<typeof proc>>().toEqualTypeOf<{ readonly POST_NOT_FOUND: { readonly status: 404 } }>()
 	})
 

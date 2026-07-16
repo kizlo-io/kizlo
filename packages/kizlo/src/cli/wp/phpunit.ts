@@ -44,11 +44,6 @@ function phpunitTargets(cfg: ResolvedTestConfig): PhpunitTarget[] {
 		const hasConfig = existsSync(resolve(hostDir, "phpunit.xml")) || existsSync(resolve(hostDir, "phpunit.xml.dist"))
 		if (!hasConfig) continue
 
-		// A phpunit config alone isn't enough: the runner invokes `vendor/bin/phpunit` and
-		// exports the wp-phpunit test library from the plugin's `vendor/`. If a plugin ships
-		// a config but its dev deps aren't installed (e.g. `composer install --no-dev`), skip
-		// it with a clear note rather than letting `php vendor/bin/phpunit` fail with a raw
-		// error and fold a spurious failure into `kizlo test`.
 		if (!existsSync(resolve(hostDir, "vendor/bin/phpunit"))) {
 			log.warn(
 				`${slug} has a phpunit config but no vendor/bin/phpunit — run \`composer install\` with dev dependencies to run its PHP tests. Skipping.`,
@@ -67,7 +62,7 @@ function phpunitTargets(cfg: ResolvedTestConfig): PhpunitTarget[] {
  * app user full access to it. Idempotent (`IF NOT EXISTS` + a re-runnable grant), so
  * it can run on every `kizlo test` next to seeding without a guard.
  */
-export async function provisionTestDb(): Promise<void> {
+async function provisionTestDb(): Promise<void> {
 	const sql = [
 		`CREATE DATABASE IF NOT EXISTS ${TEST_DB};`,
 		`GRANT ALL PRIVILEGES ON ${TEST_DB}.* TO '${MYSQL_USER}'@'%';`,
@@ -82,9 +77,6 @@ export async function provisionTestDb(): Promise<void> {
 async function runTarget(target: PhpunitTarget): Promise<number> {
 	const wpPhpunitDir = `${target.containerDir}/vendor/wp-phpunit/wp-phpunit`
 
-	// -e exports the wp-phpunit test-library path our bootstrap reads; -w sets the cwd
-	// so phpunit finds the plugin's phpunit.xml(.dist). `php vendor/bin/phpunit` avoids
-	// relying on the bind-mounted binary's executable bit.
 	const res = await compose([
 		"exec",
 		"-T",

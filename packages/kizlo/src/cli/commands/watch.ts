@@ -14,7 +14,6 @@ async function run({ args }: { args: { dir?: string } }): Promise<void> {
 	printBanner(getVersion())
 
 	const stop = await startWatcher(process.cwd(), { dir: args.dir })
-	// Another watcher already owns the lock — nothing to run in the foreground.
 	if (!stop) return
 
 	process.on("exit", stop)
@@ -24,8 +23,6 @@ async function run({ args }: { args: { dir?: string } }): Promise<void> {
 			process.exit(0)
 		})
 	}
-	// chokidar's persistent watcher holds the event loop open, so the process stays
-	// alive here until a signal tears it down.
 }
 
 export const watch = defineCommand({

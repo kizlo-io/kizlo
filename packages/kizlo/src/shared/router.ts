@@ -27,7 +27,6 @@ export function createOrpcRouter(router: AnyProcedureRouter): AnyRouter {
 	}) as never
 }
 
-// Procedures store their payload under the "~kizlo" brand, NOT at top level.
 function isProcedure(value: unknown): value is AnyProcedure {
 	if (typeof value !== "object" || value === null) return false
 	const brand = (value as Record<string, unknown>)["~kizlo"]

@@ -29,7 +29,6 @@ function readRegistry(): Registry {
 	try {
 		return JSON.parse(readFileSync(file, "utf8")) as Registry
 	} catch {
-		// A corrupt registry shouldn't wedge `dev`; start clean.
 		return {}
 	}
 }
@@ -75,8 +74,6 @@ export async function removeProjectContainers(project: string): Promise<boolean>
 		const { stdout } = await exec("docker", ["ps", "-aq", "--filter", `label=com.docker.compose.project=${project}`])
 		const ids = stdout.split("\n").filter(Boolean)
 		if (!ids.length) return false
-		// Stop gracefully first (a no-op on already-stopped containers), then force-remove
-		// so a container that ignored SIGTERM still goes; named volumes are untouched.
 		await exec("docker", ["stop", ...ids]).catch(() => {})
 		await exec("docker", ["rm", "-f", ...ids])
 		return true
@@ -121,9 +118,7 @@ export function unregisterSession(project: string): void {
 			delete registry[project]
 			writeRegistry(registry)
 		}
-	} catch {
-		// best effort — a stale entry is reaped on the next `kizlo dev`
-	}
+	} catch {}
 }
 
 /**
@@ -142,9 +137,7 @@ export async function reapOrphans(): Promise<string[]> {
 		try {
 			await stopByProject(project)
 			reaped.push(project)
-		} catch {
-			// Docker down or already gone — drop the entry anyway so it stops being retried.
-		}
+		} catch {}
 		delete registry[project]
 		changed = true
 	}

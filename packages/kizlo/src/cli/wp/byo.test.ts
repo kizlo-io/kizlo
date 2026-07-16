@@ -107,7 +107,6 @@ describe("validateByoArchive / prepareByo", () => {
 		expect(prefix).toBe("acme_")
 		expect(fs.existsSync(path.join(wordpressDir, "wp-load.php"))).toBe(true)
 		expect(fs.existsSync(path.join(wordpressDir, "wp-config.php"))).toBe(false)
-		// dump staged under .kizlo/ (outside the install dir), ready to pipe into mysql
 		expect(sqlPath).toBe(path.join(configDir, ".kizlo", "byo-import.sql"))
 		expect(fs.existsSync(sqlPath)).toBe(true)
 	})

@@ -82,7 +82,6 @@ function toDescriptor(media: Media, extra?: Pick<IconDescriptor, "media">): Icon
 	return {
 		url: media.src,
 		type: media.mime ?? "",
-		// `.ico` self-describes its bundled sizes, so it takes no hint.
 		sizes: media.mime && ICO_MIMES.has(media.mime) ? undefined : pixelSize(media),
 		...extra,
 	}
@@ -125,26 +124,16 @@ function toManifestIcons(media: Media, purpose?: "maskable"): ManifestIcon[] {
 export function resolveIcons(brand: BrandSettings): ResolvedIcons {
 	const icon: IconDescriptor[] = []
 
-	// Light `rel="icon"`: prefer the dedicated favicon, else the square brand icon.
 	const light = brand.favicon ?? brand.logo_icon
 	if (light) icon.push(toDescriptor(light))
 
-	// Dark variant only when explicitly provided; otherwise the light one covers both.
 	if (brand.favicon_dark) {
 		icon.push(toDescriptor(brand.favicon_dark, { media: "(prefers-color-scheme: dark)" }))
 	}
 
-	// iOS home-screen icon (`apple-touch-icon`): raster-only. Prefer the dedicated
-	// slot, else a raster favicon. iOS never crops, so no maskable concern here.
 	const apple = raster(brand.ios_app_icon) ?? raster(brand.favicon)
 	const appleTouch = apple ? [toDescriptor(apple)] : []
 
-	// Manifest icons (Android + desktop Chrome): raster or SVG.
-	//   - The square brand icon (else the favicon) is the default `"any"` entry,
-	//     used by desktop and shown uncropped on Android.
-	//   - The dedicated Android icon, when present, adds a `"maskable"` entry so
-	//     Android can crop it edge-to-edge. We never mark the `"any"` source
-	//     maskable, since we cannot know it has a safe zone.
 	const manifestIcons: ManifestIcon[] = []
 	const anySource = manifestSource(brand.logo_icon) ?? manifestSource(brand.favicon)
 	if (anySource) manifestIcons.push(...toManifestIcons(anySource))

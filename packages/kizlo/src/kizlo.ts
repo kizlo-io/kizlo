@@ -95,7 +95,6 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 			},
 		})
 
-		// Bound so `const { handler } = createKizlo()` keeps working.
 		this.handler = this.handler.bind(this)
 	}
 

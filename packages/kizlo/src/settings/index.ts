@@ -13,11 +13,6 @@ import type {
 	WebhookSettingsInput,
 } from "./service.interface"
 
-// Settings procedures are `internal` scope: exposed on the server client
-// (`client.settings.*`) but dropped from the browser client, since the payload
-// carries the site secret and backend config. They wrap the same
-// SettingsService reachable at `context.service.settings`.
-
 type SettingsUpdate = Awaited<ReturnType<SettingsService["updateSite"]>>
 
 /** Shared error handling for every settings write: `invalid_param` → 400, anything else → 500. */

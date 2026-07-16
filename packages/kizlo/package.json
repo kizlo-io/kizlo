@@ -95,7 +95,6 @@
 		"consola": "^3.2.3",
 		"cookie": "^1.0.2",
 		"jiti": "^2.7.0",
-		"jose": "catalog:",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
