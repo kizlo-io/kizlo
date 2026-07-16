@@ -12,6 +12,7 @@ import {
 	PaletteIcon,
 	RobotIcon,
 	TagIcon,
+	UploadSimpleIcon,
 	UsersIcon,
 	WebhooksLogoIcon,
 } from "@phosphor-icons/react"
@@ -81,6 +82,9 @@ export function useSettings() {
 				break
 			case "webhook":
 				$settings.set({ ...existing, webhook: { ...existing.webhook, ...(data as any) } })
+				break
+			case "uploads":
+				$settings.set({ ...existing, uploads: { ...existing.uploads, ...(data as any) } })
 				break
 		}
 	}
@@ -173,6 +177,10 @@ export function useNav(): NavSection[] {
 			{
 				label: "Integrations",
 				items: [{ type: "link", name: "Webhooks", path: "/integration/webhooks", icon: WebhooksLogoIcon }],
+			},
+			{
+				label: "System",
+				items: [{ type: "link", name: "Uploads", path: "/system/uploads", icon: UploadSimpleIcon }],
 			},
 		],
 		[settings],

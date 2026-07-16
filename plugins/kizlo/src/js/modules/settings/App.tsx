@@ -27,6 +27,7 @@ import { IdentitySettingsPage } from "./general/identity"
 import { SiteSettingsPage } from "./general/site"
 import { WebhookSettingsPage } from "./integration/webhook"
 import { PostTypeSettingsPage } from "./post-type"
+import { UploadsSettingsPage } from "./system/uploads"
 import { TaxonomySettingsPage } from "./taxonomy"
 
 const HEADER_LINKS: { label: string; href: string; icon: Icon }[] = [
@@ -48,6 +49,7 @@ export default function App() {
 				<Route path="/post-types/:slug" element={<PostTypeSettingsPage />} />
 				<Route path="/taxonomies/:slug" element={<TaxonomySettingsPage />} />
 				<Route path="/integration/webhooks" element={<WebhookSettingsPage />} />
+				<Route path="/system/uploads" element={<UploadsSettingsPage />} />
 
 				<Route path="/preview" element={<ComponentGallery />} />
 

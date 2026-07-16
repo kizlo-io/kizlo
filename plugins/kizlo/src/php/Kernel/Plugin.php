@@ -13,6 +13,7 @@ use Kizlo\Modules\RestApi\RestApiModule;
 use Kizlo\Modules\Seo\SeoModule;
 use Kizlo\Modules\Settings\SettingsModule;
 use Kizlo\Modules\Taxonomy\TaxonomyModule;
+use Kizlo\Modules\Upload\UploadModule;
 use Kizlo\Modules\User\UserModule;
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
@@ -42,6 +43,7 @@ class Plugin
         RestApiModule::class,
         TaxonomyModule::class,
         CommentModule::class,
+        UploadModule::class,
     ];
 
     private function __construct() {}
