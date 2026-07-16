@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Emit a per-group webhook event when settings are saved instead of a single settings.saved event. Each settings section fires settings.<group>.updated once per save, and the post type and taxonomy sections include the changed entry key in the payload.

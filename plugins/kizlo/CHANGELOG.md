@@ -4,6 +4,11 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-07-16
+### Changed
+- Emit a per-group webhook event when settings are saved instead of a single settings.saved event. Each settings section fires settings.<group>.updated once per save, and the post type and taxonomy sections include the changed entry key in the payload.
+- Render the Site Secret field as a masked text input with a show/hide toggle instead of a password field, so browsers no longer offer to save or autofill it as a login credential.
+
 ## [0.5.0] - 2026-07-15
 ### Added
 - Added theme color and background color settings to Brand. They drive the web app manifest's theme_color and background_color used on the install and splash surfaces.
@@ -55,6 +60,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.6.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.5.0...kizlo-v0.6.0
 [0.5.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.4.0...kizlo-v0.5.0
 [0.4.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.3.0...kizlo-v0.4.0
 [0.3.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.2.3...kizlo-v0.3.0
