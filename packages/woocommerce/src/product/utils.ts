@@ -1,6 +1,6 @@
 import { normalizeArrayableValue, type TODO, toPublicMetadata } from "@kizlo/shared"
-import { deserializeCurrencyFormat } from "kizlo"
-import type { ListProductInputOut, Product, ProductFilters } from "./schema"
+import { deserializeCurrencyFormat, type Media } from "kizlo"
+import type { ListProductInputOut, Product, ProductCategoryRef, ProductFilters } from "./schema"
 import type { WCK_Product, WCSK_Product, WCSK_ProductCollectionData } from "./types"
 import type { WCS_ProductRating, WCS_ProductsListInput } from "./types.wcs"
 
@@ -24,22 +24,9 @@ export function deserializeProduct(data: WCK_Product): Product {
 		onSaleTo: data.date_on_sale_to ? toTimestamp(data.date_on_sale_to) : null,
 		isInStock: data.stock_status === "instock",
 		stock: data.stock_quantity,
-		images: data.images.map((item) => ({
-			id: item.id,
-			src: item.src,
-			name: item.name,
-			alt: item.alt,
-		})),
-		categories: data.categories.map((category) => ({
-			id: category.id,
-			name: category.name,
-			slug: category.slug,
-		})),
-		tags: data.tags.map((tag) => ({
-			id: tag.id,
-			name: tag.name,
-			slug: tag.slug,
-		})),
+		images: deserializeImages(data.images),
+		categories: deserializeTermRefs(data.categories),
+		tags: deserializeTermRefs(data.tags),
 		averageRating: data.average_rating,
 		reviewCount: data.rating_count,
 		attributes: data.kizlo.attributes.map((item) => ({
@@ -82,22 +69,9 @@ export function deserializeStoreProduct(data: WCSK_Product): Product {
 			salePrice: +data.prices.sale_price,
 			regularPrice: +data.prices.regular_price,
 		},
-		images: data.images.map((item) => ({
-			id: item.id,
-			src: item.src,
-			name: item.name,
-			alt: item.alt,
-		})),
-		categories: data.categories.map((category) => ({
-			id: category.id,
-			name: category.name,
-			slug: category.slug,
-		})),
-		tags: data.tags.map((tag) => ({
-			id: tag.id,
-			name: tag.name,
-			slug: tag.slug,
-		})),
+		images: deserializeImages(data.images),
+		categories: deserializeTermRefs(data.categories),
+		tags: deserializeTermRefs(data.tags),
 		attributes: data.attributes.map((item) => ({
 			id: item.id,
 			name: item.name,
@@ -204,10 +178,14 @@ export function serializeProductListInput(data?: ListProductInputOut): WCS_Produ
 	}
 }
 
-export function toCents(value: string) {
-	return Number(value.replace(".", ""))
+function deserializeImages(images: { id: number; src: string; name: string; alt: string }[]): Media[] {
+	return images.map((item) => ({ id: item.id, src: item.src, name: item.name, alt: item.alt }))
 }
 
-export function toTimestamp(date: string) {
+function deserializeTermRefs(terms: { id: number; name: string; slug: string }[]): ProductCategoryRef[] {
+	return terms.map((term) => ({ id: term.id, name: term.name, slug: term.slug }))
+}
+
+function toTimestamp(date: string) {
 	return new Date(date).getTime()
 }

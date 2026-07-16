@@ -35,17 +35,7 @@ export const ShippingAddress = z.object({
 })
 export type ShippingAddress = z.infer<typeof ShippingAddress>
 
-export const BillingAddress = z.object({
-	firstName: z.string(),
-	lastName: z.string(),
-	phone: z.string(),
-	company: z.string().optional(),
-	address1: z.string(),
-	address2: z.string().optional(),
-	city: z.string(),
-	postcode: z.string(),
-	state: z.string(),
-	country: z.string(),
+export const BillingAddress = ShippingAddress.extend({
 	email: z.string(),
 })
 export type BillingAddress = z.infer<typeof BillingAddress>

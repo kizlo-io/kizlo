@@ -10,6 +10,3 @@ export type GetProductErrorMap = typeof GET_PRODUCT_ERROR_MAP
 
 export const LIST_PRODUCT_ERROR_MAP = defineErrorMap({})
 export type ListProductErrorMap = typeof LIST_PRODUCT_ERROR_MAP
-
-export const FILTER_PRODUCT_ERROR_MAP = defineErrorMap({})
-export type FilterProductsErrorMap = typeof FILTER_PRODUCT_ERROR_MAP
