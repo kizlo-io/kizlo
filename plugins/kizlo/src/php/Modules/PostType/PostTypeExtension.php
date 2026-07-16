@@ -44,7 +44,6 @@ class PostTypeExtension
         $base = [];
         $id   = $data['id'];
 
-        // Categories
         $categories = wp_get_post_categories($id, ['fields' => 'all']);
         if (!empty($categories)) {
             $base['categories'] = array_map(fn($term) => [
@@ -54,7 +53,6 @@ class PostTypeExtension
             ], $categories);
         }
 
-        // Tags
         $tags = wp_get_post_tags($id, ['fields' => 'all']);
         if (!empty($tags)) {
             $base['tags'] = array_map(fn($term) => [
@@ -64,7 +62,6 @@ class PostTypeExtension
             ], $tags);
         }
 
-        // Author
         $author_id = (int) $data['author'];
         if ($author_id) {
             $base['author'] = [
@@ -75,7 +72,6 @@ class PostTypeExtension
             ];
         }
 
-        // Featured media
         $thumbnail_id = get_post_thumbnail_id($id);
         if ($thumbnail_id) {
             $full          = wp_get_attachment_image_src($thumbnail_id, 'full');

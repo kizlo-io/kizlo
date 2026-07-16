@@ -84,8 +84,6 @@ export function writeDevOverride(configDir: string, opts: DevOverrideOptions): s
 	const rootBind = bind(opts.wordpressDir, WP_ROOT)
 	const remap = opts.hostUser
 		? {
-				// Run the wrapper as root so it can retag www-data, then it hands off to
-				// the normal entrypoint; wp-cli just runs directly as the host user.
 				wordpress: {
 					user: "0:0",
 					entrypoint: ["sh", REMAP_TARGET],
@@ -104,8 +102,6 @@ export function writeDevOverride(configDir: string, opts: DevOverrideOptions): s
 	}
 	const wpCli: ServiceBlock = { user: remap?.wpCliUser, volumes: [rootBind, ...mounts] }
 
-	// Publish MySQL on a host port (loopback only) so advanced users can point a SQL
-	// client at the dev database. Internal-only when no port is configured.
 	const services = [renderService("wordpress", wordpress), renderService("wp-cli", wpCli)]
 	if (opts.dbPort) services.push(renderService("mysql", { ports: [`127.0.0.1:${opts.dbPort}:3306`] }))
 

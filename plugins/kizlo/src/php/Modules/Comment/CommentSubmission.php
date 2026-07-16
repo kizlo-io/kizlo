@@ -104,11 +104,6 @@ class CommentSubmission
             'url'             => (string) $request->get_param('author_url'),
         ];
 
-        // wp_handle_comment_submission() and downstream filters (Akismet, flood
-        // check) read $_SERVER directly. Swap in the forwarded values for the
-        // duration of the call and restore in finally so a fatal in a filter
-        // can't leave the request environment polluted for the rest of the
-        // PHP-FPM worker's life.
         $orig_remote_addr = $_SERVER['REMOTE_ADDR']     ?? null;
         $orig_user_agent  = $_SERVER['HTTP_USER_AGENT'] ?? null;
         $orig_user_id     = get_current_user_id();
@@ -116,9 +111,6 @@ class CommentSubmission
         $_SERVER['REMOTE_ADDR']     = (string) $request->get_param('author_ip');
         $_SERVER['HTTP_USER_AGENT'] = substr((string) $request->get_param('user_agent'), 0, 254);
 
-        // Force the guest branch unless the SDK explicitly identifies a user;
-        // otherwise wp_handle_comment_submission would attribute the comment
-        // to the admin whose App Password authenticated this REST request.
         wp_set_current_user($user_id > 0 ? $user_id : 0);
 
         try {

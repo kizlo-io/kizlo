@@ -107,9 +107,6 @@ function Sidebar() {
 		() => groups.find((group) => group.items.some((item) => item.path === pathname))?.id ?? null,
 	)
 
-	// Keep the drill-down in sync with the route so navigating from elsewhere
-	// (e.g. the command palette) opens the group panel that owns the target page,
-	// and dismiss the mobile drawer once the route settles.
 	useEffect(() => {
 		setActive(groups.find((group) => group.items.some((item) => item.path === pathname))?.id ?? null)
 		$sidebar.set(false)

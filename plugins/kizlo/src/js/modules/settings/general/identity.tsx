@@ -9,7 +9,7 @@ import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { type RadioCardOption, RadioCards } from "@/shared/components/ui/radio"
 import { useUsers } from "@/shared/hooks/use-users"
 import { type IdentitySettingsInput, type IdentitySettingsOutput, IdentitySettingsSchema } from "@/shared/lib/schema"
-import { useSettings } from "@/shared/lib/settings"
+import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 
 const IDENTITY_OPTIONS: RadioCardOption[] = [
 	{ value: "person", label: "Person", desc: "A personal brand, blogger, freelancer, or individual creator.", icon: UserIcon },
@@ -17,7 +17,7 @@ const IDENTITY_OPTIONS: RadioCardOption[] = [
 ]
 
 export function IdentitySettingsPage() {
-	const { settings, update, isLoading } = useSettings()
+	const { settings } = useSettings()
 	const users = useUsers()
 	const userOptions = users.map((user) => ({ value: String(user.id), label: user.name }))
 
@@ -66,18 +66,8 @@ export function IdentitySettingsPage() {
 
 	const identityType = form.watch("type")
 
-	async function onSubmit(data: IdentitySettingsOutput) {
-		await update("identity", data)
-		form.reset(form.getValues())
-	}
-
 	return (
-		<SettingsForm
-			isLoading={isLoading}
-			isDirty={form.formState.isDirty}
-			onSubmit={form.handleSubmit(onSubmit)}
-			onCancel={() => form.reset()}
-		>
+		<SettingsForm {...useSettingsForm("identity", form)}>
 			<SettingsSection
 				title="Identity"
 				desc="Select whether this site represents a person or an organization. This determines which structured data (Schema.org) Kizlo outputs and which fields are shown below."

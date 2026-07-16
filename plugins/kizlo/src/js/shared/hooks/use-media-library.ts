@@ -36,12 +36,9 @@ export function useMediaLibrary(options: UseMediaOptions = {}) {
 				throw new Error("wp.media is not available")
 			}
 
-			// store resolver for this call
 			resolverRef.current = resolve
 
-			// reuse existing frame
 			if (frameRef.current) {
-				// optional: clear previous selection
 				frameRef.current.state().get("selection").reset()
 				frameRef.current.open()
 				return
@@ -98,8 +95,6 @@ export function useMediaLibrary(options: UseMediaOptions = {}) {
 	return { open, upload, maxUploadSize: getMaxUploadSize() }
 }
 
-// WP enqueues the media scripts (via wp_enqueue_media) which localise the site's
-// max upload size in bytes, e.g. "8388608b". Returns null when unavailable.
 function getMaxUploadSize(): number | null {
 	const raw = window._wpPluploadSettings?.defaults?.filters?.max_file_size
 	const bytes = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : NaN

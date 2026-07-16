@@ -16,7 +16,8 @@ import {
 	WebhooksLogoIcon,
 } from "@phosphor-icons/react"
 import apiFetch from "@wordpress/api-fetch"
-import { useMemo, useState } from "react"
+import { type BaseSyntheticEvent, useMemo, useState } from "react"
+import type { FieldValues, UseFormReturn } from "react-hook-form"
 import { toast } from "sonner"
 import type { Settings, SettingsMap } from "./schema"
 import { $settings } from "./store"
@@ -58,11 +59,9 @@ export function useSettings() {
 
 		switch (key) {
 			case "site":
-				// TODO: remove any
 				$settings.set({ ...existing, site: { ...existing.site, ...(data as any) } })
 				break
 			case "brand":
-				// TODO: remove any
 				$settings.set({ ...existing, brand: { ...existing.brand, ...(data as any) } })
 				break
 			case "identity":
@@ -87,6 +86,46 @@ export function useSettings() {
 	}
 
 	return { settings, update, isLoading }
+}
+
+type SingleSettingsKey = Exclude<keyof SettingsMap, "post_types" | "taxonomies">
+type CollectionSettingsKey = Extract<keyof SettingsMap, "post_types" | "taxonomies">
+
+interface SettingsFormBindings {
+	isLoading: boolean
+	isDirty: boolean
+	onSubmit: (event?: BaseSyntheticEvent) => Promise<void>
+	onCancel: () => void
+}
+
+export function useSettingsForm<K extends SingleSettingsKey, TInput extends FieldValues>(
+	key: K,
+	form: UseFormReturn<TInput, unknown, SettingsMap[K]>,
+): SettingsFormBindings
+export function useSettingsForm<K extends CollectionSettingsKey, TInput extends FieldValues>(
+	key: K,
+	slug: string,
+	form: UseFormReturn<TInput, unknown, SettingsMap[K]>,
+): SettingsFormBindings
+export function useSettingsForm(
+	key: keyof SettingsMap,
+	slugOrForm: string | UseFormReturn<FieldValues, unknown, FieldValues>,
+	collectionForm?: UseFormReturn<FieldValues, unknown, FieldValues>,
+): SettingsFormBindings {
+	const { update, isLoading } = useSettings()
+	const slug = typeof slugOrForm === "string" ? slugOrForm : null
+	const form = (slug === null ? slugOrForm : collectionForm) as UseFormReturn<FieldValues, unknown, FieldValues>
+	const save = update as (...args: unknown[]) => Promise<unknown>
+
+	return {
+		isLoading,
+		isDirty: form.formState.isDirty,
+		onSubmit: form.handleSubmit(async (data) => {
+			await (slug === null ? save(key, data) : save(key, slug, data))
+			form.reset(form.getValues())
+		}),
+		onCancel: () => form.reset(),
+	}
 }
 
 export function useNav(): NavSection[] {

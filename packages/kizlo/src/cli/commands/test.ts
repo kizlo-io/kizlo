@@ -54,8 +54,6 @@ async function resolveTestPort(cfg: ResolvedTestConfig, stack: DockerStack, fres
  */
 async function bringUp(cfg: ResolvedTestConfig, stack: DockerStack, fresh = false): Promise<{ stack: DockerStack; port: number }> {
 	const port = await resolveTestPort(cfg, stack, fresh)
-	// Rebind the stack to the resolved port (publishes WP_PORT there); reuse the existing
-	// binding when the port didn't move, so the common fast-rerun path allocates nothing.
 	const bound = port === cfg.port ? stack : createStack(testStack({ ...cfg, port }))
 
 	await withSpinner("Starting WordPress test stack", () => bound.composeUp(), "WordPress test stack ready")
@@ -100,13 +98,9 @@ async function runSuite({ args }: CommandContext<typeof runArgs>): Promise<void>
 	let code = 1
 	try {
 		const jsCode = await spawnTest(cfg.command, cfg.packageManager)
-		// Fold the plugin PHP suite (phpunit-in-container) into the same run; a failure
-		// on either side fails `kizlo test`.
 		const phpCode = await runPluginPhpunit(cfg)
 		code = jsCode !== 0 ? jsCode : phpCode
 	} finally {
-		// Keep the stack up by default so reruns skip the slow container boot;
-		// `isSeeded` keeps the next run idempotent. Opt into a clean teardown.
 		if (args.teardown) await withSpinner("Tearing down WordPress test stack", () => stack.composeDown(), "WordPress test stack stopped")
 		else log.info("Stack left running for fast reruns — `kizlo test stop` to stop it, or rerun with --teardown.")
 	}
@@ -151,6 +145,5 @@ export const test = defineCommand({
 	},
 	args: runArgs,
 	subCommands,
-	// Bare `kizlo test` runs the suite; the lifecycle subcommands only manage the stack.
 	run: groupDefault(Object.keys(subCommands), runSuite),
 })

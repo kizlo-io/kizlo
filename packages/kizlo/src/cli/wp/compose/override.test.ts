@@ -72,7 +72,6 @@ describe("writeDevOverride", () => {
 		expect(body).toContain(`- "${REMAP_ENTRYPOINT}:/usr/local/bin/kizlo-remap-entrypoint.sh:ro"`)
 		expect(body).toContain('KIZLO_PUID: "1000"')
 		expect(body).toContain('KIZLO_PGID: "1000"')
-		// wp-cli runs directly as the host user (no entrypoint wrapper needed there).
 		expect(body).toContain('user: "1000:1000"')
 	})
 })
@@ -96,7 +95,6 @@ describe("writeTestOverride", () => {
 		const pluginBind = `- "${path.join(dir, "plugins/kizlo-woocommerce")}:/var/www/html/wp-content/plugins/kizlo-woocommerce"`
 		expect(body).toContain("  wordpress:")
 		expect(body).toContain("  wp-cli:")
-		// One bind per service.
 		expect(body.split(pluginBind).length - 1).toBe(2)
 	})
 

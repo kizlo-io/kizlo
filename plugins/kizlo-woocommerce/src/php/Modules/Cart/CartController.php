@@ -15,9 +15,9 @@ use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
  * user's cart on login, so that's all this class registers.
  *
  * Current-user switching for headless requests is centralised in
- * {@see \Kizlo\Modules\WooCommerce\Service::maybeSwitchToCartUser()}, which runs on
- * rest_pre_dispatch — so by the time this callback runs, get_current_user_id()
- * already reflects the resolved cart owner.
+ * {@see \Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceModule::maybeSwitchToCartUser()},
+ * which runs on rest_dispatch_request — so by the time this callback runs,
+ * get_current_user_id() already reflects the resolved cart owner.
  */
 class CartController
 {

@@ -39,8 +39,6 @@ function moveInto(src: string, dest: string): void {
  */
 export function validateByoArchive(archivePath: string, wordpressDir: string): string {
 	if (!existsSync(archivePath)) throw new Error(`dev.byo archive not found: ${archivePath}`)
-	// Any tar archive: `tar` auto-detects the compression on extract (gz/xz/bz2/zst/none)
-	// on both GNU tar and bsdtar. `.zip` is excluded — GNU tar on Linux can't read it.
 	if (!/\.tar(\.(gz|xz|bz2|zst))?$|\.(tgz|txz|tbz2?|tzst)$/i.test(archivePath)) {
 		throw new Error(`dev.byo must be a tar archive (.tar.gz, .tar.xz, .tar.bz2, .tar.zst, .tar): ${archivePath}`)
 	}

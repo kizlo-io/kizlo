@@ -1,7 +1,5 @@
 import { defineFixture, type SeedContext } from "../cli/wp/types"
 
-// `location` is intentionally not assigned: the kizlo menu endpoint resolves menus
-// by slug/id, and theme menu locations aren't guaranteed to be registered.
 const MENU = {
 	name: "Primary",
 	slug: "primary",

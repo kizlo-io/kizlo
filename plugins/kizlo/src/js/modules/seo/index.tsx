@@ -6,9 +6,6 @@ import "./types"
 
 const container = document.getElementById("kizlo-seo-root")
 
-// Sandbox switch: `?kizlo_preview=1` on a managed post type's editor renders the
-// component gallery instead of the real meta box. This is the canonical WP-first
-// preview context (no preflight, full wp-admin bleed). Remove in Phase E.
 const isPreview = new URLSearchParams(window.location.search).get("kizlo_preview") === "1"
 
 if (container && isPreview) {

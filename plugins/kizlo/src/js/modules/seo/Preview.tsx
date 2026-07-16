@@ -118,8 +118,6 @@ function SearchResult({ device, title, description, host, crumbs, muted, hidden 
 	)
 }
 
-// Split a URL into a display host and its path breadcrumbs. Falls back to the
-// raw string when the value is not a parseable URL (e.g. a half-typed override).
 function parseUrl(raw: string): { host: string; crumbs: string[] } {
 	try {
 		const parsed = new URL(raw)

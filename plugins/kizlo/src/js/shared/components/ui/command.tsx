@@ -34,18 +34,9 @@ function CommandDialog({
 			title={title}
 			contentLabel={title}
 			__experimentalHideHeader
-			// Let the input's `autoFocus` set focus during mount instead. WP's
-			// focusOnMount runs a tick later, which is too late for mobile Safari to
-			// open the keyboard (it only allows focus synchronously with the mount).
 			focusOnMount={false}
 			onRequestClose={() => onOpenChange?.(false)}
 			className={cn(
-				// WP Modal turns its frame into a full-width bottom sheet below ~600px.
-				// Force a rounded card at every breakpoint instead (the overlay is
-				// display:flex, so mx-auto centers horizontally). Vertically it's
-				// centered on larger screens and pinned near the top on small ones.
-				// The cmdk internals and WP's `components-modal__content` (whose `__`
-				// can't be targeted by Tailwind arbitrary variants) live in globals.css.
 				"kizlo-finder mx-auto! my-auto! max-h-[85vh]! w-[calc(100%-2rem)]! max-w-2xl! overflow-hidden rounded-2xl! p-0! max-sm:mt-4! max-sm:mb-auto!",
 				className,
 			)}
@@ -61,12 +52,8 @@ function CommandInput({ className, ...props }: React.ComponentProps<typeof Comma
 			<MagnifyingGlassIcon className="size-4 shrink-0 text-neutral-400" />
 			<CommandPrimitive.Input
 				data-slot="command-input"
-				// Focus during mount so mobile Safari opens the keyboard (see Modal's
-				// focusOnMount note). Callers can still override via props.
 				autoFocus
 				className={cn(
-					// wp-admin styles every <input> with a border + box-shadow; reset it
-					// so cmdk's field stays flush with the icon instead of a boxed input.
 					"flex h-10 min-h-0 w-full rounded-md border-none! bg-transparent py-3 text-base shadow-none! outline-hidden placeholder:text-neutral-400 focus:border-none! focus:shadow-none! disabled:cursor-not-allowed disabled:opacity-50",
 					className,
 				)}

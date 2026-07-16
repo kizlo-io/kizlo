@@ -360,7 +360,6 @@ class Components
     <?php
     }
 
-
     // ====================================================
     // KEY-VALUE REPEATER
     // ====================================================
@@ -392,7 +391,6 @@ class Components
         $add_label         = $args['add_label'] ?? '+ Add';
         $uid               = 'kizlo_kvr_' . md5($name);
 
-        // Extra entries — anything not in fixed
         $extras = array_filter($values, fn($key) => !array_key_exists($key, $fixed), ARRAY_FILTER_USE_KEY);
     ?>
         <?php if ($fixed) : ?>

@@ -5,16 +5,17 @@ import { ArticleTypeField } from "@/modules/settings/shared/article-type-field"
 import { getContent } from "@/modules/settings/shared/content"
 import { NotFound } from "@/modules/settings/shared/not-found"
 import { PageTypeField } from "@/modules/settings/shared/page-type-field"
+import { RestApiSection } from "@/modules/settings/shared/rest-api-section"
 import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
 import { type PostTypeSettingsInput, type PostTypeSettingsOutput, PostTypeSettingsSchema } from "@/shared/lib/schema"
-import { useSettings } from "@/shared/lib/settings"
+import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 
 export function PostTypeSettingsPage() {
 	const params = useParams<{ slug: string }>()
-	const { settings, update, isLoading } = useSettings()
+	const { settings } = useSettings()
 	const postType = settings?.post_types.find((a) => a.slug === params.slug)
 
 	const form = useForm<PostTypeSettingsInput, unknown, PostTypeSettingsOutput>({
@@ -33,25 +34,16 @@ export function PostTypeSettingsPage() {
 		},
 	})
 
-	if (!postType) return <NotFound />
+	const formProps = useSettingsForm("post_types", postType?.slug ?? "", form)
 
-	async function onSubmit(data: PostTypeSettingsOutput) {
-		await update("post_types", postType?.slug ?? "", data)
-		form.reset(form.getValues())
-	}
+	if (!postType) return <NotFound />
 
 	const isSeoSupported = form.watch("seo_enabled")
 	const isArticleType = form.watch("article_type") !== "none"
 	const content = getContent({ name: postType.name ?? "Posts" })
 
 	return (
-		<SettingsForm
-			key={params.slug}
-			isLoading={isLoading}
-			isDirty={form.formState.isDirty}
-			onSubmit={form.handleSubmit(onSubmit)}
-			onCancel={() => form.reset()}
-		>
+		<SettingsForm key={params.slug} {...formProps}>
 			<SettingsSection title={content.url.heading} desc={content.url.description}>
 				<VariableField
 					name="pathname_structure"
@@ -132,16 +124,7 @@ export function PostTypeSettingsPage() {
 				) : null}
 			</SettingsSection>
 
-			{!postType.internal ? (
-				<SettingsSection title={content.access.heading} desc={content.access.description}>
-					<SwitchField
-						control={form.control}
-						name="rest_api_enabled"
-						label={content.access.enabled.label}
-						description={content.access.enabled.description}
-					/>
-				</SettingsSection>
-			) : null}
+			<RestApiSection control={form.control} access={content.access} internal={postType.internal} />
 		</SettingsForm>
 	)
 }

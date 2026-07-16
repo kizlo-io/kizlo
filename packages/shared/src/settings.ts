@@ -1,11 +1,5 @@
 // ====================================================
 // KIZLO SETTINGS — CANONICAL RESPONSE CONTRACT
-//
-// Single source of truth for the shape returned by
-// GET /kizlo/v1/settings. Shared by the server client
-// (packages/kizlo) and the plugin admin (plugins/kizlo) so the
-// two never drift. Mirrors the PHP SettingsModule::toResponse()
-// and each section's getData() defaults 1:1 — keep them in sync.
 // ====================================================
 
 import type { Media } from "./schema"
@@ -102,7 +96,6 @@ export interface BaseContentSettings {
 	search_engine_visibility: boolean | null
 	webpage_type: string
 	article_type: string | null
-	// Ordered breadcrumb middle rows: page IDs and/or the reserved "__parent__" token.
 	breadcrumbs: (string | number)[]
 }
 
@@ -194,10 +187,6 @@ export interface Settings {
 
 // ====================================================
 // CONSTANTS — bootstrap-only (getPluginData)
-//
-// Not part of the GET /settings response; the plugin admin
-// injects these on window.kizlo for the editor's variable
-// pickers and separator options.
 // ====================================================
 
 export interface SettingsVariableGroup {

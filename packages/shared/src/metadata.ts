@@ -157,32 +157,20 @@ export function defineMetadata<T extends MetadataSchemaLike>(schema: T): DefineM
 		 * ```
 		 */
 		find(metadata: KeyValueMetadata[] | MetadataRecord, key?: keyof T): any {
-			// If key is provided, return single value
 			if (key !== undefined) {
 				const keyValuePair = schema[key]
 				if (!keyValuePair) return null
 
-				let metaValue: unknown | undefined
-
-				if (Array.isArray(metadata)) {
-					const metaEntry = metadata.find((m) => m.key === keyValuePair.key)
-					metaValue = metaEntry?.value
-				} else {
-					metaValue = metadata[keyValuePair.key]
-				}
-
+				const metaValue = readMetaValue(metadata, keyValuePair.key)
 				if (!metaValue) return null
 
 				try {
-					const parsed = safeParseJson(metaValue) as unknown
-					const validated = keyValuePair.value.parse(parsed)
-					return validated
+					return keyValuePair.value.parse(safeParseJson(metaValue))
 				} catch {
 					return null
 				}
 			}
 
-			// Otherwise, return all values
 			const result = {} as { [K in keyof T]: z.output<T[K]["value"]> | null }
 
 			for (const schemaKey in schema) {
@@ -193,14 +181,7 @@ export function defineMetadata<T extends MetadataSchemaLike>(schema: T): DefineM
 					continue
 				}
 
-				let metaValue: unknown | undefined
-
-				if (Array.isArray(metadata)) {
-					const metaEntry = metadata.find((m) => m.key === keyValuePair.key)
-					metaValue = metaEntry?.value
-				} else {
-					metaValue = metadata[keyValuePair.key]
-				}
+				const metaValue = readMetaValue(metadata, keyValuePair.key)
 
 				if (!metaValue) {
 					result[schemaKey] = null
@@ -208,9 +189,7 @@ export function defineMetadata<T extends MetadataSchemaLike>(schema: T): DefineM
 				}
 
 				try {
-					const parsed = safeParseJson(metaValue)
-					const validated = keyValuePair.value.parse(parsed)
-					result[schemaKey] = validated as never
+					result[schemaKey] = keyValuePair.value.parse(safeParseJson(metaValue)) as never
 				} catch {
 					result[schemaKey] = null
 				}
@@ -302,6 +281,11 @@ export function maybeStringify(value: unknown): string {
 
 export type InferMetadata<T extends DefineMetadataReturn<any>> = {
 	[K in keyof T["schema"]]: z.output<T["schema"][K]["value"]> | null
+}
+
+function readMetaValue(metadata: KeyValueMetadata[] | MetadataRecord, key: string): unknown {
+	if (Array.isArray(metadata)) return metadata.find((m) => m.key === key)?.value
+	return metadata[key]
 }
 
 function safeParseJson<T>(value: unknown): T {

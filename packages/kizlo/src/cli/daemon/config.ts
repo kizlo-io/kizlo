@@ -8,8 +8,6 @@ import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
 import { log } from "./logger"
 
-// Fixtures carry functions (seed/cleanup), so validate only that each is an
-// object with a string `name`; z.custom passes the value through untouched.
 const fixtureSchema = z.custom<Fixture>(
 	(value) => typeof value === "object" && value !== null && typeof (value as { name?: unknown }).name === "string",
 	{ message: "must be a fixture object with a string `name` (use defineFixture)" },
@@ -22,8 +20,6 @@ const configSchema = z.object({
 	name: z.string().optional(),
 	dev: z
 		.object({
-			// Required at runtime (see resolveDevConfig); kept optional here so a missing
-			// `path` produces our guiding message instead of a raw schema error.
 			path: z.string().optional(),
 			port: z.number().int().positive().optional(),
 			dbPort: z.number().int().positive().optional(),

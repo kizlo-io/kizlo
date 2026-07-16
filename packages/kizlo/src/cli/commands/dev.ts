@@ -49,11 +49,9 @@ function printSummary(info: DevStackInfo): void {
 	if (lan) rows.push(["WP Network", `http://${lan}:${port}/wp-admin`])
 	rows.push(["Database Connection", `127.0.0.1:${info.dbPort}`])
 
-	const width = Math.max(...rows.map(([label]) => label.length)) + 1 // + the colon
+	const width = Math.max(...rows.map(([label]) => label.length)) + 1
 	const lines = ["", ...rows.map(([label, value]) => `   ${dim}- ${`${label}:`.padEnd(width)}${reset} ${cyan}${value}${reset}`)]
 
-	// On a fresh install show the one-time password; on a returning install there's
-	// nothing new to say (the stop hint after the summary is the only trailing line).
 	if (info.secrets) {
 		lines.push(
 			"",
@@ -108,7 +106,6 @@ function updateWpEnv(cfg: ResolvedDevConfig, info: DevStackInfo): { siteSecret: 
 	if (!info.appPassword) return undefined
 	const envPath = join(cfg.configDir, ".env")
 	const existing = existsSync(envPath) ? readFileSync(envPath, "utf8") : ""
-	// Preserve a user-set KIZLO_DEV_SITE_SECRET; mint one only when the dev set has none yet.
 	const siteSecret = readEnvValue(existing, "KIZLO_DEV_SITE_SECRET") ?? randomBytes(32).toString("hex")
 	const { content } = mergeEnv(
 		existing,
@@ -120,7 +117,6 @@ function updateWpEnv(cfg: ResolvedDevConfig, info: DevStackInfo): { siteSecret: 
 			KIZLO_TARGET: "dev",
 		},
 		new Set(WP_ENV_KEYS),
-		// dev never writes the backend URL itself; the key is only needed to label its (skipped) group.
 		envGroups("KIZLO_BACKEND_URL"),
 	)
 	writeFileSync(envPath, content)
@@ -151,21 +147,14 @@ function armForegroundTeardown(cfg: ResolvedDevConfig): void {
 		if (exiting) return
 		exiting = true
 		unregisterSession(cfg.project)
-		// Best effort, fully synchronous: no docker, no spinner — those can hang or throw
-		// on a broken pipe. The watchdog does the actual stop once we're gone.
 		try {
 			note(`Stopping dev stack (${reason})…`)
-		} catch {
-			// stdout already gone (closed terminal) — nothing to print to.
-		}
+		} catch {}
 		process.exit(0)
 	}
 
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => shutdown(signal))
 
-	// Closing the terminal/tab tears down the controlling TTY even when its SIGHUP never
-	// reaches us; reading stdin surfaces that as end/close/error. Only meaningful for an
-	// interactive TTY — a piped or non-interactive stdin would end at once and exit early.
 	if (process.stdin.isTTY) {
 		process.stdin.resume()
 		for (const event of ["end", "close", "error"] as const) process.stdin.on(event, () => shutdown("terminal closed"))
@@ -180,17 +169,8 @@ function armForegroundTeardown(cfg: ResolvedDevConfig): void {
  * not, so without it Node would empty its loop and exit straight after printing.
  */
 async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
-	// Clear any leftover containers for this project (a crashed session, a second
-	// invocation) so `up` builds fresh ones rather than reconciling a stale — often
-	// unhealthy — mysql, the reconcile that intermittently fails with "exited (137)".
-	// Volumes survive, so the DB and install are reused.
 	await removeProjectContainers(cfg.project)
 
-	// Pick host ports that are actually free, preferring the configured/default values.
-	// A port already held (by another stack or an unrelated server) degrades to the next
-	// free one instead of failing the whole `up`. WP publishes on all interfaces, MySQL on
-	// loopback — so each is probed on the host it's bound to. Resolving the ports here, then
-	// (re)activating the stack on them, keeps the override + bootstrap URL in agreement.
 	const port = await pickStackPort(cfg.port, { fixed: cfg.portExplicit, configKey: "dev.port" })
 	const dbPort = await pickStackPort(cfg.dbPort, { fixed: cfg.dbPortExplicit, host: "127.0.0.1", configKey: "dev.dbPort" })
 	const ready: ResolvedDevConfig = { ...cfg, port, dbPort }
@@ -202,16 +182,9 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 
 	const start = Date.now()
 	const creds = await withSpinner("Starting WordPress dev stack", () => bootstrapDev(ready))
-	// A fresh install (first boot or `reset`) returns new credentials; sync them into `.env`
-	// so the app connects to the rebuilt site instead of failing on the wiped DB's old ones.
 	if (creds.appPassword) {
 		const env = updateWpEnv(ready, creds)
 		note("Updated .env with the new WordPress credentials")
-		// Push the dev site settings into the freshly provisioned plugin: the shared secret (so webhook
-		// signing works) plus the Kizlo server's URL/backend_url (so the plugin can reach it to deliver
-		// events). backend_url is the base URL the handler is mounted at; url is its origin. The kizlo
-		// core plugin is always active in the dev stack, so the route exists; warn (don't fail) if the
-		// call doesn't land. A warm resume returns no appPassword, so this never churns.
 		if (env) {
 			const sync = await syncSiteSettings(
 				{ url: creds.url, username: creds.username, password: creds.appPassword },
@@ -233,12 +206,6 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	)
 	process.stdout.write(`\n ${green}✓${reset} Ready in ${took}\n\n`)
 
-	// Fold the contract watcher into `kizlo dev` so a single terminal both runs the
-	// WordPress stack and regenerates the contract on save. Started *after* the "Ready"
-	// summary so its "Contract generated" / "Watching for changes…" lines trail the stack
-	// output instead of splitting it. Skips silently when a standalone `kizlo watch` already
-	// holds the lock; its stop() releases that lock on exit (release is synchronous, so the
-	// process-exit handler is enough).
 	const stopWatcher = await startWatcher(ready.configDir)
 	if (stopWatcher) process.on("exit", stopWatcher)
 
@@ -252,18 +219,12 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
  * (`stop`/`down`/`reset`) manage everything else.
  */
 async function bringUp(): Promise<void> {
-	// Logo first, so the terminal shows something the instant the command runs.
 	printBanner(getVersion())
 
-	// Reap stacks orphaned by a previously crashed/killed foreground session before
-	// starting a new one, so leaked containers from any project self-heal here.
 	const reaped = await reapOrphans()
 	if (reaped.length) note(`Stopped ${reaped.length} orphaned dev stack${reaped.length === 1 ? "" : "s"}: ${reaped.join(", ")}`)
 
-	// startForeground picks the ports and activates the stack; here we only need the config.
 	const cfg = await resolveDevConfig(process.cwd())
-	// The install folder holds thousands of files; keep it out of git, but it stays
-	// visibly named at the path the user chose so they know it's their dev site.
 	if (!cfg.wordpressPath.startsWith("..")) ensureGitignored(cfg.configDir, cfg.wordpressPath)
 
 	await startForeground(cfg)
@@ -278,9 +239,6 @@ const stop = defineCommand({
 })
 
 const down = defineCommand({
-	// No `-v`: the dev DB is the only volume, so dropping it alone leaves the host files
-	// without a database — an inconsistent half-install. `reset` is the destructive path
-	// (it wipes files and DB together); `down` only removes the containers.
 	meta: { name: "down", description: "Stop and remove the dev stack containers (keeps the database and files)" },
 	async run() {
 		const { stack } = await resolve(process.cwd())
@@ -294,10 +252,7 @@ const reset = defineCommand({
 		printBanner(getVersion())
 		const { cfg, stack } = await resolve(process.cwd())
 		await withSpinner("Wiping WordPress dev stack", () => stack.composeDown({ volumes: true }), "Stack wiped")
-		// The install lives on the host, not in a volume, so clear it by hand for a
-		// genuinely fresh rebuild (the WordPress image repopulates core on next up).
 		rmSync(cfg.wordpressDir, { recursive: true, force: true })
-		// Like bare `kizlo dev`, rebuild then run foreground so the fresh stack doesn't leak.
 		await startForeground(cfg)
 	},
 })
@@ -307,6 +262,5 @@ const subCommands = { stop, down, reset }
 export const dev = defineCommand({
 	meta: { name: "dev", description: "Manage the local WordPress dev stack (stop | down | reset)" },
 	subCommands,
-	// Bare `kizlo dev` starts the stack (foreground, stops on exit); the subcommands manage its lifecycle.
 	run: groupDefault(Object.keys(subCommands), bringUp),
 })

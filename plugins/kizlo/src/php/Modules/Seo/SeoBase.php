@@ -55,8 +55,6 @@ class SeoBase
 
     public function robots(): array
     {
-        // A discouraged frontend blocks every crawler outright and drops the
-        // sitemap reference, overriding all per-type rules below.
         if ($this->settings->site->getDiscourageSearchEngines()) {
             return ['rules' => [[
                 'user_agent' => '*',
@@ -65,26 +63,12 @@ class SeoBase
             ]]];
         }
 
-        // Hidden collections are NOT disallowed here. A robots.txt path Disallow
-        // is a blunt prefix tool that over-blocks nested siblings (e.g. blocking
-        // /blog/ would also block a still-visible /blog/category/) and, by
-        // stopping crawling, prevents crawlers from ever seeing the page's
-        // noindex tag. Deindexing is handled per-URL instead: each schema emits a
-        // noindex robots meta for hidden collections and they are dropped from the
-        // sitemap. This mirrors Yoast's behavior.
         $rules = [
             'user_agent' => '*',
             'allow'      => ['/'],
             'disallow'   => [],
         ];
 
-        // Custom rules replace the generated ruleset outright: robots.txt groups
-        // don't stack (a crawler obeys one user-agent group), so a baseline
-        // `Allow: /` merged into a user's `*` group would win ties and defeat an
-        // intended `Disallow: /`. The default group is a no-op anyway (a group
-        // with no rules already allows everything), so replacing it loses
-        // nothing. Stored flat {user_agent, rule, path} directives are grouped
-        // by agent into the emitted {user_agent, allow[], disallow[]} shape.
         $customRules = $this->settings->crawling->robots->getCustomRules();
         if (!empty($customRules)) {
             $result = ['rules' => $this->groupCustomRules($customRules)];
@@ -92,7 +76,6 @@ class SeoBase
             $result = ['rules' => [$rules]];
         }
 
-        // Sitemap
         if ($this->settings->crawling->robots->getIncludeSitemap()) {
             $sitemapPathname  = $this->settings->crawling->sitemaps->getPathnameStructure();
             $result['sitemaps'] = [untrailingslashit($this->resolveUrl($this->settings->getBaseUrl(), $sitemapPathname))];
@@ -145,17 +128,9 @@ class SeoBase
         foreach ($this->settings->postTypes->all() as $post_type_slug => $post_type) {
             if (! $post_type->getSearchEngineVisibility()) continue;
 
-            // Count only indexable posts (published minus per-post noindex overrides)
-            // so a type whose posts are all noindexed drops out of the index instead
-            // of linking an empty sitemap.
             $published = (int) (wp_count_posts($post_type_slug)->publish ?? 0);
             $count     = max(0, $published - ($noindex_counts[$post_type_slug] ?? 0));
 
-            // The blog's sitemaps carry an injected entry even with no posts of
-            // their own: the post sitemap holds the blog index and the page sitemap
-            // holds the homepage. The homepage lives in exactly one of them (Yoast
-            // issue #5428): the post sitemap on a latest-posts home, the page sitemap
-            // on a static home — and drops out if that front page is noindexed.
             $carries_front = match ($post_type_slug) {
                 'post'  => $show_on_front === 'posts' || ($posts_page_id > 0 && ! $this->isNoindexed($posts_page_id)),
                 'page'  => $show_on_front === 'page' && $front_page_id > 0 && ! $this->isNoindexed($front_page_id),
@@ -178,8 +153,6 @@ class SeoBase
         foreach ($this->settings->taxonomies->all() as $taxonomy_slug => $taxonomy) {
             if (! $taxonomy->getSearchEngineVisibility()) continue;
 
-            // Exclude per-term noindex overrides so the count tracks indexable terms,
-            // mirroring how noindexed posts are dropped from the post type count.
             $count = wp_count_terms([
                 'taxonomy'   => $taxonomy_slug,
                 'hide_empty' => true,
@@ -202,9 +175,6 @@ class SeoBase
         }
 
         if ($this->settings->authors->getEnabled() && $this->settings->authors->getSearchEngineVisibility()) {
-            // Count only authors with published posts — the same population the
-            // author sitemap actually lists — not every registered user, so the
-            // page count and presence stay aligned with the entries.
             $count = count(get_users(['has_published_posts' => true, 'fields' => 'ID']));
 
             if ($count > 0) {
@@ -315,7 +285,6 @@ class SeoBase
 
         if (empty($terms) || is_wp_error($terms)) return null;
 
-        // Terms don't have modified date natively so use most recent post in taxonomy
         $posts = get_posts([
             'post_type'      => 'any',
             'posts_per_page' => 1,
@@ -369,8 +338,6 @@ class SeoBase
      */
     protected function buildRobots(bool $indexable, bool $nofollow = false): array
     {
-        // A discouraged frontend is noindex everywhere, regardless of the
-        // per-page/per-type resolution the caller passed in.
         $indexable = $indexable && !$this->settings->site->getDiscourageSearchEngines();
 
         return [
@@ -616,7 +583,6 @@ class SeoBase
         foreach (self::OVERRIDE_KEYS as $field => $meta_key) {
             $value = get_post_meta($post->ID, $meta_key, true);
 
-            // Only set fields are present; an absent key means "inherit default".
             if ($value !== '' && $value !== false && $value !== null) {
                 $overrides[$field] = $value;
             }
@@ -643,7 +609,6 @@ class SeoBase
         foreach (self::OVERRIDE_KEYS as $field => $meta_key) {
             $value = get_term_meta($term->term_id, $meta_key, true);
 
-            // Only set fields are present; an absent key means "inherit default".
             if ($value !== '' && $value !== false && $value !== null) {
                 $overrides[$field] = $value;
             }
@@ -703,8 +668,6 @@ class SeoBase
             'datePublished'    => get_the_date('c', $post),
         ];
 
-        // Yoast only emits dateModified when the post was actually edited after
-        // publishing, not for a freshly published post.
         $published = get_the_date('c', $post);
         $modified  = get_the_modified_date('c', $post);
         if (strtotime($modified) > strtotime($published)) {
@@ -713,7 +676,6 @@ class SeoBase
 
         $data['wordCount'] = str_word_count(wp_strip_all_tags($post->post_content));
 
-        // commentCount is only meaningful (and only emitted) when comments are open.
         if (comments_open($post->ID)) {
             $data['commentCount'] = (int) get_comments_number($post->ID);
         }
@@ -739,9 +701,6 @@ class SeoBase
             $data['thumbnailUrl'] = $thumbnail_url;
         }
 
-        // Tags become keywords, categories become articleSection (matching Yoast).
-        // The auto-assigned default category ("Uncategorized") is not a real
-        // section, so it is excluded.
         $tags = get_the_tags($post->ID);
         if ($tags && !is_wp_error($tags)) {
             $data['keywords'] = array_map(fn($tag) => $tag->name, $tags);
@@ -889,8 +848,6 @@ class SeoBase
             'inLanguage' => $this->language(),
         ];
 
-        // The site's main entity (Organization / Person). Yoast sets this only on the
-        // front page, where the page is "about" whoever the site represents.
         if (!empty($page['about'])) {
             $data['about'] = ['@id' => $page['about']];
         }
@@ -1125,9 +1082,6 @@ class SeoBase
             $data['foundingDate'] = $org->getFoundingDate();
         }
 
-        // Identifier and publishing-policy fields are flat schema.org properties
-        // emitted only when set; a setting-key → schema-key map keeps the builder
-        // from needing a typed getter per field.
         $extra = $org->getData();
 
         $identifier_map = [
@@ -1219,7 +1173,6 @@ class SeoBase
             'name'  => $user->display_name,
         ];
 
-        // Profile photo from settings, falling back to the user's avatar.
         $image_url = !empty($person->getImage())
             ? wp_get_attachment_url($person->getImage())
             : (get_avatar_url($user->ID, ['size' => 96]) ?: false);
@@ -1277,7 +1230,6 @@ class SeoBase
             $data['mainEntityOfPage'] = ['@id' => trailingslashit($main_entity_url)];
         }
 
-        // TODO: Get social profiles from user metabox.
         $social_profiles = get_user_meta($user->ID, 'kizlo_social_profiles', true);
 
         $sameAs = [];
@@ -1285,25 +1237,21 @@ class SeoBase
         if (!empty($social_profiles)) array_push($sameAs, ...array_column($social_profiles, 'url'));
         if (!empty($sameAs)) $data['sameAs'] = $sameAs;
 
-        // TODO: Get gender from user metabox.
         $gender = get_user_meta($user->ID, 'kizlo_gender', true);
         if (!empty($gender)) {
             $data['gender'] = $gender;
         }
 
-        // TODO: Get knows about from user metabox.
         $knows_about = get_user_meta($user->ID, 'kizlo_knows_about', true);
         if (!empty($knows_about)) {
             $data['knowsAbout'] = $knows_about;
         }
 
-        // TODO: Get knows language from user metabox.
         $knows_language = get_user_meta($user->ID, 'kizlo_knows_language', true);
         if (!empty($knows_language)) {
             $data['knowsLanguage'] = $knows_language;
         }
 
-        // TODO: Get job title from user metabox.
         $job_title = get_user_meta($user->ID, 'kizlo_job_title', true);
         if (!empty($job_title)) {
             $data['jobTitle'] = $job_title;
@@ -1577,7 +1525,6 @@ class SeoBase
             str_replace($this->getOrigin($wp_permalink), '', $wp_permalink)
         );
     }
-
 
     /**
      * Resolve the full URL for a given term.

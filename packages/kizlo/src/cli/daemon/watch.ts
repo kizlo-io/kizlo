@@ -19,14 +19,12 @@ async function regenerate(cfg: ResolvedConfig): Promise<void> {
 		if (ok) log.success("Contract updated")
 		else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
 	} catch (error) {
-		// A transient error in the user's server (e.g. mid-edit syntax error) must
-		// not crash the watcher — keep the previous contract and wait for the fix.
 		log.error("Failed to update the Kizlo contract:", error)
 	}
 }
 
 /** Watches the server directory and regenerates the contract on change. */
-export async function watch(cfg: ResolvedConfig): Promise<FSWatcher> {
+async function watch(cfg: ResolvedConfig): Promise<FSWatcher> {
 	const watcher = new FSWatcher({
 		persistent: true,
 		ignoreInitial: true,
@@ -52,8 +50,6 @@ export async function watch(cfg: ResolvedConfig): Promise<FSWatcher> {
  */
 export async function startWatcher(cwd: string, opts?: { dir?: string }): Promise<(() => void) | undefined> {
 	const lock = lockPath(cwd)
-	// Single-instance: a framework dev script and a manual `kizlo watch` (or a
-	// `kizlo dev` that folds it in) must not both watch and write the same contract.
 	if (isLocked(lock)) {
 		log.info("Watcher already running — skipping the contract watcher.")
 		return undefined
@@ -62,8 +58,6 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 	const cfg = await resolveConfig(cwd, { dir: opts?.dir })
 	acquire(lock)
 
-	// A broken server entry at startup shouldn't abort the watcher — report it and
-	// keep watching so the next save can fix it.
 	try {
 		const ok = await generateOnce(cfg)
 		if (ok) log.success("Contract generated")
@@ -77,8 +71,6 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 	return () => {
 		if (stopped) return
 		stopped = true
-		// release() is synchronous, so it clears the lock even from a process-exit
-		// handler; the watcher's own fds are freed when the process dies.
 		release(lock)
 		void watcher.close()
 	}

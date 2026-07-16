@@ -72,12 +72,9 @@ export function replaceOrigin(url: string, trustedOrigin: string): string {
 	const trusted = new URL(trustedOrigin)
 	const trustedBase = `${trusted.protocol}//${trusted.host}`
 
-	// Handle relative paths
 	if (url.startsWith("/")) return `${trustedBase}${url}`
 
-	// Parse the target URL
 	const target = new URL(url)
 
-	// Replace origin (protocol + host) but keep pathname, search, hash
 	return `${trustedBase}${target.pathname}${target.search}${target.hash}`
 }

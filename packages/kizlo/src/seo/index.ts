@@ -83,9 +83,6 @@ export const SEO_ROUTER_MAP = {
 			},
 		),
 
-		// `index` reuses the `/seo/sitemaps/:type` route with the reserved type `index`, which
-		// returns the entry list plus the canonical origin resolved from the Kizlo site URL
-		// setting (never a real content type, so there is no collision with `post_type` etc.).
 		index: createProcedure(
 			{
 				scope: "internal",

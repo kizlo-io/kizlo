@@ -29,9 +29,7 @@ async function stopStack(): Promise<void> {
 		const { stdout } = await exec("docker", ["ps", "-q", "--filter", `label=com.docker.compose.project=${project}`])
 		const ids = stdout.split("\n").filter(Boolean)
 		if (ids.length) await exec("docker", ["stop", ...ids])
-	} catch {
-		// Docker gone or already stopped — nothing left to do.
-	}
+	} catch {}
 }
 
 if (!parentPid || !project) process.exit(1)

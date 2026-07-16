@@ -31,7 +31,6 @@ class RestGuard
 
     public function requireAdmin(mixed $result): mixed
     {
-        // An earlier auth handler already failed — surface that error as-is.
         if (is_wp_error($result)) return $result;
 
         if (! is_user_logged_in()) {

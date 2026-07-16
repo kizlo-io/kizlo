@@ -3,7 +3,6 @@ import { describe, expect, test } from "vitest"
 import type { S2SClient } from "../../kizlo"
 import { createRootViewport } from "./metadata"
 
-// Stub client: createRootViewport only calls `client.settings.get.call()`.
 function clientWithBrand(brand: Partial<BrandSettings>): S2SClient<[]> {
 	return { settings: { get: { call: async () => ({ brand }) } } } as unknown as S2SClient<[]>
 }

@@ -87,7 +87,7 @@ export function customAlphabet(alphabet: string, size: number) {
 export function random(options?: RandomOptions): string {
 	const prefix = options?.prefix
 	const totalLength = options?.length ?? STANDARD_ID_LENGTH
-	const randomLength = prefix !== undefined ? totalLength - prefix.length - 1 : totalLength // -1 for underscore
+	const randomLength = prefix !== undefined ? totalLength - prefix.length - 1 : totalLength
 
 	if (randomLength < 1) throw new Error(`length too short to accommodate prefix "${prefix}"`)
 

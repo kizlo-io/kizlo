@@ -5,7 +5,6 @@ import { createProcedure, type Procedure } from "./procedure"
 
 type OutputOf<P> = P extends Procedure<any, any, infer O, any> ? O : never
 
-// A well-formed extension whose router is a concrete, literal shape.
 const billing = createExtension({
 	id: "billing",
 	init: () => ({
@@ -28,7 +27,6 @@ const loyalty = createExtension({
 	}),
 })
 
-// An extension that declares no router — its shape stays the wide `AnyProcedureRouter`.
 const empty = createExtension({ id: "empty", init: () => ({}) })
 
 describe("InferExtensionRouter", () => {
@@ -36,7 +34,6 @@ describe("InferExtensionRouter", () => {
 		type R = InferExtensionRouter<[typeof billing]>
 
 		expectTypeOf<keyof R>().toEqualTypeOf<"billing">()
-		// The nested procedure keeps its (jsonified) output type end-to-end.
 		expectTypeOf<OutputOf<R["billing"]["invoices"]["get"]>>().toEqualTypeOf<{ total: number }>()
 		expectTypeOf<OutputOf<R["billing"]["invoices"]["get"]>>().not.toBeAny()
 	})

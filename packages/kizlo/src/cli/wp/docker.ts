@@ -49,7 +49,6 @@ function run(cmd: string, args: string[], env: NodeJS.ProcessEnv, opts?: RunInpu
 		})
 		child.on("error", reject)
 		child.on("close", (code) => resolvePromise({ code: code ?? 0, stdout, stderr }))
-		// Stream a file (avoids loading a large DB dump into memory), else a string, else nothing.
 		if (opts?.inputFile !== undefined) createReadStream(opts.inputFile).on("error", reject).pipe(child.stdin)
 		else if (opts?.input !== undefined) child.stdin.end(opts.input)
 		else child.stdin.end()
@@ -91,9 +90,6 @@ function bind(stack: Stack): DockerStack {
 		await compose(["stop"], opts)
 	}
 
-	// `docker compose port wordpress 80` prints `0.0.0.0:<port>` when the container is up,
-	// nothing when it isn't — so a parsed port doubles as "this stack is running". Tells a
-	// warm stack we should reuse apart from a cold one we must (re)pick a port for.
 	const publishedPort = async (): Promise<number | undefined> => {
 		const res = await compose(["port", "wordpress", "80"])
 		const match = res.stdout.match(/:(\d+)\s*$/)
@@ -128,9 +124,6 @@ function activeStack(): DockerStack {
 	if (!active) throw new Error("No active kizlo stack — createStack() must run first.")
 	return bind(active)
 }
-
-// Stack-less helpers retained for fixtures (kizlo/test). They target the active
-// stack, which the running command set via createStack.
 
 /** `docker compose <args>` against the active stack. */
 export const compose: DockerStack["compose"] = (args, opts) => activeStack().compose(args, opts)

@@ -26,11 +26,6 @@ export interface PopoverProps {
 	children: React.ReactNode | ((props: PopoverRenderProps) => React.ReactNode)
 	placement?: PopoverPlacement
 	offset?: number
-	// Where focus lands when the panel opens. `true` (default) focuses the panel
-	// itself, which is what makes an outside click reliably close it even when
-	// the content has no tabbable element. `"firstElement"`/`"firstInputElement"`
-	// move focus to a child, but with no tabbable child nothing is focused and
-	// the panel won't close on outside click. `false` disables focus entirely.
 	focusOnMount?: boolean | "firstElement" | "firstInputElement"
 	className?: string
 	contentClassName?: string

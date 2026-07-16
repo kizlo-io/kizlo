@@ -35,8 +35,6 @@ class TermSchema extends SeoBase
             'offset'     => ($page - 1) * self::SITEMAP_PER_PAGE,
             'orderby'    => 'count',
             'order'      => 'DESC',
-            // Exclude per-term noindex overrides at the query level so page offsets
-            // and the index count stay aligned on indexable terms, mirroring posts.
             'meta_query' => [[
                 'key'     => self::OVERRIDE_KEYS['noindex'],
                 'compare' => 'NOT EXISTS',
@@ -99,10 +97,6 @@ class TermSchema extends SeoBase
         $indexable = $taxonomy_settings->getSearchEngineVisibility() && empty($overrides['noindex']);
         $nofollow  = !empty($overrides['nofollow']);
 
-        // Open Graph and Twitter fall back to the SEO title/description; a term
-        // has no featured image, so the base social image is the site fallback
-        // image, with the og/twitter override layered on top and Twitter falling
-        // back to Open Graph.
         $social = $this->resolveSocial(
             $overrides,
             $title,
@@ -189,7 +183,6 @@ class TermSchema extends SeoBase
     {
         $taxonomy_settings = $this->settings->taxonomies->get($term->taxonomy);
 
-        // Real ancestors: parent terms, top-down.
         $parents   = [];
         $parent_id = $term->parent;
         while ($parent_id) {

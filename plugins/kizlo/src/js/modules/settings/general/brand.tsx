@@ -4,7 +4,7 @@ import { ColorField, FieldError } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { BrandSettingsSchema, type BrandSettingsSchemaInput, type BrandSettingsSchemaOutput } from "@/shared/lib/schema"
-import { useSettings } from "@/shared/lib/settings"
+import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 
 type BrandControl = Control<BrandSettingsSchemaInput, unknown, BrandSettingsSchemaOutput>
 type BrandFieldName = FieldPath<BrandSettingsSchemaInput>
@@ -42,7 +42,7 @@ function MediaField({ control, label, name, url, width, height, desc }: MediaFie
 }
 
 export function BrandSettingsPage() {
-	const { settings, update, isLoading } = useSettings()
+	const { settings } = useSettings()
 	const brand = settings?.brand
 
 	const form = useForm<BrandSettingsSchemaInput, unknown, BrandSettingsSchemaOutput>({
@@ -64,18 +64,8 @@ export function BrandSettingsPage() {
 		},
 	})
 
-	async function onSubmit(data: BrandSettingsSchemaOutput) {
-		await update("brand", data)
-		form.reset(form.getValues())
-	}
-
 	return (
-		<SettingsForm
-			isLoading={isLoading}
-			isDirty={form.formState.isDirty}
-			onSubmit={form.handleSubmit(onSubmit)}
-			onCancel={() => form.reset()}
-		>
+		<SettingsForm {...useSettingsForm("brand", form)}>
 			<SettingsSection
 				title="Colors"
 				desc="The theme color tints the mobile browser chrome and the installed app's window; its dark variant is used when the visitor prefers a dark color scheme. The background color fills the app launch screen while it loads."

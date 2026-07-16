@@ -21,9 +21,7 @@ class CartModule
             'namespace'       => 'kizlo',
             'endpoint'        => CartSchema::IDENTIFIER,
             'data_callback'   => function () {
-                return array_merge([
-                    // 
-                ], kizlo_apply_extend_filter('cart'));
+                return array_merge([], kizlo_apply_extend_filter('cart'));
             },
             'schema_type'     => ARRAY_A,
         ]);
@@ -32,9 +30,7 @@ class CartModule
             'namespace'       => 'kizlo',
             'endpoint'        => CartItemSchema::IDENTIFIER,
             'data_callback'   => function ($cart_item) {
-                return array_merge([
-                    // 
-                ], kizlo_apply_extend_filter('cart_item', $cart_item));
+                return array_merge([], kizlo_apply_extend_filter('cart_item', $cart_item));
             },
             'schema_type'     => ARRAY_A,
         ]);

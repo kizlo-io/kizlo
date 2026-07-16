@@ -98,9 +98,7 @@ class ProductModule
 
     public function extendCategory(array $data, WP_Term $category): array
     {
-        $data['kizlo'] = array_merge([
-            // 
-        ], kizlo_apply_extend_filter('product_category', $category));
+        $data['kizlo'] = array_merge([], kizlo_apply_extend_filter('product_category', $category));
 
         return $data;
     }
@@ -270,10 +268,6 @@ class ProductModule
         if (!$post) {
             return new WP_Error('not_found', 'Product not found.', ['status' => 404]);
         }
-
-        // if (! $this->preview->verifyNonce($post->ID, $nonce)) {
-        //     return new WP_Error('rest_forbidden', 'Product not found.', ['status' => 403]);
-        // }
 
         return $this->getProductById($post->ID);
     }

@@ -46,11 +46,6 @@ export function deserializeSeo(data: WPK_Seo): Seo {
 
 export type SitemapIndexEntry = Pick<Sitemap, "key" | "pages" | "lastmod">
 
-// Slug scheme: page 1 is `/sitemaps/{key}.xml`, later pages are `/sitemaps/{key}-{n}.xml`.
-// The `-{n}` separator keeps parsing unambiguous (a bare numeric suffix lets a greedy
-// match swallow the page into the key). `parseSitemapSlug` is the inverse and the two
-// must stay in lockstep: the index `<loc>` entries are built by `sitemapEntryPath` and
-// read back through `parseSitemapSlug`.
 export function sitemapEntryPath(key: string, page: number): string {
 	return `/sitemaps/${key}${page > 1 ? `-${page}` : ""}.xml`
 }

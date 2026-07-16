@@ -2,13 +2,13 @@ import { type Duration, random, seconds, timestampSec, tryCatch } from "@kizlo/s
 import { jwtVerify, SignJWT } from "jose"
 import { type ConnInfo, createMiddleware, KizloError, WP_KIZLO_BASE } from "kizlo"
 
-export interface TokenPayload {
+interface TokenPayload {
 	sub: string
 	iat: number
 	exp: number
 }
 
-export async function mintGuestToken(secret: string, ttlSeconds: number): Promise<{ jwt: string; sub: string }> {
+async function mintGuestToken(secret: string, ttlSeconds: number): Promise<{ jwt: string; sub: string }> {
 	const sub = random({ length: 32, prefix: "t" })
 
 	const jwt = await new SignJWT()
@@ -21,16 +21,16 @@ export async function mintGuestToken(secret: string, ttlSeconds: number): Promis
 	return { jwt, sub }
 }
 
-export async function verifyToken(token: string, secret: string): Promise<TokenPayload> {
+async function verifyToken(token: string, secret: string): Promise<TokenPayload> {
 	const { payload } = await jwtVerify<TokenPayload>(token, encodeSecret(secret))
 	return payload
 }
 
-export function encodeSecret(secret: string): Uint8Array {
+function encodeSecret(secret: string): Uint8Array {
 	return new TextEncoder().encode(secret)
 }
 
-export function getCartHeaders(options: { userId?: number; token?: string; connInfo: ConnInfo | null }) {
+function getCartHeaders(options: { userId?: number; token?: string; connInfo: ConnInfo | null }) {
 	const { connInfo, userId, token } = options
 
 	const headers: Record<string, string> = {}

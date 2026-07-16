@@ -43,7 +43,6 @@ interface MetaBoxProps {
 	meta: SeoMeta
 	defaults: SeoDefaults
 	variables: Variable[]
-	// Omitted by the term meta box, which keeps the frozen defaults.
 	templates?: SeoTemplates
 	context?: Record<string, string>
 	variant?: SeoVariant
@@ -53,8 +52,6 @@ const TITLE_MAX = 60
 const DESC_MAX = 160
 
 export function MetaBox({ meta, defaults, variables, templates, context: baseline = {}, variant = "post" }: MetaBoxProps) {
-	// Terms are always a Schema.org CollectionPage with no featured image, so the
-	// page-type and article-type controls don't apply.
 	const isTerm = variant === "term"
 	const noun = isTerm ? "term" : "post"
 	const templateSource = isTerm ? "taxonomy" : "post-type"
@@ -64,8 +61,6 @@ export function MetaBox({ meta, defaults, variables, templates, context: baselin
 			title: meta.title,
 			description: meta.description,
 			canonical: meta.canonical,
-			// Pre-select the post-type default so the recommended value is visible;
-			// an existing override wins if present.
 			webpage_type: meta.webpage_type || defaults.webpage_type,
 			article_type: meta.article_type || defaults.article_type,
 			og_title: meta.og.title,
@@ -94,8 +89,6 @@ export function MetaBox({ meta, defaults, variables, templates, context: baselin
 				og_description: values.og_description.trim(),
 				twitter_title: values.twitter_title.trim(),
 				twitter_description: values.twitter_description.trim(),
-				// Only persist a schema type when it deviates from the default, so an
-				// untouched select keeps inheriting the post-type setting.
 				...(values.webpage_type !== defaults.webpage_type ? { webpage_type: values.webpage_type } : {}),
 				...(values.article_type !== defaults.article_type ? { article_type: values.article_type } : {}),
 				...(ogImage ? { og_image_id: ogImage.id } : {}),
@@ -104,21 +97,13 @@ export function MetaBox({ meta, defaults, variables, templates, context: baselin
 		[values, defaults.webpage_type, defaults.article_type, ogImage, twitterImage],
 	)
 
-	// Resolve variables against the live editor state so the search preview shows
-	// real values and updates as the author types.
 	const context = useEditorContext(baseline, variant)
 	const resolved = (template: string) => resolveTemplate(template, context).trim()
 
-	// Live-resolved defaults: what each field falls back to when left empty. Used
-	// as the field placeholders and as the preview value when there's no override,
-	// so the placeholders track the editor instead of showing the stale
-	// server-rendered values.
 	const defaultTitle = resolved(templates?.title ?? defaults.title) || defaults.title
 	const defaultDescription = resolved(templates?.description ?? defaults.description) || defaults.description
 	const defaultCanonical = templates ? resolveTemplate(templates.canonical, context) : defaults.canonical
 
-	// A populated override wins, resolved live too; otherwise fall back to the
-	// live default so editing the post updates the preview even when SEO is blank.
 	const effectiveTitle = resolved(values.title) || defaultTitle
 	const effectiveDescription = resolved(values.description) || defaultDescription
 	const effectiveUrl = values.canonical.trim() || defaultCanonical
@@ -313,8 +298,6 @@ function SocialGroup({
 	)
 }
 
-// Red when missing or over the limit, amber when present but under the
-// recommended minimum, green inside the recommended window.
 function lengthTone(length: number, min: number, max: number): Tone {
 	if (length === 0 || length > max) return "bad"
 	if (length < min) return "warn"

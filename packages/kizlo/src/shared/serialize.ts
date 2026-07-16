@@ -31,18 +31,14 @@ export function deserializeListMetadata(data: WP_ListMetadata): ListMetadata {
 
 export function serializeCurrencyFormat(data: CurrencyFormat): WP_CurrencyFormat {
 	return {
-		// Identity
 		currency_code: data.currencyCode,
 		currency_symbol: data.currencySymbol,
 
-		// Formatting
 		currency_prefix: data.currencyPrefix,
 		currency_suffix: data.currencySuffix,
 
-		// Precision
 		currency_minor_unit: data.currencyMinorUnit,
 
-		// Separators
 		currency_decimal_separator: data.currencyDecimalSeparator,
 		currency_thousand_separator: data.currencyThousandSeparator,
 	}
@@ -50,18 +46,14 @@ export function serializeCurrencyFormat(data: CurrencyFormat): WP_CurrencyFormat
 
 export function deserializeCurrencyFormat(data: WP_CurrencyFormat): CurrencyFormat {
 	return {
-		// Identity
 		currencyCode: data.currency_code,
 		currencySymbol: data.currency_symbol,
 
-		// Formatting
 		currencyPrefix: data.currency_prefix,
 		currencySuffix: data.currency_suffix,
 
-		// Precision
 		currencyMinorUnit: data.currency_minor_unit,
 
-		// Separators
 		currencyDecimalSeparator: data.currency_decimal_separator,
 		currencyThousandSeparator: data.currency_thousand_separator,
 	}

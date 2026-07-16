@@ -41,8 +41,6 @@ export interface MediaInputProps extends React.HTMLAttributes<HTMLElement> {
 }
 
 export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
-	// Locally remembered pick, so a freshly selected item can render its preview
-	// before the parent commits it. Seeded from `url` for uncontrolled callers.
 	const [picked, setPicked] = useState<MediaItem | null>(props.url ? { id: 0, url: props.url, title: "", mime: "" } : null)
 	const [isDragging, setDragging] = useState(false)
 	const [isUploading, setUploading] = useState(false)
@@ -52,9 +50,6 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 	const typeLabel = TYPE_LABEL[props.type]
 	const hasPreview = props.type === "image" || props.type === "video"
 
-	// In controlled mode the form owns the value (a media id): the preview follows
-	// it, falling back to `url` for the saved media and to the local pick while a
-	// new selection is still uncommitted. Otherwise the local pick drives it.
 	const item: MediaItem | null =
 		props.value === undefined
 			? picked
@@ -74,9 +69,6 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 	const onSelect = async () => {
 		if (isUploading) return
 
-		// WP's media modal toggles `overflow: hidden` on <body> while open and
-		// resets the window scroll position when it closes, jumping the settings
-		// page to the top. Capture and restore the offset around the modal.
 		const scrollY = window.scrollY
 		const selected = (await media.open())[0]
 		requestAnimationFrame(() => window.scrollTo(0, scrollY))

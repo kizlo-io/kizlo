@@ -7,18 +7,8 @@ use WP_REST_Request;
 use WP_REST_Response;
 use WPCF7_ContactForm;
 
-/**
- * Handles CF7 form submission via the Kizlo REST API.
- *
- * @since 1.0.0
- */
 class Cf7Module
 {
-    /**
-     * Boot the service — register hooks.
-     *
-     * @since 1.0.0
-     */
     public function register(): void
     {
         kizlo_register_route([
@@ -37,14 +27,6 @@ class Cf7Module
         ]);
     }
 
-    /**
-     * Validate that the given form ID corresponds to a published CF7 form.
-     *
-     * @since 1.0.0
-     *
-     * @param int $form_id The form ID to validate.
-     * @return true|WP_Error
-     */
     public function validate_form_id(int $form_id): true|WP_Error
     {
         if (! function_exists('wpcf7_contact_form')) {
@@ -58,7 +40,6 @@ class Cf7Module
         if (! wpcf7_contact_form($form_id)) {
             return new WP_Error(
                 'cf7_form_not_found',
-                /* translators: %d: form ID */
                 sprintf('No Contact Form 7 form found with ID %d.', $form_id),
                 ['status' => 404]
             );
@@ -67,14 +48,6 @@ class Cf7Module
         return true;
     }
 
-    /**
-     * Handle a CF7 form submission via the REST API.
-     *
-     * @since 1.0.0
-     *
-     * @param WP_REST_Request $request Incoming REST request.
-     * @return WP_REST_Response|WP_Error
-     */
     public function handle_submission(WP_REST_Request $request): WP_REST_Response|WP_Error
     {
         $form_id = (int) $request->get_param('form_id');
@@ -102,11 +75,6 @@ class Cf7Module
     }
 
     /**
-     * Extract and merge field data from the REST request body.
-     *
-     * @since 1.0.0
-     *
-     * @param WP_REST_Request $request
      * @return array<string, mixed>
      */
     private function extract_form_data(WP_REST_Request $request): array
@@ -122,14 +90,8 @@ class Cf7Module
     }
 
     /**
-     * Populate $_POST with CF7-expected keys and run the submission pipeline.
-     * Restores the original $_POST afterwards.
-     *
-     * @since 1.0.0
-     *
-     * @param WPCF7_ContactForm    $form
      * @param array<string, mixed> $form_data
-     * @return array<string, mixed> CF7 submission result.
+     * @return array<string, mixed>
      */
     private function submit_form(WPCF7_ContactForm $form, array $form_data): array
     {
@@ -143,12 +105,10 @@ class Cf7Module
             '_wpcf7_container_post' => 0,
         ]);
 
-        // Bypass spam ONLY after captcha passes
         add_filter('wpcf7_skip_spam_check', '__return_true');
 
         $result = $form->submit();
 
-        // Clean up
         $_POST = $original_post;
         remove_filter('wpcf7_skip_spam_check', '__return_false');
 
@@ -156,10 +116,6 @@ class Cf7Module
     }
 
     /**
-     * Normalize CF7's raw invalid-fields array into a cleaner API shape.
-     *
-     * @since 1.0.0
-     *
      * @param array<string, array{reason?: string, idref: string}> $invalid_fields
      * @return array<int, array{field: string, message: string}>
      */

@@ -2,8 +2,9 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
+import { githubRelease, kizloRelease } from "./constants"
 import { isLocalPlugin } from "./types"
-import { credentialsPath, findConfigDir, githubRelease, kizloRelease, resolvePluginSource } from "./utils"
+import { credentialsPath, findConfigDir, resolvePluginSource } from "./utils"
 
 describe("githubRelease", () => {
 	test("builds a release-zip URL where the asset is named after the tag", () => {

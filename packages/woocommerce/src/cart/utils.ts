@@ -164,7 +164,7 @@ export function deserializeCart(data: WCS_Cart): Cart {
 	}
 }
 
-export function deserializeCartShippingAddress(cart: WCS_Cart): CartShippingAddress {
+function deserializeCartShippingAddress(cart: WCS_Cart): CartShippingAddress {
 	return {
 		address1: cart.shipping_address.address_1,
 		address2: cart.shipping_address.address_2,
@@ -179,7 +179,7 @@ export function deserializeCartShippingAddress(cart: WCS_Cart): CartShippingAddr
 	}
 }
 
-export function deserializeCartBillingAddress(cart: WCS_Cart): CartBillingAddress {
+function deserializeCartBillingAddress(cart: WCS_Cart): CartBillingAddress {
 	return {
 		address1: cart.billing_address.address_1,
 		address2: cart.billing_address.address_2,
@@ -195,7 +195,7 @@ export function deserializeCartBillingAddress(cart: WCS_Cart): CartBillingAddres
 	}
 }
 
-export interface LineItemTotals {
+interface LineItemTotals {
 	unitPrice: number
 	grossAmount: number
 	discountAmount: number
@@ -205,7 +205,7 @@ export interface LineItemTotals {
 	total: number
 }
 
-export interface LineItemTotalsInput {
+interface LineItemTotalsInput {
 	quantity: number
 	subtotal: number
 	subtotal_tax: number
@@ -213,26 +213,13 @@ export interface LineItemTotalsInput {
 	total: number
 }
 
-export function calculateLineItemTotals(input: LineItemTotalsInput): LineItemTotals {
-	// Unit Price = subtotal / quantity
+function calculateLineItemTotals(input: LineItemTotalsInput): LineItemTotals {
 	const unitPrice = input.subtotal / input.quantity
-
-	// Gross amount = subtotal
 	const grossAmount = input.subtotal
-
-	// Discount Amount = subtotal - total
 	const discountAmount = input.subtotal - input.total
-
-	// Discount Tax Amount = subtotalTax - totalTax
 	const discountTaxAmount = input.subtotal_tax - input.total_tax
-
-	// Net Amount = total
 	const netAmount = input.total
-
-	// Tax Amount = line.totalTax
 	const taxAmount = input.total_tax
-
-	// Total = line.total + line.totalTax
 	const total = input.total + input.total_tax
 
 	return {

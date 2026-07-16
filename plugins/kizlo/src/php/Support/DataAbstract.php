@@ -137,7 +137,6 @@ abstract class DataAbstract
      */
     protected function validate(string $key, mixed $value): void
     {
-        // override in child
     }
 
     /**

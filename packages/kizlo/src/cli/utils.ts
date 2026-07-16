@@ -90,7 +90,7 @@ export function resolveModuleImport(cwd: string, targetRel: string, fromDirRel: 
 	if (alias !== undefined) {
 		if (alias === "") return relativeImport(targetRel, fromDirRel)
 		const prefix = alias.replace(/\/+$/, "")
-		const base = detectImportAlias(cwd, targetRel) // reuse the project's base mapping when the prefix matches
+		const base = detectImportAlias(cwd, targetRel)
 		return base && base.prefix === prefix ? base.importPath : `${prefix}/${target.replace(/^src\//, "")}`
 	}
 
@@ -224,8 +224,6 @@ export function mergeEnv(
 		return line
 	})
 
-	// Keys not yet in the file, appended below. Grouped sections come first, each with its header
-	// and a blank-line separator; anything left over (no group) is appended bare, preserving order.
 	const remaining = new Map(Object.entries(values).filter(([key]) => !present.has(key)))
 	const append = (key: string) => {
 		added.push(key)
