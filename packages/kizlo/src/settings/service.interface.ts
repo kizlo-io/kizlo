@@ -8,6 +8,7 @@ import type {
 	PostTypeSettings,
 	SiteSettings,
 	TaxonomySettings,
+	UploadsSettings,
 	WebhookSettings,
 } from "@kizlo/shared"
 
@@ -23,6 +24,7 @@ export type {
 	PostTypeSettings,
 	SiteSettings,
 	TaxonomySettings,
+	UploadsSettings,
 	WebhookSettings,
 }
 
@@ -45,6 +47,8 @@ export type IdentitySettingsInput = Partial<{
 export type AuthorsSettingsInput = Partial<AuthorsSettings>
 
 export type CrawlingSettingsInput = Partial<CrawlingSettings>
+
+export type UploadsSettingsInput = Partial<UploadsSettings>
 
 export type PostTypeSettingsInput = Partial<
 	Pick<

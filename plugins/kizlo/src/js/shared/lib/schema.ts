@@ -245,6 +245,16 @@ export const WebhookSettingsSchema = z.object({
 export type WebhookSettingsInput = z.input<typeof WebhookSettingsSchema>
 export type WebhookSettingsOutput = z.output<typeof WebhookSettingsSchema>
 
+// ====================================================
+// UPLOADS SCHEMA
+// ====================================================
+
+export const UploadsSettingsSchema = z.object({
+	allowed_mimes: z.array(z.string()),
+})
+export type UploadsSettingsInput = z.input<typeof UploadsSettingsSchema>
+export type UploadsSettingsOutput = z.output<typeof UploadsSettingsSchema>
+
 export interface SettingsMap {
 	site: SiteSettingsSchemaOutput
 	brand: BrandSettingsSchemaOutput
@@ -254,4 +264,5 @@ export interface SettingsMap {
 	taxonomies: TaxonomySettingsOutput
 	webhook: WebhookSettingsOutput
 	crawling: CrawlingSettingsOutput
+	uploads: UploadsSettingsOutput
 }

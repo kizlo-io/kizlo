@@ -10,6 +10,7 @@ import type {
 	Settings,
 	SiteSettingsInput,
 	TaxonomySettingsInput,
+	UploadsSettingsInput,
 	WebhookSettingsInput,
 } from "./service.interface"
 
@@ -72,6 +73,12 @@ export const SETTINGS_ROUTER_MAP = {
 		{ scope: "internal", input: schemaType<WebhookSettingsInput>(), output: schemaType<null>() },
 		async ({ context, input, errors }) =>
 			resolveUpdate(await context.service.settings.updateWebhook(input), context, errors, "Update webhook settings"),
+	),
+
+	updateUploads: createProcedure(
+		{ scope: "internal", input: schemaType<UploadsSettingsInput>(), output: schemaType<null>() },
+		async ({ context, input, errors }) =>
+			resolveUpdate(await context.service.settings.updateUploads(input), context, errors, "Update uploads settings"),
 	),
 
 	updatePostType: createProcedure(

@@ -16,6 +16,7 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettingsCollection;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettings;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettingsCollection;
 use Kizlo\Modules\Settings\Integration\WebhookSettings;
+use Kizlo\Modules\Settings\Uploads\UploadsSettings;
 
 class Settings
 {
@@ -27,6 +28,7 @@ class Settings
     public readonly TaxonomySettingsCollection $taxonomies;
     public readonly WebhookSettings            $webhook;
     public readonly CrawlingSettings           $crawling;
+    public readonly UploadsSettings            $uploads;
 
     private function __construct(
         SiteSettings               $site,
@@ -37,6 +39,7 @@ class Settings
         TaxonomySettingsCollection $taxonomies,
         CrawlingSettings           $crawling,
         WebhookSettings            $webhook,
+        UploadsSettings            $uploads,
     ) {
         $this->site       = $site;
         $this->brand      = $brand;
@@ -46,6 +49,7 @@ class Settings
         $this->taxonomies = $taxonomies;
         $this->crawling   = $crawling;
         $this->webhook    = $webhook;
+        $this->uploads    = $uploads;
     }
 
     /**
@@ -73,6 +77,7 @@ class Settings
             taxonomies: new TaxonomySettingsCollection($taxonomies),
             crawling: CrawlingSettings::load(),
             webhook: WebhookSettings::load(),
+            uploads: UploadsSettings::load(),
         );
     }
 
@@ -98,6 +103,7 @@ class Settings
                 taxonomies: new TaxonomySettingsCollection($taxonomies),
                 crawling: new CrawlingSettings($cache['crawling']),
                 webhook: new WebhookSettings($cache['webhook']),
+                uploads: new UploadsSettings($cache['uploads'] ?? []),
             );
         }
 
@@ -125,6 +131,7 @@ class Settings
             'taxonomies' => array_map(fn($s) => $s->getData(), $this->taxonomies->all()),
             'crawling'   => $this->crawling->getData(),
             'webhook'    => $this->webhook->getData(),
+            'uploads'    => $this->uploads->getData(),
         ]);
     }
 

@@ -13,6 +13,8 @@ use Kizlo\Modules\Settings\Identity\IdentitySettingsService;
 use Kizlo\Modules\Settings\PostType\PostTypeSettingsService;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettingsService;
 use Kizlo\Modules\Settings\Integration\IntegrationSettingsService;
+use Kizlo\Modules\Settings\Uploads\UploadsSettings;
+use Kizlo\Modules\Settings\Uploads\UploadsSettingsService;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\Support\Utils;
 
@@ -26,6 +28,7 @@ class SettingsModule
     private TaxonomySettingsService $taxonomy;
     private IntegrationSettingsService $integration;
     private CrawlingSettingsService $crawling;
+    private UploadsSettingsService $uploads;
 
     public function __construct()
     {
@@ -37,6 +40,7 @@ class SettingsModule
         $this->authors     = new AuthorsSettingsService();
         $this->integration = new IntegrationSettingsService();
         $this->crawling    = new CrawlingSettingsService();
+        $this->uploads     = new UploadsSettingsService();
     }
 
     /**
@@ -52,6 +56,7 @@ class SettingsModule
         $this->taxonomy->register();
         $this->integration->register();
         $this->crawling->register();
+        $this->uploads->register();
 
         $this->registerRestRoutes();
     }
@@ -88,6 +93,7 @@ class SettingsModule
                 'post_types'       => $this->postType->toResponse($settings->postTypes),
                 'taxonomies'       => $this->taxonomy->toResponse($settings->taxonomies),
                 'crawling'         => $this->crawling->toResponse($settings->crawling),
+                'uploads'          => $this->uploads->toResponse($settings->uploads),
                 'plain_permalinks' => empty(get_option('permalink_structure')),
                 'statuses'         => PostTypeSettings::getStatuses(),
             ],
@@ -102,6 +108,9 @@ class SettingsModule
                 'site'  => [
                     'title_separators' => SiteSettings::TITLE_SEPARATORS,
                     'default_title_separator' => SiteSettings::DEFAULT_TITLE_SEPARATOR,
+                ],
+                'uploads' => [
+                    'supported_mimes' => UploadsSettings::supportedMimeOptions(),
                 ],
                 'post_type' => [
                     'path_variables'    => Variables::toJSON('post_type_path'),
