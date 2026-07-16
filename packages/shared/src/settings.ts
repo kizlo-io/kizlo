@@ -163,6 +163,15 @@ export interface WebhookSettings {
 	webhook_urls: string[]
 }
 
+export interface UploadMime {
+	ext: string
+	mime: string
+}
+
+export interface UploadsSettings {
+	allowed_mimes: UploadMime[]
+}
+
 export interface PostStatusDefinition {
 	label: string
 	slug: string
@@ -181,6 +190,7 @@ export interface Settings {
 	taxonomies: TaxonomySettings[]
 	crawling: CrawlingSettings
 	webhook: WebhookSettings
+	uploads: UploadsSettings
 	statuses: PostStatusDefinition[]
 	plain_permalinks: boolean
 }

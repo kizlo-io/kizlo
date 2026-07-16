@@ -245,6 +245,84 @@ export const WebhookSettingsSchema = z.object({
 export type WebhookSettingsInput = z.input<typeof WebhookSettingsSchema>
 export type WebhookSettingsOutput = z.output<typeof WebhookSettingsSchema>
 
+// ====================================================
+// UPLOADS SCHEMA
+// ====================================================
+
+/**
+ * Extensions the server refuses (see UploadsSettings::DENIED_EXTENSIONS). Kept
+ * in sync for inline feedback; the PHP list is the authoritative gate.
+ */
+const DENIED_UPLOAD_EXTENSIONS = new Set([
+	"php",
+	"php2",
+	"php3",
+	"php4",
+	"php5",
+	"php6",
+	"php7",
+	"php8",
+	"phtml",
+	"pht",
+	"phps",
+	"phar",
+	"phpt",
+	"cgi",
+	"pl",
+	"py",
+	"rb",
+	"sh",
+	"bash",
+	"ksh",
+	"zsh",
+	"exe",
+	"com",
+	"bat",
+	"cmd",
+	"msi",
+	"scr",
+	"dll",
+	"jar",
+	"js",
+	"mjs",
+	"cjs",
+	"jsp",
+	"asp",
+	"aspx",
+	"html",
+	"htm",
+	"xhtml",
+	"shtml",
+	"shtm",
+	"htaccess",
+	"htpasswd",
+	"ini",
+	"so",
+])
+
+export const UploadMimeSchema = z.object({
+	ext: z
+		.string()
+		.trim()
+		.toLowerCase()
+		.min(1, "Extension is required.")
+		.regex(/^[a-z0-9]+$/, "Letters and numbers only, no dot.")
+		.refine((ext) => !DENIED_UPLOAD_EXTENSIONS.has(ext), "This file type is blocked for security reasons."),
+	mime: z
+		.string()
+		.trim()
+		.toLowerCase()
+		.min(1, "MIME type is required.")
+		.regex(/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/, "Enter a valid MIME type, e.g. image/svg+xml."),
+})
+export type UploadMimeInput = z.input<typeof UploadMimeSchema>
+
+export const UploadsSettingsSchema = z.object({
+	allowed_mimes: z.array(UploadMimeSchema),
+})
+export type UploadsSettingsInput = z.input<typeof UploadsSettingsSchema>
+export type UploadsSettingsOutput = z.output<typeof UploadsSettingsSchema>
+
 export interface SettingsMap {
 	site: SiteSettingsSchemaOutput
 	brand: BrandSettingsSchemaOutput
@@ -254,4 +332,5 @@ export interface SettingsMap {
 	taxonomies: TaxonomySettingsOutput
 	webhook: WebhookSettingsOutput
 	crawling: CrawlingSettingsOutput
+	uploads: UploadsSettingsOutput
 }

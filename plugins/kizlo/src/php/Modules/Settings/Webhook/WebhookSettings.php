@@ -1,12 +1,12 @@
 <?php
 
-namespace Kizlo\Modules\Settings\Integration;
+namespace Kizlo\Modules\Settings\Webhook;
 
 use Kizlo\Modules\Settings\SettingsAbstract;
 
 class WebhookSettings extends SettingsAbstract
 {
-    protected const OPTION_KEY = 'kizlo_settings_integration_webhook';
+    protected const OPTION_KEY = 'kizlo_settings_webhook';
 
     protected array $data = [
         'post_types'   => ['allow' => [], 'deny' => []],

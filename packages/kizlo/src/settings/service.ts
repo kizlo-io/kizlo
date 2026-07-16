@@ -9,6 +9,7 @@ import type {
 	Settings,
 	SiteSettingsInput,
 	TaxonomySettingsInput,
+	UploadsSettingsInput,
 	WebhookSettingsInput,
 } from "./service.interface"
 
@@ -46,6 +47,10 @@ export class SettingsService {
 
 	public async updateCrawling(input: CrawlingSettingsInput) {
 		return this.update("/settings/crawling", input)
+	}
+
+	public async updateUploads(input: UploadsSettingsInput) {
+		return this.update("/settings/uploads", input)
 	}
 
 	public async updatePostType(slug: string, input: PostTypeSettingsInput) {

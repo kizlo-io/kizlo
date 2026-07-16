@@ -22,7 +22,8 @@
 	"require": {
 		"php": ">=8.2",
 		"standard-webhooks/standard-webhooks": "^1.0",
-		"yahnis-elsts/plugin-update-checker": "^5.7"
+		"yahnis-elsts/plugin-update-checker": "^5.7",
+		"enshrined/svg-sanitize": "^0.22.0"
 	},
 	"require-dev": {
 		"phpstan/phpstan": "^2.2",
