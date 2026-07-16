@@ -1,5 +1,11 @@
 # @kizlo/shared
 
+## 0.3.1
+
+### Patch Changes
+
+- [#44](https://github.com/kizlo-io/kizlo/pull/44) [`57b9063`](https://github.com/kizlo-io/kizlo/commit/57b90637728972602f0ec0aad2dec7ff31f8369a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Normalize the public barrel to the wildcard export convention, mark the package `sideEffects: false` for tree-shaking, and drop the unused `html-entities` and `@types/js-cookie` dev dependencies. Internal cleanup with no runtime behaviour change; the type-level `Duration` alias is now re-exported alongside the existing surface.
+
 ## 0.3.0
 
 ### Minor Changes
