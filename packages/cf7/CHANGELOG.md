@@ -1,5 +1,14 @@
 # @kizlo/cf7
 
+## 0.1.5
+
+### Patch Changes
+
+- [#44](https://github.com/kizlo-io/kizlo/pull/44) [`57b9063`](https://github.com/kizlo-io/kizlo/commit/57b90637728972602f0ec0aad2dec7ff31f8369a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Mark the package `sideEffects: false` for tree-shaking and drop unused internal code (the `SubmitFormInput` schema and the `CF7ServiceInterface`, `WP_SubmitCF7Input`, and `WP_SubmitCF7Result` types). Internal cleanup with no runtime behaviour change; the public surface is unchanged.
+
+- Updated dependencies [[`57b9063`](https://github.com/kizlo-io/kizlo/commit/57b90637728972602f0ec0aad2dec7ff31f8369a)]:
+  - @kizlo/shared@0.3.1
+
 ## 0.1.4
 
 ### Patch Changes
