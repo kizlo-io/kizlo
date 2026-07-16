@@ -1,5 +1,15 @@
 # kizlo
 
+## 0.6.0
+
+### Minor Changes
+
+- [#42](https://github.com/kizlo-io/kizlo/pull/42) [`5e4cf88`](https://github.com/kizlo-io/kizlo/commit/5e4cf887f02651a044fb121b70609c88941e0de1) Thanks [@IDJGILL](https://github.com/IDJGILL)! - The Next.js revalidation integration now refreshes the whole site with `revalidatePath("/", "layout")` when a frontend-affecting settings group changes, so edits like SEO metadata surface without a manual purge. This covers every settings group except `settings.crawling.updated` (robots.txt only, already handled by the robots cache tag) and `settings.integration.updated` (backend webhook config). Revalidation stays lazy, so routes re-render on their next request with cached content served warm from the Data Cache.
+
+- [#42](https://github.com/kizlo-io/kizlo/pull/42) [`5e4cf88`](https://github.com/kizlo-io/kizlo/commit/5e4cf887f02651a044fb121b70609c88941e0de1) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Replace the single `settings.saved` webhook event with per-group events so consumers can react to a specific settings change. Flat groups emit `settings.site.updated`, `settings.brand.updated`, `settings.identity.updated`, `settings.authors.updated`, `settings.crawling.updated`, and `settings.integration.updated` with a `null` payload. The keyed groups emit `settings.post_type.updated` and `settings.taxonomy.updated` with a `{ key }` payload naming the changed entry.
+
+  This is a breaking change to the event surface: handlers switching on `settings.saved` no longer match. The Next.js revalidation integration now refreshes the robots cache only on `settings.crawling.updated` and `settings.site.updated` instead of every settings change.
+
 ## 0.5.0
 
 ### Minor Changes
