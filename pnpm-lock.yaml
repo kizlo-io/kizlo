@@ -145,9 +145,6 @@ importers:
       jiti:
         specifier: ^2.7.0
         version: 2.7.0
-      jose:
-        specifier: 'catalog:'
-        version: 6.1.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3
