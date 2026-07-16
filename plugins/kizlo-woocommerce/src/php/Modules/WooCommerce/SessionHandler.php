@@ -42,7 +42,6 @@ class SessionHandler extends WC_Session_Handler
 
     public const PREFIX_GUEST = 't_';
 
-    private bool $is_new_guest = false;
     private ?int $resolved_user_id = null;
 
     public function init()
@@ -51,11 +50,6 @@ class SessionHandler extends WC_Session_Handler
         $this->_data        = $this->get_session_data();
 
         add_action('shutdown', [$this, 'save_data'], 20);
-    }
-
-    public function is_new_guest(): bool
-    {
-        return $this->is_new_guest;
     }
 
     public function get_resolved_user_id(): ?int
@@ -110,7 +104,6 @@ class SessionHandler extends WC_Session_Handler
             return $token;
         }
 
-        $this->is_new_guest = true;
         // session_key column is VARCHAR(32); keep the prefix + hex within that.
         return self::PREFIX_GUEST . bin2hex(random_bytes(15));
     }
