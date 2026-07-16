@@ -51,10 +51,6 @@ export function AccordionRow({ id, icon: Glyph, label, value, tone = "neutral", 
 	const open = context.isOpen(id)
 	const rowRef = useRef<HTMLDivElement>(null)
 
-	// When a row opens, if it overflows the viewport (e.g. a bottom row whose
-	// expanded content would sit off-screen), anchor the trigger to the top so the
-	// panel flows down from it. `block: "start"` keeps the trigger visible instead
-	// of aligning the panel's bottom and pushing the trigger off-screen.
 	useEffect(() => {
 		if (!open) return
 

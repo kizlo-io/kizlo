@@ -6,10 +6,10 @@ import { SwitchField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
 import { type AuthorSettingsInput, type AuthorSettingsOutput, AuthorSettingsSchema } from "@/shared/lib/schema"
-import { useSettings } from "@/shared/lib/settings"
+import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 
 export function AuthorsSettingsPage() {
-	const { settings, update, isLoading } = useSettings()
+	const { settings } = useSettings()
 
 	const form = useForm<AuthorSettingsInput, unknown, AuthorSettingsOutput>({
 		resolver: zodResolver(AuthorSettingsSchema),
@@ -25,18 +25,8 @@ export function AuthorsSettingsPage() {
 
 	const content = getContent({ name: "Authors" })
 
-	async function onSubmit(data: AuthorSettingsOutput) {
-		await update("authors", data)
-		form.reset(form.getValues())
-	}
-
 	return (
-		<SettingsForm
-			isLoading={isLoading}
-			isDirty={form.formState.isDirty}
-			onSubmit={form.handleSubmit(onSubmit)}
-			onCancel={() => form.reset()}
-		>
+		<SettingsForm {...useSettingsForm("authors", form)}>
 			<SettingsSection
 				title="Authors"
 				desc="Manage the URL structure and SEO configuration for author archive pages, including title templates, meta descriptions, and search visibility."

@@ -74,9 +74,6 @@ export interface MultiSelectProps extends Omit<BaseSelectProps, "value"> {
 	onChange?: (values: string[]) => void
 }
 
-// FormTokenField works with display labels rather than {value,label}, so we
-// bridge both directions through lookup maps and validate typed input against
-// known labels. Labels must be unique across the option set.
 export function MultiSelect({ ...props }: MultiSelectProps) {
 	const { byValue, byLabel, suggestions } = useMemo(() => {
 		const byValue: Record<string, string> = {}

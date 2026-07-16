@@ -4,11 +4,8 @@ import { usePages } from "@/shared/hooks/use-pages"
 import { Button } from "./ui/button"
 import { Combobox } from "./ui/select"
 
-// Reserved row that expands to the item's real ancestors. Mirrors
-// SeoBase::BREADCRUMB_PARENT_TOKEN on the PHP side.
 export const BREADCRUMB_PARENT_TOKEN = "__parent__"
 
-// Set apart from page titles so it reads as a dynamic slot, not a real page.
 const PARENT_OPTION_LABEL = "↳  Parent — dynamic (its real ancestors)"
 
 interface BreadcrumbsFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues> {

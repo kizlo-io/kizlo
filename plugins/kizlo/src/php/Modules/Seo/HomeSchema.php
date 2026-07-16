@@ -24,16 +24,9 @@ class HomeSchema extends SeoBase
         $indexable   = empty($overrides['noindex']);
         $nofollow    = !empty($overrides['nofollow']);
 
-        // A static front page can opt into an Article type; when it does, the
-        // homepage head mirrors a post (og:type=article + an article block),
-        // matching the Article node jsonLd() emits. The latest-posts homepage
-        // has no underlying page, so it stays a plain website.
         $article_type = $front_page ? $this->effectiveArticleType($front_page) : null;
         $is_article   = !empty($article_type) && $article_type !== 'none';
 
-        // On the homepage, OG/Twitter fall back to the site fallback image (not a
-        // featured image). Template overrides resolve against the front page when
-        // one exists; the latest-posts homepage never carries overrides.
         $social = $this->resolveSocial(
             $overrides,
             $title,
@@ -74,8 +67,6 @@ class HomeSchema extends SeoBase
         $graph[] = $this->homeWebPageLd();
         $graph[] = $this->homeBreadcrumbLd();
 
-        // When a static front page opts into an Article type, emit an Article
-        // node anchored to the homepage URL, resolved from the front page post.
         $front_page = $this->frontPage();
         if ($front_page) {
             $article_type = $this->effectiveArticleType($front_page);
@@ -118,10 +109,7 @@ class HomeSchema extends SeoBase
             'date_published' => null,
             'date_modified'  => null,
             'breadcrumb_id'  => trailingslashit($this->settings->getBaseUrl()) . '#breadcrumb',
-            // The front page is "about" the site's main entity (org or person).
             'about'          => $this->publisherId(),
-            // A static front page can override the WebPage subtype; the
-            // latest-posts homepage stays a plain WebPage.
             'webpage_type'   => $front_page ? $this->effectiveWebpageType($front_page) : null,
             'article_type'   => null,
         ]);
@@ -185,13 +173,8 @@ class HomeSchema extends SeoBase
     {
         $site_name = $this->settings->site->getName() ?? get_bloginfo('name');
 
-        // The latest-posts homepage has no underlying page, so the site name is
-        // the only sensible fallback.
         if (!$front_page) return $site_name;
 
-        // A static front page behaves like any other page: an empty override
-        // falls back to the post type's title structure (matching the meta box
-        // placeholder), not the bare site name.
         $post_type = $this->settings->postTypes->get($front_page->post_type);
         $template  = !empty($overrides['title'])
             ? $overrides['title']

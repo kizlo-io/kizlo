@@ -41,7 +41,6 @@ class CommentModule
 
     private function _extendBase(WP_Comment $comment): array
     {
-        // Author (registered users only; guests remain null)
         $author = null;
         if ((int) $comment->user_id) {
             $user = get_user_by('id', $comment->user_id);
@@ -55,12 +54,10 @@ class CommentModule
             }
         }
 
-        // Parent post
         $post = null;
         $post_obj = get_post((int) $comment->comment_post_ID);
         if ($post_obj) {
 
-            // Featured image
             $featured_image = null;
             $thumbnail_id   = get_post_thumbnail_id($post_obj->ID);
             if ($thumbnail_id) {
@@ -73,7 +70,6 @@ class CommentModule
                 ];
             }
 
-
             $post = [
                 'id'    => $post_obj->ID,
                 'slug'  => $post_obj->post_name,
@@ -82,7 +78,6 @@ class CommentModule
             ];
         }
 
-        // Reply count
         $reply_count = (int) get_comments([
             'count'  => true,
             'status' => 'approve',

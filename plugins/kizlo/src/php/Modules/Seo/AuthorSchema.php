@@ -126,13 +126,9 @@ class AuthorSchema extends SeoBase
         $graph[] = $this->authorWebPageLd($user);
         $graph[] = $this->authorBreadcrumbLd($user);
 
-        // The Person is the main entity of its own ProfilePage.
         $profile_url = trailingslashit($this->resolveAuthorUrl($user));
 
         if ($this->isSitePerson($user)) {
-            // In person mode the identity node from baseGraph() already represents
-            // this author (same @id); mark that node as the page's main entity in
-            // place rather than emitting a duplicate.
             $person_id = $this->personId($user);
             foreach ($graph as &$node) {
                 if (($node['@id'] ?? null) === $person_id) {
@@ -181,7 +177,6 @@ class AuthorSchema extends SeoBase
      */
     public function authorBreadcrumbLd(WP_User $user): array
     {
-        // Author archives have no real ancestors; only configured rows apply.
         return $this->buildBreadcrumbLd(
             $this->resolveAuthorUrl($user),
             $user->display_name,

@@ -4,11 +4,11 @@ import { FieldError, PasswordInputField, SwitchField, TextInputField } from "@/s
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { SiteSettingsSchema, type SiteSettingsSchemaInput, type SiteSettingsSchemaOutput } from "@/shared/lib/schema"
-import { useSettings } from "@/shared/lib/settings"
+import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 import { cn } from "@/shared/lib/utils"
 
 export function SiteSettingsPage() {
-	const { settings, update, isLoading } = useSettings()
+	const { settings } = useSettings()
 
 	const form = useForm<SiteSettingsSchemaInput, unknown, SiteSettingsSchemaOutput>({
 		resolver: zodResolver(SiteSettingsSchema),
@@ -26,18 +26,8 @@ export function SiteSettingsPage() {
 		},
 	})
 
-	async function onSubmit(data: SiteSettingsSchemaOutput) {
-		await update("site", data)
-		form.reset(form.getValues())
-	}
-
 	return (
-		<SettingsForm
-			isLoading={isLoading}
-			isDirty={form.formState.isDirty}
-			onSubmit={form.handleSubmit(onSubmit)}
-			onCancel={() => form.reset()}
-		>
+		<SettingsForm {...useSettingsForm("site", form)}>
 			<SettingsSection
 				title="Site identity"
 				desc="Core settings that identify your site to Kizlo and secure communication between the plugin and Kizlo sdk."

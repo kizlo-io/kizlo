@@ -19,8 +19,6 @@ export function Button({ variant, size, className, children, ...props }: ButtonP
 			variant={toWPVariant}
 			__next40pxDefaultSize
 			className={cn(
-				// Show the WP focus ring while a toggle trigger (e.g. a popover) is
-				// expanded, since real focus moves into the panel.
 				"aria-expanded:wp-ring flex w-max shrink-0 gap-1.5 whitespace-nowrap [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 				{
 					"[&_svg:not([class*='size-'])]:size-3": size === "xs",

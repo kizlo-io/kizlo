@@ -39,13 +39,10 @@ function kizlo_log($data = '✨', $append = true)
 {
     $log_file = kizlo_get_path('debug.txt');
 
-    // Convert arrays/objects to readable string
     if (is_array($data) || is_object($data)) $data = print_r($data, true);
 
-    // Add timestamp
     $message = '[' . date('Y-m-d H:i:s') . '] ' . $data . PHP_EOL;
 
-    // Write to file
     $mode = $append ? FILE_APPEND : 0;
 
     @file_put_contents($log_file, $message, $mode);
@@ -174,21 +171,15 @@ function kizlo_register_route_interceptor(array $args)
     }
 
     $filter = static function ($response, $handler, WP_REST_Request $request) use ($route, $methods, $callback) {
-        // Bail out if $response is an error or $response isn't a WP_REST_Response.
-        // The rest_request_after_callbacks filter may pass an array or other
-        // value for some endpoints (e.g. /wc-admin/options), not just a
-        // WP_REST_Response or WP_Error.
         if (is_wp_error($response) || ! ($response instanceof WP_REST_Response)) {
             return $response;
         }
 
-        // Match request methods (if defined, allow all otherwise.)
         $methods_array = is_array($methods) ? $methods : [$methods];
         if (! empty($methods) && ! in_array(strtoupper($request->get_method()), array_map('strtoupper', $methods_array), true)) {
             return $response;
         }
 
-        // Match route pattern using kizlo_route_match
         if (! kizlo_route_match($route, $request)) {
             return $response;
         }
@@ -237,17 +228,12 @@ function kizlo_ensure_media_data(int $id): array
         'mime' => get_post_mime_type($id) ?: '',
     ];
 
-    // Raster attachments carry pixel dimensions; SVGs and other scalable
-    // sources do not, so these stay absent rather than null.
     $metadata = wp_get_attachment_metadata($id);
     if (!empty($metadata['width']) && !empty($metadata['height'])) {
         $data['width']  = (int) $metadata['width'];
         $data['height'] = (int) $metadata['height'];
     }
 
-    // WordPress auto-generates resized copies of every raster upload. Expose them
-    // so consumers (e.g. the web-manifest icon set) can pick a real 192/512-ish
-    // source instead of guessing. Scalable sources have no generated sizes.
     if (!empty($metadata['sizes'])) {
         $variants = [];
         foreach (array_keys($metadata['sizes']) as $size) {
@@ -376,6 +362,5 @@ function kizlo_emit_event(string $type, ?array $data = null): bool
 {
     return \Kizlo\Modules\Webhook\Webhook::sendEvent($type, $data);
 }
-
 
 kizlo_include_post_type('projects');

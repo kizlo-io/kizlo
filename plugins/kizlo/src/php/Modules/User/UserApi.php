@@ -117,19 +117,16 @@ class UserApi
 
     public function verifyUserCredentials(string $username, string $password): array | WP_Error
     {
-        // Attempt to get the user by login or email.
         $user = get_user_by('login', $username);
 
         if (! $user) {
             $user = get_user_by('email', $username);
         }
 
-        // Unknown username / email.
         if (! $user) {
             return new WP_Error('invalid_credentials', 'No account exists with that username or email.', ['status' => 404]);
         }
 
-        // Verify the password against the stored hash.
         if (! wp_check_password($password, $user->user_pass, $user->ID)) {
             return new WP_Error('invalid_credentials', 'The password you entered is incorrect.', ['status' => 401]);
         }

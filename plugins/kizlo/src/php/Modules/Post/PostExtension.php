@@ -53,7 +53,6 @@ class PostExtension
 
     private function _extendPostBase(WP_Post $post)
     {
-        // Categories
         $categories = [];
         foreach (wp_get_post_categories($post->ID, ['fields' => 'all']) as $term) {
             $categories[] = [
@@ -63,7 +62,6 @@ class PostExtension
             ];
         }
 
-        // Tags
         $tags = [];
         foreach (wp_get_post_tags($post->ID, ['fields' => 'all']) as $term) {
             $tags[] = [
@@ -73,7 +71,6 @@ class PostExtension
             ];
         }
 
-        // Author
         $author_id = (int) $post->post_author;
         $author    = [
             'id'           => $author_id,
@@ -82,7 +79,6 @@ class PostExtension
             'avatar_url'   => get_avatar_url($author_id),
         ];
 
-        // Featured image
         $featured_image = null;
         $thumbnail_id   = get_post_thumbnail_id($post->ID);
         if ($thumbnail_id) {

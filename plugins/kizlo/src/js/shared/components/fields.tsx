@@ -6,9 +6,6 @@ import { Toggle } from "./ui/toggle"
 
 export type { SelectOption } from "./ui/select"
 
-// RHF-aware field wrappers built on the new WP-based components. Each renders
-// its own label + description (help) and surfaces validation errors below.
-
 export interface BaseFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues> {
 	label?: string
 	name: FieldPath<TFieldValues>

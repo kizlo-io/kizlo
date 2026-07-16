@@ -23,9 +23,6 @@ class AdminColor
         $palette = $GLOBALS['_wp_admin_css_colors'][$scheme] ?? null;
         $colors = is_object($palette) && ! empty($palette->colors) ? $palette->colors : [];
 
-        // Scheme palettes list the menu background first and the accent third;
-        // fall back to the last colour, then the WP default, so an unusual
-        // scheme still yields something sensible.
         $accent = $colors[2] ?? (end($colors) ?: self::FALLBACK_ACCENT);
         $menuBg = $colors[0] ?? self::FALLBACK_MENU_BG;
 

@@ -21,7 +21,6 @@ class PluginSettingsPage
     {
         add_action('admin_menu', [$this, 'registerMenu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueueScripts']);
-        // $this->registerRestRoutes();
     }
 
     public function enqueueScripts(string $hook): void

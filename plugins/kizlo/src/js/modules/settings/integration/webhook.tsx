@@ -6,10 +6,10 @@ import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { Button } from "@/shared/components/ui/button"
 import { TextInput } from "@/shared/components/ui/input"
 import { type WebhookSettingsInput, type WebhookSettingsOutput, WebhookSettingsSchema } from "@/shared/lib/schema"
-import { useSettings } from "@/shared/lib/settings"
+import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 
 export function WebhookSettingsPage() {
-	const { settings, update, isLoading } = useSettings()
+	const { settings } = useSettings()
 
 	const form = useForm<WebhookSettingsInput, unknown, WebhookSettingsOutput>({
 		resolver: zodResolver(WebhookSettingsSchema),
@@ -22,18 +22,8 @@ export function WebhookSettingsPage() {
 
 	const { fields, append, remove } = useFieldArray({ control: form.control, name: "webhook_urls" as never })
 
-	async function onSubmit(data: WebhookSettingsOutput) {
-		await update("webhook", data)
-		form.reset(form.getValues())
-	}
-
 	return (
-		<SettingsForm
-			isLoading={isLoading}
-			isDirty={form.formState.isDirty}
-			onSubmit={form.handleSubmit(onSubmit)}
-			onCancel={() => form.reset()}
-		>
+		<SettingsForm {...useSettingsForm("webhook", form)}>
 			<SettingsSection
 				title="Webhook URLs"
 				desc="One or more endpoints that will receive a POST request when triggered content changes. Each URL must be publicly accessible."

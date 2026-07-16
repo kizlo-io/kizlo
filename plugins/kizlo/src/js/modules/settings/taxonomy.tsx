@@ -3,16 +3,17 @@ import { useForm } from "react-hook-form"
 import { useParams } from "react-router-dom"
 import { getContent } from "@/modules/settings/shared/content"
 import { NotFound } from "@/modules/settings/shared/not-found"
+import { RestApiSection } from "@/modules/settings/shared/rest-api-section"
 import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
 import { type TaxonomySettingsInput, type TaxonomySettingsOutput, TaxonomySettingsSchema } from "@/shared/lib/schema"
-import { useSettings } from "@/shared/lib/settings"
+import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 
 export function TaxonomySettingsPage() {
 	const params = useParams<{ slug: string }>()
-	const { settings, update, isLoading } = useSettings()
+	const { settings } = useSettings()
 	const taxonomy = settings?.taxonomies.find((a) => a.slug === params.slug)
 
 	const form = useForm<TaxonomySettingsInput, unknown, TaxonomySettingsOutput>({
@@ -28,24 +29,15 @@ export function TaxonomySettingsPage() {
 		},
 	})
 
-	if (!taxonomy) return <NotFound />
+	const formProps = useSettingsForm("taxonomies", taxonomy?.slug ?? "", form)
 
-	async function onSubmit(data: TaxonomySettingsOutput) {
-		await update("taxonomies", taxonomy?.slug ?? "", data)
-		form.reset(form.getValues())
-	}
+	if (!taxonomy) return <NotFound />
 
 	const isSeoSupported = form.watch("seo_enabled")
 	const content = getContent({ name: taxonomy.name })
 
 	return (
-		<SettingsForm
-			key={params.slug}
-			isLoading={isLoading}
-			isDirty={form.formState.isDirty}
-			onSubmit={form.handleSubmit(onSubmit)}
-			onCancel={() => form.reset()}
-		>
+		<SettingsForm key={params.slug} {...formProps}>
 			<SettingsSection title={content.url.heading} desc={content.url.description}>
 				<VariableField
 					name="pathname_structure"
@@ -108,16 +100,7 @@ export function TaxonomySettingsPage() {
 				) : null}
 			</SettingsSection>
 
-			{!taxonomy.internal ? (
-				<SettingsSection title={content.access.heading} desc={content.access.description}>
-					<SwitchField
-						control={form.control}
-						name="rest_api_enabled"
-						label={content.access.enabled.label}
-						description={content.access.enabled.description}
-					/>
-				</SettingsSection>
-			) : null}
+			<RestApiSection control={form.control} access={content.access} internal={taxonomy.internal} />
 		</SettingsForm>
 	)
 }

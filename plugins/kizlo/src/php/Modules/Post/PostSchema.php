@@ -33,11 +33,6 @@ class PostSchema extends SeoBase
         $posts_page_id = (int) get_option('page_for_posts');
         $front_page_id = (int) get_option('page_on_front');
 
-        // In the page sitemap, drop the pages that are represented elsewhere: a
-        // static homepage becomes the site root "/" (injected below), and a
-        // static "Posts page" (e.g. /blog) is the blog index emitted in the post
-        // sitemap. Removing them here avoids listing either page twice (and
-        // keeps the homepage as "/" rather than its own pathname).
         $exclude = [];
         if ($post_type === 'page' && $show_on_front === 'page') {
             if ($front_page_id > 0) $exclude[] = $front_page_id;
@@ -53,8 +48,6 @@ class PostSchema extends SeoBase
             'order'          => 'DESC',
             'fields'         => 'ids',
             'post__not_in'   => $exclude,
-            // Exclude per-post noindex overrides at the query level so page
-            // offsets and the index page count stay aligned on indexable posts.
             'meta_query'     => [[
                 'key'     => self::OVERRIDE_KEYS['noindex'],
                 'compare' => 'NOT EXISTS',
@@ -63,9 +56,6 @@ class PostSchema extends SeoBase
 
         $entries = [];
 
-        // The first page carries an injected entry (the blog index in the post
-        // sitemap, or the homepage in the page sitemap). Build it before the
-        // empty-posts short-circuit so it survives on a brand-new site.
         if ($page === 1) {
             $front = $this->sitemapFrontEntry($post_type, $show_on_front, $posts_page_id, $front_page_id);
             if ($front !== null) $entries[] = $front;
@@ -83,7 +73,6 @@ class PostSchema extends SeoBase
                 'images'  => [],
             ];
 
-            // Featured image
             $thumbnail_id = get_post_thumbnail_id($post_id);
             if ($thumbnail_id) {
                 $thumbnail_url = wp_get_attachment_url($thumbnail_id);
@@ -95,7 +84,6 @@ class PostSchema extends SeoBase
                 }
             }
 
-            // Content images
             if (!empty($post->post_content)) {
                 preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $post->post_content, $matches);
                 foreach ($matches[1] as $image_url) {
@@ -137,11 +125,9 @@ class PostSchema extends SeoBase
             if ($show_on_front === 'posts') {
                 $loc = $home;
             } elseif ($posts_page_id > 0 && ($posts_page = get_post($posts_page_id))) {
-                // A noindexed "Posts page" (e.g. /blog) is dropped from the sitemap.
                 if ($this->isNoindexed($posts_page_id)) return null;
                 $loc = trailingslashit($this->resolvePostUrl($posts_page, $this->settings->postTypes->get('page')));
             } else {
-                // Static homepage with no Posts page: there is no blog index.
                 return null;
             }
 
@@ -149,15 +135,10 @@ class PostSchema extends SeoBase
         }
 
         if ($post_type === 'page') {
-            // The page sitemap only carries the homepage "/" when a static page is
-            // assigned as the front page. On a latest-posts home the post sitemap
-            // owns "/" and it must not appear here too (Yoast issue #5428).
             if ($show_on_front !== 'page' || $front_page_id <= 0) {
                 return null;
             }
 
-            // A noindexed static front page drops the homepage "/" from the sitemap,
-            // matching the noindex robots tag HomeSchema emits for it.
             if ($this->isNoindexed($front_page_id)) {
                 return null;
             }
@@ -195,9 +176,6 @@ class PostSchema extends SeoBase
         $indexable = $post_type_settings->getSearchEngineVisibility() && empty($overrides['noindex']);
         $nofollow  = !empty($overrides['nofollow']);
 
-        // Open Graph and Twitter each fall back to the SEO title/description and
-        // the base image, with per-network overrides layered on top. The base
-        // image is the featured image, falling back to the site fallback image.
         $social = $this->resolveSocial(
             $overrides,
             $title,
@@ -255,9 +233,6 @@ class PostSchema extends SeoBase
 
         $graph[] = $this->breadcrumbLd($post);
 
-        // When the author is the site's representative person, the identity node
-        // from baseGraph() already represents them (same @id), so no separate
-        // author node is emitted — the two merge into one.
         $author = get_userdata((int) $post->post_author);
 
         if ($author && !$this->isSitePerson($author)) {
@@ -429,7 +404,6 @@ class PostSchema extends SeoBase
     {
         $post_type_settings = $this->settings->postTypes->get($post->post_type);
 
-        // Real ancestors: the post's hierarchical parents (pages), top-down.
         $ancestors = [];
         foreach (array_reverse(get_post_ancestors($post)) as $ancestor_id) {
             $ancestor = get_post($ancestor_id);

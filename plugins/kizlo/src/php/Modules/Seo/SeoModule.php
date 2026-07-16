@@ -86,9 +86,6 @@ class SeoModule
         $page = max(1, (int) ($request->get_param('page') ?? 1));
 
         return match ($type) {
-            // `index` is a reserved pseudo-type: it returns the index entries plus the
-            // canonical origin (from the Kizlo site URL) so callers never build sitemap
-            // `<loc>`s from the request host. It is never a real content type.
             'index'  => new WP_REST_Response($this->sitemapIndexPayload($settings)),
             'post_type'  => new WP_REST_Response((new PostSchema($settings))->sitemapEntries($key, $page)),
             'taxonomy'  => new WP_REST_Response((new TermSchema($settings))->sitemapEntries($key, $page)),

@@ -11,7 +11,6 @@ interface WP_RestPage {
 	title: { rendered: string }
 }
 
-// Load published WordPress pages for breadcrumb / navigation pickers.
 export function usePages() {
 	const [pages, setPages] = useState<PageOption[]>([])
 

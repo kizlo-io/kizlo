@@ -14,9 +14,6 @@ interface VariableFieldProps<TFieldValues extends FieldValues = FieldValues, TCo
 	variant?: "text" | "textarea"
 }
 
-// A text/textarea input paired with the template variables it accepts. The
-// variables render as clickable <code> chips inside the field's description;
-// clicking one copies its token so it can be pasted into the field.
 export function VariableField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
 	control,
 	name,
@@ -72,8 +69,6 @@ export function VariableField<TFieldValues extends FieldValues = FieldValues, TC
 	)
 }
 
-// A copyable <code> chip for a template variable (e.g. {{title}}). Clicking it
-// copies the token and briefly swaps in a check mark.
 function VariableCode({ value, description }: Variable) {
 	const { copy, copied } = useClipboard({
 		cb() {

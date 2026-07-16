@@ -23,7 +23,6 @@ class OrganizationSettings extends SettingsAbstract
         'logo'            => null,
         'social_profiles' => [],
 
-        // Business identifiers (flat schema.org string properties).
         'vat_id'          => null,
         'tax_id'          => null,
         'iso6523_code'    => null,
@@ -31,7 +30,6 @@ class OrganizationSettings extends SettingsAbstract
         'lei_code'        => null,
         'naics'           => null,
 
-        // Publishing / news policy URLs (Google News oriented).
         'publishing_principles'      => null,
         'ownership_funding_info'     => null,
         'actionable_feedback_policy' => null,

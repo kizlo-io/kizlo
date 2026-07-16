@@ -3,35 +3,10 @@ import z from "zod"
 
 // ====================================================
 // INTERFACE
-//
-// The settings response shape is defined once in @kizlo/shared
-// and re-exported here so the admin UI and the server client
-// stay 1:1. Only the Zod form schemas below are admin-specific.
 // ====================================================
 
-export type {
-	AuthorsSettings,
-	BaseContentSettings,
-	BrandSettings,
-	CrawlingSettings,
-	IdentitySettings,
-	Media,
-	OrganizationFounder,
-	OrganizationSettings,
-	PersonSettings,
-	PostStatusDefinition,
-	PostTypeSettings,
-	PostTypeSupports,
-	SettingsConstants,
-	SiteSettings,
-	SocialProfile,
-	TaxonomySettings,
-	Variable,
-	WebhookSettings,
-} from "@kizlo/shared"
+export type { SettingsConstants, Variable } from "@kizlo/shared"
 
-// The admin bootstraps window.kizlo with the full API response plus the
-// constants block (variable pickers, title separators) the editor UI needs.
 export interface Settings extends ApiSettings {
 	constants: SettingsConstants
 }
@@ -106,9 +81,6 @@ export const SiteSettingsSchema = z.object({
 export type SiteSettingsSchemaInput = z.input<typeof SiteSettingsSchema>
 export type SiteSettingsSchemaOutput = z.output<typeof SiteSettingsSchema>
 
-// 3- or 6-digit hex color, `#` prefixed. The picker only emits this shape;
-// validating here surfaces a bad manual value in the UI instead of silently
-// dropping it to null on save (PHP's sanitize_hex_color rejects it).
 const HexColor = z
 	.string()
 	.regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Enter a valid hex color, e.g. #1a2b3c.")
@@ -132,10 +104,6 @@ export const BrandSettingsSchema = z.object({
 export type BrandSettingsSchemaInput = z.input<typeof BrandSettingsSchema>
 export type BrandSettingsSchemaOutput = z.output<typeof BrandSettingsSchema>
 
-// A user is required once the site represents a person: the person node, its
-// @id, the publisher, `about`, and the author-merge all key off it. An empty
-// combobox value fails validation rather than saving a person identity with no
-// user behind it.
 export const RequiredUserSchema: z.ZodType<number, string> = z.preprocess(
 	(val) => (val === "" || val == null ? undefined : Number(val)),
 	z.number({ error: "Select a user to represent this site." }).int().positive(),

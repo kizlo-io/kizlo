@@ -55,9 +55,7 @@ export function ShellSidebar({ open = false, onClose, className, children, ...pr
 				data-slot="shell-sidebar"
 				data-open={open}
 				className={cn(
-					// Mobile: off-canvas fixed drawer that slides in when data-open.
 					"fixed inset-y-0 left-0 z-999999 flex w-64 shrink-0 -translate-x-full flex-col border-neutral-200 border-r bg-white transition-transform duration-200 data-[open=true]:translate-x-0",
-					// Desktop: static sticky rail, always visible.
 					"md:sticky md:top-(--kizlo-admin-bar) md:z-auto md:h-[calc(100vh-var(--kizlo-admin-bar))] md:translate-x-0 md:transition-none",
 					className,
 				)}

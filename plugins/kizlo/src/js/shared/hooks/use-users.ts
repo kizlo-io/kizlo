@@ -11,9 +11,6 @@ interface WP_RestUser {
 	name: string
 }
 
-// Load the site's WordPress users for identity/author selection. Uses the edit
-// context so all accounts are returned (not only those with published posts),
-// which requires the `list_users` capability the settings screen already needs.
 export function useUsers() {
 	const [users, setUsers] = useState<UserOption[]>([])
 

@@ -38,10 +38,6 @@ export function TextInput({ ...props }: TextInputProps) {
 
 export interface PasswordInputProps extends Omit<React.HTMLAttributes<HTMLInputElement>, "onChange">, BaseInputProps {}
 
-// Rendered as a masked `type="text"` input rather than `type="password"` so the
-// browser never treats it as a credential field — this stops the "save password"
-// prompt and autofill for a value that is a shared secret, not a login. The eye
-// button toggles the CSS masking so the secret can be read back when needed.
 export function PasswordInput({ ...props }: PasswordInputProps) {
 	const [visible, setVisible] = useState(false)
 	const id = `${props.name}-password-input`

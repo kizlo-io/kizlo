@@ -69,8 +69,6 @@ class TermSeoMetaBox
                 'meta'      => $this->getMeta($term),
                 'defaults'  => $seo->seoDefaults($term),
                 'variables' => Variables::toJSON('taxonomy_content'),
-                // Raw templates + baseline token values so the preview re-resolves
-                // variables live as the name/description fields change.
                 'templates' => [
                     'title'       => $taxonomy_settings->getTitleStructure() ?? Variables::DEFAULT_TAX_TITLE_TEMPLATE,
                     'description' => $taxonomy_settings->getDescriptionStructure() ?? Variables::DEFAULT_TAX_DESC_TEMPLATE,

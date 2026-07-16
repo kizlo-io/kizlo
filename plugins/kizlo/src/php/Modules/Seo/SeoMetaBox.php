@@ -72,9 +72,6 @@ class SeoMetaBox
                 'meta'      => $this->getMeta($post),
                 'defaults'  => $seo->seoDefaults($post),
                 'variables' => Variables::forPostType($post->post_type),
-                // Raw templates + baseline token values so the preview can
-                // re-resolve variables live as the editor's fields change,
-                // rather than showing the server-frozen defaults.
                 'templates' => [
                     'title'       => $post_type_settings->getTitleStructure() ?? Variables::DEFAULT_POST_TITLE_TEMPLATE,
                     'description' => $post_type_settings->getDescriptionStructure() ?? Variables::DEFAULT_POST_DESC_TEMPLATE,
@@ -102,8 +99,6 @@ class SeoMetaBox
         $raw = isset($_POST['kizlo_seo']) ? json_decode(wp_unslash($_POST['kizlo_seo']), true) : null;
         $raw = is_array($raw) ? $raw : [];
 
-        // Each override is its own post meta key. A set value is written; an empty
-        // value deletes the key so the post falls back to the post-type default.
         $values = [
             'title'               => sanitize_text_field($raw['title'] ?? ''),
             'description'         => sanitize_textarea_field($raw['description'] ?? ''),
