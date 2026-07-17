@@ -201,8 +201,8 @@ export function BrandSettingsPage() {
 						height: 512,
 						desc: (
 							<>
-								Used in browser tabs and bookmarks. Keep it legible on both light and dark backgrounds. Square SVG or PNG, at
-								least <strong>512 × 512 px</strong>.
+								Used in browser tabs and bookmarks. Keep it legible on both light and dark backgrounds. Square SVG or PNG, at least{" "}
+								<strong>512 × 512 px</strong>.
 							</>
 						),
 					}}
