@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { existsSync, rmSync } from "node:fs"
+import { networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { WordPressService } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
@@ -40,6 +41,27 @@ function generatePassword(): string {
 	return randomBytes(18).toString("base64url")
 }
 
+/** First non-internal IPv4 address — the router-assigned LAN address (undefined when offline). */
+function lanAddress(): string | undefined {
+	for (const ifaces of Object.values(networkInterfaces())) {
+		for (const iface of ifaces ?? []) {
+			if (iface.family === "IPv4" && !iface.internal) return iface.address
+		}
+	}
+	return undefined
+}
+
+/**
+ * The URL the dev stack is provisioned at. We prefer the router-assigned LAN address over `localhost`
+ * so it's reachable from off the host (the app in a container or on another device). Serving WordPress
+ * under the request host is already handled by the container's `WORDPRESS_CONFIG_EXTRA` (it derives
+ * `WP_HOME`/`WP_SITEURL` from `HTTP_HOST` per request), so this is only the address we write into `.env`
+ * and print. Falls back to `localhost` when the machine is offline, so bare local dev still works.
+ */
+function devUrl(port: number): string {
+	return `http://${lanAddress() ?? "localhost"}:${port}`
+}
+
 /**
  * Seed `dev.fixtures` into a freshly installed dev stack, reusing the test seeding
  * primitives: seed the default subscriber so `ctx.userId` exists, then run each `seed`
@@ -77,7 +99,7 @@ async function seedDevFixtures(cfg: ResolvedDevConfig, url: string): Promise<num
  * concern.
  */
 export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo> {
-	const url = `http://localhost:${cfg.port}`
+	const url = devUrl(cfg.port)
 
 	const fresh = !existsSync(join(cfg.wordpressDir, "wp-includes", "version.php"))
 	const byo = fresh && cfg.byo ? await prepareByo(cfg.byo, cfg.wordpressDir, cfg.configDir) : undefined
