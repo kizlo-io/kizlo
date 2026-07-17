@@ -21,9 +21,7 @@ class BrandSettingsService
         'logo_wordmark',
         'logo_wordmark_dark',
         'favicon',
-        'favicon_dark',
-        'ios_app_icon',
-        'android_app_icon',
+        'app_icon',
     ];
 
     /**

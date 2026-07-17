@@ -36,9 +36,7 @@ export interface BrandSettings {
 	logo_wordmark: Media | null
 	logo_wordmark_dark: Media | null
 	favicon: Media | null
-	favicon_dark: Media | null
-	ios_app_icon: Media | null
-	android_app_icon: Media | null
+	app_icon: Media | null
 	theme_color: string | null
 	theme_color_dark: string | null
 	background_color: string | null
