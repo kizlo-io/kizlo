@@ -46,50 +46,47 @@ export function useSettings() {
 		const slug = typeof args[1] === "string" ? args[1] : null
 		const data = (typeof args[1] === "string" ? args[2] : args[1]) as SettingsMap[K]
 
-		await apiFetch<{ success: boolean } | { code: string; message: string; data: null }>({
-			method: "PUT",
-			body: JSON.stringify(data),
-			path: `/kizlo/v1/settings/${key}${slug ? `/${slug}` : ""}`,
-		})
-			.then(() => toast.success("Settings saved successfully."))
-			.catch(() => toast.error("Something went wrong, please try again."))
-			.finally(() => setLoading(false))
+		try {
+			// Media-bearing sections return their saved state with attachment ids
+			// resolved back to { id, src } objects. Merge that into the store rather
+			// than the submitted form data (bare ids), which would otherwise clobber
+			// every media preview until the next refresh. Sections that reply 204 fall
+			// back to the submitted data, whose shape matches the store.
+			const response = await apiFetch<SettingsMap[K] | null>({
+				method: "PUT",
+				body: JSON.stringify(data),
+				path: `/kizlo/v1/settings/${key}${slug ? `/${slug}` : ""}`,
+			})
 
-		const existing = $settings.get()
-		if (!existing) return null
+			toast.success("Settings saved successfully.")
 
-		switch (key) {
-			case "site":
-				$settings.set({ ...existing, site: { ...existing.site, ...(data as any) } })
-				break
-			case "brand":
-				$settings.set({ ...existing, brand: { ...existing.brand, ...(data as any) } })
-				break
-			case "identity":
-				$settings.set({ ...existing, identity: { ...existing.identity, ...(data as any) } })
-				break
-			case "post_types":
-				$settings.set({
-					...existing,
-					post_types: existing.post_types.map((item) => (item.slug === slug ? { ...item, ...data } : item)),
-				})
-				break
-			case "taxonomies":
-				$settings.set({
-					...existing,
-					taxonomies: existing.taxonomies.map((item) => (item.slug === slug ? { ...item, ...data } : item)),
-				})
-				break
-			case "webhook":
-				$settings.set({ ...existing, webhook: { ...existing.webhook, ...(data as any) } })
-				break
-			case "uploads":
-				$settings.set({ ...existing, uploads: { ...existing.uploads, ...(data as any) } })
-				break
+			const existing = $settings.get()
+			if (existing) $settings.set(applyUpdate(existing, key, slug, response ?? data))
+		} catch {
+			toast.error("Something went wrong, please try again.")
+		} finally {
+			setLoading(false)
 		}
 	}
 
 	return { settings, update, isLoading }
+}
+
+function applyUpdate<K extends keyof SettingsMap>(existing: Settings, key: K, slug: string | null, data: SettingsMap[K]): Settings {
+	switch (key) {
+		case "post_types":
+			return {
+				...existing,
+				post_types: existing.post_types.map((item) => (item.slug === slug ? { ...item, ...(data as any) } : item)),
+			}
+		case "taxonomies":
+			return {
+				...existing,
+				taxonomies: existing.taxonomies.map((item) => (item.slug === slug ? { ...item, ...(data as any) } : item)),
+			}
+		default:
+			return { ...existing, [key]: { ...(existing[key as SettingsKeys] as object), ...(data as any) } }
+	}
 }
 
 type SingleSettingsKey = Exclude<keyof SettingsMap, "post_types" | "taxonomies">

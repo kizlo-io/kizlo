@@ -44,7 +44,7 @@ class IdentitySettingsService
 
                 Webhook::sendEvent(Webhook::SETTINGS_IDENTITY_UPDATED_EVENT);
 
-                return new WP_REST_Response(null, 204);
+                return new WP_REST_Response($this->toResponse(IdentitySettings::load()));
             },
         ]);
     }
