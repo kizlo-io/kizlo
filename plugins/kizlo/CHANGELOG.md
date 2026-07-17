@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-07-17
+### Fixed
+- Fix media pickers not registering a selection: the frame close event was resolving empty before the select event fired.
+
 ## [0.8.0] - 2026-07-17
 ### Changed
 - Merge the iOS and Android app icon settings into a single App icon used for every home-screen and install surface.
@@ -78,6 +82,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.8.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.8.0...kizlo-v0.8.1
 [0.8.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.7.0...kizlo-v0.8.0
 [0.7.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.6.0...kizlo-v0.7.0
 [0.6.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.5.0...kizlo-v0.6.0

@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Fix media pickers not registering a selection: the frame close event was resolving empty before the select event fired.
