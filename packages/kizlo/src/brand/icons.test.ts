@@ -15,9 +15,7 @@ const EMPTY: BrandSettings = {
 	logo_wordmark: null,
 	logo_wordmark_dark: null,
 	favicon: null,
-	favicon_dark: null,
-	ios_app_icon: null,
-	android_app_icon: null,
+	app_icon: null,
 	theme_color: null,
 	theme_color_dark: null,
 	background_color: null,
@@ -33,7 +31,7 @@ describe("resolveIcons", () => {
 	})
 
 	test("tolerates absent slots delivered as undefined rather than null", () => {
-		const sparse = { ...EMPTY, ios_app_icon: undefined, favicon: undefined } as unknown as BrandSettings
+		const sparse = { ...EMPTY, app_icon: undefined, favicon: undefined } as unknown as BrandSettings
 		expect(() => resolveIcons(sparse)).not.toThrow()
 		expect(resolveIcons(sparse)).toEqual({ icon: [], appleTouch: [], manifestIcons: [] })
 	})
@@ -59,37 +57,39 @@ describe("resolveIcons", () => {
 		expect(result.icon[0]?.type).toBe("image/png")
 	})
 
-	test("adds a dark variant with a prefers-color-scheme media query", () => {
-		const result = resolveIcons(brand({ favicon: media("image/png"), favicon_dark: media("image/png", "https://cdn.test/dark") }))
-		expect(result.icon).toHaveLength(2)
-		expect(result.icon[1]).toMatchObject({ url: "https://cdn.test/dark", media: "(prefers-color-scheme: dark)" })
-		expect(result.icon[1]?.media).toBe("(prefers-color-scheme: dark)")
+	test("emits a single unconstrained icon with no scheme media query", () => {
+		const result = resolveIcons(brand({ favicon: media("image/png", "https://cdn.test/fav") }))
+		expect(result.icon).toEqual([{ url: "https://cdn.test/fav?v=1", type: "image/png", sizes: "any" }])
 	})
 
-	test("emits no dark link when favicon_dark is empty", () => {
-		const result = resolveIcons(brand({ favicon: media("image/png") }))
-		expect(result.icon).toHaveLength(1)
-		expect(result.icon[0]?.media).toBeUndefined()
+	test("appends the attachment id as a `?v=` cache-buster", () => {
+		const result = resolveIcons(brand({ favicon: { ...media("image/png", "https://cdn.test/fav"), id: 42 } }))
+		expect(result.icon[0]?.url).toBe("https://cdn.test/fav?v=42")
+	})
+
+	test("uses `&v=` when the source url already has a query string", () => {
+		const result = resolveIcons(brand({ favicon: media("image/png", "https://cdn.test/fav?size=full") }))
+		expect(result.icon[0]?.url).toBe("https://cdn.test/fav?size=full&v=1")
 	})
 
 	describe("apple touch icon (raster guard)", () => {
-		test("uses the dedicated iOS slot when it is a raster", () => {
-			const result = resolveIcons(brand({ ios_app_icon: media("image/png", "https://cdn.test/apple") }))
-			expect(result.appleTouch).toEqual([{ url: "https://cdn.test/apple", type: "image/png", sizes: "any" }])
+		test("uses the app icon slot when it is a raster", () => {
+			const result = resolveIcons(brand({ app_icon: media("image/png", "https://cdn.test/apple") }))
+			expect(result.appleTouch).toEqual([{ url: "https://cdn.test/apple?v=1", type: "image/png", sizes: "any" }])
 		})
 
-		test("reports the iOS icon's real size when dimensions are known", () => {
-			const result = resolveIcons(brand({ ios_app_icon: media("image/png", "https://cdn.test/apple", { width: 180, height: 180 }) }))
-			expect(result.appleTouch).toEqual([{ url: "https://cdn.test/apple", type: "image/png", sizes: "180x180" }])
+		test("reports the app icon's real size when dimensions are known", () => {
+			const result = resolveIcons(brand({ app_icon: media("image/png", "https://cdn.test/apple", { width: 180, height: 180 }) }))
+			expect(result.appleTouch).toEqual([{ url: "https://cdn.test/apple?v=1", type: "image/png", sizes: "180x180" }])
 		})
 
-		test("steps down to a raster favicon when the iOS slot holds an SVG", () => {
-			const result = resolveIcons(brand({ ios_app_icon: media("image/svg+xml"), favicon: media("image/png", "https://cdn.test/fav") }))
-			expect(result.appleTouch).toEqual([{ url: "https://cdn.test/fav", type: "image/png", sizes: "any" }])
+		test("steps down to a raster favicon when the app icon slot holds an SVG", () => {
+			const result = resolveIcons(brand({ app_icon: media("image/svg+xml"), favicon: media("image/png", "https://cdn.test/fav") }))
+			expect(result.appleTouch).toEqual([{ url: "https://cdn.test/fav?v=1", type: "image/png", sizes: "any" }])
 		})
 
 		test("emits nothing when no raster source exists at all", () => {
-			const result = resolveIcons(brand({ ios_app_icon: media("image/svg+xml"), favicon: media("image/x-icon") }))
+			const result = resolveIcons(brand({ app_icon: media("image/svg+xml"), favicon: media("image/x-icon") }))
 			expect(result.appleTouch).toEqual([])
 		})
 	})
@@ -137,40 +137,24 @@ describe("resolveIcons", () => {
 			expect(result.manifestIcons).toEqual([{ src: "https://cdn.test/full.png", type: "image/png", sizes: "512x512" }])
 		})
 
-		test("adds the Android icon as a separate `maskable` entry", () => {
+		test("prefers the app icon over logo_icon as the manifest source", () => {
 			const result = resolveIcons(
 				brand({
+					app_icon: media("image/png", "https://cdn.test/app", { width: 512, height: 512 }),
 					logo_icon: media("image/png", "https://cdn.test/mark", { width: 512, height: 512 }),
-					android_app_icon: media("image/png", "https://cdn.test/mask", { width: 512, height: 512 }),
 				}),
 			)
-			expect(result.manifestIcons).toEqual([
-				{ src: "https://cdn.test/mark", type: "image/png", sizes: "512x512" },
-				{ src: "https://cdn.test/mask", type: "image/png", sizes: "512x512", purpose: "maskable" },
-			])
+			expect(result.manifestIcons).toEqual([{ src: "https://cdn.test/app", type: "image/png", sizes: "512x512" }])
 		})
 
-		test("never marks the `any` source maskable when no Android icon is set", () => {
-			const result = resolveIcons(brand({ logo_icon: media("image/png", "https://cdn.test/mark", { width: 512, height: 512 }) }))
-			expect(result.manifestIcons.every((i) => i.purpose === undefined)).toBe(true)
+		test("emits a single `any` entry with no maskable variant", () => {
+			const result = resolveIcons(brand({ app_icon: media("image/png", "https://cdn.test/app", { width: 512, height: 512 }) }))
+			expect(result.manifestIcons).toEqual([{ src: "https://cdn.test/app", type: "image/png", sizes: "512x512" }])
 		})
 
 		test("emits an SVG source as a single scalable `any` entry", () => {
 			const result = resolveIcons(brand({ logo_icon: media("image/svg+xml", "https://cdn.test/mark.svg") }))
 			expect(result.manifestIcons).toEqual([{ src: "https://cdn.test/mark.svg", type: "image/svg+xml", sizes: "any" }])
-		})
-
-		test("pairs a scalable `any` SVG with a maskable Android icon", () => {
-			const result = resolveIcons(
-				brand({
-					logo_icon: media("image/svg+xml", "https://cdn.test/mark.svg"),
-					android_app_icon: media("image/png", "https://cdn.test/mask", { width: 512, height: 512 }),
-				}),
-			)
-			expect(result.manifestIcons).toEqual([
-				{ src: "https://cdn.test/mark.svg", type: "image/svg+xml", sizes: "any" },
-				{ src: "https://cdn.test/mask", type: "image/png", sizes: "512x512", purpose: "maskable" },
-			])
 		})
 
 		test("drops non-square variants, keeping only square renditions", () => {

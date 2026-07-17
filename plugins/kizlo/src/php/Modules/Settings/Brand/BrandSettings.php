@@ -7,10 +7,11 @@ use Kizlo\Modules\Settings\SettingsAbstract;
 /**
  * Manages brand asset settings stored under a single WordPress option.
  *
- * Covers the logo variants, favicons, and app icon rendered by the headless
- * frontend. Favicons and logos come in light/dark pairs so the frontend can
- * swap them by color scheme; the base variant is the fallback and the dark
- * variant is optional. Each media field is stored as an attachment ID.
+ * Covers the logo variants, favicon, and app icons rendered by the headless
+ * frontend. Logos come in light/dark pairs so the frontend can swap them by
+ * color scheme; the favicon is a single scheme-agnostic icon, since browsers
+ * disagree on swapping favicons by scheme. Each media field is stored as an
+ * attachment ID.
  *
  * @since 1.0.0
  */
@@ -26,9 +27,7 @@ class BrandSettings extends SettingsAbstract
         'logo_wordmark'      => null,
         'logo_wordmark_dark' => null,
         'favicon'            => null,
-        'favicon_dark'       => null,
-        'ios_app_icon'       => null,
-        'android_app_icon'   => null,
+        'app_icon'           => null,
         'theme_color'            => null,
         'theme_color_dark'       => null,
         'background_color'       => null,
@@ -44,9 +43,7 @@ class BrandSettings extends SettingsAbstract
             'logo_wordmark',
             'logo_wordmark_dark',
             'favicon',
-            'favicon_dark',
-            'ios_app_icon',
-            'android_app_icon'   => !empty($value) ? absint($value) : null,
+            'app_icon'           => !empty($value) ? absint($value) : null,
 
             'theme_color',
             'theme_color_dark',
@@ -66,9 +63,7 @@ class BrandSettings extends SettingsAbstract
             'logo_wordmark',
             'logo_wordmark_dark',
             'favicon',
-            'favicon_dark',
-            'ios_app_icon',
-            'android_app_icon'   => $this->assertValidMediaId($key, $value),
+            'app_icon'           => $this->assertValidMediaId($key, $value),
 
             'theme_color',
             'theme_color_dark',
@@ -172,7 +167,8 @@ class BrandSettings extends SettingsAbstract
     }
 
     /**
-     * WordPress media attachment ID for the default (light-scheme) favicon.
+     * WordPress media attachment ID for the favicon. A single scheme-agnostic
+     * icon; browsers disagree on swapping favicons by color scheme.
      */
     public function getFavicon(): ?int
     {
@@ -187,49 +183,19 @@ class BrandSettings extends SettingsAbstract
     }
 
     /**
-     * WordPress media attachment ID for the dark-scheme favicon variant.
+     * WordPress media attachment ID for the app icon. A single square icon used
+     * for the Apple touch icon and the web-manifest icon, so every home-screen
+     * and install surface renders the same mark.
      */
-    public function getFaviconDark(): ?int
+    public function getAppIcon(): ?int
     {
-        return $this->get('favicon_dark');
+        return $this->get('app_icon');
     }
 
     /** @param int|null $value Attachment ID or null to clear. */
-    public function setFaviconDark(?int $value): static
+    public function setAppIcon(?int $value): static
     {
-        $this->set('favicon_dark', $value);
-        return $this;
-    }
-
-    /**
-     * WordPress media attachment ID for the iOS home-screen icon
-     * (`apple-touch-icon`). Full-bleed, opaque; iOS masks the corners itself.
-     */
-    public function getIosAppIcon(): ?int
-    {
-        return $this->get('ios_app_icon');
-    }
-
-    /** @param int|null $value Attachment ID or null to clear. */
-    public function setIosAppIcon(?int $value): static
-    {
-        $this->set('ios_app_icon', $value);
-        return $this;
-    }
-
-    /**
-     * WordPress media attachment ID for the Android/PWA maskable icon. Needs a
-     * padded safe zone so the launcher can crop it to any adaptive shape.
-     */
-    public function getAndroidAppIcon(): ?int
-    {
-        return $this->get('android_app_icon');
-    }
-
-    /** @param int|null $value Attachment ID or null to clear. */
-    public function setAndroidAppIcon(?int $value): static
-    {
-        $this->set('android_app_icon', $value);
+        $this->set('app_icon', $value);
         return $this;
     }
 

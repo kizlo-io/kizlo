@@ -26,31 +26,29 @@ export interface IconDescriptor {
 	type: string
 	/** `"any"` for scalable/single sources; omitted for `.ico`. */
 	sizes?: string
-	/** Media query for scheme-specific variants, e.g. `(prefers-color-scheme: dark)`. */
-	media?: string
 }
 
 export interface ManifestIcon {
 	src: string
 	type: string
 	sizes: string
-	/**
-	 * `"maskable"` marks art with a safe zone the launcher may crop to any
-	 * adaptive shape; omitted (default `"any"`) sources render uncropped.
-	 */
-	purpose?: "any" | "maskable"
 }
 
 export interface ResolvedIcons {
-	/** `rel="icon"` candidates: the light source plus an optional dark variant. */
+	/**
+	 * `rel="icon"` candidate: a single scheme-agnostic source, or empty. Browsers
+	 * disagree on scheme-swapping favicons (Safari ignores the `media` attribute
+	 * and never re-evaluates an SVG's internal `@media`), so one icon that reads
+	 * on both light and dark tab bars is the only cross-browser-safe surface.
+	 */
 	icon: IconDescriptor[]
 	/** `rel="apple-touch-icon"` candidate (raster-guarded), or empty. */
 	appleTouch: IconDescriptor[]
 	/**
-	 * Web-manifest icon entries (raster or SVG): the square brand icon as the
-	 * default `"any"` source — expanded to one entry per real square rendition —
-	 * plus the dedicated Android icon as `"maskable"` when provided. Either may
-	 * be absent.
+	 * Web-manifest icon entries (raster or SVG): a single square source —
+	 * expanded to one entry per real square rendition — that every non-iOS
+	 * install surface (Android, Chrome, macOS Safari) renders uncropped. Absent
+	 * when no manifest-compatible source exists.
 	 */
 	manifestIcons: ManifestIcon[]
 }
@@ -78,12 +76,21 @@ function pixelSize(media: Media): string {
 	return media.width && media.height ? `${media.width}x${media.height}` : "any"
 }
 
-function toDescriptor(media: Media, extra?: Pick<IconDescriptor, "media">): IconDescriptor {
+/**
+ * Append the attachment id as a `?v=` cache-buster. Safari (and every browser)
+ * keys its favicon cache by URL, so tying the version to the attachment id means
+ * the URL changes when a different icon is chosen — busting the stale cache —
+ * while staying stable across renders when the icon is unchanged.
+ */
+function versioned(src: string, id: number): string {
+	return `${src}${src.includes("?") ? "&" : "?"}v=${id}`
+}
+
+function toDescriptor(media: Media): IconDescriptor {
 	return {
-		url: media.src,
+		url: versioned(media.src, media.id),
 		type: media.mime ?? "",
 		sizes: media.mime && ICO_MIMES.has(media.mime) ? undefined : pixelSize(media),
-		...extra,
 	}
 }
 
@@ -94,12 +101,11 @@ function toDescriptor(media: Media, extra?: Pick<IconDescriptor, "media">): Icon
  * or above the floor so browsers get genuine 192/512-ish icons; if none qualify
  * (e.g. a non-square upload) the original is used as-is.
  */
-function toManifestIcons(media: Media, purpose?: "maskable"): ManifestIcon[] {
+function toManifestIcons(media: Media): ManifestIcon[] {
 	const type = media.mime ?? ""
-	const withPurpose = purpose ? { purpose } : {}
 
 	if (media.mime === SVG_MIME) {
-		return [{ src: media.src, type, sizes: "any", ...withPurpose }]
+		return [{ src: media.src, type, sizes: "any" }]
 	}
 
 	const renditions = [{ src: media.src, width: media.width, height: media.height }, ...(media.variants ?? [])]
@@ -112,7 +118,7 @@ function toManifestIcons(media: Media, purpose?: "maskable"): ManifestIcon[] {
 		const sizes = r.width && r.height ? `${r.width}x${r.height}` : "any"
 		if (seen.has(sizes)) continue
 		seen.add(sizes)
-		icons.push({ src: r.src, type, sizes, ...withPurpose })
+		icons.push({ src: r.src, type, sizes })
 	}
 	return icons
 }
@@ -122,24 +128,26 @@ function toManifestIcons(media: Media, purpose?: "maskable"): ManifestIcon[] {
  * nothing are simply left out; the consumer only emits what is present.
  */
 export function resolveIcons(brand: BrandSettings): ResolvedIcons {
+	// One unconstrained favicon, no `prefers-color-scheme` swap. Chrome honors a
+	// scheme-scoped `media` on `rel=icon`, but Safari ignores it and shows the
+	// last-declared icon in every scheme, so a light/dark pair renders wrong there.
+	// A single icon that reads on both tab backgrounds is the safe surface.
 	const icon: IconDescriptor[] = []
+	const primary = brand.favicon ?? brand.logo_icon
+	if (primary) icon.push(toDescriptor(primary))
 
-	const light = brand.favicon ?? brand.logo_icon
-	if (light) icon.push(toDescriptor(light))
-
-	if (brand.favicon_dark) {
-		icon.push(toDescriptor(brand.favicon_dark, { media: "(prefers-color-scheme: dark)" }))
-	}
-
-	const apple = raster(brand.ios_app_icon) ?? raster(brand.favicon)
+	// iOS/iPadOS Safari is the only surface that reads apple-touch-icon; it must
+	// be a raster (Apple ignores SVG here), so fall back to the favicon raster.
+	const apple = raster(brand.app_icon) ?? raster(brand.favicon)
 	const appleTouch = apple ? [toDescriptor(apple)] : []
 
+	// Every non-iOS install surface (Android, Chrome, macOS Safari) reads the
+	// manifest. A single uncropped source keeps them all consistent, so emit one
+	// `"any"` icon and no `"maskable"` variant (browsers diverge on which they
+	// pick, which is the inconsistency we're avoiding).
 	const manifestIcons: ManifestIcon[] = []
-	const anySource = manifestSource(brand.logo_icon) ?? manifestSource(brand.favicon)
+	const anySource = manifestSource(brand.app_icon) ?? manifestSource(brand.logo_icon) ?? manifestSource(brand.favicon)
 	if (anySource) manifestIcons.push(...toManifestIcons(anySource))
-
-	const maskable = manifestSource(brand.android_app_icon)
-	if (maskable) manifestIcons.push(...toManifestIcons(maskable, "maskable"))
 
 	return { icon, appleTouch, manifestIcons }
 }

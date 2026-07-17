@@ -46,7 +46,7 @@ export function createRootViewport(client: S2SClient<[]>) {
 }
 
 function toNextIcon(icon: IconDescriptor): IconDescriptor {
-	return { url: icon.url, type: icon.type, sizes: icon.sizes, media: icon.media }
+	return { url: icon.url, type: icon.type, sizes: icon.sizes }
 }
 
 export function createPageMetadata(head: SeoHead): Metadata {

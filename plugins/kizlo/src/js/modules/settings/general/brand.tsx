@@ -55,9 +55,7 @@ export function BrandSettingsPage() {
 			logo_wordmark: brand?.logo_wordmark?.id ?? null,
 			logo_wordmark_dark: brand?.logo_wordmark_dark?.id ?? null,
 			favicon: brand?.favicon?.id ?? null,
-			favicon_dark: brand?.favicon_dark?.id ?? null,
-			ios_app_icon: brand?.ios_app_icon?.id ?? null,
-			android_app_icon: brand?.android_app_icon?.id ?? null,
+			app_icon: brand?.app_icon?.id ?? null,
 			theme_color: brand?.theme_color ?? null,
 			theme_color_dark: brand?.theme_color_dark ?? null,
 			background_color: brand?.background_color ?? null,
@@ -191,7 +189,7 @@ export function BrandSettingsPage() {
 
 			<SettingsSection
 				title="Favicon"
-				desc="The icon browsers show in tabs and bookmarks. A transparent mark needs both a light and dark version so it stays visible in each browser theme."
+				desc="The icon browsers show in tabs and bookmarks. A single icon is used across light and dark browser themes, so choose one that stays legible on both."
 			>
 				<MediaField
 					control={form.control}
@@ -203,59 +201,28 @@ export function BrandSettingsPage() {
 						height: 512,
 						desc: (
 							<>
-								The default favicon, used on light browser themes and as the fallback. Square SVG or PNG, at least{" "}
+								Used in browser tabs and bookmarks. Keep it legible on both light and dark backgrounds. Square SVG or PNG, at least{" "}
 								<strong>512 × 512 px</strong>.
 							</>
 						),
 					}}
 				/>
-
-				<MediaField
-					control={form.control}
-					{...{
-						label: "Favicon Dark",
-						name: "favicon_dark",
-						url: brand?.favicon_dark?.src,
-						width: 512,
-						height: 512,
-						desc: "Shown when the browser is in dark mode. Optional; the default favicon is used if empty.",
-					}}
-				/>
 			</SettingsSection>
 
 			<SettingsSection
-				title="iOS app icon"
-				desc="Shown when your site is added to an iPhone or iPad home screen. iOS rounds the corners itself and never crops the artwork, so use a full-bleed, opaque design with no padding and no transparency."
+				title="App icon"
+				desc="Used when your site is added to a home screen or installed as an app on any platform. One icon serves them all."
 			>
 				<MediaField
 					control={form.control}
 					label="Icon"
-					name="ios_app_icon"
-					url={brand?.ios_app_icon?.src}
-					width={180}
-					height={180}
-					desc={
-						<>
-							Full-bleed, opaque PNG, at least <strong>180 × 180 px</strong>.
-						</>
-					}
-				/>
-			</SettingsSection>
-
-			<SettingsSection
-				title="Android app icon"
-				desc="Used when your site is installed as an app on Android and in Chrome. Android crops the icon to the launcher's shape (circle, squircle, and so on), so keep the important artwork inside a centered safe zone with padding around it."
-			>
-				<MediaField
-					control={form.control}
-					label="Icon"
-					name="android_app_icon"
-					url={brand?.android_app_icon?.src}
+					name="app_icon"
+					url={brand?.app_icon?.src}
 					width={512}
 					height={512}
 					desc={
 						<>
-							Maskable PNG with a padded safe zone, at least <strong>512 × 512 px</strong>.
+							Square PNG, at least <strong>512 × 512 px</strong>.
 						</>
 					}
 				/>
