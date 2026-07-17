@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto"
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { defineCommand } from "citty"
 import { palette, printBanner } from "../banner"
@@ -24,29 +23,18 @@ function note(text: string): void {
 	process.stdout.write(`   ${dim}${text}${reset}\n`)
 }
 
-/** First non-internal IPv4 address, for the LAN-reachable "Network" URL (undefined when offline). */
-function lanAddress(): string | undefined {
-	for (const ifaces of Object.values(networkInterfaces())) {
-		for (const iface of ifaces ?? []) {
-			if (iface.family === "IPv4" && !iface.internal) return iface.address
-		}
-	}
-	return undefined
-}
-
 /**
- * Print the connection summary as an aligned, Next.js-style block. Shows the wp-admin
- * URL on localhost ("Local") and — when a LAN address exists — on the network, so the
- * stack can be opened from other devices. On a fresh install, also show the one-time
- * wp-admin password (it's never stored, so this is the only chance to see it).
+ * Print the connection summary as an aligned, Next.js-style block. Shows the wp-admin URL on
+ * the loopback ("Local") and — when the stack is installed on a LAN address rather than
+ * localhost — on the network, so it can be opened from other devices. On a fresh install, also
+ * show the one-time wp-admin password (it's never stored, so this is the only chance to see it).
  */
 function printSummary(info: DevStackInfo): void {
 	const { cyan, dim, reset } = palette()
-	const port = new URL(info.url).port
-	const lan = lanAddress()
+	const { port, hostname } = new URL(info.url)
 
-	const rows: [string, string][] = [["WP Local", `${info.url}/wp-admin`]]
-	if (lan) rows.push(["WP Network", `http://${lan}:${port}/wp-admin`])
+	const rows: [string, string][] = [["WP Local", `http://localhost:${port}/wp-admin`]]
+	if (hostname !== "localhost") rows.push(["WP Network", `${info.url}/wp-admin`])
 	rows.push(["Database Connection", `127.0.0.1:${info.dbPort}`])
 
 	const width = Math.max(...rows.map(([label]) => label.length)) + 1
@@ -124,6 +112,29 @@ function updateWpEnv(cfg: ResolvedDevConfig, info: DevStackInfo): { siteSecret: 
 }
 
 /**
+ * Re-point `KIZLO_DEV_WORDPRESS_URL` at the current dev URL on a warm resume, so a LAN address that
+ * changed since the last session (a new DHCP lease, a different network) doesn't leave the app talking
+ * to a dead IP. Only this one key is rewritten — the credentials and secret from the fresh install are
+ * preserved — and it's a no-op when `.env` is absent (nothing provisioned yet) or already current.
+ * The full fresh-install write goes through {@link updateWpEnv} instead; this covers the resume path it
+ * skips. Returns true when it changed the file. The app still needs a restart to read the new value.
+ */
+function syncDevUrl(cfg: ResolvedDevConfig, url: string): boolean {
+	const envPath = join(cfg.configDir, ".env")
+	if (!existsSync(envPath)) return false
+	const existing = readFileSync(envPath, "utf8")
+	if (readEnvValue(existing, "KIZLO_DEV_WORDPRESS_URL") === url) return false
+	const { content } = mergeEnv(
+		existing,
+		{ KIZLO_DEV_WORDPRESS_URL: url },
+		new Set(["KIZLO_DEV_WORDPRESS_URL"]),
+		envGroups("KIZLO_BACKEND_URL"),
+	)
+	writeFileSync(envPath, content)
+	return true
+}
+
+/**
  * Arm the foreground teardown — call this *before* the containers start, so a cancel at
  * any point (even mid-startup, with mysql up but wordpress still booting) stops whatever
  * already came up. The teardown is owned by a detached **watchdog** process, not by this
@@ -195,6 +206,8 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 					`Could not sync the site settings to WordPress (${sync.error}) — make sure the kizlo plugin is active, then set them from the Kizlo settings.`,
 				)
 		}
+	} else if (syncDevUrl(ready, creds.url)) {
+		note("Updated .env WordPress URL to the current network address — restart your app to pick it up")
 	}
 	printSummary(creds)
 
