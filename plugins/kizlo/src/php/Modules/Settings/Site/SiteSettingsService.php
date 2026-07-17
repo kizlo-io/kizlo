@@ -32,7 +32,7 @@ class SiteSettingsService
 
                 Webhook::sendEvent(Webhook::SETTINGS_SITE_UPDATED_EVENT);
 
-                return new WP_REST_Response(null, 204);
+                return new WP_REST_Response($this->toResponse($settings));
             },
         ]);
     }
