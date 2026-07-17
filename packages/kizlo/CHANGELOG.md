@@ -1,5 +1,24 @@
 # kizlo
 
+## 0.7.0
+
+### Minor Changes
+
+- [#49](https://github.com/kizlo-io/kizlo/pull/49) [`fb22269`](https://github.com/kizlo-io/kizlo/commit/fb222699ef00695b63c8fc489f1b6b74ff75a74e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Collapse the favicon to a single scheme-agnostic icon and remove the `favicon_dark` setting. Safari ignores the `media` attribute on `rel="icon"` (and never re-evaluates an SVG's internal `@media`), so a light/dark favicon pair rendered wrong there and could flicker on reload elsewhere. `resolveIcons` now emits one unconstrained `rel="icon"`, and `IconDescriptor` no longer carries a `media` field. Design a single favicon that reads on both light and dark tab backgrounds.
+
+  Icon URLs now carry a `?v=<attachment-id>` cache-buster so a swapped icon fetches fresh instead of serving Safari's stale favicon cache; the version is stable across renders when the icon is unchanged.
+
+- [#49](https://github.com/kizlo-io/kizlo/pull/49) [`fb22269`](https://github.com/kizlo-io/kizlo/commit/fb222699ef00695b63c8fc489f1b6b74ff75a74e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Collapse the separate `ios_app_icon` and `android_app_icon` brand settings into a single `app_icon`. Only iOS/iPadOS Safari reads the `apple-touch-icon`; every other install surface (Android, Chrome, macOS Safari) reads the web manifest, and browsers disagree on which manifest entry to pick when an `any` and a `maskable` icon are both present, so per-platform icons rendered inconsistently. `resolveIcons` now emits one `app_icon` as both the `apple-touch-icon` and the single manifest `any` icon (no `maskable` variant), so home-screen and install surfaces show the same mark. `ManifestIcon` no longer carries a `purpose` field.
+
+### Patch Changes
+
+- [#52](https://github.com/kizlo-io/kizlo/pull/52) [`b04dc20`](https://github.com/kizlo-io/kizlo/commit/b04dc203eaa39230e1b09144721c385b35e7b9d7) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Point the local dev stack's `KIZLO_DEV_WORDPRESS_URL` at the machine's LAN address instead of `localhost`, so the app can reach WordPress from off the host (running in a container or on another device). `kizlo init` and `kizlo dev` (including `reset`) write the router-assigned IPv4 address, falling back to `localhost` when the machine is offline. WordPress itself already serves under whatever host a request comes in on (via the container's `WORDPRESS_CONFIG_EXTRA`), so no site-URL rewrite is involved.
+
+  A warm `kizlo dev` start now also re-points `KIZLO_DEV_WORDPRESS_URL` in `.env` when the LAN address changed since the last session (a new DHCP lease or a different network), so restarting the app picks up the current address without a full `reset`. The dev summary shows a loopback "WP Local" URL alongside the "WP Network" one.
+
+- Updated dependencies [[`fb22269`](https://github.com/kizlo-io/kizlo/commit/fb222699ef00695b63c8fc489f1b6b74ff75a74e), [`fb22269`](https://github.com/kizlo-io/kizlo/commit/fb222699ef00695b63c8fc489f1b6b74ff75a74e)]:
+  - @kizlo/shared@0.4.0
+
 ## 0.6.1
 
 ### Patch Changes
