@@ -68,8 +68,10 @@ export function useMediaLibrary(options: UseMediaOptions = {}) {
 			}
 
 			const handleClose = () => {
-				resolverRef.current?.([])
-				resolverRef.current = null
+				setTimeout(() => {
+					resolverRef.current?.([])
+					resolverRef.current = null
+				}, 0)
 			}
 
 			frame.on("select", handleSelect)
