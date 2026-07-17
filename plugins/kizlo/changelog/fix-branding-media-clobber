@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Fix branding, site, and identity media pickers clearing other saved images when a single icon was changed or removed; saves now reconcile the store from the server's resolved response.

@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Show the selected file name in media pickers, add a checkerboard preview canvas so white or transparent logos stay visible, and stop the page jumping to the top when the media modal is closed without a selection.

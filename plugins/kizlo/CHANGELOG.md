@@ -4,6 +4,17 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-17
+### Changed
+- Merge the iOS and Android app icon settings into a single App icon used for every home-screen and install surface.
+
+### Removed
+- Remove the dark favicon setting; the favicon is now a single icon that serves every browser theme, since Safari ignores light/dark favicon switching.
+
+### Fixed
+- Fix branding, site, and identity media pickers clearing other saved images when a single icon was changed or removed; saves now reconcile the store from the server's resolved response.
+- Show the selected file name in media pickers, add a checkerboard preview canvas so white or transparent logos stay visible, and stop the page jumping to the top when the media modal is closed without a selection.
+
 ## [0.7.0] - 2026-07-16
 ### Added
 - Add Uploads settings to allow custom file types by extension and MIME type (SVG and ICO enabled by default), with automatic SVG sanitization and a block list for executable/script types
@@ -67,6 +78,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.8.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.7.0...kizlo-v0.8.0
 [0.7.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.6.0...kizlo-v0.7.0
 [0.6.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.5.0...kizlo-v0.6.0
 [0.5.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.4.0...kizlo-v0.5.0
