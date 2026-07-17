@@ -125,7 +125,13 @@ export function resolveIcons(brand: BrandSettings): ResolvedIcons {
 	const icon: IconDescriptor[] = []
 
 	const light = brand.favicon ?? brand.logo_icon
-	if (light) icon.push(toDescriptor(light))
+	if (light) {
+		// When a dark variant is present, scope the default to light so exactly one
+		// icon matches per scheme. An unconstrained default also matches in dark mode,
+		// leaving two valid candidates that browsers pick between arbitrarily per load.
+		const scheme = brand.favicon_dark ? { media: "(prefers-color-scheme: light)" as const } : undefined
+		icon.push(toDescriptor(light, scheme))
+	}
 
 	if (brand.favicon_dark) {
 		icon.push(toDescriptor(brand.favicon_dark, { media: "(prefers-color-scheme: dark)" }))

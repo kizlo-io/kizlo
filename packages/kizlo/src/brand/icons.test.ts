@@ -66,6 +66,16 @@ describe("resolveIcons", () => {
 		expect(result.icon[1]?.media).toBe("(prefers-color-scheme: dark)")
 	})
 
+	test("scopes the default icon to light when a dark variant exists so exactly one matches per scheme", () => {
+		const result = resolveIcons(brand({ favicon: media("image/png"), favicon_dark: media("image/png", "https://cdn.test/dark") }))
+		expect(result.icon[0]?.media).toBe("(prefers-color-scheme: light)")
+	})
+
+	test("leaves the default icon unconstrained when there is no dark variant", () => {
+		const result = resolveIcons(brand({ favicon: media("image/png") }))
+		expect(result.icon[0]?.media).toBeUndefined()
+	})
+
 	test("emits no dark link when favicon_dark is empty", () => {
 		const result = resolveIcons(brand({ favicon: media("image/png") }))
 		expect(result.icon).toHaveLength(1)
