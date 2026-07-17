@@ -64,9 +64,16 @@ export function useMediaLibrary(options: UseMediaOptions = {}) {
 				}
 
 				resolverRef.current?.(items)
+				resolverRef.current = null
+			}
+
+			const handleClose = () => {
+				resolverRef.current?.([])
+				resolverRef.current = null
 			}
 
 			frame.on("select", handleSelect)
+			frame.on("close", handleClose)
 
 			frameRef.current = frame
 			frame.open()

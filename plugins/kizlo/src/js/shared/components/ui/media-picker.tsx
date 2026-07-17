@@ -18,6 +18,11 @@ const TYPE_LABEL: Record<MediaType, string> = {
 	application: "file",
 }
 
+const CHECKERBOARD_STYLE: React.CSSProperties = {
+	backgroundImage: "repeating-conic-gradient(#e2e2e2 0% 25%, #f5f5f5 0% 50%)",
+	backgroundSize: "16px 16px",
+}
+
 const TYPE_ACCEPT: Record<MediaType, string> = {
 	image: "an image",
 	video: "a video",
@@ -60,6 +65,8 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 					: props.url
 						? { id: props.value, url: props.url, title: "", mime: "" }
 						: null
+
+	const name = item ? fileName(item) || `Selected ${typeLabel}` : ""
 
 	const setSelected = (selected: MediaItem) => {
 		setPicked(selected)
@@ -156,7 +163,7 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 					) : (
 						<div className="w-full overflow-clip rounded-lg border border-neutral-300 bg-neutral-100">
 							{props.type === "image" ? (
-								<div className="h-28 md:h-40">
+								<div className="relative h-34 p-2 md:h-40" style={CHECKERBOARD_STYLE}>
 									<img
 										alt={item.alt ?? ""}
 										src={item.url}
@@ -166,9 +173,11 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 							) : (
 								<div className="flex h-40 flex-col items-center gap-3 p-6 text-center">
 									<TypeIcon className="size-9 text-neutral-500" weight="thin" />
-									<p className="w-full break-all text-neutral-900 text-sm">{item.title || `Selected ${typeLabel}`}</p>
+									<p className="w-full break-all text-neutral-900 text-sm">{name}</p>
 								</div>
 							)}
+
+							<SelectedFileInfo text={name} icon={TypeIcon} />
 
 							<div className="flex items-center border-neutral-300 border-t [&>button]:flex-1 [&>button]:cursor-pointer [&>button]:border-0 [&>button]:bg-white [&>button]:p-2 [&>button]:text-neutral-700 [&>button]:shadow-none [&>button]:outline-none [&>button]:hover:bg-neutral-200">
 								<button type="button" onClick={onSelect} className="border-neutral-300 border-r!">
@@ -201,7 +210,7 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 						<>
 							<TypeIcon className="size-5 shrink-0 text-neutral-400" weight="thin" />
 							<span className={cn("truncate text-sm", item ? "text-neutral-900" : "text-neutral-500")}>
-								{item ? item.title || `Selected ${typeLabel}` : `Select or Drag & Drop`}
+								{item ? name : `Select or Drag & Drop`}
 							</span>
 						</>
 					)}
@@ -211,6 +220,35 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 			{item && desc ? <p className="mt-2 mb-0 text-neutral-500 text-xs leading-relaxed">{desc}</p> : null}
 		</div>
 	)
+}
+
+function SelectedFileInfo({ text, icon: Icon, className }: { text: string; icon: Icon; className?: string }) {
+	const head = text.slice(0, -8)
+	const tail = text.slice(-8)
+
+	return (
+		<div
+			className={cn("flex w-full items-center gap-2 border-neutral-300 border-t bg-white px-3 py-2 text-neutral-700 text-xs", className)}
+		>
+			<Icon className="size-4 shrink-0 text-neutral-500" />
+
+			<span className="flex min-w-0 flex-1">
+				<span className="min-w-0 truncate">{head}</span>
+				<span className="shrink-0 whitespace-pre">{tail}</span>
+			</span>
+		</div>
+	)
+}
+
+function fileName(item: MediaItem): string {
+	const path = item.url.split(/[?#]/)[0] ?? item.url
+	const last = path.slice(path.lastIndexOf("/") + 1)
+
+	try {
+		return decodeURIComponent(last) || item.title
+	} catch {
+		return last || item.title
+	}
 }
 
 function formatBytes(bytes: number): string {
