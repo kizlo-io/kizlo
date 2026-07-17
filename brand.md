@@ -10,18 +10,18 @@ Kizlo is the open-source foundation for building content-driven applications on 
 Headless WordPress made stupidly easy.
 
 ### SEO Title
-Kizlo: The TypeScript Toolkit for Headless WordPress
+Kizlo: The TypeScript Framework for Headless WordPress
 
 ### SEO Meta Description
-Kizlo is an open-source toolkit for building content-driven applications with WordPress as a headless CMS. Fully typed end-to-end, built for the AI era.
+Kizlo is an open-source framework for building content-driven applications with WordPress as a headless CMS. Fully typed end-to-end, built for the AI era.
 
 ---
 ---
 
-## Kizlo Toolkit
+## Kizlo Framework
 
 ### Title
-The open-source TypeScript toolkit for headless WordPress
+The open-source TypeScript framework for headless WordPress
 
 ### Description
-Kizlo is an open-source TypeScript toolkit for building content-driven applications with WordPress as a headless CMS and a frontend using Next.js, Astro, Svelte, or TanStack Start. Get an instant local, Docker-based environment to develop, test, and ship faster from your machine.
+Kizlo is an open-source TypeScript framework for building content-driven applications with WordPress as a headless CMS and a frontend using Next.js, Astro, Svelte, or TanStack Start. Get an instant local, Docker-based environment to develop, test, and ship faster from your machine.

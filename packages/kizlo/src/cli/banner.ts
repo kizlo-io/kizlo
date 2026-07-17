@@ -7,7 +7,7 @@ const KIZLO_CLI_WORD_MARK = [
 	"╚═╝  ╚═╝╚═╝╚══════╝╚══════╝ ╚═════╝ ",
 ]
 
-const KIZLO_TAGLINE = "Headless WordPress toolkit for TypeScript"
+const KIZLO_TAGLINE = "Headless WordPress framework for TypeScript"
 
 function colorSupported(): boolean {
 	return Boolean(process.stdout.isTTY) && process.env.NO_COLOR === undefined && process.env.TERM !== "dumb"

@@ -1,6 +1,6 @@
 export const appName = "Kizlo"
 export const appDescription =
-	"Kizlo is the toolkit for headless WordPress — build websites, mobile apps, and agentic applications on a stack you host and own from top to bottom."
+	"Kizlo is the framework for headless WordPress — build websites, mobile apps, and agentic applications on a stack you host and own from top to bottom."
 export const siteUrl = "https://kizlo.io"
 export const docsRoute = "/docs"
 export const docsImageRoute = "/og/docs"

@@ -7,7 +7,7 @@ export { postFixture } from "../post/fixture"
 
 /**
  * The kizlo core content fixtures (posts/comments + menu). Mount these in
- * `kizlo.config.ts` so the toolkit's own suites have content to read; consumers
+ * `kizlo.config.ts` so the framework's own suites have content to read; consumers
  * who only need a clean WP stack can leave them out.
  */
 export const coreFixtures: Fixture[] = [postFixture(), menuFixture()]

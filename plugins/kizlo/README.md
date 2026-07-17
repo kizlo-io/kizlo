@@ -14,7 +14,7 @@
 <h3 align="center">Kizlo</h3>
 
 <p align="center">
-  A plugin that connects your WordPress with Kizlo toolkit, headlessly.
+  A plugin that connects your WordPress with the Kizlo framework, headlessly.
 </p>
 
 ---

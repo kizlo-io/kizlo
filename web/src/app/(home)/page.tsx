@@ -36,7 +36,7 @@ export default async function HomePage() {
 			</div>
 
 			<h1 className="max-w-2xl text-balance font-semibold text-4xl text-fd-foreground capitalize tracking-tight sm:text-5xl">
-				The toolkit for headless WordPress
+				The framework for headless WordPress
 			</h1>
 
 			<p className="mt-5 max-w-xl text-balance text-fd-muted-foreground leading-relaxed sm:text-lg">

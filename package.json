@@ -1,7 +1,7 @@
 {
 	"name": "kizlo-turbo",
 	"private": true,
-	"description": "A headless WordPress toolkit for TypeScript — monorepo.",
+	"description": "A headless WordPress framework for TypeScript — monorepo.",
 	"license": "MIT",
 	"author": "Kizlo",
 	"homepage": "https://github.com/kizlo-io/kizlo#readme",

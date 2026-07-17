@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Kizlo
  * Plugin URI: https://kizlo.io/plugins/kizlo
- * Description: A plugin that connects your WordPress with Kizlo toolkit, headlessly.
+ * Description: A plugin that connects your WordPress with the Kizlo framework, headlessly.
  * Version: 0.8.1
  * Author: Kizlo Developers
  * Author URI: https://kizlo.io
