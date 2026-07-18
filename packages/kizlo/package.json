@@ -2,7 +2,7 @@
 	"name": "kizlo",
 	"version": "0.7.0",
 	"type": "module",
-	"description": "A headless WordPress toolkit for TypeScript.",
+	"description": "A headless WordPress framework for TypeScript.",
 	"keywords": [
 		"wordpress",
 		"headless",

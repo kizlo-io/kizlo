@@ -6,7 +6,7 @@ type CreateMetadata = Omit<Metadata, "title"> & {
 }
 
 export function createMetadata({ title, description, openGraph, twitter, ...rest }: CreateMetadata = {}): Metadata {
-	const resolvedTitle = title ? `${title} | ${appName}` : `${appName} — The toolkit for headless WordPress`
+	const resolvedTitle = title ? `${title} | ${appName}` : `${appName} — The framework for headless WordPress`
 	const resolvedDescription = description ?? appDescription
 
 	return {

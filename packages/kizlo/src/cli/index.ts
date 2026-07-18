@@ -6,7 +6,7 @@ const main = defineCommand({
 	meta: {
 		name: "kizlo",
 		version: getVersion(),
-		description: "Kizlo CLI — headless WordPress toolkit",
+		description: "Kizlo CLI — headless WordPress framework",
 	},
 	subCommands: {
 		init: () => import("./commands/init").then((m) => m.init),
