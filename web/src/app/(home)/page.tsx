@@ -35,13 +35,13 @@ export default async function HomePage() {
 				<img src="https://cdn.kizlo.io/logo/icon-dark.svg" alt={appName} className="relative h-14 w-14 dark:hidden" />
 			</div>
 
-			<h1 className="max-w-2xl text-balance font-semibold text-4xl text-fd-foreground capitalize tracking-tight sm:text-5xl">
-				The framework for headless WordPress
+			<h1 className="max-w-2xl text-balance font-semibold text-4xl text-fd-foreground tracking-tight sm:text-5xl">
+				The Framework for Headless WordPress
 			</h1>
 
-			<p className="mt-5 max-w-xl text-balance text-fd-muted-foreground leading-relaxed sm:text-lg">
-				{appName} is built for a stack that you host and own from top to bottom. Use it to build websites, mobile apps, agentic
-				applications, and more.
+			<p className="mt-5 max-w-3xl text-balance text-fd-muted-foreground leading-relaxed sm:text-lg">
+				{appName} is the open-source framework for content-driven apps on headless WordPress. Bring your own frontend and ship fully typed,
+				end to end.
 			</p>
 
 			<div className="mt-6 flex flex-wrap items-center justify-center gap-3">
