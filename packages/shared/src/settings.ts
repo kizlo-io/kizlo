@@ -142,9 +142,6 @@ export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_typ
 }
 
 export interface CrawlingSettings {
-	sitemaps: {
-		pathname_structure: string
-	}
 	robots: {
 		include_sitemap: boolean
 		custom_rules: {

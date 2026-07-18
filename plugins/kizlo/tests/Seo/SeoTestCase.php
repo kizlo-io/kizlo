@@ -112,7 +112,6 @@ abstract class SeoTestCase extends TestCase
         ], $overrides['taxonomies'] ?? []);
 
         $robots  = array_merge(['include_sitemap' => true, 'custom_rules' => []], $overrides['robots'] ?? []);
-        $sitemap = array_merge(['pathname_structure' => '/sitemaps/index.xml'], $overrides['sitemap'] ?? []);
 
         update_option('kizlo_settings_site', $site);
         update_option('kizlo_settings_identity', $identity);
@@ -122,7 +121,6 @@ abstract class SeoTestCase extends TestCase
         update_option('kizlo_settings_post_types', $postTypes);
         update_option('kizlo_settings_taxonomies', $taxonomies);
         update_option('kizlo_settings_robots', $robots);
-        update_option('kizlo_settings_sitemap', $sitemap);
 
         Settings::invalidateCache();
 

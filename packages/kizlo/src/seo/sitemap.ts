@@ -75,6 +75,21 @@ export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitema
 	}
 }
 
+/**
+ * Builds a handler that permanently redirects the well-known `/sitemap.xml` to the generated
+ * sitemap index at `/sitemaps/index.xml`. Crawlers probe the standard path regardless of what
+ * robots.txt advertises, so this points them at the real index. The target is derived from the
+ * same `SITEMAP_BASE`/`SITEMAP_INDEX_SLUG` constants the sitemap route is mounted on, so there is
+ * a single source of truth for where the index lives. Framework-agnostic like `createSitemapRoute`.
+ */
+export function createSitemapRedirectRoute() {
+	const location = `${SITEMAP_BASE}/${SITEMAP_INDEX_SLUG}`
+
+	return function GET(_request: Request): Response {
+		return new Response(null, { status: 308, headers: { Location: location } })
+	}
+}
+
 function lastPathSegment(url: URL): string {
 	return decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() ?? "")
 }

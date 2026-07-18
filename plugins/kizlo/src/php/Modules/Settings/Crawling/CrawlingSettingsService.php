@@ -29,7 +29,6 @@ class CrawlingSettingsService
 
                 $crawling = CrawlingSettings::load();
                 $crawling->robots->setData($data['robots'])->save();
-                $crawling->sitemaps->setData($data['sitemaps'])->save();
 
                 Webhook::sendEvent(Webhook::SETTINGS_CRAWLING_UPDATED_EVENT);
 

@@ -51,15 +51,6 @@ export const NulledStringSchema: z.ZodType<string | null, string> = z
 	.preprocess((val) => val ?? "", z.string())
 	.transform((val) => (val === "" ? null : val)) as never
 
-export const NulledSitemapPathSchema: z.ZodType<string | null, string> = z
-	.preprocess(
-		(val) => val ?? "",
-		z.string().refine((val) => val === "" || /^(\/[^\s/]+)*\/[^\s/]+\.xml$/.test(val), {
-			message: "Pathname must be a valid path ending with a .xml filename (e.g. /sitemaps/index.xml)",
-		}),
-	)
-	.transform((val) => (val === "" ? null : val)) as never
-
 export const SocialProfileSchema = z.object({
 	url: z.url("Enter a valid URL."),
 	platform: z.string().min(1, "Platform name is required."),
@@ -183,9 +174,6 @@ export type AuthorSettingsOutput = z.output<typeof AuthorSettingsSchema>
 // ====================================================
 
 export const CrawlingSettingsSchema = z.object({
-	sitemaps: z.object({
-		pathname_structure: NulledSitemapPathSchema,
-	}),
 	robots: z.object({
 		include_sitemap: z.boolean(),
 		custom_rules: z.array(

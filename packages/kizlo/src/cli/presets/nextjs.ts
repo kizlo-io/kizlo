@@ -13,6 +13,7 @@ export const nextjs: Preset = {
 		const apiDir = `${ctx.appDir}/api/kizlo/[[...rest]]`
 		const robotsDir = `${ctx.appDir}/robots.txt`
 		const sitemapDir = `${ctx.appDir}/sitemaps/[sitemap]`
+		const sitemapRedirectDir = `${ctx.appDir}/sitemap.xml`
 		const manifestDir = `${ctx.appDir}/site.webmanifest`
 		return [
 			{
@@ -84,6 +85,18 @@ export const runtime = "edge"
 export const dynamic = "force-dynamic"
 
 export const GET = createSitemapRoute(client)
+`,
+			},
+			{
+				label: "sitemap.xml redirect route",
+				relPath: `${sitemapRedirectDir}/route.ts`,
+				contents: `import { createSitemapRedirectRoute } from "kizlo/nextjs/server"
+
+// Many crawlers ignore robots.txt and probe the well-known /sitemap.xml directly. This route
+// permanently redirects (308) to the generated index at /sitemaps/index.xml. The response is a
+// fixed constant with no WordPress call or request input, so Next statically generates it at
+// build time (no runtime/edge function invoked per request).
+export const GET = createSitemapRedirectRoute()
 `,
 			},
 			{
