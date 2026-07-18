@@ -29,6 +29,8 @@ export const POST_ROUTER_MAP = {
 				const response = await postType.get({ type: "id", value: result.id })
 				if (response.error) {
 					switch (response.error.code) {
+						case "invalid_post_type":
+						case "post_type_not_found":
 						case "rest_post_invalid_id":
 							throw errors.POST_NOT_FOUND()
 						case "rest_post_incorrect_password":
@@ -48,6 +50,8 @@ export const POST_ROUTER_MAP = {
 			const response = await postType.get(identifier)
 			if (response.error) {
 				switch (response.error.code) {
+					case "invalid_post_type":
+					case "post_type_not_found":
 					case "rest_post_invalid_id":
 						throw errors.POST_NOT_FOUND()
 					case "rest_post_incorrect_password":

@@ -1,46 +1,49 @@
-import { stringifiedMetaRecord } from "@kizlo/shared"
+import { resolveWpTimestamp, stringifiedMetaRecord } from "@kizlo/shared"
 import { deserializeSeo } from "../seo/utils"
 import type { Post } from "./schema"
 import type { WPK_Post } from "./types"
 
 export function deserializePost(data: WPK_Post): Post {
+	const locked = data.password.length > 0
+	const kizlo = data.kizlo
+
 	return {
 		id: data.id,
 		title: data.title.rendered,
-		content: !data.password.length ? (data.content?.rendered ?? null) : null,
-		excerpt: !data.password.length ? data.excerpt.rendered : null,
-		protected: !!data.password.length,
-		featuredMedia: data.kizlo?.featured_media
+		content: locked ? null : (data.content?.rendered ?? null),
+		excerpt: locked ? null : (data.excerpt?.rendered ?? null),
+		protected: locked,
+		featuredMedia: kizlo.featured_media
 			? {
-					id: data.kizlo.featured_media.id,
-					alt: data.kizlo.featured_media.alt,
+					id: kizlo.featured_media.id,
+					alt: kizlo.featured_media.alt,
 					name: data.title.rendered,
-					src: data.kizlo.featured_media.url,
+					src: kizlo.featured_media.url,
 				}
 			: null,
 		commentsEnabled: data.comment_status === "open",
 		slug: data.slug,
 		sticky: data.sticky ?? false,
-		tags: data.kizlo.tags ?? [],
-		categories: data.kizlo.categories ?? [],
-		author: data.kizlo.author
+		tags: kizlo.tags ?? [],
+		categories: kizlo.categories ?? [],
+		author: kizlo.author
 			? {
-					id: data.kizlo.author.id,
-					name: data.kizlo.author.name,
-					avatar: data.kizlo.author.avatar_url
+					id: kizlo.author.id,
+					name: kizlo.author.name,
+					avatar: kizlo.author.avatar_url
 						? {
 								id: 0,
-								alt: data.kizlo.author.name,
-								name: data.kizlo.author.name,
-								src: data.kizlo.author.avatar_url,
+								alt: kizlo.author.name,
+								name: kizlo.author.name,
+								src: kizlo.author.avatar_url,
 							}
 						: null,
 				}
 			: null,
 		format: data.format ?? "standard",
-		seo: data.kizlo.seo ? deserializeSeo(data.kizlo.seo) : null,
-		createdAt: new Date(data.date ?? "").getTime(),
-		updatedAt: new Date(data.modified ?? "").getTime(),
+		seo: kizlo.seo ? deserializeSeo(kizlo.seo) : null,
+		createdAt: resolveWpTimestamp(data.date) ?? resolveWpTimestamp(data.modified) ?? 0,
+		updatedAt: resolveWpTimestamp(data.modified) ?? 0,
 		meta: stringifiedMetaRecord(data.meta ?? {}),
 	}
 }

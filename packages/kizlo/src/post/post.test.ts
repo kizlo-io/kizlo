@@ -45,3 +45,9 @@ test("posts.get by id returns the post with matching id", async () => {
 test("posts.get nonexistent throws POST_NOT_FOUND", async () => {
 	await expect(kizlo.client.posts.get.call({ params: { identifier: "999999" } })).rejects.toMatchObject({ code: "POST_NOT_FOUND" })
 })
+
+test("posts.get by unknown slug throws POST_NOT_FOUND", async () => {
+	await expect(kizlo.client.posts.get.call({ params: { identifier: "no-such-post-slug" } })).rejects.toMatchObject({
+		code: "POST_NOT_FOUND",
+	})
+})
