@@ -15,6 +15,13 @@ class SeoBase
     protected const SITEMAP_PER_PAGE = 1000;
 
     /**
+     * Pathname of the generated sitemap index. Fixed because the frontend sitemap route is
+     * mounted at a hardcoded base (`/sitemaps`) and the index `<loc>`s point at it, so the
+     * path cannot vary. robots.txt advertises exactly this, matching what the frontend serves.
+     */
+    protected const SITEMAP_INDEX_PATH = '/sitemaps/index.xml';
+
+    /**
      * Reserved breadcrumb row that expands, in place, to the current item's real
      * ancestor chain (page parents / parent terms). A page-ID row cannot collide
      * with it since IDs are numeric. Mirrored as a literal in the settings
@@ -77,8 +84,7 @@ class SeoBase
         }
 
         if ($this->settings->crawling->robots->getIncludeSitemap()) {
-            $sitemapPathname  = $this->settings->crawling->sitemaps->getPathnameStructure();
-            $result['sitemaps'] = [untrailingslashit($this->resolveUrl($this->settings->getBaseUrl(), $sitemapPathname))];
+            $result['sitemaps'] = [untrailingslashit($this->resolveUrl($this->settings->getBaseUrl(), self::SITEMAP_INDEX_PATH))];
         }
 
         return $result;

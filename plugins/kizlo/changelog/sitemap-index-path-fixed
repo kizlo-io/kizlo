@@ -1,0 +1,4 @@
+Significance: minor
+Type: removed
+
+Remove the configurable sitemap index pathname setting. The sitemap index is now fixed at /sitemaps/index.xml, matching where the frontend route is mounted, so robots.txt always advertises a path that resolves.
