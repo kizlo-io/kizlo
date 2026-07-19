@@ -18,7 +18,7 @@ export const MENU_ROUTER_MAP = {
 				errors: LIST_MENU_ITEM_ERROR_MAP,
 			},
 			async ({ context, errors, input }) => {
-				const response = await context.service.wordpress.menus.items.list(deserializeListMenuInput(input.query))
+				const response = await context.wordpress.menus.items.list(deserializeListMenuInput(input.query))
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -66,7 +66,7 @@ export const MENU_ROUTER_MAP = {
 				output: MenuGroupItemList,
 			},
 			async ({ context, errors, input }) => {
-				const response = await context.service.wordpress.menus.items.list(deserializeListMenuInput(input.query))
+				const response = await context.wordpress.menus.items.list(deserializeListMenuInput(input.query))
 
 				if (response.error) {
 					switch (response.error.code) {

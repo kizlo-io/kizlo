@@ -100,7 +100,7 @@ const { data } = await client.woocommerce.products.list({ query: { perPage: 12 }
 ## Custom extensions
 
 When no package fits, you can author your own extension and get a first-class API layer of your own. Inside
-a procedure you also have the **WordPress client** at `context.service.wordpress`, so you can build on top
+a procedure you also have the **WordPress client** at `context.wordpress`, so you can build on top
 of the REST API — for example, wrapping the core post endpoint and returning a shape that's yours, not
 WordPress's:
 
@@ -121,7 +121,7 @@ export const featured = createExtension({
           output: z.object({ id: z.number(), headline: z.string() }),
         },
         async ({ input, context }) => {
-          const { data, error } = await context.service.wordpress.posts.get({ id: input.params.id })
+          const { data, error } = await context.wordpress.posts.get({ id: input.params.id })
           if (error) throw error
 
           return { id: data.id, headline: data.title.rendered }

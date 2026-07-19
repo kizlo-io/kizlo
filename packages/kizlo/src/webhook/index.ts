@@ -1,6 +1,6 @@
 import { type Schema, type SchemaOutput, tryCatchSync, verifyWebhook } from "@kizlo/shared"
 import z from "zod"
-import type { ServerContext } from "../context"
+import type { ProcedureContext } from "../context"
 import { KizloError } from "../shared/error"
 import { createProcedure } from "../shared/procedure"
 import { AnyEvent, type KizloEvent } from "./schema"
@@ -21,7 +21,7 @@ export type InferEventUnion<T extends AnyEvents> = {
 
 export type EventHandlerFn<T extends AnyEvents> = (
 	event: InferEventUnion<T> | KizloEvent | null,
-	context: ServerContext,
+	context: ProcedureContext,
 ) => Promise<void> | void
 
 export interface WebhookOptions {

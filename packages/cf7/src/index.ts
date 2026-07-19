@@ -36,7 +36,7 @@ export function contactFormSeven<TId extends string, TOptions extends ContactFor
 								throw new KizloError("BAD_REQUEST", { message: "Invalid form data", data: formResult.issues })
 							}
 
-							const response = await context.service.wordpress.post<WP_SubmitCF7Data>(`/cf7/${options.id}`, {
+							const response = await context.wordpress.post<WP_SubmitCF7Data>(`/cf7/${options.id}`, {
 								body: formResult.value as Record<string, unknown>,
 								base: WP_KIZLO_BASE,
 							})

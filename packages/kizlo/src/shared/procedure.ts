@@ -1,7 +1,7 @@
 import type { DeepMerge, Pathname, Prettify, Promisify, Schema, SchemaInput, SchemaIssue, SchemaOutput } from "@kizlo/shared"
 import type { JsonifiedValue } from "@orpc/openapi-client"
 import { type HTTPMethod, os } from "@orpc/server"
-import type { ServerContext } from "../context"
+import type { ProcedureContext } from "../context"
 import {
 	COMMON_ERRORS,
 	createThrowableErrorMap,
@@ -11,7 +11,7 @@ import {
 	type ThrowableErrorMap,
 	type WithCommonErrorMap,
 } from "./error"
-import type { AnyMiddleware, InferUses, Middleware } from "./middleware"
+import type { AnyMiddleware, InferMiddlewares, Middleware } from "./middleware"
 
 // ====================================================
 // SHARED
@@ -62,14 +62,14 @@ export type InvocationScope = "internal" | "remote" | "api"
 /** Callable map of a procedure's declared error codes plus the built-in common HTTP errors. */
 export type ProcedureErrors<TError extends DefinedErrorMapLike = DefinedErrorMapLike> = ThrowableErrorMap<WithCommonErrorMap<TError>>
 
-export type ProcedureHandler<TInput, TOutput, TError extends DefinedErrorMapLike, TContext extends ServerContext> = (
+export type ProcedureHandler<TInput, TOutput, TError extends DefinedErrorMapLike, TContext extends ProcedureContext> = (
 	options: BaseHandlerOptions<TInput, TContext, TError>,
 ) => Promisify<TOutput>
 
 export interface Procedure<TScope extends InvocationScope, TInput, TOutput, TError extends DefinedErrorMapLike = DefinedErrorMapLike> {
 	"~kizlo": {
 		uses: AnyMiddleware[]
-		handler: ProcedureHandler<TInput, TOutput, TError, ServerContext>
+		handler: ProcedureHandler<TInput, TOutput, TError, ProcedureContext>
 		options: {
 			scope: TScope
 			errors?: TError
@@ -86,8 +86,6 @@ export interface Procedure<TScope extends InvocationScope, TInput, TOutput, TErr
 }
 
 export type AnyProcedure = Procedure<InvocationScope, any, any, any>
-
-export type ProcedureContext<TMiddlewares extends AnyMiddleware[]> = ServerContext & InferUses<TMiddlewares>
 
 export type SchemaIO<TSchema, TMap extends "output" | "input"> = TMap extends "output" ? SchemaOutput<TSchema> : SchemaInput<TSchema>
 
@@ -216,7 +214,7 @@ export function createProcedure<
 		SchemaOutput<TOutput>,
 		TError
 	>[] = Middleware<ResolvedSchemaOutput<TScope, TPathname, TInput, TBody, TParams, TQuery, THeaders>, SchemaOutput<TOutput>, TError>[],
-	TContext extends ProcedureContext<TMiddlewares> = ProcedureContext<TMiddlewares>,
+	TContext extends ProcedureContext & InferMiddlewares<TMiddlewares> = ProcedureContext & InferMiddlewares<TMiddlewares>,
 >(
 	options: ProcedureOptions<TScope, TPathname, TInput, TBody, TParams, TQuery, THeaders, TOutput, TError, TMiddlewares>,
 	handler: ProcedureHandler<

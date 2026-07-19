@@ -6,7 +6,7 @@ import type { AuthAdapter } from "./adapters/auth"
 import type { CaptchaAdapter } from "./adapters/captcha"
 import type { GeoAdapter } from "./adapters/geo"
 import type { Environment, LoggerAdapter } from "./adapters/logger"
-import { Context, type ServerContext } from "./context"
+import { Context, type ProcedureContext } from "./context"
 import { ROUTER_MAP, type RouterMap } from "./router"
 import { RPC_PROTOCOL_HEADER } from "./shared/constants"
 import { KizloError } from "./shared/error"
@@ -54,8 +54,8 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 	public readonly context: Context
 	public readonly client: S2SClient<TExts>
 	public readonly router: RootRouter<TExts>
-	private readonly remoteHandler: RPCHandler<ServerContext>
-	private readonly openapiHandler: OpenAPIHandler<ServerContext>
+	private readonly remoteHandler: RPCHandler<ProcedureContext>
+	private readonly openapiHandler: OpenAPIHandler<ProcedureContext>
 	private readonly config: KizloConfig<TExts>
 
 	constructor(config: KizloConfig<TExts>) {

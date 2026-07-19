@@ -1,10 +1,10 @@
 import type { UnionToIntersection } from "@kizlo/shared"
-import type { ServerContext } from "../context"
+import type { ProcedureContext } from "../context"
 import type { DefinedErrorMapLike } from "./error"
 import type { BaseHandlerOptions } from "./procedure"
 import type { AnyContext } from "./types"
 
-export type InferUses<T extends readonly AnyMiddleware[] | undefined> = T extends readonly []
+export type InferMiddlewares<T extends readonly AnyMiddleware[] | undefined> = T extends readonly []
 	? object
 	: T extends readonly AnyMiddleware[]
 		? UnionToIntersection<ExtractMiddlewareContextOutput<T[number]>>
@@ -25,7 +25,11 @@ export type MiddlewareNextFn<TOutput> = {
 	}): Promise<MiddlewareResult<UOutContext, TOutput>>
 }
 
-export type MiddlewareOptions<TInput, TOutput, TError extends DefinedErrorMapLike> = BaseHandlerOptions<TInput, ServerContext, TError> & {
+export type MiddlewareOptions<TInput, TOutput, TError extends DefinedErrorMapLike> = BaseHandlerOptions<
+	TInput,
+	ProcedureContext,
+	TError
+> & {
 	/** Run the next middleware (or the handler) and return its result; pass `{ context }` to extend the context for everything downstream. */
 	next: MiddlewareNextFn<TOutput>
 }

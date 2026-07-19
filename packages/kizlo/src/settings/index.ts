@@ -1,4 +1,4 @@
-import type { ServerContext } from "../context"
+import type { ProcedureContext } from "../context"
 import { createProcedure, type ProcedureErrors, schemaType } from "../shared/procedure"
 import type { WP_Result } from "../wordpress"
 import type { SettingsService } from "./service"
@@ -28,7 +28,7 @@ type SettingsUpdate<TData> =
 	Awaited<ReturnType<SettingsService["updateSite"]>> extends WP_Result<unknown, infer TCode> ? WP_Result<TData, TCode> : never
 
 /** Shared error handling for every settings write: `invalid_param` → 400, `rest_forbidden` → 403, anything else → 500. */
-function resolveUpdate<TData>(response: SettingsUpdate<TData>, context: ServerContext, errors: ProcedureErrors, label: string): TData {
+function resolveUpdate<TData>(response: SettingsUpdate<TData>, context: ProcedureContext, errors: ProcedureErrors, label: string): TData {
 	if (response.error) {
 		switch (response.error.code) {
 			case "invalid_param":
@@ -46,7 +46,7 @@ function resolveUpdate<TData>(response: SettingsUpdate<TData>, context: ServerCo
 
 export const SETTINGS_ROUTER_MAP = {
 	get: createProcedure({ scope: "internal", output: schemaType<Settings>() }, async ({ context, errors }) => {
-		const response = await context.service.settings.get()
+		const response = await context.settings.get()
 
 		if (response.error) {
 			if (response.error.code === "rest_forbidden") throw errors.FORBIDDEN({ message: response.error.message })
@@ -61,7 +61,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<SiteSettingsInput>(), output: schemaType<SiteSettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateSite(input), context, errors, "Update site settings"),
+				resolveUpdate(await context.settings.updateSite(input), context, errors, "Update site settings"),
 		),
 	},
 
@@ -69,7 +69,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<BrandSettingsInput>(), output: schemaType<BrandSettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateBrand(input), context, errors, "Update brand settings"),
+				resolveUpdate(await context.settings.updateBrand(input), context, errors, "Update brand settings"),
 		),
 	},
 
@@ -77,7 +77,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<IdentitySettingsInput>(), output: schemaType<IdentitySettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateIdentity(input), context, errors, "Update identity settings"),
+				resolveUpdate(await context.settings.updateIdentity(input), context, errors, "Update identity settings"),
 		),
 	},
 
@@ -85,7 +85,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<AuthorsSettingsInput>(), output: schemaType<AuthorsSettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateAuthors(input), context, errors, "Update authors settings"),
+				resolveUpdate(await context.settings.updateAuthors(input), context, errors, "Update authors settings"),
 		),
 	},
 
@@ -93,7 +93,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<CrawlingSettingsInput>(), output: schemaType<CrawlingSettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateCrawling(input), context, errors, "Update crawling settings"),
+				resolveUpdate(await context.settings.updateCrawling(input), context, errors, "Update crawling settings"),
 		),
 	},
 
@@ -101,7 +101,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<WebhookSettingsInput>(), output: schemaType<WebhookSettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateWebhook(input), context, errors, "Update webhook settings"),
+				resolveUpdate(await context.settings.updateWebhook(input), context, errors, "Update webhook settings"),
 		),
 	},
 
@@ -109,7 +109,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<UploadsSettingsInput>(), output: schemaType<UploadsSettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateUploads(input), context, errors, "Update uploads settings"),
+				resolveUpdate(await context.settings.updateUploads(input), context, errors, "Update uploads settings"),
 		),
 	},
 
@@ -117,7 +117,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<{ key: string; data: PostTypeSettingsInput }>(), output: schemaType<PostTypeSettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updatePostType(input.key, input.data), context, errors, "Update post type settings"),
+				resolveUpdate(await context.settings.updatePostType(input.key, input.data), context, errors, "Update post type settings"),
 		),
 	},
 
@@ -125,7 +125,7 @@ export const SETTINGS_ROUTER_MAP = {
 		update: createProcedure(
 			{ scope: "internal", input: schemaType<{ key: string; data: TaxonomySettingsInput }>(), output: schemaType<TaxonomySettings>() },
 			async ({ context, input, errors }) =>
-				resolveUpdate(await context.service.settings.updateTaxonomy(input.key, input.data), context, errors, "Update taxonomy settings"),
+				resolveUpdate(await context.settings.updateTaxonomy(input.key, input.data), context, errors, "Update taxonomy settings"),
 		),
 	},
 }
