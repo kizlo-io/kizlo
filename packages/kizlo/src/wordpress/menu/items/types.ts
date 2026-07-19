@@ -17,21 +17,24 @@ export type WP_MenuItemStatusFilter = WP_MenuItemStatus | "auto-draft" | "inheri
 export type WP_MenuItemTarget = "_blank" | ""
 
 /** Sort collection by object attribute. */
-export type WP_MenuItemOrderBy =
-	| "author"
-	| "date"
-	| "id"
-	| "include"
-	| "modified"
-	| "parent"
-	| "relevance"
-	| "slug"
-	| "include_slugs"
-	| "title"
-	| "menu_order"
+export const WP_MENU_ITEM_ORDER_BYES = [
+	"author",
+	"date",
+	"id",
+	"include",
+	"modified",
+	"parent",
+	"relevance",
+	"slug",
+	"include_slugs",
+	"title",
+	"menu_order",
+] as const
+export type WP_MenuItemOrderBy = (typeof WP_MENU_ITEM_ORDER_BYES)[number]
 
 /** Limit result set based on relationship between multiple taxonomies. */
-export type WP_MenuItemTaxRelation = "AND" | "OR"
+export const WP_MENU_ITEM_TAX_RELATIONS = ["AND", "OR"] as const
+export type WP_MenuItemTaxRelation = (typeof WP_MENU_ITEM_TAX_RELATIONS)[number]
 
 /** The title for the menu item. */
 export interface WP_MenuItemTitle {

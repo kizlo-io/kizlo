@@ -43,7 +43,7 @@ export const MENU_ROUTER_MAP = {
 							href,
 							name: item.title.rendered,
 							description: item.description,
-							type: item.object as any,
+							type: item.object,
 							meta: stringifiedMetaRecord(item.meta ?? {}),
 						}
 					}),
