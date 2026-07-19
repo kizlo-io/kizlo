@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Include the resolved term URL in the category REST enrichment so the headless category API can expose it.

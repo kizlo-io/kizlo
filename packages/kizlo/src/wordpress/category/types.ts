@@ -8,7 +8,8 @@ import type { WP_Context, WP_Link, WP_ListOrder } from "../types"
 export type WP_CategoryTaxonomy = "category"
 
 /** Sort collection by term attribute. */
-export type WP_CategoryOrderBy = "id" | "include" | "name" | "slug" | "include_slugs" | "term_group" | "description" | "count"
+export const WP_CATEGORY_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs", "term_group", "description", "count"] as const
+export type WP_CategoryOrderBy = (typeof WP_CATEGORY_ORDER_BYS)[number]
 
 /** Hypermedia links for the category resource. */
 export interface WP_CategoryLinks {
@@ -79,7 +80,7 @@ export interface WP_CategoryListInput {
 	slug?: string | string[]
 }
 
-export type WP_CategoryListErrorCode = "rest_post_invalid_id" | "rest_forbidden_context"
+export type WP_CategoryListErrorCode = "rest_post_invalid_page_number" | "rest_forbidden_context"
 
 // ====================================================
 // CREATE — POST /wp/v2/categories

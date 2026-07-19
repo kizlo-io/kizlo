@@ -1,3 +1,5 @@
+export * from "./category/service"
+export * from "./category/types"
 export * from "./comment/service"
 export * from "./comment/types"
 export * from "./constants"
