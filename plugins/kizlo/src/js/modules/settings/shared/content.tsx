@@ -11,12 +11,7 @@ export function getContent({ name }: ContentArgs) {
 			description: <>Defines who and how {lowercaseName} type can be accessed through the REST API.</>,
 			enabled: {
 				label: "Allow API access",
-				description: (
-					<>
-						Disables all API access to this post type, including secret key access. When enabled, use the publicly_queryable flag to control
-						whether public key can access it.
-					</>
-				),
+				description: <>When off, all API access to this post type is blocked, including secret key access.</>,
 			},
 			base: {
 				label: "REST API Base",

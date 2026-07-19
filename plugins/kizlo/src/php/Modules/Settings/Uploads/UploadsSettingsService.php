@@ -26,9 +26,10 @@ class UploadsSettingsService
             'callback' => function (WP_REST_Request $request) {
                 $data = $request->get_json_params();
 
-                UploadsSettings::load()->setData($data)->save();
+                $settings = UploadsSettings::load();
+                $settings->setData($data)->save();
 
-                return new WP_REST_Response(null, 204);
+                return new WP_REST_Response($this->toResponse($settings));
             },
         ]);
     }

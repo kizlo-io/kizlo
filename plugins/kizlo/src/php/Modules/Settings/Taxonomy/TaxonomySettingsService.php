@@ -2,9 +2,11 @@
 
 namespace Kizlo\Modules\Settings\Taxonomy;
 
+use InvalidArgumentException;
 use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
+use WP_Taxonomy;
 
 class TaxonomySettingsService
 {
@@ -26,13 +28,19 @@ class TaxonomySettingsService
             'route'    => '/settings/taxonomies/(?P<slug>[a-z0-9_-]+)',
             'callback' => function (WP_REST_Request $request) {
                 $slug     = $request->get_param('slug');
+                $taxonomy = get_taxonomy($slug);
+
+                if (!$taxonomy) {
+                    throw new InvalidArgumentException("Unknown taxonomy: {$slug}.");
+                }
+
                 $settings = TaxonomySettings::load($slug);
                 $settings->setData($request->get_json_params());
                 $settings->save($slug);
 
                 Webhook::sendEvent(Webhook::SETTINGS_TAXONOMY_UPDATED_EVENT, ['key' => $slug]);
 
-                return new WP_REST_Response(null, 204);
+                return new WP_REST_Response($this->toItemResponse($taxonomy, $settings));
             },
         ]);
     }
@@ -47,20 +55,27 @@ class TaxonomySettingsService
         $result = [];
 
         foreach (TaxonomySettings::getAvailableObjects() as $taxonomy) {
-            $settings = $collection->get($taxonomy->name);
-
-            $result[] = array_merge(
-                [
-                    'name'               => $taxonomy->label,
-                    'slug'               => $taxonomy->name,
-                    'hierarchical'       => $taxonomy->hierarchical,
-                    'publicly_queryable' => $taxonomy->publicly_queryable,
-                    'internal'           => TaxonomySettings::checkInternal($taxonomy->name),
-                ],
-                $settings->getData()
-            );
+            $result[] = $this->toItemResponse($taxonomy, $collection->get($taxonomy->name));
         }
 
         return $result;
+    }
+
+    /**
+     * Merge a single taxonomy's runtime metadata with its saved settings.
+     *
+     * @return array<string, mixed>
+     */
+    public function toItemResponse(WP_Taxonomy $taxonomy, TaxonomySettings $settings): array
+    {
+        return array_merge(
+            [
+                'name'               => $taxonomy->label,
+                'slug'               => $taxonomy->name,
+                'hierarchical'       => $taxonomy->hierarchical,
+                'internal'           => TaxonomySettings::checkInternal($taxonomy->name),
+            ],
+            $settings->getData()
+        );
     }
 }

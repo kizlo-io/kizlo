@@ -5,7 +5,7 @@ export const { router, client, context, handler } = createKizlo({
 	extensions: [
 		createExtension({
 			id: "test",
-			init: () => {
+			init: (a) => {
 				return {
 					events: [
 						createEventHandler((e, c) => {
@@ -17,3 +17,5 @@ export const { router, client, context, handler } = createKizlo({
 		}),
 	],
 })
+
+// client.settings.postType.update({ key: "", data: {} })
