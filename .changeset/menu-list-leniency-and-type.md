@@ -1,8 +1,19 @@
 ---
-"kizlo": patch
+"kizlo": minor
 ---
 
-Menu API robustness fixes.
+Menu API improvements and fixes.
+
+Output (`MenuItem` / group items) additions:
+
+- `parent`: the parent menu-item id (`null` at the top level), so the flat list can be assembled into a hierarchy without the group endpoint.
+- `target`: the link target (`"_blank"` or `""`), for rendering `<a target>`.
+- `objectId`: the id of the linked post or term, to correlate a nav item back to its source resource.
+- `order`: the item's sort position (WordPress' `menu_order`), so the flat list can be ordered without the group endpoint.
+- `classes`: editor-assigned CSS classes (WordPress' empty-class `[""]` quirk filtered out), for theme styling hooks.
+- `attrTitle`: the link's `title` attribute text.
+- `xfn`: the anchor's XFN `rel` relationships (empty entries filtered out).
+- `invalid`: whether the linked object no longer exists, so broken links can be hidden or badged.
 
 List input (`menus.items.list` / `menus.group`) changes:
 
@@ -14,3 +25,4 @@ List input (`menus.items.list` / `menus.group`) changes:
 Fixes:
 
 - A menu item whose linked `object` is a non-standard type (any custom post type or taxonomy, `tag`, etc.) no longer fails output validation with a 500. The item `type` is now a permissive string.
+- `href` now returns the full path instead of only the last URL segment, so nested targets (e.g. `/about-us/team`) are no longer truncated to their leaf. Custom links keep the authored value (including absolute external URLs), and an internal path resolves to the same `href` whether the item is a custom link or a linked page.

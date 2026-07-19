@@ -93,6 +93,30 @@ test("menus.items.list filters by menu id", async () => {
 	expect(none.items).toHaveLength(0)
 })
 
+test("menus.items.list applies include/exclude filters", async () => {
+	// `include` is deterministic by id, proving the filter is actually forwarded (not silently dropped).
+	const only = await kizlo.client.menus.items.list.call({ query: { include: [parentId] } })
+	expect(only.items.map((item) => item.id)).toEqual([parentId])
+
+	const without = await kizlo.client.menus.items.list.call({ query: { menus: [menuId], exclude: [parentId], perPage: 100 } })
+	expect(without.items.some((item) => item.id === parentId)).toBe(false)
+})
+
+test("menus.items.list exposes parent id, href, and link attributes", async () => {
+	const result = await kizlo.client.menus.items.list.call({ query: { menus: [menuId], perPage: 100 } })
+	const parent = result.items.find((item) => item.name === PARENT_NAME)
+	const child = result.items.find((item) => item.name === CHILD_NAME)
+
+	expect(parent?.parent).toBeNull()
+	expect(child?.parent).toBe(parent?.id)
+	// Custom links are passed through verbatim, so the authored path is preserved in full.
+	expect(parent?.href).toBe("/menu-test-parent")
+	expect(parent?.target).toBe("")
+	// WP's empty-class quirk ([""]) is filtered to a clean array.
+	expect(parent?.classes).not.toContain("")
+	expect(parent?.invalid).toBe(false)
+})
+
 test("menus.items.list excludes unpublished items", async () => {
 	const result = await kizlo.client.menus.items.list.call({ query: {} })
 	expect(result.items.some((item) => item.name === DRAFT_NAME)).toBe(false)
