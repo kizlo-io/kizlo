@@ -14,6 +14,7 @@ import { SAFE_REQUEST_TIMEOUT, UNEXPECTED_BODY_SNIPPET_LENGTH, WP_AUTH_HEADER_KE
 import { WP_Error } from "./error"
 import { MenuService } from "./menu/service"
 import { PostService } from "./post/service"
+import { TagService } from "./tag/service"
 import type { WordPressCredentials, WP_List, WP_ListMetadata, WP_RequestInput, WP_Result } from "./types"
 import { UserService } from "./user/service"
 import { isWordPressResourceError } from "./utils"
@@ -23,6 +24,7 @@ export class WordPressService {
 	public readonly comments = new CommentService(this)
 	public readonly categories = new CategoryService(this)
 	public readonly posts = new PostService(this)
+	public readonly tags = new TagService(this)
 	public readonly menus = new MenuService(this)
 
 	private readonly siteBase: string
