@@ -19,7 +19,18 @@ export const WP_POST_FORMATS = ["standard", "aside", "chat", "gallery", "link", 
 export type WP_PostFormat = (typeof WP_POST_FORMATS)[number]
 
 /** Sort collection by post attribute. */
-export const WP_POST_ORDER_BYES = ["author", "date", "id", "include", "modified", "parent", "relevance", "slug", "include_slugs", "title"] as const
+export const WP_POST_ORDER_BYES = [
+	"author",
+	"date",
+	"id",
+	"include",
+	"modified",
+	"parent",
+	"relevance",
+	"slug",
+	"include_slugs",
+	"title",
+] as const
 export type WP_PostOrderBy = (typeof WP_POST_ORDER_BYES)[number]
 
 /** Limit result set based on relationship between multiple taxonomies. */

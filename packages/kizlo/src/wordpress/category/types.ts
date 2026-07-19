@@ -8,15 +8,7 @@ import type { WP_Context, WP_Link, WP_ListOrder } from "../types"
 export type WP_CategoryTaxonomy = "category"
 
 /** Sort collection by term attribute. */
-export type WP_CategoryOrderBy =
-	| "id"
-	| "include"
-	| "name"
-	| "slug"
-	| "include_slugs"
-	| "term_group"
-	| "description"
-	| "count"
+export type WP_CategoryOrderBy = "id" | "include" | "name" | "slug" | "include_slugs" | "term_group" | "description" | "count"
 
 /** Hypermedia links for the category resource. */
 export interface WP_CategoryLinks {
@@ -87,9 +79,7 @@ export interface WP_CategoryListInput {
 	slug?: string | string[]
 }
 
-export type WP_CategoryListErrorCode =
-	| "rest_post_invalid_id"
-	| "rest_forbidden_context"
+export type WP_CategoryListErrorCode = "rest_post_invalid_id" | "rest_forbidden_context"
 
 // ====================================================
 // CREATE — POST /wp/v2/categories
@@ -108,10 +98,7 @@ export interface WP_CategoryCreateInput {
 	meta?: Record<string, unknown>
 }
 
-export type WP_CategoryCreateErrorCode =
-	| "rest_taxonomy_not_hierarchical"
-	| "rest_term_invalid"
-	| "rest_cannot_create"
+export type WP_CategoryCreateErrorCode = "rest_taxonomy_not_hierarchical" | "rest_term_invalid" | "rest_cannot_create"
 
 // ====================================================
 // RETRIEVE — GET /wp/v2/categories/<id>
@@ -124,9 +111,7 @@ export interface WP_CategoryRetrieveInput {
 	context?: WP_Context
 }
 
-export type WP_CategoryRetrieveErrorCode =
-	| "rest_forbidden_context"
-	| "rest_term_invalid"
+export type WP_CategoryRetrieveErrorCode = "rest_forbidden_context" | "rest_term_invalid"
 
 // ====================================================
 // UPDATE — POST /wp/v2/categories/<id>
@@ -147,10 +132,7 @@ export interface WP_CategoryUpdateInput {
 	meta?: Record<string, unknown>
 }
 
-export type WP_CategoryUpdateErrorCode =
-	| "rest_taxonomy_not_hierarchical"
-	| "rest_term_invalid"
-	| "rest_cannot_update"
+export type WP_CategoryUpdateErrorCode = "rest_taxonomy_not_hierarchical" | "rest_term_invalid" | "rest_cannot_update"
 
 // ====================================================
 // DELETE — DELETE /wp/v2/categories/<id>
@@ -170,7 +152,4 @@ export interface WP_CategoryDeleteInput {
  */
 export type WP_CategoryDeleteResponse = { deleted: true; previous: WP_Category }
 
-export type WP_CategoryDeleteErrorCode =
-	| "rest_cannot_delete"
-	| "rest_term_invalid"
-	| "rest_trash_not_supported"
+export type WP_CategoryDeleteErrorCode = "rest_cannot_delete" | "rest_term_invalid" | "rest_trash_not_supported"
