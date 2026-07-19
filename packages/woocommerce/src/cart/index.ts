@@ -48,7 +48,7 @@ export const CART_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, errors }) => {
-			const response = await context.service.wordpress.get<WCS_Cart, WCS_CartGetErrorCode>("/cart", {
+			const response = await context.wordpress.get<WCS_Cart, WCS_CartGetErrorCode>("/cart", {
 				base: WC_STORE_BASE,
 				headers: context.sessionHeaders,
 			})
@@ -113,7 +113,7 @@ export const CART_ROUTER = {
 						: {},
 			}
 
-			const response = await context.service.wordpress.post<WCS_Cart, WCS_CartUpdateCustomerErrorCode>("/cart/update-customer", {
+			const response = await context.wordpress.post<WCS_Cart, WCS_CartUpdateCustomerErrorCode>("/cart/update-customer", {
 				base: WC_STORE_BASE,
 				body: {
 					billing_address: updateData.billing_address,
@@ -145,7 +145,7 @@ export const CART_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input: { body }, errors }) => {
-			const response = await context.service.wordpress.post<WCS_Cart, WCS_CartSelectShippingRateErrorCode>("/cart/select-shipping-rate", {
+			const response = await context.wordpress.post<WCS_Cart, WCS_CartSelectShippingRateErrorCode>("/cart/select-shipping-rate", {
 				base: WC_STORE_BASE,
 				headers: context.sessionHeaders,
 				body: {
@@ -182,7 +182,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { body: input }, errors }) => {
-				const response = await context.service.wordpress.post<WCS_Cart, WCS_CartAddItemErrorCode>("/cart/add-item", {
+				const response = await context.wordpress.post<WCS_Cart, WCS_CartAddItemErrorCode>("/cart/add-item", {
 					body: {
 						id: input.productId,
 						quantity: input.quantity,
@@ -234,7 +234,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { params, body }, errors }) => {
-				const response = await context.service.wordpress.post<WCS_Cart, WCS_CartUpdateItemErrorCode>("/cart/update-item", {
+				const response = await context.wordpress.post<WCS_Cart, WCS_CartUpdateItemErrorCode>("/cart/update-item", {
 					body: {
 						key: params.key,
 						quantity: body.quantity,
@@ -276,7 +276,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { params }, errors }) => {
-				const response = await context.service.wordpress.post<WCS_Cart, WCS_CartRemoveItemErrorCode>("/cart/remove-item", {
+				const response = await context.wordpress.post<WCS_Cart, WCS_CartRemoveItemErrorCode>("/cart/remove-item", {
 					body: { key: params.key },
 					base: WC_STORE_BASE,
 					headers: context.sessionHeaders,
@@ -309,7 +309,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { body }, errors }) => {
-				const response = await context.service.wordpress.post<WCS_Cart, WCS_CartApplyCouponErrorCode>("/cart/apply-coupon", {
+				const response = await context.wordpress.post<WCS_Cart, WCS_CartApplyCouponErrorCode>("/cart/apply-coupon", {
 					body: { code: body.code },
 					base: WC_STORE_BASE,
 					headers: context.sessionHeaders,
@@ -342,7 +342,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input, errors }) => {
-				const response = await context.service.wordpress.post<WCS_Cart, WCS_CartRemoveCouponErrorCode>("/cart/remove-coupon", {
+				const response = await context.wordpress.post<WCS_Cart, WCS_CartRemoveCouponErrorCode>("/cart/remove-coupon", {
 					body: { code: input.params.code },
 					base: WC_STORE_BASE,
 					headers: context.sessionHeaders,

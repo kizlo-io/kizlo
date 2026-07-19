@@ -37,6 +37,6 @@
 		"/docs/reference/types/error-definition",
 		"/docs/reference/types/fixture",
 		"/docs/reference/types/kizlo-error",
-		"/docs/reference/types/server-context"
+		"/docs/reference/types/procedure-context"
 	]
 }

@@ -15,7 +15,7 @@ export const CUSTOMER_ROUTER = {
 			const auth = await context.getAuthUser()
 			if (!auth) throw errors.FORBIDDEN()
 
-			const response = await context.service.wordpress.get<WC_Customer, WC_CustomerRetrieveErrorCode>(`/customers/${auth.id}`, {
+			const response = await context.wordpress.get<WC_Customer, WC_CustomerRetrieveErrorCode>(`/customers/${auth.id}`, {
 				base: WC_CORE_BASE,
 			})
 			if (response.error) throw response.error

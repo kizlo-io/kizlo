@@ -26,7 +26,7 @@ export const PRODUCT_ROUTER = {
 			if (input.query?.previewToken) {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.PRODUCT_NOT_FOUND()
-				const response = await context.service.wordpress.get<WCK_Product, WC_ProductRetrieveErrorCode>(`/products/${result.id}`, {
+				const response = await context.wordpress.get<WCK_Product, WC_ProductRetrieveErrorCode>(`/products/${result.id}`, {
 					base: WC_CORE_BASE,
 				})
 				if (response.error) {
@@ -40,7 +40,7 @@ export const PRODUCT_ROUTER = {
 				}
 				return deserializeProduct(response.data)
 			}
-			const response = await context.service.wordpress.get<WCK_Product[], WC_ProductListErrorCode>("/products", {
+			const response = await context.wordpress.get<WCK_Product[], WC_ProductListErrorCode>("/products", {
 				searchParams: { slug: input.params.identifier },
 				base: WC_CORE_BASE,
 			})
@@ -70,7 +70,7 @@ export const PRODUCT_ROUTER = {
 		},
 		async ({ context, input, errors }) => {
 			const searchParams = serializeProductListInput(input.query)
-			const response = await context.service.wordpress.get<WCSK_Product[], WCS_ProductsListErrorCode>("/products", {
+			const response = await context.wordpress.get<WCSK_Product[], WCS_ProductsListErrorCode>("/products", {
 				base: WC_STORE_BASE,
 				searchParams: { ...searchParams } satisfies WCS_ProductsListInput,
 			})
@@ -81,7 +81,7 @@ export const PRODUCT_ROUTER = {
 						throw errors.INTERNAL_SERVER_ERROR()
 				}
 			}
-			const list = context.service.wordpress.resolveList({
+			const list = context.wordpress.resolveList({
 				data: response.data,
 				headers: response.headers,
 				searchParams: { ...searchParams },
@@ -102,7 +102,7 @@ export const PRODUCT_ROUTER = {
 		},
 		async ({ context, errors, input }) => {
 			const searchParams = serializeProductListInput(input.query)
-			const response = await context.service.wordpress.get<WCSK_ProductCollectionData, WCS_ProductCollectionDataErrorCode>(
+			const response = await context.wordpress.get<WCSK_ProductCollectionData, WCS_ProductCollectionDataErrorCode>(
 				"/products/collection-data",
 				{
 					base: WC_STORE_BASE,

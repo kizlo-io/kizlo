@@ -1,4 +1,4 @@
-import type { Service } from "../service"
+import type { WordPressService } from "../wordpress"
 import { WP_KIZLO_BASE } from "../wordpress"
 import type {
 	AuthorsSettings,
@@ -23,15 +23,15 @@ import type {
 } from "./service.interface"
 
 export class SettingsService {
-	private readonly service: Service
+	private readonly wordpress: WordPressService
 
-	constructor(service: Service) {
-		this.service = service
+	constructor(wordpress: WordPressService) {
+		this.wordpress = wordpress
 	}
 
 	/** Fetch every Kizlo settings section in one response. */
 	public async get() {
-		return this.service.wordpress.get<Settings>("/settings", { base: WP_KIZLO_BASE })
+		return this.wordpress.get<Settings>("/settings", { base: WP_KIZLO_BASE })
 	}
 
 	public async updateSite(input: SiteSettingsInput) {
@@ -71,6 +71,6 @@ export class SettingsService {
 	}
 
 	private async update<TData>(path: string, body: unknown) {
-		return this.service.wordpress.put<TData, "invalid_param">(path, { base: WP_KIZLO_BASE, body })
+		return this.wordpress.put<TData, "invalid_param">(path, { base: WP_KIZLO_BASE, body })
 	}
 }

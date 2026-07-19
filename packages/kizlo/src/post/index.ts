@@ -20,7 +20,7 @@ export const POST_ROUTER_MAP = {
 			errors: GET_POST_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const postType = getPostTypeService<WPK_Post>("post", context.service.wordpress)
+			const postType = getPostTypeService<WPK_Post>("post", context.wordpress)
 
 			if (input.query?.previewToken) {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
@@ -88,7 +88,7 @@ export const POST_ROUTER_MAP = {
 		},
 		async ({ input, context, errors }) => {
 			const q = input.query
-			const postType = getPostTypeService<WPK_Post>("post", context.service.wordpress)
+			const postType = getPostTypeService<WPK_Post>("post", context.wordpress)
 
 			// Drop an orderby WP would reject for a missing companion param, so the list degrades instead of 400ing.
 			const orderby =
@@ -131,7 +131,7 @@ export const POST_ROUTER_MAP = {
 				}
 			}
 
-			const list = context.service.wordpress.resolveList({
+			const list = context.wordpress.resolveList({
 				data: response.data,
 				headers: response.headers,
 				searchParams: input.query,

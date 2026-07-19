@@ -4,11 +4,13 @@ import type { AuthUser } from "./adapters/auth"
 import type { ConnInfo } from "./adapters/geo"
 import { type Logger, type LogLevel, noopAdapter } from "./adapters/logger"
 import { CookiesStorage } from "./cookie"
+import { EmailService } from "./email/service"
 import type { ServiceAdapters } from "./kizlo"
-import { Service } from "./service"
+import { SettingsService } from "./settings/service"
 import { compare, hmac } from "./shared/crypto"
 import { PreviewTokenData, type PreviewTokenPayload } from "./shared/schema"
 import type { WordPressCredentials } from "./wordpress"
+import { WordPressService } from "./wordpress"
 
 export interface ContextConfig {
 	siteSecret: string
@@ -21,15 +23,24 @@ export type ConnInfoFn = () => Promise<ConnInfo | null>
 export type VerifyCaptchaFn = (token: string) => Promise<boolean>
 export type VerifyPreviewTokenFn = (token: string) => Promise<PreviewTokenPayload | null>
 
-export interface ServerContext {
+/**
+ * The context every procedure, middleware, event, and webhook handler receives — the fixed base
+ * the server builds. A procedure's handler receives this base plus whatever its middleware injected
+ * via `next({ context })`.
+ */
+export interface ProcedureContext {
 	/** The incoming HTTP `Request`, or `null` for server-side (non-HTTP) invocations. */
 	request: Request | null
 	/** Response headers to be sent (e.g. `Set-Cookie`), or `null` server-side. */
 	headers: Headers | null
 	/** The configured logger adapter. */
 	logger: Logger
-	/** Typed service clients — the WordPress client at `service.wordpress`, with more services added over time. */
-	service: Service
+	/** Typed WordPress REST client. */
+	wordpress: WordPressService
+	/** Kizlo settings client. */
+	settings: SettingsService
+	/** Transactional email client. */
+	email: EmailService
 	/** The resolved context config: site secret, adapters, and WordPress credentials. */
 	config: ContextConfig
 	/** Resolve the caller's connection info (IP, geo) via the geo adapter, or `null`. */
@@ -49,11 +60,15 @@ export interface ServerContext {
 export class Context {
 	private readonly config: ContextConfig
 	private readonly logger: Logger
-	private readonly service: Service
+	private readonly wordpress: WordPressService
+	private readonly settings: SettingsService
+	private readonly email: EmailService
 
 	constructor(config: ContextConfig) {
 		this.config = config
-		this.service = new Service(config)
+		this.wordpress = new WordPressService(config)
+		this.settings = new SettingsService(this.wordpress)
+		this.email = new EmailService(this.wordpress)
 		this.logger = this.createLogger()
 	}
 
@@ -65,14 +80,16 @@ export class Context {
 			request: request.clone(),
 			config: this.config,
 			logger: this.logger,
-			service: this.service,
+			wordpress: this.wordpress,
+			settings: this.settings,
+			email: this.email,
 			getConnInfo: this.createConnInfoFn(request),
 			verifyCaptcha: this.createVerifyCaptchaFn(request),
 			getAuthUser: this.createGetUserFn(request),
 			verifyPreviewToken: this.createVerifyPreviewTokenFn(),
 			cookies: this.createRestCookieStorage(request, headers),
 			invokedBy: "client",
-		} satisfies ServerContext
+		} satisfies ProcedureContext
 	}
 
 	public createServerContext() {
@@ -84,13 +101,15 @@ export class Context {
 			request: null,
 			config: this.config,
 			logger: this.logger,
-			service: this.service,
+			wordpress: this.wordpress,
+			settings: this.settings,
+			email: this.email,
 			getAuthUser: this.createGetUserFn(null),
 			getConnInfo: this.createConnInfoFn(null),
 			verifyCaptcha: this.createVerifyCaptchaFn(null),
 			verifyPreviewToken: this.createVerifyPreviewTokenFn(),
 			invokedBy: "server",
-		} satisfies ServerContext
+		} satisfies ProcedureContext
 	}
 
 	private createRestCookieStorage(request: Request, headers: Headers): CookiesStorage {

@@ -16,7 +16,7 @@ is required.
 ## Your first extension
 
 Here's a complete extension. It reads a WordPress post through the **WordPress client** at
-`context.service.wordpress` and returns a shape that's yours, not WordPress's:
+`context.wordpress` and returns a shape that's yours, not WordPress's:
 
 ```ts title="src/lib/kizlo/server/featured.ts"
 import { createExtension, createProcedure } from "kizlo"
@@ -36,7 +36,7 @@ export const featured = () =>
             output: z.object({ id: z.number(), headline: z.string() }),
           },
           async ({ input, context }) => {
-            const { data, error } = await context.service.wordpress.posts.get({ id: input.params.id })
+            const { data, error } = await context.wordpress.posts.get({ id: input.params.id })
             if (error) throw error
 
             return { id: data.id, headline: data.title.rendered }
@@ -216,7 +216,7 @@ createProcedure(
     errors: FEATURED_ERROR_MAP,
   },
   async ({ input, context, errors }) => {
-    const response = await context.service.wordpress.posts.get({ id: input.params.id })
+    const response = await context.wordpress.posts.get({ id: input.params.id })
 
     if (response.error) {
       switch (response.error.code) {

@@ -75,7 +75,7 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 			const [err, data] = await tryCatch(verifyToken(foundToken, context.config.siteSecret))
 
 			if (!err) {
-				const response = await context.service.wordpress.post("/cart/merge", {
+				const response = await context.wordpress.post("/cart/merge", {
 					base: WP_KIZLO_BASE,
 					headers: getCartHeaders({ userId: auth.id, token: data.sub, connInfo }),
 				})

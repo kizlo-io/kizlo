@@ -25,7 +25,7 @@ export const COMMENT_ROUTER_MAP = {
 			output: Comment,
 		},
 		async ({ context, errors, input }) => {
-			const response = await context.service.wordpress.get<WPK_Comment, WP_CommentRetrieveErrorCode>(`/comments/${input.params.id}`, {
+			const response = await context.wordpress.get<WPK_Comment, WP_CommentRetrieveErrorCode>(`/comments/${input.params.id}`, {
 				base: WP_CORE_BASE,
 				searchParams: { password: input.query?.password } satisfies Omit<WP_CommentRetrieveInput, "id">,
 			})
@@ -59,7 +59,7 @@ export const COMMENT_ROUTER_MAP = {
 			output: CommentList,
 		},
 		async ({ context, errors, input }) => {
-			const response = await context.service.wordpress.get<WPK_Comment[], WP_CommentListErrorCode>(`/comments`, {
+			const response = await context.wordpress.get<WPK_Comment[], WP_CommentListErrorCode>(`/comments`, {
 				base: WP_CORE_BASE,
 				searchParams: {
 					context: "edit",
@@ -98,7 +98,7 @@ export const COMMENT_ROUTER_MAP = {
 				}
 			}
 
-			const list = context.service.wordpress.resolveList({
+			const list = context.wordpress.resolveList({
 				data: response.data,
 				headers: response.headers,
 				searchParams: input.query,
@@ -130,7 +130,7 @@ export const COMMENT_ROUTER_MAP = {
 				if (!valid) throw errors.COMMENT_CAPTCHA_INVALID()
 			}
 
-			const response = await context.service.wordpress.post<WPK_Comment, WP_CommentCreateErrorCode>(`/comments`, {
+			const response = await context.wordpress.post<WPK_Comment, WP_CommentCreateErrorCode>(`/comments`, {
 				body: {
 					user_id: user?.id,
 					author_ip: connInfo.ip,

@@ -12,7 +12,7 @@ export const SEO_ROUTER_MAP = {
 			output: Seo,
 		},
 		async ({ context, errors }) => {
-			const response = await context.service.wordpress.get<WPK_Seo, WP_CommonErrorCode>("/seo/homepage", {
+			const response = await context.wordpress.get<WPK_Seo, WP_CommonErrorCode>("/seo/homepage", {
 				base: WP_KIZLO_BASE,
 			})
 
@@ -32,7 +32,7 @@ export const SEO_ROUTER_MAP = {
 				output: SitemapList,
 			},
 			async ({ context, errors }) => {
-				const response = await context.service.wordpress.get<WPK_Sitemap[], WP_CommonErrorCode>("/seo/sitemaps", {
+				const response = await context.wordpress.get<WPK_Sitemap[], WP_CommonErrorCode>("/seo/sitemaps", {
 					base: WP_KIZLO_BASE,
 				})
 
@@ -51,7 +51,7 @@ export const SEO_ROUTER_MAP = {
 				output: SitemapIndex,
 			},
 			async ({ context, errors }) => {
-				const response = await context.service.wordpress.get<WPK_SitemapIndex, WP_CommonErrorCode>("/seo/sitemaps/index", {
+				const response = await context.wordpress.get<WPK_SitemapIndex, WP_CommonErrorCode>("/seo/sitemaps/index", {
 					base: WP_KIZLO_BASE,
 				})
 
@@ -74,7 +74,7 @@ export const SEO_ROUTER_MAP = {
 			output: Robots,
 		},
 		async ({ context, errors }) => {
-			const response = await context.service.wordpress.get<WPK_Robots, WP_CommonErrorCode>(`/seo/robots`, {
+			const response = await context.wordpress.get<WPK_Robots, WP_CommonErrorCode>(`/seo/robots`, {
 				base: WP_KIZLO_BASE,
 			})
 			if (response.error) {
@@ -100,7 +100,7 @@ export const SEO_ROUTER_MAP = {
 			input: ListSitemapUrlInput,
 		},
 		async ({ context, input, errors }) => {
-			const response = await context.service.wordpress.get<WPK_SitemapUrl[], WP_CommonErrorCode>(
+			const response = await context.wordpress.get<WPK_SitemapUrl[], WP_CommonErrorCode>(
 				`/seo/sitemaps/${input.type}/${input.type !== "author" ? input.key : ""}`,
 				{
 					base: WP_KIZLO_BASE,

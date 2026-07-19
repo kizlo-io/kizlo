@@ -38,7 +38,7 @@ it to receive every built-in WordPress event instead. Each entry:
 - **`event`** — the `{ type, data }` payload, or `null` when the request carries no recognized event. With
   `events` declared, `event` is narrowed to your union, so switching on `event.type` types `event.data`. Without
   it, `event` is the built-in event shape.
-- **`context`** — a [`ServerContext`](/docs/reference/types/server-context).
+- **`context`** — a [`ProcedureContext`](/docs/reference/types/procedure-context).
 
 ## Returns
 

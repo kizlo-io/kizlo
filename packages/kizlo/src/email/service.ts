@@ -1,17 +1,16 @@
-import type { Service } from "../service"
-import type { WP_CommonErrorCode } from "../wordpress"
+import type { WordPressService, WP_CommonErrorCode } from "../wordpress"
 import { WP_KIZLO_BASE } from "../wordpress"
 import type { EmailSendParams } from "./service.interface"
 
 export class EmailService {
-	private readonly service: Service
+	private readonly wordpress: WordPressService
 
-	constructor(service: Service) {
-		this.service = service
+	constructor(wordpress: WordPressService) {
+		this.wordpress = wordpress
 	}
 
 	public async send(params: EmailSendParams): Promise<void> {
-		const { data, error } = await this.service.wordpress.post<{ success: boolean }, WP_CommonErrorCode>("/email/send", {
+		const { data, error } = await this.wordpress.post<{ success: boolean }, WP_CommonErrorCode>("/email/send", {
 			body: params,
 			base: WP_KIZLO_BASE,
 		})
