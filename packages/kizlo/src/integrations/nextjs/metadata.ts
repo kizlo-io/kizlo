@@ -68,8 +68,8 @@ export function createPageMetadata(head: SeoHead): Metadata {
 				? [
 						{
 							url: head.og.image.url,
-							width: head.og.image.width,
-							height: head.og.image.height,
+							width: head.og.image.width ?? undefined,
+							height: head.og.image.height ?? undefined,
 							alt: head.og.image.alt ?? undefined,
 						},
 					]
@@ -81,7 +81,7 @@ export function createPageMetadata(head: SeoHead): Metadata {
 			description: head.twitter.description || undefined,
 			site: head.twitter.site ?? undefined,
 			creator: head.twitter.creator ?? undefined,
-			images: head.twitter.image ? [head.twitter.image] : undefined,
+			images: head.twitter.image ? [{ url: head.twitter.image, alt: head.twitter.imageAlt ?? undefined }] : undefined,
 		},
 	}
 }
