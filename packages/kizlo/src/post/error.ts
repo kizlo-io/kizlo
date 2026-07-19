@@ -17,13 +17,5 @@ export const LIST_POST_ERROR_MAP = defineErrorMap({
 		status: 400,
 		message: "The requested page does not exist.",
 	},
-	POST_SEARCH_REQUIRED: {
-		status: 400,
-		message: "A search term is required.",
-	},
-	POST_ORDERBY_INCLUDE_MISSING: {
-		status: 400,
-		message: "Ordering by 'include' requires the include parameter.",
-	},
 })
 export type ListPostErrorMap = typeof LIST_POST_ERROR_MAP

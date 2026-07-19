@@ -29,6 +29,8 @@ export const POST_ROUTER_MAP = {
 				const response = await postType.get({ type: "id", value: result.id })
 				if (response.error) {
 					switch (response.error.code) {
+						case "invalid_post_type":
+						case "post_type_not_found":
 						case "rest_post_invalid_id":
 							throw errors.POST_NOT_FOUND()
 						case "rest_post_incorrect_password":
@@ -39,7 +41,7 @@ export const POST_ROUTER_MAP = {
 					}
 				}
 
-				return deserializePost({ ...response.data, password: "" })
+				return deserializePost({ ...response.data, password: "" }, { preview: true })
 			}
 
 			const identifier = parseIdentifier(input.params.identifier)
@@ -48,6 +50,8 @@ export const POST_ROUTER_MAP = {
 			const response = await postType.get(identifier)
 			if (response.error) {
 				switch (response.error.code) {
+					case "invalid_post_type":
+					case "post_type_not_found":
 					case "rest_post_invalid_id":
 						throw errors.POST_NOT_FOUND()
 					case "rest_post_incorrect_password":
@@ -59,6 +63,8 @@ export const POST_ROUTER_MAP = {
 			}
 
 			const data = response.data
+
+			if (data.status !== "publish") throw errors.POST_NOT_FOUND()
 
 			if (input.query?.password && data.password) {
 				const match = await compare(input.query.password, data.password)
@@ -81,7 +87,13 @@ export const POST_ROUTER_MAP = {
 			errors: LIST_POST_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
+			const q = input.query
 			const postType = getPostTypeService<WPK_Post>("post", context.service.wordpress)
+
+			// Drop an orderby WP would reject for a missing companion param, so the list degrades instead of 400ing.
+			const orderby =
+				(q?.orderby === "relevance" && !q?.search) || (q?.orderby === "include" && q?.include === undefined) ? undefined : q?.orderby
+
 			const response = await postType.list({
 				context: "edit",
 				status: "publish",
@@ -89,13 +101,15 @@ export const POST_ROUTER_MAP = {
 				author: input.query?.author,
 				author_exclude: input.query?.authorExclude,
 				before: input.query?.before,
+				modified_after: input.query?.modifiedAfter,
+				modified_before: input.query?.modifiedBefore,
 				categories: input.query?.categories,
 				categories_exclude: input.query?.categoriesExclude,
 				exclude: input.query?.exclude,
 				include: input.query?.include,
 				offset: input.query?.offset,
 				order: input.query?.order,
-				orderby: input.query?.orderby,
+				orderby,
 				page: input.query?.page,
 				per_page: input.query?.perPage,
 				search: input.query?.search,
@@ -111,10 +125,6 @@ export const POST_ROUTER_MAP = {
 				switch (response.error.code) {
 					case "rest_post_invalid_page_number":
 						throw errors.POST_INVALID_PAGE()
-					case "rest_no_search_term_defined":
-						throw errors.POST_SEARCH_REQUIRED()
-					case "rest_orderby_include_missing_include":
-						throw errors.POST_ORDERBY_INCLUDE_MISSING()
 					default:
 						context.logger.error("List posts unhandled error", response.error, { code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()
@@ -129,7 +139,7 @@ export const POST_ROUTER_MAP = {
 
 			return {
 				meta: deserializeListMetadata(list.meta),
-				items: list.items.map(deserializePost),
+				items: list.items.map((item) => deserializePost(item)),
 			}
 		},
 	),

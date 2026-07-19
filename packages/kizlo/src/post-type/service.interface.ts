@@ -1,6 +1,55 @@
+import type { Media } from "@kizlo/shared"
 import type { WPK_Seo } from "../seo/types"
 import type { Identifier } from "../shared/identifier"
-import type { WP_PostCommentStatus, WP_PostFormat, WP_PostStatus } from "../wordpress"
+import type {
+	WP_PostCommentStatus,
+	WP_PostCreateErrorCode,
+	WP_PostDeleteErrorCode,
+	WP_PostFormat,
+	WP_PostListErrorCode,
+	WP_PostRetrieveErrorCode,
+	WP_PostStatus,
+	WP_PostUpdateErrorCode,
+} from "../wordpress"
+
+/** A resolved taxonomy term attached to an enriched post. */
+export interface WPK_TermRef {
+	id: number
+	name: string
+	slug: string
+}
+
+/**
+ * The `kizlo` enrichment block injected by the plugin's post-type controller.
+ * Every field is optional: the PHP layer omits `url`/`categories`/`tags`/`author`/
+ * `featured_media` when unavailable, and `seo` is only present on single fetches
+ * (never on list items).
+ */
+export interface WPK_PostEnrichment {
+	seo?: WPK_Seo
+	url?: string
+	categories?: WPK_TermRef[]
+	tags?: WPK_TermRef[]
+	author?: {
+		id: number
+		name: string
+		slug: string
+		avatar_url?: string
+	}
+	featured_media?: Media | null
+}
+
+/**
+ * Error codes returned by the custom `kizlo/v1/post-types` routes. These widen
+ * the underlying WP core post error codes with the plugin's own guards:
+ * `invalid_post_type` (unknown post type) and `post_type_not_found` (unresolved
+ * slug identifier).
+ */
+export type WPK_PostTypeListErrorCode = WP_PostListErrorCode | "invalid_post_type"
+export type WPK_PostTypeRetrieveErrorCode = WP_PostRetrieveErrorCode | "invalid_post_type" | "post_type_not_found"
+export type WPK_PostTypeCreateErrorCode = WP_PostCreateErrorCode | "invalid_post_type"
+export type WPK_PostTypeUpdateErrorCode = WP_PostUpdateErrorCode | "invalid_post_type" | "post_type_not_found"
+export type WPK_PostTypeDeleteErrorCode = WP_PostDeleteErrorCode | "invalid_post_type" | "post_type_not_found"
 
 export interface WPK_PostType {
 	/** Unique identifier for the post. */
@@ -81,31 +130,7 @@ export interface WPK_PostType {
 	/** The terms assigned to the post in the post_tag taxonomy. */
 	tags?: number[]
 
-	kizlo?: {
-		seo?: WPK_Seo
-
-		categories?: {
-			id: number
-			name: string
-			slug: string
-		}[]
-		tags?: {
-			id: number
-			name: string
-			slug: string
-		}[]
-		author?: {
-			id: number
-			name: string
-			slug: string
-			avatar_url?: string
-		}
-		featured_media?: {
-			id: number
-			url: string
-			alt: string
-		} | null
-	}
+	kizlo?: WPK_PostEnrichment
 }
 
 export interface WPK_CreatePostTypeInput {

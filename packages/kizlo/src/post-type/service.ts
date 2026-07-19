@@ -1,16 +1,18 @@
 import { trimLeadingTrailingSlashes } from "@kizlo/shared"
 import type { Identifier } from "../shared/identifier"
-import type {
-	WordPressService,
-	WP_PostCreateErrorCode,
-	WP_PostDeleteErrorCode,
-	WP_PostListErrorCode,
-	WP_PostListInput,
-	WP_PostRetrieveErrorCode,
-	WP_PostUpdateErrorCode,
-} from "../wordpress"
+import type { WordPressService, WP_PostListInput } from "../wordpress"
 import { WP_KIZLO_BASE } from "../wordpress"
-import type { WPK_CreatePostTypeInput, WPK_DeletePostTypeInput, WPK_PostType, WPK_UpdatePostTypeInput } from "./service.interface"
+import type {
+	WPK_CreatePostTypeInput,
+	WPK_DeletePostTypeInput,
+	WPK_PostType,
+	WPK_PostTypeCreateErrorCode,
+	WPK_PostTypeDeleteErrorCode,
+	WPK_PostTypeListErrorCode,
+	WPK_PostTypeRetrieveErrorCode,
+	WPK_PostTypeUpdateErrorCode,
+	WPK_UpdatePostTypeInput,
+} from "./service.interface"
 
 export class PostTypeService<T = WPK_PostType> {
 	private readonly key: string
@@ -22,34 +24,34 @@ export class PostTypeService<T = WPK_PostType> {
 	}
 
 	public async get(identifier: Identifier) {
-		return await this.wordpress.get<T, WP_PostRetrieveErrorCode>(this.resolvePath(identifier), {
+		return await this.wordpress.get<T, WPK_PostTypeRetrieveErrorCode>(this.resolvePath(identifier), {
 			base: WP_KIZLO_BASE,
 		})
 	}
 
 	public async list(input: WP_PostListInput) {
-		return await this.wordpress.get<T[], WP_PostListErrorCode>(this.resolvePath(), {
+		return await this.wordpress.get<T[], WPK_PostTypeListErrorCode>(this.resolvePath(), {
 			base: WP_KIZLO_BASE,
 			searchParams: { ...input },
 		})
 	}
 
 	public async create(input: WPK_CreatePostTypeInput) {
-		return await this.wordpress.post<T, WP_PostCreateErrorCode>(this.resolvePath(), {
+		return await this.wordpress.post<T, WPK_PostTypeCreateErrorCode>(this.resolvePath(), {
 			base: WP_KIZLO_BASE,
 			body: input,
 		})
 	}
 
 	public async update(input: WPK_UpdatePostTypeInput) {
-		return await this.wordpress.put<T, WP_PostUpdateErrorCode>(this.resolvePath(input.identifier), {
+		return await this.wordpress.put<T, WPK_PostTypeUpdateErrorCode>(this.resolvePath(input.identifier), {
 			base: WP_KIZLO_BASE,
 			body: input,
 		})
 	}
 
 	public async delete(input: WPK_DeletePostTypeInput) {
-		return await this.wordpress.delete<T, WP_PostDeleteErrorCode>(this.resolvePath(input.identifier), {
+		return await this.wordpress.delete<T, WPK_PostTypeDeleteErrorCode>(this.resolvePath(input.identifier), {
 			base: WP_KIZLO_BASE,
 			searchParams: { force: input.force },
 		})

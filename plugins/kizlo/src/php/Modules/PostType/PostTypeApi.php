@@ -83,7 +83,15 @@ class PostTypeApi
         }
 
         $controller = new WP_REST_Posts_Controller($key);
-        $response   = $controller->get_items($request);
+
+        $attributes         = $request->get_attributes();
+        $attributes['args'] = $controller->get_collection_params();
+        $request->set_attributes($attributes);
+
+        $sanitized = $request->sanitize_params();
+        if (is_wp_error($sanitized)) return $sanitized;
+
+        $response = $controller->get_items($request);
 
         if (is_wp_error($response)) return $response;
 

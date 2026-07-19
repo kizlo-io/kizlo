@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\PostType;
 
 use Kizlo\Modules\Post\PostSchema;
+use Kizlo\Modules\Settings\Settings;
 use Kizlo\Support\Utils;
 
 class PostTypeExtension
@@ -15,7 +16,7 @@ class PostTypeExtension
         $post_seo      = new PostSchema($settings);
 
         $data['kizlo'] = array_merge(
-            $this->extendBase($data),
+            $this->extendBase($data, $settings),
             [
                 'seo'    => [
                     'head'   => $post_seo->buildMeta($post),
@@ -32,17 +33,22 @@ class PostTypeExtension
     {
         $extend        = $data['kizlo']['extend'] ?? [];
         $data['kizlo'] = array_merge(
-            $this->extendBase($data),
+            $this->extendBase($data, Utils::getSettings()),
             ['extend' => $extend]
         );
 
         return $data;
     }
 
-    private function extendBase(array $data): array
+    private function extendBase(array $data, Settings $settings): array
     {
         $base = [];
         $id   = $data['id'];
+        $post = get_post($id);
+
+        if ($post) {
+            $base['url'] = $settings->resolvePostUrl($post, $settings->postTypes->get($post->post_type));
+        }
 
         $categories = wp_get_post_categories($id, ['fields' => 'all']);
         if (!empty($categories)) {
@@ -74,12 +80,7 @@ class PostTypeExtension
 
         $thumbnail_id = get_post_thumbnail_id($id);
         if ($thumbnail_id) {
-            $full          = wp_get_attachment_image_src($thumbnail_id, 'full');
-            $base['featured_media'] = [
-                'id'  => $thumbnail_id,
-                'url' => $full[0] ?? null,
-                'alt' => get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true),
-            ];
+            $base['featured_media'] = kizlo_ensure_media_data($thumbnail_id);
         }
 
         return $base;

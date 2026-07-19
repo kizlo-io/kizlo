@@ -15,6 +15,18 @@ import z from "zod/v4"
  */
 export const arrayable = <T extends z.ZodTypeAny>(schema: T) => z.union([schema, z.array(schema)])
 
+/**
+ * Wrap an optional field so an invalid value is dropped (parsed to `undefined`)
+ * instead of throwing. Intended for lenient read surfaces such as list-query
+ * filters, where a bad value should degrade gracefully rather than 400. Do not
+ * use it on inputs where a wrong value must fail loudly (single-resource fetches,
+ * writes).
+ *
+ * @example
+ * lenient(z.enum(["asc", "desc"])) // "bogus" → undefined instead of a ZodError
+ */
+export const lenient = <T extends z.ZodTypeAny>(schema: T) => schema.optional().catch(undefined)
+
 export function normalizeArrayableValue<T>(val: T | T[] | undefined): T[] | undefined {
 	if (val == null) return undefined
 	return Array.isArray(val) ? val : [val]
@@ -66,6 +78,7 @@ export const Media = z.object({
 	width: z.number().optional(),
 	height: z.number().optional(),
 	variants: z.array(z.object({ src: z.string(), width: z.number(), height: z.number() })).optional(),
+	srcset: z.string().optional(),
 })
 export type Media = z.infer<typeof Media>
 

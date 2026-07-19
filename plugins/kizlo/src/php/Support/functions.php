@@ -216,7 +216,7 @@ function kizlo_apply_extend_filter(string $name, $arg = []): array
  * Used when returning media data in API responses.
  *
  * @param  int $id Attachment ID.
- * @return array{id: int, name: string, alt: string, src: string, mime: string, width?: int, height?: int, variants?: array<int, array{src: string, width: int, height: int}>}
+ * @return array{id: int, name: string, alt: string, src: string, mime: string, width?: int, height?: int, variants?: array<int, array{src: string, width: int, height: int}>, srcset?: string}
  */
 function kizlo_ensure_media_data(int $id): array
 {
@@ -248,6 +248,9 @@ function kizlo_ensure_media_data(int $id): array
         }
         if ($variants) $data['variants'] = $variants;
     }
+
+    $srcset = wp_get_attachment_image_srcset($id, 'full', $metadata ?: null);
+    if ($srcset) $data['srcset'] = $srcset;
 
     return $data;
 }

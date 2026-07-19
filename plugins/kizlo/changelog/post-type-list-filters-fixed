@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Fix collection filters being ignored on the post-type list route. The route passed the raw request to the posts controller without the controller's collection params, so WordPress never ran its sanitizers and filters that need transforming (slug, categories, tags, author, include/exclude) were silently dropped. The route now attaches and sanitizes those params before delegating, so list filtering works.
