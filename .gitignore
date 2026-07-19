@@ -10,7 +10,7 @@ coverage
 .kizlo/
 
 # local WordPress dev install (kizlo dev — dev.path)
-wordpress/
+/web/wordpress/
 
 # next.js
 .next/
@@ -63,7 +63,6 @@ plugins/*/vendor/
 .dev.vars
 
 .source
-wordpress
 
 debug.txt
 
