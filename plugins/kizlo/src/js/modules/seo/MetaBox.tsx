@@ -111,7 +111,7 @@ export function MetaBox({ meta, defaults, variables, templates, context: baselin
 	const hasImage = Boolean(ogImage?.url || defaults.og_image?.url)
 
 	return (
-		<div className={cn("flex flex-col", isTerm && "border border-neutral-300 bg-white shadow-[0_1px_1px_rgba(0,0,0,.04)]")}>
+		<div className={cn("flex flex-col", isTerm && "max-w-135.5 border border-neutral-300 bg-white shadow-[0_1px_1px_rgba(0,0,0,.04)]")}>
 			<input type="hidden" name="kizlo_seo" value={serialized} />
 
 			<Preview title={effectiveTitle} description={effectiveDescription} url={effectiveUrl} indexable={indexable} />

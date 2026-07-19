@@ -1,3 +1,4 @@
+import { CATEGORY_ROUTER_MAP } from "./category"
 import { COMMENT_ROUTER_MAP } from "./comment"
 import { MENU_ROUTER_MAP } from "./menu"
 import { POST_ROUTER_MAP } from "./post"
@@ -6,6 +7,7 @@ import { SETTINGS_ROUTER_MAP } from "./settings"
 
 export const ROUTER_MAP = {
 	posts: POST_ROUTER_MAP,
+	categories: CATEGORY_ROUTER_MAP,
 	seo: SEO_ROUTER_MAP,
 	menus: MENU_ROUTER_MAP,
 	comments: COMMENT_ROUTER_MAP,

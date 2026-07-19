@@ -8,5 +8,6 @@ class TaxonomyModule
     {
         (new TermListener())->register();
         (new TermExtension())->register();
+        (new TaxonomyApi())->register();
     }
 }

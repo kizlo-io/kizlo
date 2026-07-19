@@ -64,10 +64,12 @@ class TermExtension
     /**
      * The shared term base carried on both single and list responses.
      *
-     * @return array{id: int, name: string, slug: string, description: string, parent: int, count: int}
+     * @return array{id: int, name: string, slug: string, description: string, parent: int, count: int, url: string}
      */
     private function extendBase(WP_Term $term): array
     {
+        $settings = Utils::getSettings();
+
         return [
             'id'          => $term->term_id,
             'name'        => $term->name,
@@ -75,6 +77,7 @@ class TermExtension
             'description' => $term->description,
             'parent'      => $term->parent,
             'count'       => $term->count,
+            'url'         => $settings->resolveTermUrl($term, $settings->taxonomies->get($term->taxonomy)),
         ];
     }
 }

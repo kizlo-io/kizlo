@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add kizlo/v1/taxonomies/:taxonomy REST routes that resolve a term by id or slug server-side, so headless clients can fetch a single term by slug in one request instead of a list-then-get round trip.
