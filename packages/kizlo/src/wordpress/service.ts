@@ -8,6 +8,7 @@ import {
 	tryCatch,
 	tryCatchSync,
 } from "@kizlo/shared"
+import { CategoryService } from "./category/service"
 import { CommentService } from "./comment/service"
 import { SAFE_REQUEST_TIMEOUT, UNEXPECTED_BODY_SNIPPET_LENGTH, WP_AUTH_HEADER_KEY, WP_AUTH_TYPE } from "./constants"
 import { WP_Error } from "./error"
@@ -20,6 +21,7 @@ import { isWordPressResourceError } from "./utils"
 export class WordPressService {
 	public readonly users = new UserService(this)
 	public readonly comments = new CommentService(this)
+	public readonly categories = new CategoryService(this)
 	public readonly posts = new PostService(this)
 	public readonly menus = new MenuService(this)
 
