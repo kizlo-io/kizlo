@@ -15,29 +15,31 @@ export interface WPK_Seo {
 			title: string
 			url: string
 			site_name: string
-			description: string
-			image: {
+			description?: string
+			image?: {
 				url: string
-				width: string
-				height: string
-				type: string
+				width: number | null
+				height: number | null
+				type: string | null
 				alt: string | null
-			} | null
+			}
 		}
 		twitter: {
-			card: "summary_large_image"
+			card: "summary" | "summary_large_image"
 			title: string
 			site: string | null
 			creator: string | null
-			description: string
-			image: string | null
+			description?: string
+			image?: string
+			image_alt?: string
 		}
 		article: {
-			published_time: string
-			modified_time: string
-			author: string
-			author_url: string
-			section: string
+			published_time?: string
+			modified_time?: string
+			author?: string
+			author_url?: string
+			section?: string
+			tags?: string[]
 		} | null
 	}
 	schema: {
@@ -80,10 +82,4 @@ export interface WPK_SitemapUrl {
 	loc: string
 	lastmod: string
 	images: WPK_SitemapUrlImage[]
-}
-
-export interface WPK_ListSitemapUrlInput {
-	type: WPK_SitemapContentType
-	key?: string
-	page?: number
 }
