@@ -28,11 +28,14 @@ class CrawlingSettingsService
                 $data = $request->get_json_params();
 
                 $crawling = CrawlingSettings::load();
-                $crawling->robots->setData($data['robots'])->save();
+
+                if (isset($data['robots'])) {
+                    $crawling->robots->setData($data['robots'])->save();
+                }
 
                 Webhook::sendEvent(Webhook::SETTINGS_CRAWLING_UPDATED_EVENT);
 
-                return new WP_REST_Response(null, 204);
+                return new WP_REST_Response($this->toResponse($crawling));
             },
         ]);
     }

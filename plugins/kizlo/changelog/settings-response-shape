@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Settings responses no longer include the read-only publicly_queryable flag on post types and taxonomies, and every settings update endpoint now returns the saved section (previously some replied 204). Updating an unknown post type or taxonomy slug now returns a 400 instead of silently creating an orphan entry.

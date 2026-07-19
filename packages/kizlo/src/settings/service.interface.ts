@@ -62,7 +62,6 @@ export type PostTypeSettingsInput = Partial<
 		| "pathname_structure"
 		| "comment_action_structure"
 		| "rest_api_enabled"
-		| "publicly_queryable"
 		| "breadcrumbs"
 	>
 >
@@ -76,7 +75,6 @@ export type TaxonomySettingsInput = Partial<
 		| "seo_enabled"
 		| "pathname_structure"
 		| "rest_api_enabled"
-		| "publicly_queryable"
 		| "breadcrumbs"
 	>
 >

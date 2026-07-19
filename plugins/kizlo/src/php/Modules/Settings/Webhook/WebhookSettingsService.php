@@ -25,11 +25,12 @@ class WebhookSettingsService
             'methods'  => 'PUT',
             'route'    => '/settings/webhook',
             'callback' => function (WP_REST_Request $request) {
-                WebhookSettings::load()->setData($request->get_json_params())->save();
+                $settings = WebhookSettings::load();
+                $settings->setData($request->get_json_params())->save();
 
                 Webhook::sendEvent(Webhook::SETTINGS_INTEGRATION_UPDATED_EVENT);
 
-                return new WP_REST_Response(null, 204);
+                return new WP_REST_Response($this->toResponse($settings));
             },
         ]);
     }

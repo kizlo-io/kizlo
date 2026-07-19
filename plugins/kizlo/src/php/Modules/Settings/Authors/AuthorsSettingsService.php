@@ -31,7 +31,7 @@ class AuthorsSettingsService
 
                 Webhook::sendEvent(Webhook::SETTINGS_AUTHORS_UPDATED_EVENT);
 
-                return new WP_REST_Response(null, 204);
+                return new WP_REST_Response($this->toResponse($settings));
             },
         ]);
     }

@@ -125,7 +125,6 @@ export interface PostTypeSettings extends BaseContentSettings {
 	comment_action_structure: string | null
 	rest_api_enabled: boolean
 	internal: boolean
-	publicly_queryable: boolean
 	content_variables: Variable[]
 	supports: PostTypeSupports
 }
@@ -138,7 +137,6 @@ export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_typ
 	pathname_structure: string | null
 	rest_api_enabled: boolean
 	internal: boolean
-	publicly_queryable: boolean
 }
 
 export interface CrawlingSettings {
