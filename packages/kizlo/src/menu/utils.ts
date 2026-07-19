@@ -3,6 +3,14 @@ import type { WP_MenuItem, WP_MenuItemListInput } from "../wordpress"
 import type { ListMenuInputOut, MenuGroupItem } from "./schema"
 
 export function deserializeListMenuInput(input?: ListMenuInputOut): WP_MenuItemListInput {
+	// Drop an orderby WP would reject for a missing companion param, so the list degrades instead of 400ing.
+	const orderby =
+		(input?.orderby === "relevance" && !input?.search) ||
+		(input?.orderby === "include" && input?.include === undefined) ||
+		(input?.orderby === "include_slugs" && input?.slug === undefined)
+			? undefined
+			: input?.orderby
+
 	return {
 		context: "edit",
 		after: input?.after,
@@ -14,7 +22,7 @@ export function deserializeListMenuInput(input?: ListMenuInputOut): WP_MenuItemL
 		menus_exclude: input?.menusExclude,
 		offset: input?.offset,
 		order: input?.order,
-		orderby: input?.orderby,
+		orderby,
 		page: input?.page,
 		per_page: input?.perPage,
 		search: input?.search,
@@ -63,7 +71,7 @@ export function buildMenuGroupItem(wpItem: WP_MenuItem, items: WP_MenuItem[]): M
 		href,
 		name: wpItem.title.rendered,
 		description: wpItem.description,
-		type: wpItem.object as any,
+		type: wpItem.object,
 		items: children,
 		hasItems: children.length > 0,
 		meta: stringifiedMetaRecord(wpItem.meta ?? {}),

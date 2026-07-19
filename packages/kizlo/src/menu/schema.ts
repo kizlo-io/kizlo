@@ -1,10 +1,11 @@
-import { arrayable, type LiteralUnion, Metadata, NumberLike } from "@kizlo/shared"
+import { arrayable, type LiteralUnion, lenient, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { ListMetadata, ListOrder } from "../shared/schema"
+import { WP_MENU_ITEM_ORDER_BYES, WP_MENU_ITEM_TAX_RELATIONS } from "../wordpress/menu/items/types"
 
-export const MENU_TYPES = ["page", "post", "category", "product", "product_cat", "product_tag", "custom"] as const
-export const MenuType = z.enum(MENU_TYPES)
-export type MenuType = LiteralUnion<z.infer<typeof MenuType>, string>
+export const MENU_TYPES = ["page", "post", "category", "tag", "product", "product_cat", "product_tag", "custom"] as const
+export type MenuType = LiteralUnion<(typeof MENU_TYPES)[number], string>
+export const MenuType: z.ZodType<MenuType> = z.string()
 
 export const MenuItem = z.object({
 	id: z.number(),
@@ -16,7 +17,7 @@ export const MenuItem = z.object({
 })
 export type MenuItem = z.output<typeof MenuItem>
 
-export interface MenuGroupItem {
+export type MenuGroupItem = {
 	id: number
 	href: string
 	name: string
@@ -44,38 +45,31 @@ export type MenuGroupItemList = z.output<typeof MenuGroupItemList>
 // LIST
 // ====================================================
 
-export const MENU_ITEM_ORDER_BYES = [
-	"author",
-	"date",
-	"id",
-	"include",
-	"parent",
-	"relevance",
-	"slug",
-	"include_slugs",
-	"title",
-	"menu_order",
-] as const
-export const MenuItemOrderBy = z.enum(MENU_ITEM_ORDER_BYES)
+// Public order-by derives from the core union, dropping `modified` (edit-only field, not exposed on the public surface).
+export const MenuItemOrderBy = z.enum(WP_MENU_ITEM_ORDER_BYES).exclude(["modified"])
 export type MenuItemOrderBy = z.infer<typeof MenuItemOrderBy>
 
+export const MENU_ITEM_SEARCH_COLUMNS = ["post_title", "post_content", "post_excerpt"] as const
+export const MenuItemSearchColumn = z.enum(MENU_ITEM_SEARCH_COLUMNS)
+export type MenuItemSearchColumn = z.infer<typeof MenuItemSearchColumn>
+
 export const ListMenuInput = z.object({
-	page: NumberLike.optional(),
-	perPage: NumberLike.optional(),
-	search: z.string().optional(),
-	after: z.string().optional(),
-	before: z.string().optional(),
-	exclude: arrayable(NumberLike).optional(),
-	include: arrayable(NumberLike).optional(),
-	offset: NumberLike.optional(),
-	order: ListOrder.optional(),
-	orderby: MenuItemOrderBy.optional(),
-	searchColumns: z.array(z.string()).optional(),
-	slug: arrayable(z.string()).optional(),
-	taxRelation: z.enum(["AND", "OR"]).optional(),
-	menus: arrayable(NumberLike).optional(),
-	menusExclude: arrayable(NumberLike).optional(),
-	menuOrder: NumberLike.optional(),
+	page: NumberLike.pipe(z.number().int().min(1)).catch(1).optional(),
+	perPage: lenient(NumberLike.pipe(z.number().int().min(1).max(100))),
+	search: lenient(z.string()),
+	after: lenient(z.string()),
+	before: lenient(z.string()),
+	exclude: lenient(arrayable(NumberLike)),
+	include: lenient(arrayable(NumberLike)),
+	offset: lenient(NumberLike.pipe(z.number().int().min(0))),
+	order: lenient(ListOrder),
+	orderby: lenient(MenuItemOrderBy),
+	searchColumns: lenient(z.array(MenuItemSearchColumn)),
+	slug: lenient(arrayable(z.string())),
+	taxRelation: lenient(z.enum(WP_MENU_ITEM_TAX_RELATIONS)),
+	menus: lenient(arrayable(NumberLike)),
+	menusExclude: lenient(arrayable(NumberLike)),
+	menuOrder: lenient(NumberLike.pipe(z.number().int())),
 })
 export type ListMenuInputIn = z.input<typeof ListMenuInput>
 export type ListMenuInputOut = z.output<typeof ListMenuInput>
