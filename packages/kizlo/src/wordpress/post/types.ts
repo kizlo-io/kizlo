@@ -5,7 +5,8 @@
 import type { WP_Context, WP_Link, WP_ListOrder } from "../types"
 
 /** A named status for the post. Used in responses and as the input on create/update. */
-export type WP_PostStatus = "publish" | "future" | "draft" | "pending" | "private" | "trash"
+export const WP_POST_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
+export type WP_PostStatus = (typeof WP_POST_STATUSES)[number]
 
 /** Status filter values accepted by `GET /wp/v2/posts`. Widens `WP_PostStatus` with WP-internal statuses and the `any` alias. */
 export type WP_PostStatusFilter = WP_PostStatus | "auto-draft" | "inherit" | "any"
@@ -14,13 +15,16 @@ export type WP_PostStatusFilter = WP_PostStatus | "auto-draft" | "inherit" | "an
 export type WP_PostCommentStatus = "open" | "closed"
 
 /** The format for the post. */
-export type WP_PostFormat = "standard" | "aside" | "chat" | "gallery" | "link" | "image" | "quote" | "status" | "video" | "audio"
+export const WP_POST_FORMATS = ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"] as const
+export type WP_PostFormat = (typeof WP_POST_FORMATS)[number]
 
 /** Sort collection by post attribute. */
-export type WP_PostOrderBy = "author" | "date" | "id" | "include" | "modified" | "parent" | "relevance" | "slug" | "include_slugs" | "title"
+export const WP_POST_ORDER_BYES = ["author", "date", "id", "include", "modified", "parent", "relevance", "slug", "include_slugs", "title"] as const
+export type WP_PostOrderBy = (typeof WP_POST_ORDER_BYES)[number]
 
 /** Limit result set based on relationship between multiple taxonomies. */
-export type WP_PostTaxRelation = "AND" | "OR"
+export const WP_POST_TAX_RELATIONS = ["AND", "OR"] as const
+export type WP_PostTaxRelation = (typeof WP_POST_TAX_RELATIONS)[number]
 
 /** The globally unique identifier for the post. */
 export interface WP_PostGuid {

@@ -1,23 +1,14 @@
-import { arrayable, BooleanLike, Metadata, NumberLike } from "@kizlo/shared"
+import { arrayable, BooleanLike, lenient, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { IdentifierInput, ListMetadata, ListOrder, Media } from "../shared/schema"
+import { WP_POST_FORMATS, WP_POST_ORDER_BYES, WP_POST_STATUSES, WP_POST_TAX_RELATIONS } from "../wordpress/post/types"
 
-export const POST_TYPE_FORMATS = ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"] as const
-export const PostTypeFormat = z.enum(POST_TYPE_FORMATS)
+export const PostTypeFormat = z.enum(WP_POST_FORMATS)
 export type PostTypeFormat = z.infer<typeof PostTypeFormat>
 
-export const POST_STATUSES = ["publish", "future", "draft", "pending", "private"] as const
-export const PostStatus = z.enum(POST_STATUSES)
+export const PostStatus = z.enum(WP_POST_STATUSES).exclude(["trash"])
 export type PostStatus = z.infer<typeof PostStatus>
-
-export const POST_COMMENT_STATUSES = ["approved", "hold", "spam", "trash"] as const
-export const PostCommentStatus = z.enum(POST_COMMENT_STATUSES)
-export type PostCommentStatus = z.infer<typeof PostCommentStatus>
-
-export const POST_COMMENT_TYPES = ["comment", "pingback", "trackback"] as const
-export const PostCommentType = z.enum(POST_COMMENT_TYPES)
-export type PostCommentType = z.infer<typeof PostCommentType>
 
 // ====================================================
 // POST
@@ -26,6 +17,7 @@ export type PostCommentType = z.infer<typeof PostCommentType>
 export const PostAuthorRef = z.object({
 	id: z.number(),
 	name: z.string(),
+	slug: z.string(),
 	avatar: Media.nullable(),
 })
 export type PostAuthorRef = z.infer<typeof PostAuthorRef>
@@ -47,11 +39,15 @@ export type PostTagRef = z.infer<typeof PostTagRef>
 export const Post = z.object({
 	id: z.number(),
 	slug: z.string(),
+	url: z.string().nullable(),
+	parent: z.number().nullable(),
 	title: z.string().nullable(),
 	content: z.string().nullable(),
 	excerpt: z.string().nullable(),
 	commentsEnabled: z.boolean(),
 	protected: z.boolean(),
+	preview: z.boolean(),
+	status: PostStatus,
 	format: PostTypeFormat,
 	sticky: z.boolean(),
 	author: PostAuthorRef.nullable(),
@@ -83,31 +79,36 @@ export type RetrievePostInput = z.input<typeof RetrievePostInput>
 export const PostList = z.object({ items: z.array(Post), meta: ListMetadata })
 export type PostList = z.output<typeof PostList>
 
-export const POST_ORDER_BYES = ["author", "date", "id", "include", "parent", "relevance", "slug", "include_slugs", "title"] as const
-export const PostOrderBy = z.enum(POST_ORDER_BYES)
+export const PostOrderBy = z.enum(WP_POST_ORDER_BYES)
 export type PostOrderBy = z.infer<typeof PostOrderBy>
 
+export const POST_SEARCH_COLUMNS = ["post_title", "post_content", "post_excerpt"] as const
+export const PostSearchColumn = z.enum(POST_SEARCH_COLUMNS)
+export type PostSearchColumn = z.infer<typeof PostSearchColumn>
+
 export const ListPostInput = z.object({
-	page: NumberLike.optional(),
-	perPage: NumberLike.optional(),
-	search: z.string().optional(),
-	after: z.string().optional(),
-	before: z.string().optional(),
-	author: arrayable(NumberLike).optional(),
-	authorExclude: arrayable(NumberLike).optional(),
-	exclude: arrayable(NumberLike).optional(),
-	include: arrayable(NumberLike).optional(),
-	offset: NumberLike.optional(),
-	order: ListOrder.optional(),
-	orderby: PostOrderBy.optional(),
-	searchColumns: z.array(z.string()).optional(),
-	slug: arrayable(z.string()).optional(),
-	taxRelation: z.enum(["AND", "OR"]).optional(),
-	categories: arrayable(NumberLike).optional(),
-	categoriesExclude: arrayable(NumberLike).optional(),
-	tags: arrayable(NumberLike).optional(),
-	tagsExclude: arrayable(NumberLike).optional(),
-	sticky: BooleanLike.optional(),
+	page: NumberLike.pipe(z.number().int().min(1)).catch(1).optional(),
+	perPage: lenient(NumberLike.pipe(z.number().int().min(1).max(100))),
+	search: lenient(z.string()),
+	after: lenient(z.string()),
+	before: lenient(z.string()),
+	modifiedAfter: lenient(z.string()),
+	modifiedBefore: lenient(z.string()),
+	author: lenient(arrayable(NumberLike)),
+	authorExclude: lenient(arrayable(NumberLike)),
+	exclude: lenient(arrayable(NumberLike)),
+	include: lenient(arrayable(NumberLike)),
+	offset: lenient(NumberLike.pipe(z.number().int().min(0))),
+	order: lenient(ListOrder),
+	orderby: lenient(PostOrderBy),
+	searchColumns: lenient(z.array(PostSearchColumn)),
+	slug: lenient(arrayable(z.string())),
+	taxRelation: lenient(z.enum(WP_POST_TAX_RELATIONS)),
+	categories: lenient(arrayable(NumberLike)),
+	categoriesExclude: lenient(arrayable(NumberLike)),
+	tags: lenient(arrayable(NumberLike)),
+	tagsExclude: lenient(arrayable(NumberLike)),
+	sticky: lenient(BooleanLike),
 })
 export type ListPostInputIn = z.input<typeof ListPostInput>
 export type ListPostInputOut = z.output<typeof ListPostInput>

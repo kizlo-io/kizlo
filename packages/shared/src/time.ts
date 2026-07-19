@@ -60,19 +60,26 @@ export const isValidTimestampMs = (value: number): boolean => {
 }
 
 /**
- * Converts a WordPress date string to epoch milliseconds, treating null,
+ * Converts a WordPress GMT date string to epoch milliseconds, treating null,
  * undefined, and unparseable values as absent (`null`) rather than `NaN`.
- * WP returns `null` dates for statuses like `auto-draft`, so callers get a
- * clean sentinel instead of a `NaN` timestamp.
- * @param value - A WP date string, or null/undefined.
+ *
+ * WordPress emits its `*_gmt` fields in UTC but without a timezone designator
+ * (e.g. `"2023-11-14T10:00:00"`); a bare date-time string is parsed in the host's
+ * local timezone, so a `Z` is appended to force UTC. Pass the `*_gmt` fields, not
+ * the site-local ones. WP also returns `null` dates for statuses like `auto-draft`,
+ * so callers get a clean sentinel instead of a `NaN` timestamp.
+ *
+ * @param value - A WP GMT date string, or null/undefined.
  * @returns number (milliseconds) or null when the value cannot be resolved.
  * @example
- * resolveWpTimestamp("2023-11-14T10:00:00"); // 1699956000000
+ * resolveWpTimestamp("2023-11-14T10:00:00"); // 1699956000000 (parsed as UTC)
  * resolveWpTimestamp(null); // null
  */
 export const resolveWpTimestamp = (value: string | null | undefined): number | null => {
 	if (!value) return null
-	const time = new Date(value).getTime()
+	const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value)
+	const normalized = value.includes("T") && !hasTimezone ? `${value}Z` : value
+	const time = new Date(normalized).getTime()
 	return Number.isNaN(time) ? null : time
 }
 

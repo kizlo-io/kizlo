@@ -1,3 +1,4 @@
+import type { Media } from "@kizlo/shared"
 import type { WPK_Seo } from "../seo/types"
 import type { Identifier } from "../shared/identifier"
 import type {
@@ -20,12 +21,13 @@ export interface WPK_TermRef {
 
 /**
  * The `kizlo` enrichment block injected by the plugin's post-type controller.
- * Every field is optional: the PHP layer omits `categories`/`tags`/`author`/
- * `featured_media` when the post has none, and `seo` is only present on single
- * fetches (never on list items).
+ * Every field is optional: the PHP layer omits `url`/`categories`/`tags`/`author`/
+ * `featured_media` when unavailable, and `seo` is only present on single fetches
+ * (never on list items).
  */
 export interface WPK_PostEnrichment {
 	seo?: WPK_Seo
+	url?: string
 	categories?: WPK_TermRef[]
 	tags?: WPK_TermRef[]
 	author?: {
@@ -34,11 +36,7 @@ export interface WPK_PostEnrichment {
 		slug: string
 		avatar_url?: string
 	}
-	featured_media?: {
-		id: number
-		url: string
-		alt: string
-	} | null
+	featured_media?: Media | null
 }
 
 /**

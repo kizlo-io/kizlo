@@ -8,7 +8,7 @@ export const { router, client, context, handler } = createKizlo({
 			init: () => {
 				return {
 					events: [
-						createEventHandler((e) => {
+						createEventHandler((e, c) => {
 							console.log(e)
 						}),
 					],
