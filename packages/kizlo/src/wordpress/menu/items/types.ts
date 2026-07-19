@@ -14,7 +14,8 @@ export type WP_MenuItemStatus = "publish" | "future" | "draft" | "pending" | "pr
 export type WP_MenuItemStatusFilter = WP_MenuItemStatus | "auto-draft" | "inherit" | "any"
 
 /** The target attribute of the link element for this menu item. */
-export type WP_MenuItemTarget = "_blank" | ""
+export const WP_MENU_ITEM_TARGETS = ["_blank", ""] as const
+export type WP_MenuItemTarget = (typeof WP_MENU_ITEM_TARGETS)[number]
 
 /** Sort collection by object attribute. */
 export const WP_MENU_ITEM_ORDER_BYES = [

@@ -3,16 +3,16 @@
 	"extends": "./build.json",
 	"compilerOptions": {
 		"paths": {
-			"kizlo": ["${configDir}../packages/kizlo/src/index.ts"],
-			"kizlo/config": ["${configDir}../packages/kizlo/src/config.ts"],
-			"kizlo/test": ["${configDir}../packages/kizlo/src/test/index.ts"],
-			"kizlo/nextjs": ["${configDir}../packages/kizlo/src/integrations/nextjs/index.ts"],
-			"kizlo/nextjs/server": ["${configDir}../packages/kizlo/src/integrations/nextjs/server.ts"],
-			"@kizlo/cf7": ["${configDir}../packages/cf7/src/index.ts"],
-			"@kizlo/cf7/test": ["${configDir}../packages/cf7/src/test/index.ts"],
-			"@kizlo/shared": ["${configDir}../packages/shared/src/index.ts"],
-			"@kizlo/woocommerce": ["${configDir}../packages/woocommerce/src/index.ts"],
-			"@kizlo/woocommerce/test": ["${configDir}../packages/woocommerce/src/test/index.ts"],
+			"kizlo": ["${configDir}/../kizlo/src/index.ts"],
+			"kizlo/config": ["${configDir}/../kizlo/src/config.ts"],
+			"kizlo/test": ["${configDir}/../kizlo/src/test/index.ts"],
+			"kizlo/nextjs": ["${configDir}/../kizlo/src/integrations/nextjs/index.ts"],
+			"kizlo/nextjs/server": ["${configDir}/../kizlo/src/integrations/nextjs/server.ts"],
+			"@kizlo/cf7": ["${configDir}/../cf7/src/index.ts"],
+			"@kizlo/cf7/test": ["${configDir}/../cf7/src/test/index.ts"],
+			"@kizlo/shared": ["${configDir}/../shared/src/index.ts"],
+			"@kizlo/woocommerce": ["${configDir}/../woocommerce/src/index.ts"],
+			"@kizlo/woocommerce/test": ["${configDir}/../woocommerce/src/test/index.ts"],
 		}
 	}
 }

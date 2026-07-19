@@ -4,7 +4,7 @@ import { deserializeListMetadata } from "../shared/serialize"
 import type { WP_MenuItem } from "../wordpress"
 import { LIST_MENU_ITEM_ERROR_MAP } from "./errors"
 import { ListMenuInput, MenuGroupItemList, MenuItemList } from "./schema"
-import { buildMenuGroupItem, deserializeListMenuInput, extractSlugFromUrl } from "./utils"
+import { buildMenuGroupItem, deserializeListMenuInput, extractPath } from "./utils"
 
 export const MENU_ROUTER_MAP = {
 	items: {
@@ -35,18 +35,22 @@ export const MENU_ROUTER_MAP = {
 				}
 
 				return {
-					items: response.data.items.map((item) => {
-						const href = item.object !== "custom" ? extractSlugFromUrl(item.url) : item.url
-
-						return {
-							id: item.id,
-							href,
-							name: item.title.rendered,
-							description: item.description,
-							type: item.object,
-							meta: stringifiedMetaRecord(item.meta ?? {}),
-						}
-					}),
+					items: response.data.items.map((item) => ({
+						id: item.id,
+						parent: item.parent === 0 ? null : item.parent,
+						type: item.object,
+						objectId: item.object_id,
+						href: extractPath(item.url, item.object === "custom"),
+						name: item.title.rendered,
+						description: item.description,
+						target: item.target,
+						classes: item.classes.filter(Boolean),
+						attrTitle: item.attr_title,
+						xfn: item.xfn.filter(Boolean),
+						order: item.menu_order,
+						invalid: item.invalid,
+						meta: stringifiedMetaRecord(item.meta ?? {}),
+					})),
 					meta: deserializeListMetadata(response.data.meta),
 				}
 			},

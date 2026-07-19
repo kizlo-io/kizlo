@@ -33,29 +33,28 @@ export function deserializeListMenuInput(input?: ListMenuInputOut): WP_MenuItemL
 	}
 }
 
-export function extractSlugFromUrl(url: string): string {
+/**
+ * The `href` a headless frontend links to. WP builds a non-custom item's `url` as an absolute same-site
+ * URL, so we return its full pathname; a custom item's `url` is passed through as authored (a relative
+ * path, or an absolute URL for external links). Both yield the same value for the same internal path.
+ */
+export function extractPath(url: string, isCustom: boolean): string {
 	if (!url || url.trim() === "") return "/"
 
 	const trimmed = url.trim()
 
-	let pathname: string
+	// Custom links are authored verbatim and may point off-site, so never strip their host.
+	if (isCustom) return trimmed
 
 	if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
 		try {
-			pathname = new URL(trimmed).pathname
+			return new URL(trimmed).pathname || "/"
 		} catch {
-			pathname = trimmed
+			return trimmed
 		}
-	} else {
-		pathname = trimmed
 	}
 
-	const cleanPath = pathname.replace(/^\/+|\/+$/g, "")
-
-	if (!cleanPath) return "/"
-
-	const segments = cleanPath.split("/")
-	return segments[segments.length - 1] ?? "/"
+	return trimmed
 }
 
 export function buildMenuGroupItem(wpItem: WP_MenuItem, items: WP_MenuItem[]): MenuGroupItem {
@@ -64,14 +63,21 @@ export function buildMenuGroupItem(wpItem: WP_MenuItem, items: WP_MenuItem[]): M
 		.sort((a, b) => a.menu_order - b.menu_order)
 		.map((child) => buildMenuGroupItem(child, items))
 
-	const href = wpItem.object !== "custom" ? extractSlugFromUrl(wpItem.url) : wpItem.url
-
 	return {
 		id: wpItem.id,
-		href,
+		parent: wpItem.parent === 0 ? null : wpItem.parent,
+		type: wpItem.object,
+		objectId: wpItem.object_id,
+		href: extractPath(wpItem.url, wpItem.object === "custom"),
 		name: wpItem.title.rendered,
 		description: wpItem.description,
-		type: wpItem.object,
+		target: wpItem.target,
+		// WP stores "no classes" as [""], so drop empty entries.
+		classes: wpItem.classes.filter(Boolean),
+		attrTitle: wpItem.attr_title,
+		xfn: wpItem.xfn.filter(Boolean),
+		order: wpItem.menu_order,
+		invalid: wpItem.invalid,
 		items: children,
 		hasItems: children.length > 0,
 		meta: stringifiedMetaRecord(wpItem.meta ?? {}),

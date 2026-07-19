@@ -1,28 +1,47 @@
 import { arrayable, type LiteralUnion, lenient, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { ListMetadata, ListOrder } from "../shared/schema"
-import { WP_MENU_ITEM_ORDER_BYES, WP_MENU_ITEM_TAX_RELATIONS } from "../wordpress/menu/items/types"
+import { WP_MENU_ITEM_ORDER_BYES, WP_MENU_ITEM_TARGETS, WP_MENU_ITEM_TAX_RELATIONS } from "../wordpress/menu/items/types"
 
 export const MENU_TYPES = ["page", "post", "category", "tag", "product", "product_cat", "product_tag", "custom"] as const
 export type MenuType = LiteralUnion<(typeof MENU_TYPES)[number], string>
 export const MenuType: z.ZodType<MenuType> = z.string()
 
+export const MenuTarget = z.enum(WP_MENU_ITEM_TARGETS)
+export type MenuTarget = z.infer<typeof MenuTarget>
+
 export const MenuItem = z.object({
 	id: z.number(),
+	parent: z.number().nullable(),
+	type: MenuType,
+	objectId: z.number(),
 	href: z.string(),
 	name: z.string(),
-	type: MenuType,
 	description: z.string(),
+	target: MenuTarget,
+	classes: z.array(z.string()),
+	attrTitle: z.string(),
+	xfn: z.array(z.string()),
+	order: z.number(),
+	invalid: z.boolean(),
 	meta: Metadata,
 })
 export type MenuItem = z.output<typeof MenuItem>
 
 export type MenuGroupItem = {
 	id: number
+	parent: number | null
+	type: MenuType
+	objectId: number
 	href: string
 	name: string
-	type: MenuType
 	description: string
+	target: MenuTarget
+	classes: string[]
+	attrTitle: string
+	xfn: string[]
+	order: number
+	invalid: boolean
 	hasItems: boolean
 	meta: Metadata
 	items: MenuGroupItem[]
@@ -45,7 +64,6 @@ export type MenuGroupItemList = z.output<typeof MenuGroupItemList>
 // LIST
 // ====================================================
 
-// Public order-by derives from the core union, dropping `modified` (edit-only field, not exposed on the public surface).
 export const MenuItemOrderBy = z.enum(WP_MENU_ITEM_ORDER_BYES).exclude(["modified"])
 export type MenuItemOrderBy = z.infer<typeof MenuItemOrderBy>
 
