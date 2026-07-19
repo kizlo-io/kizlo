@@ -21,9 +21,9 @@ export const SeoHead = z.object({
 		image: z
 			.object({
 				url: z.string(),
-				width: z.string(),
-				height: z.string(),
-				type: z.string(),
+				width: z.number().nullable(),
+				height: z.number().nullable(),
+				type: z.string().nullable(),
 				alt: z.string().nullable(),
 			})
 			.nullable(),
@@ -35,6 +35,7 @@ export const SeoHead = z.object({
 		creator: z.string().nullable(),
 		description: z.string(),
 		image: z.string().nullable(),
+		imageAlt: z.string().nullable(),
 	}),
 	article: z
 		.object({
@@ -43,6 +44,7 @@ export const SeoHead = z.object({
 			author: z.string(),
 			authorUrl: z.string(),
 			section: z.string(),
+			tags: z.array(z.string()),
 		})
 		.nullable(),
 })
