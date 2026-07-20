@@ -13,6 +13,7 @@ import { CommentService } from "./comment/service"
 import { SAFE_REQUEST_TIMEOUT, UNEXPECTED_BODY_SNIPPET_LENGTH, WP_AUTH_HEADER_KEY, WP_AUTH_TYPE } from "./constants"
 import { WP_Error } from "./error"
 import { MenuService } from "./menu/service"
+import { PageService } from "./page/service"
 import { PostService } from "./post/service"
 import { TagService } from "./tag/service"
 import type { WordPressCredentials, WP_List, WP_ListMetadata, WP_RequestInput, WP_Result } from "./types"
@@ -24,6 +25,7 @@ export class WordPressService {
 	public readonly comments = new CommentService(this)
 	public readonly categories = new CategoryService(this)
 	public readonly posts = new PostService(this)
+	public readonly pages = new PageService(this)
 	public readonly tags = new TagService(this)
 	public readonly menus = new MenuService(this)
 

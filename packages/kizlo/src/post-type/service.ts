@@ -29,10 +29,10 @@ export class PostTypeService<T = WPK_PostType> {
 		})
 	}
 
-	public async list(input: WP_PostListInput) {
+	public async list<L extends object = WP_PostListInput>(input: L) {
 		return await this.wordpress.get<T[], WPK_PostTypeListErrorCode>(this.resolvePath(), {
 			base: WP_KIZLO_BASE,
-			searchParams: { ...input },
+			searchParams: { ...input } as Record<string, unknown>,
 		})
 	}
 
