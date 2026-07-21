@@ -1,5 +1,11 @@
 {
 	"title": "Functions",
 	"icon": "Function",
-	"pages": ["emit-event", "register-route", "register-route-interceptor"]
+	"pages": [
+		"register-route",
+		"register-route-interceptor",
+		"include-post-type",
+		"extend-post-type",
+		"emit-event"
+	]
 }

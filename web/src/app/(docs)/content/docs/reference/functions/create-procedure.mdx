@@ -1,6 +1,6 @@
 ---
 title: createProcedure
-description: Define a single API operation — its scope, schemas, errors, middleware, and handler.
+description: Define a single API operation with its scope, schemas, errors, middleware, and handler.
 ---
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -17,7 +17,7 @@ createProcedure(options, handler)
 
 ### `options`
 
-`scope` and `output` are required on every procedure; the remaining fields depend on the scope. Pick a tab
+`scope` and `output` are required on every procedure. The remaining fields depend on the scope. Pick a tab
 for the full, type-checked shape:
 
 <Tabs defaultValue="api">
@@ -53,14 +53,15 @@ for the full, type-checked shape:
 </Tabs>
 
 <Callout>
-  Every schema slot speaks [Standard Schema](https://standardschema.dev) — use [Zod](https://zod.dev),
-  [Valibot](https://valibot.dev), [ArkType](https://arktype.io), or pass `schemaType<MyType>()` to type a
-  slot from a plain TypeScript type with no runtime validation.
+  Every schema slot speaks [Standard Schema](https://standardschema.dev). Use [Zod](https://zod.dev),
+  [Valibot](https://valibot.dev), [ArkType](https://arktype.io), or pass
+  [`schemaType<MyType>()`](/docs/reference/functions/schema-type) to type a slot from a plain TypeScript type
+  with no runtime validation.
 </Callout>
 
 ### `handler`
 
-`(ctx) => output | Promise<output>` — runs the operation and returns a value matching `output`. It receives:
+`(ctx) => output | Promise<output>`. Runs the operation and returns a value matching `output`. It receives:
 
 <AutoTypeTable
   path="../packages/kizlo/src/shared/procedure.ts"
@@ -70,14 +71,14 @@ for the full, type-checked shape:
 
 ## Returns
 
-A `Procedure` object — the value you assign to a `router` key; it's never called directly.
+A `Procedure` object, the value you assign to a `router` key. It's never called directly.
 
-Its output type depends on scope: `api` serializes to JSON, so a `Date` arrives as a `string`; `remote` and
+Its output type depends on scope. `api` serializes to JSON, so a `Date` arrives as a `string`. `remote` and
 `internal` preserve your original types end to end.
 
 ## Examples
 
-One extension can group procedures of every scope in its `router` — here an `internal` server-only operation,
+One extension can group procedures of every scope in its `router`. Here an `internal` server-only operation,
 a `remote` call, and an `api` endpoint, exposed as `client.content.sitemap` / `.search` / `.get`:
 
 ```ts title="src/lib/kizlo/server/content/index.ts"
@@ -89,7 +90,7 @@ export const content = () =>
     id: "content",
     init: () => ({
       router: {
-        // internal — server-only, left out of the browser client
+        // internal: server-only, left out of the browser client
         sitemap: createProcedure(
           {
             scope: "internal",
@@ -98,7 +99,7 @@ export const content = () =>
           async ({ context }) => buildSitemap(context),
         ),
 
-        // remote — RPC-style, one input schema, types preserved on the client
+        // remote: RPC-style, one input schema, types preserved on the client
         search: createProcedure(
           {
             scope: "remote",
@@ -114,7 +115,7 @@ export const content = () =>
           },
         ),
 
-        // api — a REST endpoint with typed params, callable over HTTP from anywhere
+        // api: a REST endpoint with typed params, callable over HTTP from anywhere
         get: createProcedure(
           {
             scope: "api",

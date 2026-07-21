@@ -5,8 +5,8 @@ types: [DefinedErrorMapLike]
 ---
 
 `defineErrorMap` captures an object of error codes with their literal types preserved, so you declare a set of
-errors once and pass it to a procedure's `errors` option — reusing it across the procedures and middleware that
-share those codes. It returns the map unchanged; its only job is to infer precise types.
+errors once and pass it to a procedure's `errors` option, reusing it across the procedures and middleware that
+share those codes. It returns the map unchanged. Its only job is to infer precise types.
 
 ## Parameters
 
@@ -16,22 +16,22 @@ defineErrorMap(map)
 
 ### `map`
 
-An object keyed by error code — your own code (e.g. `POST_NOT_FOUND`) or a [common HTTP code](#common-codes) you
+An object keyed by error code: your own code (e.g. `POST_NOT_FOUND`) or a [common HTTP code](#common-codes) you
 want to override. Each value is an [`ErrorDefinition`](/docs/reference/types/error-definition).
 
 ### Common codes
 
 Keys may be any string, or one of the built-in HTTP codes below. Listing a common code overrides its default
-`status`/`message`; every common code is throwable from a handler whether or not you list it.
+`status`/`message`. Every common code is throwable from a handler whether or not you list it.
 
 <CommonErrorsTable />
 
 ## Returns
 
 The same object, typed `as const`. Assign it to a constant and pass it to a procedure's
-[`errors` option](/docs/reference/functions/create-procedure#options); derive its type with `typeof` when you need
-to refer to it. At runtime Kizlo turns it into the callable `errors` map your handler receives — see
-[createThrowableErrorMap](/docs/reference/functions/create-throwable-error-map).
+[`errors` option](/docs/reference/functions/create-procedure#options), and derive its type with `typeof` when you
+need to refer to it. At runtime Kizlo turns it into the callable `errors` map your handler receives (see
+[createThrowableErrorMap](/docs/reference/functions/create-throwable-error-map)).
 
 ## Examples
 

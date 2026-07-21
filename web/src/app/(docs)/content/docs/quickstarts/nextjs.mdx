@@ -1,0 +1,248 @@
+---
+title: Next.js
+description: Wire Kizlo into a Next.js app and make your first call.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+import { File, Folder, Files } from 'fumadocs-ui/components/files'
+
+<Callout>
+  This quickstart covers the app side. Make sure WordPress is ready first (see
+  [Installation](/docs/installation)) — either connect your own WordPress with the plugin and an
+  Application Password, or let Kizlo run one locally in Docker.
+</Callout>
+
+## Set up Kizlo in a new project
+
+Starting fresh? Scaffold a Next.js app with Kizlo already wired:
+
+```package-install
+npx kizlo@latest create --template nextjs my-app
+```
+
+It scaffolds a fully wired project and walks you through your WordPress credentials. When it
+finishes, `cd my-app`.
+
+## Set up Kizlo in an existing project
+
+Add Kizlo to an app you already have. Use the CLI (recommended) or wire the files by hand —
+both produce the same result.
+
+### CLI setup (recommended)
+
+Run the initializer in your project root:
+
+```package-install
+npx kizlo@latest init
+```
+
+It detects your framework, `src` dir (if present), package manager, import alias, etc. and scaffolds:
+
+<Files>
+  <Folder name="src" defaultOpen>
+    <Folder name="app" defaultOpen>
+      <Folder name="api" defaultOpen>
+        <Folder name="kizlo" defaultOpen>
+          <Folder name="[[...rest]]" defaultOpen>
+            <File name="route.ts" />
+          </Folder>
+        </Folder>
+      </Folder>
+    </Folder>
+    <Folder name="lib" defaultOpen>
+      <Folder name="kizlo" defaultOpen>
+        <Folder name="server" defaultOpen>
+          <File name="index.ts" />
+            <Folder name="generated">
+              <File name="contract.json" />
+              <File name="index.ts" />
+            </Folder>
+        </Folder>
+        <File name="client.ts" />
+      </Folder>
+    </Folder>
+  </Folder>
+  <File name="kizlo.config.ts" />
+  <File name=".env" />
+</Files>
+
+Along the way it asks whether to run WordPress locally in Docker or connect your own, writes
+the matching credentials to `.env`, and generates the contract — so when `init` finishes you're
+ready to make your first call.
+
+<Callout>
+  Feel free to customize this folder structure however you like — just point the `dir` option in
+  `kizlo.config.ts` at it, so kizlo knows where your server files and kizlo instance live and can
+  generate the server contract.
+</Callout>
+
+### Manual setup
+
+Prefer to wire it yourself? Create the same files the CLI would.
+
+<Steps>
+
+<Step>
+
+#### Install the package
+
+```package-install
+npm install kizlo@latest
+```
+
+</Step>
+
+<Step>
+
+#### Add `kizlo.config.ts`
+
+At your project root — it tells the CLI where Kizlo lives and which import alias to use:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  alias: "@",
+})
+```
+
+</Step>
+
+<Step>
+
+#### Create the server
+
+At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `KIZLO_SITE_SECRET` from `.env`:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo/nextjs/server"
+
+export const { router, client, context, handler } = createKizlo()
+```
+
+</Step>
+
+<Step>
+
+#### Mount the route handler
+
+Next.js, at `src/app/api/kizlo/[[...rest]]/route.ts` — re-export the server's `handler` for every method:
+
+```ts title="src/app/api/kizlo/[[...rest]]/route.ts"
+import { handler } from "@/lib/kizlo/server"
+
+export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS }
+```
+
+</Step>
+
+<Step>
+
+#### Generate the contract
+
+So `server/generated/` exists before the client imports it:
+
+```package-install
+npx kizlo generate
+```
+
+</Step>
+
+<Step>
+
+#### Create the client
+
+At `src/lib/kizlo/client.ts` from the generated contract — it's typed automatically:
+
+```ts title="src/lib/kizlo/client.ts"
+import { createKizloClient } from "kizlo/nextjs"
+import { contract } from "./server/generated"
+
+export const client = createKizloClient(contract)
+```
+
+</Step>
+
+<Step>
+
+#### Environment
+
+Finally, connect WordPress — a local stack while you build, your hosted WordPress in production.
+
+#### Local
+
+Let Kizlo run WordPress for you — nothing to fill in:
+
+```package-install
+npx kizlo dev
+```
+
+It starts WordPress in Docker, writes its dev credentials to `.env` for you, and watches your server files
+to keep the contract in sync — one command for the whole local loop.
+
+#### Remote
+
+For your hosted WordPress, add its credentials to `.env`:
+
+```bash title=".env"
+KIZLO_WORDPRESS_URL=https://your-site.com
+KIZLO_WORDPRESS_USERNAME=admin
+KIZLO_WORDPRESS_APPLICATION_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
+KIZLO_SITE_SECRET=                       # a long random string
+NEXT_PUBLIC_KIZLO_BACKEND_URL=http://localhost:3000/api/kizlo
+```
+
+Generate `KIZLO_SITE_SECRET` with `openssl rand -hex 32`. While developing, run `npx kizlo watch` to keep
+the generated contract in sync as you edit your server files.
+
+</Step>
+
+</Steps>
+
+## Render a post
+
+That's it 🎉 — here's the payoff: a complete dynamic blog post route. A single Server Component fetches
+the post by slug and, alongside the markup, wires up everything a real post page needs:
+
+- **`generateMetadata`** — title, description, canonical, Open Graph, and Twitter tags. Kizlo's
+  `createPageMetadata` maps the post's SEO straight into Next.js `Metadata`, so you don't hand-write tags.
+- **JSON-LD** — the post already carries `schema.org` structured data at `post.seo.schema`; render it
+  with `<SeoSchema />` for rich results.
+
+Each route renders on demand for its slug, so there's no build-time list step.
+
+```tsx title="src/app/blog/[slug]/page.tsx"
+import { createPageMetadata, SeoSchema } from "kizlo/nextjs/server"
+import { notFound } from "next/navigation"
+import { client } from "@/lib/kizlo/server"
+
+type Props = { params: Promise<{ slug: string }> }
+
+// SEO tags (title, canonical, Open Graph, Twitter) from the post's SEO head.
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params
+  const { data: post } = await client.posts.get({ params: { identifier: slug } })
+  if (!post?.seo) return {}
+  return createPageMetadata(post.seo.head)
+}
+
+export default async function PostPage({ params }: Props) {
+  const { slug } = await params
+  const { data: post, error } = await client.posts.get({ params: { identifier: slug } })
+
+  if (error) notFound()
+
+  return (
+    <article>
+      {/* JSON-LD structured data for rich results. */}
+      <SeoSchema schema={post.seo?.schema} />
+      <h1>{post.title}</h1>
+      <div dangerouslySetInnerHTML={{ __html: post.content ?? "" }} />
+    </article>
+  )
+}
+```
+
+From here, head to [Concepts](/docs/concepts/extension) to see how procedures, extensions, and adapters
+compose into something production-ready.

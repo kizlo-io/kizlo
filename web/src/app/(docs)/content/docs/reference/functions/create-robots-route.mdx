@@ -1,0 +1,38 @@
+---
+title: createRobotsRoute
+description: Serve robots.txt from the rules and sitemaps configured in WordPress.
+---
+
+`createRobotsRoute` builds a `Request` to `Response` handler that serves `robots.txt`. It reads the user-agent
+rules and sitemap URLs from your WordPress content through the server-to-server `client` returned by
+[`createKizlo`](/docs/reference/functions/create-kizlo), and renders them as plain text. Mount the returned handler
+at `/robots.txt`.
+
+<Callout>
+  On Next.js, import `createRobotsRoute` from `kizlo/nextjs/server` instead. That variant wraps this one with route
+  caching.
+</Callout>
+
+## Parameters
+
+```ts
+createRobotsRoute(client)
+```
+
+### `client`
+
+The server-to-server `client` from [`createKizlo`](/docs/reference/functions/create-kizlo). The handler calls
+`client.seo.robots` for the configured `Allow`/`Disallow` rules and the sitemap URLs to advertise.
+
+## Returns
+
+An async `GET(request)` handler that responds with `text/plain` robots.txt. Export it from your route.
+
+## Examples
+
+```ts title="src/app/robots.txt/route.ts"
+import { createRobotsRoute } from "kizlo"
+import { client } from "@/lib/kizlo/server"
+
+export const GET = createRobotsRoute(client)
+```

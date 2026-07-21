@@ -1,0 +1,52 @@
+---
+title: schemaType
+description: Type a procedure schema slot from a plain TypeScript type, with no runtime validation.
+---
+
+`schemaType<T>()` fills a [procedure](/docs/reference/functions/create-procedure) schema slot from a TypeScript
+type instead of a runtime schema. It produces a [Standard Schema](https://standardschema.dev) that passes every
+value through unchanged, so the slot is fully typed but nothing is validated at runtime. Reach for it when a value
+is already trusted or validated elsewhere and you only want the types.
+
+## Parameters
+
+```ts
+schemaType<TInput, TOutput = TInput>(schema?)
+```
+
+### `schema`
+
+Optional. An existing [Standard Schema](https://standardschema.dev) to wrap and re-type. Omit it to get the
+pass-through schema that validates nothing. `TOutput` defaults to `TInput` when you supply only one type argument.
+
+## Returns
+
+A `Schema<TInput, TOutput>` you assign to any schema slot on a procedure: `input`, `output`, `params`, `query`,
+`body`, or `headers`. The slot's inferred type comes from the type arguments, not from parsing a value.
+
+<Callout>
+  A slot typed with `schemaType` is not validated. Use a real schema ([Zod](https://zod.dev),
+  [Valibot](https://valibot.dev), [ArkType](https://arktype.io)) for anything a client sends that you don't
+  otherwise trust.
+</Callout>
+
+## Examples
+
+Type an `output` from an existing interface, with no schema to maintain:
+
+```ts title="src/lib/kizlo/server/content/index.ts"
+import { createProcedure, schemaType } from "kizlo"
+
+interface Featured {
+  id: number
+  headline: string
+}
+
+const get = createProcedure(
+  {
+    scope: "internal",
+    output: schemaType<Featured[]>(),
+  },
+  async ({ context }) => loadFeatured(context),
+)
+```

@@ -4,11 +4,11 @@ description: Build a custom auth adapter that resolves the caller's identity.
 ---
 
 `createAuthAdapter` declares a custom auth adapter, typed against the `AuthAdapter` contract. Kizlo calls it to
-resolve who is making a request — mapping your session to a WordPress user. Register the result on
+resolve who is making a request, mapping your session to a WordPress user. Register the result on
 [`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.auth`.
 
-Reach for this when you bring your own session layer. For common providers, use a prebuilt adapter instead — those
-are covered in the adapter guides, not here.
+Reach for this when you bring your own session layer. For common providers, use a prebuilt adapter instead. Those
+live in the adapter guides, not here.
 
 ## Parameters
 
@@ -32,7 +32,7 @@ createAuthAdapter(adapter)
 
 ## Returns
 
-The adapter, unchanged — `createAuthAdapter` attaches the `AuthAdapter` type for inference and gives you one
+The adapter, unchanged. `createAuthAdapter` only attaches the `AuthAdapter` type so you get inference and one
 documented entry point.
 
 ## Examples

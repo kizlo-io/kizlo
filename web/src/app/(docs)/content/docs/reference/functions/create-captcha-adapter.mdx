@@ -8,7 +8,7 @@ to verify a challenge token submitted with a request. Register the result on
 [`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.captcha`.
 
 Reach for this to support a provider Kizlo doesn't ship. For Turnstile, reCAPTCHA, hCaptcha, and friends, use a
-prebuilt adapter instead — covered in the adapter guides, not here.
+prebuilt adapter instead. Those live in the adapter guides, not here.
 
 ## Parameters
 
@@ -18,12 +18,12 @@ createCaptchaAdapter(adapter)
 
 ### `adapter`
 
-The verify function — `(input: { token, ip }) => Promise<boolean>`. It receives the user-submitted `token` and the
+The verify function, `(input: { token, ip }) => Promise<boolean>`. It receives the user-submitted `token` and the
 caller's `ip`, verifies the token with your provider, and resolves `true` for a human, `false` otherwise.
 
 ## Returns
 
-The function, unchanged — `createCaptchaAdapter` attaches the `CaptchaAdapter` type for inference and gives you one
+The function, unchanged. `createCaptchaAdapter` only attaches the `CaptchaAdapter` type so you get inference and one
 documented entry point.
 
 ## Examples

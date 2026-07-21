@@ -22,6 +22,7 @@ A handful of commands cover the whole workflow, from first scaffold to a green t
 
 | Command | What it does |
 | --- | --- |
+| [`kizlo create`](#kizlo-create) | Scaffold a new project with Kizlo already wired |
 | [`kizlo init`](#kizlo-init) | Set up Kizlo in the current project |
 | [`kizlo generate`](#kizlo-generate) | Generate the contract once — for builds and CI |
 | [`kizlo watch`](#kizlo-watch) | Regenerate the contract on every save, during development |
@@ -30,6 +31,19 @@ A handful of commands cover the whole workflow, from first scaffold to a green t
 
 Every command reads [`kizlo.config.ts`](#configuration) to find where your server lives and how your test
 stack is set up.
+
+## `kizlo create`
+
+`create` scaffolds a **new project** with Kizlo already wired — reach for it when you're starting from
+scratch rather than adding to an app you already have. Give it a template and a directory name:
+
+```package-install
+npx kizlo@latest create --template nextjs my-app
+```
+
+It creates `my-app/`, lays down a fully wired project for that template (currently `nextjs`), and runs the
+same WordPress credential prompts as [`init`](#kizlo-init). When it finishes, `cd my-app` and make your
+first call — the [Next.js quickstart](/docs/quickstarts/nextjs) walks it end to end.
 
 ## `kizlo init`
 
@@ -58,9 +72,10 @@ framework mounts the handler at a known path (`/api/kizlo` for Next.js), so `ini
 app's public URL — and derives the backend from it, writing it to `NEXT_PUBLIC_KIZLO_BACKEND_URL`.
 
 The **base** preset has no known mount, so `init` asks two URLs: your public **site URL** (what the plugin
-points back at) and the **backend URL** where you've mounted the handler (written to `KIZLO_BACKEND_URL`). The
-generated `client.ts` routes to the backend: same-origin deploys default to the page origin, and a backend on a
-different origin is inlined into `createKizloClient(contract, { url })` — swap that for your bundler's own
+points back at) and the **backend URL** where you've mounted the handler (written to `KIZLO_BACKEND_URL`).
+
+The generated `client.ts` routes to that backend. Same-origin deploys default to the page origin; a backend on
+a different origin is inlined into `createKizloClient(contract, { url })`. Swap that for your bundler's own
 public env var (e.g. `import.meta.env.VITE_KIZLO_BACKEND_URL`) to set it per environment.
 
 ## `kizlo generate`
@@ -129,8 +144,10 @@ npx kizlo dev
 
 On first install, `kizlo dev` mints a **random** admin password (not a guessable default) and prints it once
 so you can log into `wp-admin`. Save it then; it isn't stored on disk. Later runs are idempotent and leave
-that login untouched. The dev stack mints no application password — that's a test-stack concern; if you want
-to point an app at this stack over REST, create one in `wp-admin → Users → Profile → Application Passwords`.
+that login untouched.
+
+The dev stack mints no application password — that's a test-stack concern. To point an app at this stack over
+REST, create one in `wp-admin → Users → Profile → Application Passwords`.
 
 The dev MySQL is published on `127.0.0.1:3307` (override with [`dev.dbPort`](#configuration)) so you can
 inspect or edit tables directly, beyond what `wp-admin` exposes. Kizlo doesn't bundle a database UI — point
@@ -148,10 +165,11 @@ mysql -h127.0.0.1 -P3307 -uwordpress -pwppass wordpress
 </Callout>
 
 The dev stack always enables PHP OPcache with dev-safe settings (it still picks up your live edits), which
-offsets most of the slower file I/O that a bind-mounted install costs on macOS/Windows. On native Linux it
-also runs the container as **your** user, so the files WordPress writes into the folder are owned by you and
-stay editable — no `sudo`, no permission surprises. macOS/Windows handle that mapping already, so nothing
-extra happens there.
+offsets most of the slower file I/O that a bind-mounted install costs on macOS/Windows.
+
+On native Linux it also runs the container as **your** user, so the files WordPress writes into the folder are
+owned by you and stay editable — no `sudo`, no permission surprises. macOS/Windows handle that mapping
+already, so nothing extra happens there.
 
 ### Adopt an existing site
 
@@ -172,9 +190,10 @@ dev: { path: "wordpress", byo: "backup.tar.gz" }
 
 Kizlo hydrates from the archive whenever the stack is **fresh** — the first `kizlo dev` or any time after
 `kizlo dev reset`. It wires the install to the dev database and rewrites the site URL to
-`http://localhost:8080` with a proper `search-replace`, so serialized data stays intact. Log in with your
-**own** site's credentials — the import carries its users over. To swap a running default install for your
-site, set `byo` and run `kizlo dev reset`.
+`http://localhost:8080` with a proper `search-replace`, so serialized data stays intact.
+
+Log in with your **own** site's credentials — the import carries its users over. To swap a running default
+install for your site, set `byo` and run `kizlo dev reset`.
 
 <Callout>
   Keep the archive **outside** `dev.path` (e.g. at the project root), since `reset` wipes `dev.path`. A dump
@@ -232,8 +251,9 @@ straight to your terminal, and `kizlo test` exits with your suite's exit code.
 
 A `kizlo test` run leaves the stack **up** by default, so you can poke at WP Admin, debug a
 [fixture](/docs/concepts/development-and-testing#fixtures), or point another tool at the seeded credentials between runs. To get a
-running stack without invoking your suite, run `kizlo test` once — it seeds and stays up. These subcommands
-drive that same stack's lifecycle by hand:
+running stack without invoking your suite, run `kizlo test` once — it seeds and stays up.
+
+These subcommands drive that same stack's lifecycle by hand:
 
 | Command | What it does |
 | --- | --- |

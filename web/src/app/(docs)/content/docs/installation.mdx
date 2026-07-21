@@ -1,225 +1,79 @@
 ---
 title: Installation
 icon: DownloadSimple
-description: Install the Kizlo plugin and add Kizlo to your project.
+description: Point Kizlo at your own WordPress, or let it run one locally in Docker.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps'
-import { File, Folder, Files } from 'fumadocs-ui/components/files'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
-This installation guide uses Next.js for its examples. Other frameworks like Astro, SolidJS, and Vue are supported through their own adapters — the CLI detects your framework and wires the right one.
+Kizlo talks to WordPress. You can point it at your own, or let Kizlo run one
+locally in Docker for development. Pick the one that fits — both end at the same
+[quickstart](/docs/quickstarts/nextjs).
 
-<Steps>
+<Tabs defaultValue="local">
+  <TabsList variant="line">
+    <TabsTrigger value="local">
+        Local (Docker)
+    </TabsTrigger>
 
-<Step>
+    <TabsTrigger value="site">
+        Your WordPress
+    </TabsTrigger>
+  </TabsList>
 
-#### Install & activate the WordPress plugin
+  <TabsContent value="local">
+    ### Run WordPress locally
 
-Download the latest Kizlo plugin, then in WP Admin go to **Plugins → Add New → Upload Plugin**,
-choose the zip, and **Activate**.
+    For local development you don't need your own WordPress or a plugin download. During the quickstart,
+    `npx kizlo dev` boots a self-contained WordPress in Docker with the Kizlo plugin already
+    bundled, provisions an Application Password, and writes it to `.env` — so the local stack is
+    ready to call with nothing to set up by hand.
 
-<DownloadButton plugin="kizlo" />
+    The one thing to have ready now is [Docker Desktop](https://www.docker.com/products/docker-desktop/),
+    installed and running.
 
-Once activated, the plugin keeps itself up to date from within WordPress — no need to come back here for future versions.
+    <Callout>
+      That's the whole setup for local dev. Head to the [quickstart](/docs/quickstarts/nextjs) —
+      `kizlo dev` handles the plugin and credentials for you.
+    </Callout>
+  </TabsContent>
 
-</Step>
+  <TabsContent value="site">
+    ### Connect your own WordPress
 
-<Step>
+    Pointing Kizlo at a live site or an existing WordPress install takes two steps.
 
-#### Create an admin Application Password
+    <Steps>
 
-In WP Admin go to **Users → Profile → Application Passwords** (on a user with admin capability),
-give it a name like `kizlo`, and generate it.
+    <Step>
 
-This is the credential Kizlo uses to talk to WordPress. Copy it now — WordPress only shows it
-once — and keep for upcoming step.
+    #### Install & activate the WordPress plugin
 
-</Step>
+    Download the latest Kizlo plugin, then in WP Admin go to **Plugins → Add New → Upload Plugin**,
+    choose the zip, and **Activate**.
 
-  <Step>
+    <DownloadButton plugin="kizlo" />
 
-  #### Add Kizlo to your project
+    Once activated, the plugin keeps itself up to date from within WordPress — no need to come back here for future versions.
 
-  You have two ways to set up Kizlo in an existing project: the CLI or a manual setup. We recommend the CLI — it has smart framework detection that wires each piece itself and walks you step by step through setting up your environment variables.
+    </Step>
 
-  <Tabs defaultValue="CLI">
-    <TabsList variant="line">
-      <TabsTrigger value="CLI">
-          CLI
-      </TabsTrigger>
+    <Step>
 
-      <TabsTrigger value="manual">
-          Manual
-      </TabsTrigger>
-    </TabsList>
+    #### Create an admin Application Password
 
-    <TabsContent value="CLI">
-      ### CLI Setup
-      Run the initializer in your project root: 
+    In WP Admin go to **Users → Profile → Application Passwords** (on a user with admin capability),
+    give it a name like `kizlo`, and generate it.
 
-      ```package-install
-      npx kizlo@latest init
-      ```
-      It detects your framework, `src` dir (if present), package manager, import alias, etc. and scaffolds:
+    This is the credential Kizlo uses to talk to WordPress. Copy it now — WordPress only shows it
+    once — and keep it for the quickstart.
 
-      <Files>
-        <Folder name="src" defaultOpen>
-          <Folder name="app" defaultOpen>
-            <Folder name="api" defaultOpen>
-              <Folder name="kizlo" defaultOpen>
-                <Folder name="[[...rest]]" defaultOpen>
-                  <File name="route.ts" />
-                </Folder>
-              </Folder>
-            </Folder>
-          </Folder>
-          <Folder name="lib" defaultOpen>
-            <Folder name="kizlo" defaultOpen>
-              <Folder name="server" defaultOpen>
-                <File name="index.ts" />
-                  <Folder name="generated">
-                    <File name="contract.json" />
-                    <File name="index.ts" />
-                  </Folder>
-              </Folder>
-              <File name="client.ts" />
-            </Folder>
-          </Folder>
-        </Folder>
-        <File name="kizlo.config.ts" />
-        <File name=".env" />
-      </Files>
+    </Step>
 
-      Along the way it prompts you for your WordPress credentials and writes them to `.env`, then
-      generates the contract — so when `init` finishes you're ready to make your first call.
+    </Steps>
+  </TabsContent>
+</Tabs>
 
-      <Callout>
-        Feel free to customize this folder structure however you like — just point the `dir` option in
-        `kizlo.config.ts` at it, so kizlo knows where your server files and kizlo instance live and can
-        generate the server contract.
-      </Callout>
-    </TabsContent>
-
-    <TabsContent value="manual">
-      ### Manual Setup
-      Prefer to wire it yourself? Create the same files by hand.
-
-      <Steps>
-
-      <Step>
-
-      #### Install the package
-
-      ```package-install
-      npm install kizlo
-      ```
-
-      </Step>
-
-      <Step>
-
-      #### Add `kizlo.config.ts`
-
-      At your project root — it tells the CLI where Kizlo lives and which import alias to use:
-
-      ```ts title="kizlo.config.ts"
-      import { defineConfig } from "kizlo"
-
-      export default defineConfig({
-        dir: "src/lib/kizlo",
-        alias: "@",
-      })
-      ```
-
-      </Step>
-
-      <Step>
-
-      #### Create the server
-
-      At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `KIZLO_SITE_SECRET` from `.env`:
-
-      ```ts title="src/lib/kizlo/server/index.ts"
-      import { createKizlo } from "kizlo/nextjs/server"
-
-      export const { router, client, context, handler } = createKizlo()
-      ```
-
-      </Step>
-
-      <Step>
-
-      #### Mount the route handler
-
-      Next.js, at `src/app/api/kizlo/[[...rest]]/route.ts` — re-export the server's `handler` for every method:
-
-      ```ts title="src/app/api/kizlo/[[...rest]]/route.ts"
-      import { handler } from "@/lib/kizlo/server"
-
-      export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS }
-      ```
-
-      </Step>
-
-      <Step>
-
-      #### Add `.env`
-
-      With the credentials from the config and Application Password steps above:
-
-      ```bash title=".env"
-      KIZLO_WORDPRESS_URL=https://your-site.com
-      KIZLO_WORDPRESS_USERNAME=admin
-      KIZLO_WORDPRESS_APPLICATION_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
-      KIZLO_SITE_SECRET=                       # a long random string
-      NEXT_PUBLIC_KIZLO_BACKEND_URL=http://localhost:3000/api/kizlo
-      ```
-
-      </Step>
-
-      <Step>
-
-      #### Generate the contract
-
-      So `server/generated/` exists before the client imports it:
-
-      ```package-install
-      npx kizlo generate
-      ```
-
-      <Callout>
-        Instead of re-running this every time you add or change a procedure, run `npm kizlo watch` — it
-        watches your server files and refreshes the contract automatically, so the client is always
-        typed against the latest.
-      </Callout>
-
-      </Step>
-
-      <Step>
-
-      #### Create the client
-
-      At `src/lib/kizlo/client.ts` from the generated contract — it's typed automatically:
-
-      ```ts title="src/lib/kizlo/client.ts"
-      import { createKizloClient } from "kizlo/nextjs"
-      import { contract } from "./server/generated"
-
-      export const client = createKizloClient(contract)
-      ```
-
-      </Step>
-
-      </Steps>
-    </TabsContent>
-  </Tabs>
-</Step>
-
-  <Step>
-    #### Thats it 🎉!
-    With the files in place, your project is wired up — head to the [Quickstart](/docs/quickstart) to make your first calls and tour the API surface.
-  </Step>
-
-</Steps>
-
+With WordPress ready either way, head to the [Next.js quickstart](/docs/quickstarts/nextjs) to add
+Kizlo to your app and make your first call.

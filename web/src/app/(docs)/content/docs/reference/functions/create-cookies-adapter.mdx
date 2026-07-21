@@ -4,11 +4,11 @@ description: Build a custom cookies adapter for reading and writing cookies.
 ---
 
 `createCookiesAdapter` declares a custom cookies adapter, typed against the `CookiesAdapter` contract. Kizlo uses it
-to read and write cookies — for sessions, preview tokens, and the like. Register the result on
+to read and write cookies for sessions, preview tokens, and the like. Register the result on
 [`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.cookies`.
 
-Reach for this to bridge your framework's cookie store. On Next.js, the integration wires this for you — covered in
-the adapter guides, not here.
+Reach for this to bridge your framework's cookie store. On Next.js, the integration wires this for you. That setup
+lives in the adapter guides, not here.
 
 ## Parameters
 
@@ -22,12 +22,12 @@ createCookiesAdapter(adapter)
   type={`CookiesAdapter`}
 />
 
-The methods are batched — `setAll` / `getAll` / `deleteAll` — so Kizlo applies all cookie changes for a request in
+The methods are batched (`setAll` / `getAll` / `deleteAll`), so Kizlo applies all cookie changes for a request in
 one pass. Each may be sync or async.
 
 ## Returns
 
-The adapter, unchanged — `createCookiesAdapter` attaches the `CookiesAdapter` type for inference and gives you one
+The adapter, unchanged. `createCookiesAdapter` only attaches the `CookiesAdapter` type so you get inference and one
 documented entry point.
 
 ## Examples

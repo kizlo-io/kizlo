@@ -15,8 +15,11 @@
 		"create-logger-adapter",
 		"create-extension",
 		"create-procedure",
+		"schema-type",
 		"create-middleware",
 		"create-event-handler",
+		"create-sitemap-route",
+		"create-robots-route",
 		"define-error-map",
 		"create-throwable-error-map"
 	]

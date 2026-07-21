@@ -1,19 +1,19 @@
 ---
 title: Adapter
 icon: PlugsConnected
-description: Learn how adapters let you plug in your own auth, logging, cookies, geo, and captcha — and swap them later.
+description: Learn how adapters let you plug in your own auth, logging, cookies, geo, and captcha, then swap them later.
 ---
 
-A few of the things Kizlo needs have no single right answer: which provider signs in your users, where logs
-go, how cookies are read, what separates a real visitor from a bot. That choice should be yours.
+Some of what Kizlo needs has no single right answer: which provider signs in your users, where logs go, how
+cookies are read, what separates a real visitor from a bot. Kizlo doesn't pick for you.
 
-So Kizlo doesn't hardcode one. For each capability it defines a small **contract** — a handful of methods it
-promises to call — and lets you supply the implementation. That implementation is an **adapter**.
+For each capability it defines a small **contract**, a handful of methods it promises to call, and lets you
+supply the implementation. That implementation is an **adapter**.
 
 ```ts title="src/lib/kizlo/server/index.ts"
 export const { client, handler } = createKizlo({
   adapters: {
-    auth: betterAuthAdapter(),
+    auth: myAuth(),
     captcha: turnstile({ secret: process.env.TURNSTILE_SECRET }),
     logger: consoleLog(),
   },
@@ -21,14 +21,15 @@ export const { client, handler } = createKizlo({
 ```
 
 You name the implementation; Kizlo calls it when it needs that capability and stays out of the rest. It never
-knows whether `auth` is Clerk or better-auth, only that it can ask for the current user.
+knows whether `auth` is Clerk, better-auth, or your own session store, only that it can ask for the current
+user.
 
 ## Why it's not locked in
 
-Because each adapter is just a contract, the thing behind it is yours to swap. Move from Clerk to better-auth,
-Vercel to Cloudflare, `console` to Datadog, and you change **one adapter** — Kizlo and the rest of your app
-never notice, because they only ever spoke to the contract. The dependency is on a *capability*, never on a
-specific service.
+Because each adapter is just a contract, the service behind it is yours to swap. Move from Clerk to
+better-auth, Vercel to Cloudflare, `console` to Datadog, and you change **one adapter**. Kizlo and the rest of
+your app never notice, because they only ever spoke to the contract. Your dependency is on a *capability*,
+never on a specific service.
 
 ## The interfaces
 
@@ -52,16 +53,15 @@ interface AuthAdapter {
 }
 ```
 
-Kizlo hands you the incoming `Request`; you read your session however you issue it — cookie, header, bearer
-token — and return the user, or `null` when no one's signed in. This is the seam between Kizlo and whatever
-owns your sessions; the prebuilt [Clerk](/docs/adapters/clerk) and [better-auth](/docs/adapters/better-auth)
-adapters are this same interface, filled in:
+Kizlo hands you the incoming `Request`; you read your session however you issue it (cookie, header, bearer
+token) and return the user, or `null` when no one's signed in. This is the seam between Kizlo and whatever owns
+your sessions. Wrap your provider in `createAuthAdapter` to fill in the contract:
 
 ```ts
-import type { AuthAdapter } from "kizlo"
+import { createAuthAdapter } from "kizlo"
 
-export function myAuth(): AuthAdapter {
-  return {
+export function myAuth() {
+  return createAuthAdapter({
     async getUser(request) {
       const session = await mySessionStore.read(request)
       if (!session) return null
@@ -72,7 +72,7 @@ export function myAuth(): AuthAdapter {
         email: session.email,
       }
     },
-  }
+  })
 }
 ```
 
@@ -124,9 +124,9 @@ friends); behind another CDN, you read its headers instead.
 type CaptchaAdapter = (input: { token: string; ip: string }) => Promise<boolean>
 ```
 
-The simplest of the five — just a function. You get the `token` your frontend collected and the caller's
-`ip`, verify it with your provider, and return `true` for *human*. `turnstile`, `recaptcha`, `hcaptcha`,
-`altcha` and the rest are all this one function pointed at different verification APIs:
+The simplest of the five: just a function. You get the `token` your frontend collected and the caller's `ip`,
+verify it with your provider, and return `true` for *human*. `turnstile`, `recaptcha`, `hcaptcha`, `altcha`
+and the rest are all this one function pointed at different verification APIs:
 
 ```ts
 import type { CaptchaAdapter } from "kizlo"
@@ -160,15 +160,16 @@ built-in `consoleLog` prints; a one-liner can forward each `payload` to your pla
 
 ## Built-ins, defaults, and mocks
 
-You rarely write an adapter from scratch. Kizlo ships implementations for the common cases — `turnstile`,
-`recaptcha`, and `hcaptcha` for captcha; `consoleLog` for logging; `geoVercelNext` for reading geo on Vercel
-— and the [framework integration](/docs/installation) wires sensible defaults (like your framework's cookie
-store) so the everyday setup works with little or no `adapters` block at all. You reach for the option to
-**override** a default or plug in something Kizlo doesn't ship.
+You rarely write an adapter from scratch. Kizlo ships implementations for the common cases: `turnstile`,
+`recaptcha`, and `hcaptcha` for captcha; `consoleLog` for logging; `geoVercelNext` for reading geo on Vercel.
+The [framework integration](/docs/installation) wires sensible defaults, like your framework's cookie store,
+so the everyday setup needs little or no `adapters` block. Reach for the option to **override** a default or
+plug in something Kizlo doesn't ship (`auth` is always yours to write).
 
 Because an adapter is just a contract, it's also the natural place to substitute behaviour in
-[tests](/docs/concepts/development-and-testing). Each capability has a **mock** — `authMock`, `geoMock` — that returns fixed
-values, so a test can stand in a known user or location without touching a real provider:
+[tests](/docs/concepts/development-and-testing). Each capability has a **mock**, such as `authMock` and
+`geoMock`, that returns fixed values, so a test can stand in a known user or location without touching a real
+provider:
 
 ```ts title="kizlo.test.ts"
 createKizlo({
