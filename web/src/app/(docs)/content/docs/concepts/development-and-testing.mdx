@@ -1,16 +1,16 @@
 ---
 title: Development & Testing
 icon: Cube
-description: Learn how Kizlo runs a real WordPress on your machine — one to build against, one to test against.
+description: "Learn how Kizlo runs a real WordPress on your machine: one to build against, one to test against."
 ---
 
 Every WordPress project starts with the same chore: getting WordPress running on your machine. The usual route
-is a desktop app — the GUI installers WordPress points you to — and they're fine for a classic site. But
-you're building a *headless* app, and they stop at the WordPress: no way to test against it, no seeded content,
-nothing tied to the project you're actually shipping.
+is a desktop app, one of the GUI installers WordPress points you to, and they're fine for a classic site.
 
-Kizlo gives you a setup built for that, the same in every project: a **dev stack** you build against by hand,
-and a **test stack** your suite runs against. All you install is Docker.
+But you're building a *headless* app, and they stop at the WordPress: no way to test against it, no seeded
+content, nothing tied to the project you're actually shipping. Kizlo gives you a setup built for that, the same
+in every project: a **dev stack** you build against by hand, and a **test stack** your suite runs against. All
+you install is Docker.
 
 ```package-install
 npx kizlo dev
@@ -21,33 +21,33 @@ npx kizlo test
 ```
 
 The [CLI page](/docs/concepts/cli#kizlo-dev) covers both commands, their subcommands, and every config field.
-This page covers the ideas behind them — why a real WordPress, and which stack does what.
+This page covers the ideas behind them: why a real WordPress, and which stack does what.
 
 ## Why a real WordPress
 
-A mock of the WordPress REST API only proves your code agrees with your *guesses* about WordPress — not that
+A mock of the WordPress REST API only proves your code agrees with your *guesses* about WordPress, not that
 the guesses are right. Kizlo's whole job is talking to a real WordPress, so building and testing against one is
 the point, not a compromise.
 
 Pointing at a shared staging site isn't the answer either: you break other people's work when you break yours,
-and you wait on someone else to install a plugin. A local stack is yours alone — start it, fill it, wipe it,
+and you wait on someone else to install a plugin. A local stack is yours alone: start it, fill it, wipe it,
 without asking anyone.
 
 <Callout>
   [Docker Desktop](https://www.docker.com/products/docker-desktop/) installs in a click, and Kizlo drives it
-  from there — you never run a `docker` command yourself. The first run builds the stack; later runs reuse it,
+  from there, and you never run a `docker` command yourself. The first run builds the stack; later runs reuse it,
   so both stay fast.
 </Callout>
 
 ## Two stacks, one model
 
-Both stacks are the same Docker WordPress, and you can seed both from the same fixtures — so what you build
+Both stacks are the same Docker WordPress, and you can seed both from the same fixtures, so what you build
 against is what you test against. What differs is their purpose:
 
 | | `kizlo dev` | `kizlo test` |
 | --- | --- | --- |
 | **For** | Building your app by hand | Running your suite |
-| **Lifecycle** | Persistent — survives restarts | Reused warm, reset on demand |
+| **Lifecycle** | Persistent, survives restarts | Reused warm, reset on demand |
 | **Files** | Fully editable on disk | Container-internal |
 | **Default URL** | `http://localhost:8080` | `http://localhost:8889` |
 | **Admin login** | Random password, printed once | Managed for the test client |
@@ -55,7 +55,7 @@ against is what you test against. What differs is their purpose:
 The two stacks are fully independent: a dev stack can stay up while your tests spin a throwaway one beside it,
 and neither touches the other's data.
 
-You seed each stack from **[fixtures](#fixtures)** in `kizlo.config.ts` — a separate list per stack. Point both
+You seed each stack from **[fixtures](#fixtures)** in `kizlo.config.ts`, a separate list per stack. Point both
 at the same ones and a post or plugin behaves identically whether you're building or testing; give them
 different sets when a test needs a world your dev site doesn't.
 
@@ -98,9 +98,10 @@ export default defineConfig({
 })
 ```
 
-Kizlo runs `seed` only when it provisions a fresh stack, so reruns never double up. For setup the REST API
-can't express — pretty permalinks, an option flag — call `wpCli` inside `seed` to run any wp-cli command
-against the stack.
+Kizlo runs `seed` only when it provisions a fresh stack, so reruns never double up.
+
+Some setup the REST API can't express, like pretty permalinks or an option flag. For those, import `wpCli` from
+`kizlo/test` and call it inside `seed` to run any wp-cli command against the stack.
 
 <Callout>
   An [extension](/docs/concepts/extension) ships its data the same way: it exports a fixture that installs its
@@ -109,8 +110,10 @@ against the stack.
 
 ## The development loop
 
-You build against the dev stack like a site you installed yourself — it persists and stays editable (see the
-table above). What keeps that loop tight is [`kizlo watch`](/docs/concepts/cli#kizlo-watch): edit a
+You build against the dev stack like a site you installed yourself: it persists and stays editable (see the
+table above).
+
+What keeps that loop tight is [`kizlo watch`](/docs/concepts/cli#kizlo-watch): edit a
 [procedure](/docs/concepts/extension) and it regenerates the typed [contract](/docs/concepts/client) before you
 call it; change content in `wp-admin` and your app reads it on the next request. Nothing to restart to stay in
 sync.
@@ -122,7 +125,7 @@ can hit a procedure at two levels.
 
 ### Server-side
 
-Call the procedure directly and get its data back, or its typed error thrown — the quickest check of what a
+Call the procedure directly and get its data back, or its typed error thrown, the quickest check of what a
 procedure *does*. `getKizloTestInstance` wires an instance from the seeded credentials and the
 [adapter](/docs/concepts/adapter) mocks:
 
@@ -159,8 +162,8 @@ test("reads a seeded post over the client", async () => {
 })
 ```
 
-Reach for the stack only when a test depends on how WordPress actually responds. Pure logic — a schema, a
-procedure's branching — runs on its own with no WordPress and no Docker, and those fast tests are what make the
+Reach for the stack only when a test depends on how WordPress actually responds. Pure logic, like a schema or a
+procedure's branching, runs on its own with no WordPress and no Docker, and those fast tests are what make the
 stack-backed ones worth trusting.
 
 <Callout type="info">

@@ -13,7 +13,7 @@ export const generateViewport = createRootViewport(client)
 export default function Layout({ children }: LayoutProps<"/">) {
 	return (
 		<html lang="en" className={cn(geist.variable, "font-sans antialiased")} suppressHydrationWarning>
-			<body className="flex min-h-screen flex-col">
+			<body className="flex min-h-screen flex-col" suppressHydrationWarning>
 				<RootProvider>{children}</RootProvider>
 			</body>
 		</html>

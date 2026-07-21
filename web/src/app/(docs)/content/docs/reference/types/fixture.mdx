@@ -1,6 +1,6 @@
 ---
 title: Fixture
-description: The serializable test layer — seed data plus the plugins it depends on.
+description: The serializable test layer, seed data plus the plugins it depends on.
 types: [Fixture]
 ---
 
@@ -25,6 +25,6 @@ known records over the typed WordPress client, plus the `plugins` that content d
   type={`SeedContext`}
 />
 
-`seed` returns a record of **handles** — ids, codes, or slugs of what it created — stored under the fixture's `name`
+`seed` returns a record of **handles** (ids, codes, or slugs of what it created) stored under the fixture's `name`
 so a test can read them back and re-fetch the live resource. Return handles, not full snapshots, which would drift
 from WordPress state.

@@ -1,6 +1,6 @@
 ---
 title: defineFixture
-description: Author a typed test/dev fixture — seed data plus the plugins it depends on.
+description: Author a typed test/dev fixture with seed data plus the plugins it depends on.
 ---
 
 `defineFixture` authors a fixture: the serializable test layer an extension ships alongside its live code. A fixture
@@ -14,12 +14,12 @@ depends on. Pass fixtures to a config's [`dev`/`test`](/docs/reference/functions
 defineFixture(fixture)
 ```
 
-`fixture` is a [`Fixture`](/docs/reference/types/fixture) — its `seed`/`cleanup` functions, the `plugins` it needs,
+`fixture` is a [`Fixture`](/docs/reference/types/fixture): its `seed`/`cleanup` functions, the `plugins` it needs,
 and the `name` its seeded handles are stored under.
 
 ## Returns
 
-The same fixture object, unchanged — `defineFixture` is an identity function that exists purely to attach types and
+The same fixture object, unchanged. `defineFixture` is an identity function that exists only to attach types and
 give you inference and autocomplete while authoring.
 
 ## Examples

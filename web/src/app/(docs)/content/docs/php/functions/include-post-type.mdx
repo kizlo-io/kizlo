@@ -1,0 +1,52 @@
+---
+title: kizlo_include_post_type
+description: Surface an existing custom post type in Kizlo so it appears alongside the built-in content types.
+---
+
+`kizlo_include_post_type` makes an already-registered custom post type available in Kizlo. Kizlo surfaces its own
+built-in types by default; call this from your plugin to add yours to that set. The post type must already be
+registered with `show_in_rest` enabled. It's a global, so no import is needed.
+
+## Parameters
+
+```php
+kizlo_include_post_type(string $post_type): void
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `$post_type` | `string` | The post type key. Must already be registered with `show_in_rest: true`. |
+
+## Returns
+
+`void`. The key is added to the `kizlo_included_post_types` filter, so Kizlo lists the post type among its available
+content types.
+
+## Examples
+
+Register the post type as usual, then include it:
+
+```php title="wp-content/plugins/your-plugin/portfolio.php"
+add_action('init', function () {
+    register_post_type('portfolio', [
+        'public'       => true,
+        'show_in_rest' => true,
+        'label'        => 'Portfolio',
+    ]);
+});
+
+kizlo_include_post_type('portfolio');
+```
+
+## kizlo_include_taxonomy
+
+```php
+kizlo_include_taxonomy(string $taxonomy): void
+```
+
+The taxonomy counterpart. It adds a registered taxonomy to the `kizlo_included_taxonomies` filter so Kizlo surfaces
+it too. The taxonomy must already be registered with `show_in_rest` enabled.
+
+```php title="wp-content/plugins/your-plugin/portfolio.php"
+kizlo_include_taxonomy('project_type');
+```

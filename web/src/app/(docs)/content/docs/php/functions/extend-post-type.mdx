@@ -1,0 +1,59 @@
+---
+title: kizlo_extend_post_type
+description: Inject custom data into a post type's REST response so the Kizlo client reads it under kizlo.extend.
+---
+
+`kizlo_extend_post_type` adds fields to a single post type entry's REST response. It hooks `rest_prepare_{$post_type}`
+and merges your callback's return into the response under `kizlo -> extend`, where the Kizlo client reads it. Use it to
+surface post meta or computed values that WordPress doesn't return by default. It's a global, so no import is needed.
+
+## Parameters
+
+```php
+kizlo_extend_post_type(string $post_type, callable $callback): void
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `$post_type` | `string` | The registered post type key, e.g. `portfolio`. |
+| `$callback` | `callable` | Invoked as `callback(WP_REST_Response $response, WP_Post $post, WP_REST_Request $request)`. Must return an array. |
+
+The callback runs only for single-entry requests (when the `id` param is set). For list requests, use
+[`kizlo_extend_post_type_item`](#kizlo_extend_post_type_item).
+
+## Returns
+
+`void`. The filter is attached on registration; the returned array lands on each matching response under
+`kizlo.extend`.
+
+## Examples
+
+```php title="wp-content/plugins/your-plugin/portfolio.php"
+kizlo_extend_post_type('portfolio', function ($response, $post, $request) {
+    return [
+        'project_url' => get_post_meta($post->ID, 'project_url', true),
+    ];
+});
+```
+
+## kizlo_extend_post_type_item
+
+```php
+kizlo_extend_post_type_item(string $post_type, callable $callback): void
+```
+
+The list counterpart. It runs for each item in a post type **list** response (when the `id` param is absent),
+injecting the callback's return into that item's `kizlo.extend`. Same signature, same return shape.
+
+```php title="wp-content/plugins/your-plugin/portfolio.php"
+kizlo_extend_post_type_item('portfolio', function ($response, $post, $request) {
+    return [
+        'project_url' => get_post_meta($post->ID, 'project_url', true),
+    ];
+});
+```
+
+<Callout>
+  Register both to cover single and list responses with the same extend data. The single hook fires when a request
+  carries an `id`; the list hook fires when it doesn't.
+</Callout>

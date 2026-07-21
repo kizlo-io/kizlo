@@ -1,6 +1,6 @@
 ---
 title: createMiddleware
-description: Define reusable logic that runs before a procedure's handler — guard access, extend the context, or wrap the call.
+description: Define reusable logic that runs before a procedure's handler to guard access, extend the context, or wrap the call.
 ---
 
 `createMiddleware` builds one middleware: a function that runs before a procedure's handler. Attach it through a
@@ -15,7 +15,7 @@ createMiddleware(handler)
 
 ### `handler`
 
-`(options) => Promise<{ output, context }>` — return the result of `next()` (or a value of the same shape). It
+`(options) => Promise<{ output, context }>`. Return the result of `next()`, or a value of the same shape. It
 receives:
 
 <AutoTypeTable
@@ -25,12 +25,12 @@ receives:
 />
 
 `input`, `context`, and `errors` are the same arguments a [handler](/docs/reference/functions/create-procedure#handler)
-receives — `input` typed from the procedure's schemas, `errors` carrying that procedure's codes plus the common
+receives: `input` typed from the procedure's schemas, `errors` carrying that procedure's codes plus the common
 HTTP errors. `next` is the one addition.
 
 #### `next`
 
-Advances the chain — runs the next middleware, then the handler — and resolves with its result. Call it bare to
+Advances the chain (runs the next middleware, then the handler) and resolves with its result. Call it bare to
 continue, or pass options to extend the downstream context:
 
 <AutoTypeTable
@@ -52,7 +52,7 @@ to short-circuit: throw `errors.SOME_CODE()` and nothing downstream runs.
 
 ## Returns
 
-A `Middleware` — pass it in a procedure's `middlewares` array. It's never called directly.
+A `Middleware`. Pass it in a procedure's `middlewares` array. It's never called directly.
 
 ## Examples
 
@@ -63,14 +63,14 @@ typed, on every middleware and handler after it:
 import { createMiddleware } from "kizlo"
 
 export const requireMember = createMiddleware(async ({ context, next, errors }) => {
-  const userId = await context.getAuthUserId()
-  if (!userId) throw errors.UNAUTHORIZED()
+  const user = await context.getAuthUser()
+  if (!user) throw errors.UNAUTHORIZED()
 
-  return next({ context: { userId } })
+  return next({ context: { userId: user.id } })
 })
 ```
 
-Wrap a middleware in a factory when it needs configuration — return `createMiddleware` from a function that
+Wrap a middleware in a factory when it needs configuration. Return `createMiddleware` from a function that
 takes options:
 
 ```ts title="src/lib/kizlo/server/session.ts"

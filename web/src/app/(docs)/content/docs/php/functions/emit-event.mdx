@@ -20,13 +20,13 @@ kizlo_emit_event(string $type, array|null $data = null): bool
 
 ## Returns
 
-`bool` — `false` when the plugin has no site secret or no configured webhook URLs; otherwise `true` once the event
-is dispatched. Delivery is **non-blocking and best-effort** — the call returns without waiting for the app to
+`bool`. Returns `false` when the plugin has no site secret or no configured webhook URLs, otherwise `true` once the
+event is dispatched. Delivery is **non-blocking and best-effort**: the call returns without waiting for the app to
 respond.
 
 ## Examples
 
-Emit the event from your plugin — `kizlo_emit_event` is global, so no import is needed:
+Emit the event from your plugin. `kizlo_emit_event` is global, so no import is needed:
 
 ```php title="wp-content/plugins/your-plugin/reviews.php"
 kizlo_emit_event('review.created', [
@@ -35,7 +35,7 @@ kizlo_emit_event('review.created', [
 ]);
 ```
 
-Handle it in your app with a typed [`createEventHandler`](/docs/reference/functions/create-event-handler) — declare
+Handle it in your app with a typed [`createEventHandler`](/docs/reference/functions/create-event-handler). Declare
 the matching `type` and `data` schema, and the payload is typed end to end:
 
 ```ts
@@ -49,6 +49,6 @@ createEventHandler(
 ```
 
 <Callout>
-  `kizlo_emit_event` wraps the underlying `\Kizlo\Modules\Webhook\Webhook::sendEvent()` method — use whichever
+  `kizlo_emit_event` wraps the underlying `\Kizlo\Modules\Webhook\Webhook::sendEvent()` method. Use whichever
   you prefer; the function is the idiomatic, hook-friendly form.
 </Callout>

@@ -5,7 +5,7 @@ description: Register an admin-only REST endpoint under the Kizlo namespace.
 
 `kizlo_register_route` registers a REST endpoint under Kizlo's namespace (`kizlo/v1`). It is **admin-only**: Kizlo
 attaches a permission check requiring the `manage_options` capability, so the route is reachable only by
-authenticated administrators. Call it from your plugin — it's a global, so no import is needed.
+authenticated administrators. Call it from your plugin. It's a global, so no import is needed.
 
 ## Parameters
 
@@ -20,7 +20,7 @@ kizlo_register_route(array $args): void
 | `callback` | `callable` | Handler receiving a `WP_REST_Request`, returning a `WP_REST_Response` or `WP_Error`. |
 | `args` | `array` | Optional per-parameter validation/sanitization rules, passed through to `register_rest_route`. |
 
-A `route` is required — omitting it triggers `_doing_it_wrong` and the route is skipped. The callback is wrapped so a
+A `route` is required. Omitting it triggers `_doing_it_wrong`, and the route is skipped. The callback is wrapped so a
 thrown `InvalidArgumentException` becomes a `400 invalid_param` response automatically.
 
 ## Returns
@@ -68,7 +68,7 @@ kizlo_register_route([
 kizlo_route_match(string $route, WP_REST_Request $request): bool
 ```
 
-Returns `true` when a request's route matches a `:param` pattern — the same matching
+Returns `true` when a request's route matches a `:param` pattern, the same matching
 [`kizlo_register_route_interceptor`](/docs/php/functions/register-route-interceptor) uses internally.
 
 ```php

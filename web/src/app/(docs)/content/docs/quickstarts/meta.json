@@ -1,0 +1,5 @@
+{
+	"title": "Quickstarts",
+	"icon": "RocketLaunch",
+	"pages": ["index", "nextjs"]
+}

@@ -5,8 +5,8 @@ description: Wrap a test instance with the real client for end-to-end tests.
 
 `getKizloClientTestInstance` wraps a [`getKizloTestInstance`](/docs/reference/functions/get-kizlo-test-instance)
 with the real browser client, routing its requests through the test instance's `handler`. Use it for end-to-end
-tests — calls go through serialization and the same scope rules as production (internal procedures never leave the
-server), returning the `{ success, data, error }` envelope your frontend sees.
+tests. Calls go through serialization and the same scope rules as production (internal procedures never leave the
+server), returning the `{ data, error, success }` result your frontend sees.
 
 ## Parameters
 
@@ -21,13 +21,13 @@ contract is generated and its `handler` becomes the client's transport, so reque
 
 ## Returns
 
-A `Promise` of a `KizloClientTestInstance` — a [`createKizloClient`](/docs/reference/functions/create-kizlo-client)
-client bound to the test instance. `await` it, then call procedures through `instance.client`; each resolves to a
-`{ success, data, error }` result.
+A `Promise` of a `KizloClientTestInstance`, a [`createKizloClient`](/docs/reference/functions/create-kizlo-client)
+client bound to the test instance. `await` it, then call procedures through `instance.client`. Each resolves to a
+`{ data, error, success }` result.
 
-It complements `getKizloTestInstance`: that calls procedures directly through the server `client` (the quickest
-check of what a procedure *does*); this goes through the full client → handler path, catching what a direct call
-can't — serialization and rules like internal procedures never reaching the browser.
+It complements `getKizloTestInstance`. That one calls procedures directly through the server `client`, the quickest
+check of what a procedure *does*. This one goes through the full client to handler path, catching what a direct call
+can't: serialization and rules like internal procedures never reaching the browser.
 
 ## Examples
 

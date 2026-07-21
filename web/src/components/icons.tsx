@@ -1,5 +1,19 @@
 import type { ComponentProps } from "react"
-import { type SimpleIcon, siBetterauth, siClerk } from "simple-icons"
+import {
+	type SimpleIcon,
+	siAstro,
+	siBetterauth,
+	siBun,
+	siClerk,
+	siDeno,
+	siNextdotjs,
+	siNodedotjs,
+	siReact,
+	siSolid,
+	siSvelte,
+	siTanstack,
+	siVuedotjs,
+} from "simple-icons"
 
 function brandIcon(icon: SimpleIcon) {
 	function BrandIcon(props: ComponentProps<"svg">) {
@@ -16,6 +30,16 @@ function brandIcon(icon: SimpleIcon) {
 export const brandIcons = {
 	Clerk: brandIcon(siClerk),
 	BetterAuth: brandIcon(siBetterauth),
+	NextJs: brandIcon(siNextdotjs),
+	React: brandIcon(siReact),
+	Astro: brandIcon(siAstro),
+	Vue: brandIcon(siVuedotjs),
+	SvelteKit: brandIcon(siSvelte),
+	SolidStart: brandIcon(siSolid),
+	TanStackStart: brandIcon(siTanstack),
+	Node: brandIcon(siNodedotjs),
+	Bun: brandIcon(siBun),
+	Deno: brandIcon(siDeno),
 }
 
 export type BrandIconName = keyof typeof brandIcons

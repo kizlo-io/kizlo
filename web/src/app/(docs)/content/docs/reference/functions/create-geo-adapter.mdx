@@ -4,11 +4,11 @@ description: Build a custom geo adapter that describes the caller's connection.
 ---
 
 `createGeoAdapter` declares a custom geo adapter, typed against the `GeoAdapter` contract. Kizlo calls it to describe
-the connection — IP, location, and user agent — for the current request. Register the result on
+the connection (IP, location, and user agent) for the current request. Register the result on
 [`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.geo`.
 
 Reach for this when your platform exposes geo data Kizlo doesn't read out of the box. For Vercel's edge headers,
-use the prebuilt adapter instead — covered in the adapter guides, not here.
+use the prebuilt adapter instead. That one lives in the adapter guides, not here.
 
 ## Parameters
 
@@ -22,7 +22,7 @@ createGeoAdapter(adapter)
   type={`GeoAdapter`}
 />
 
-`getConnInfo` returns the connection info — fill in what you know and leave the rest `null`:
+`getConnInfo` returns the connection info. Fill in what you know and leave the rest `null`:
 
 <AutoTypeTable
   path="../packages/kizlo/src/adapters/geo.ts"
@@ -32,7 +32,7 @@ createGeoAdapter(adapter)
 
 ## Returns
 
-The adapter, unchanged — `createGeoAdapter` attaches the `GeoAdapter` type for inference and gives you one
+The adapter, unchanged. `createGeoAdapter` only attaches the `GeoAdapter` type so you get inference and one
 documented entry point.
 
 ## Examples

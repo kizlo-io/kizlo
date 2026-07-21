@@ -1,0 +1,58 @@
+---
+title: createSitemapRoute
+description: Serve the generated XML sitemap index and its collection pages from your Kizlo server.
+---
+
+`createSitemapRoute` builds a `Request` to `Response` handler that serves your sitemap: the index at
+`/sitemaps/index.xml` and every collection page under it. It reads the sitemaps from your WordPress content through
+the server-to-server `client` returned by [`createKizlo`](/docs/reference/functions/create-kizlo). Mount the
+returned handler on a route under `/sitemaps`.
+
+<Callout>
+  On Next.js, import `createSitemapRoute` from `kizlo/nextjs/server` instead. That variant wraps this one with
+  route caching and mount assertions, and expects the dynamic segment `/sitemaps/[sitemap]`.
+</Callout>
+
+## Parameters
+
+```ts
+createSitemapRoute(client, options?)
+```
+
+### `client`
+
+The server-to-server `client` from [`createKizlo`](/docs/reference/functions/create-kizlo). The handler calls
+`client.seo` to list the sitemaps and resolve each page's URLs.
+
+### `options.extra`
+
+Optional. Extra sitemaps not backed by WordPress, for pages that live in your app (docs, marketing routes). Each
+entry adds itself to the index and serves its own pages:
+
+- **`entry`**: how the sitemap appears in the index (its `key` and page count).
+- **`urls`**: `(origin, page) => SitemapUrl[]`, the URLs for a given page.
+
+## Returns
+
+An async `GET(request)` handler. It reads the last path segment as the slug: `index.xml` renders the index, and any
+other slug renders that collection page. Export it from your route.
+
+## Examples
+
+Mount the sitemap and redirect the well-known `/sitemap.xml` at the generated index:
+
+```ts title="src/app/sitemaps/[sitemap]/route.ts"
+import { createSitemapRoute } from "kizlo"
+import { client } from "@/lib/kizlo/server"
+
+export const GET = createSitemapRoute(client)
+```
+
+`createSitemapRedirectRoute` builds a handler that permanently redirects `/sitemap.xml` to
+`/sitemaps/index.xml`, so crawlers probing the standard path reach the real index. It takes no arguments:
+
+```ts title="src/app/sitemap.xml/route.ts"
+import { createSitemapRedirectRoute } from "kizlo"
+
+export const GET = createSitemapRedirectRoute()
+```

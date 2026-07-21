@@ -38,6 +38,6 @@ throw new KizloError("NOT_FOUND", { message: "Post not found" })
 
 ## Detecting
 
-`isKizloError(value)` narrows an unknown value to `KizloError` — it matches a real instance or any object with the
-`KizloError` shape (so it survives serialization across a boundary). `toKizloError(value)` normalizes any thrown
+`isKizloError(value)` narrows an unknown value to `KizloError`. It matches a real instance or any object with the
+`KizloError` shape, so it survives serialization across a boundary. `toKizloError(value)` normalizes any thrown
 value into a `KizloError`, falling back to `INTERNAL_SERVER_ERROR`.

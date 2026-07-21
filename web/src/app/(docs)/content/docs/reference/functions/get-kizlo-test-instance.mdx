@@ -3,8 +3,8 @@ title: getKizloTestInstance
 description: Wire a Kizlo instance against the seeded test stack for integration tests.
 ---
 
-`getKizloTestInstance` builds a Kizlo instance wired to the running test stack — admin credentials read from the
-seeded test-credentials artifact, with the adapter mocks in place. Call your
+`getKizloTestInstance` builds a Kizlo instance wired to the running test stack, with admin credentials read from the
+seeded test-credentials artifact and the adapter mocks in place. Call your
 [procedures](/docs/reference/functions/create-procedure) directly through its `client` to test what they *do*
 against real WordPress responses.
 
@@ -16,21 +16,21 @@ getKizloTestInstance(options?)
 
 ### `options.extensions`
 
-The [extensions](/docs/reference/functions/create-extension) to register on the test instance — the same array you
+The [extensions](/docs/reference/functions/create-extension) to register on the test instance, the same array you
 pass to [`createKizlo`](/docs/reference/functions/create-kizlo). Their namespaces appear on the returned `client`.
 Omit it to test only the core routes.
 
 ## Returns
 
-A `KizloTestInstance` — a [`createKizlo`](/docs/reference/functions/create-kizlo) instance pre-configured for tests:
+A `KizloTestInstance`, a [`createKizlo`](/docs/reference/functions/create-kizlo) instance pre-configured for tests:
 
 - Credentials come from the seeded test stack (the admin user), read from the test-credentials artifact that
-  `kizlo test` writes — so the stack must be provisioned first.
+  `kizlo test` writes, so the stack must be provisioned first.
 - Adapters are mocked: `geo`, `auth` (resolves the seeded user), and `captcha` (accepts test tokens). The logger is
   restricted to `warn` and `error`.
 
-Call procedures through `instance.client`. Use `.call(...)` to get the value back (or its typed error thrown) — the
-quickest check of a procedure's behavior.
+Call procedures through `instance.client`. Use `.call(...)` to get the value back, or its typed error thrown. That
+is the quickest check of a procedure's behavior.
 
 ## Examples
 

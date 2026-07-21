@@ -1,6 +1,6 @@
 ---
 title: createKizlo
-description: Create a Kizlo server — the client, request handler, and router for your app.
+description: Create a Kizlo server, the client, request handler, and router for your app.
 ---
 
 `createKizlo` builds your Kizlo server from credentials and registered [extensions](/docs/reference/functions/create-extension).
@@ -35,14 +35,14 @@ A `Kizlo` instance with four members:
 
 | Member | Description |
 | --- | --- |
-| `handler` | `(request: Request) => Promise<Response>` — the fetch handler to mount on your server route. It is pre-bound, so destructuring keeps it working. |
+| `handler` | `(request: Request) => Promise<Response>`, the fetch handler to mount on your server route. It is pre-bound, so destructuring keeps it working. |
 | `client` | A server-to-server client for calling your own procedures from server code. |
 | `router` | The resolved router (core routes plus every registered extension and the webhook route). |
 | `context` | The shared server context passed to procedures and middleware. |
 
 ## Examples
 
-Zero-config — everything from `.env`:
+Zero-config, everything from `.env`:
 
 ```ts title="src/lib/kizlo/server/index.ts"
 import { createKizlo } from "kizlo"

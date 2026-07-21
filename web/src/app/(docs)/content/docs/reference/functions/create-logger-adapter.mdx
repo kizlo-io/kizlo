@@ -7,8 +7,8 @@ description: Build a custom logger adapter that receives Kizlo's log records.
 with a structured record for every log; forward each one to your platform's logging SDK. Register the result on
 [`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.logger`.
 
-Reach for this to ship logs somewhere specific. To just print to the console, use the prebuilt `consoleLog` adapter
-instead — covered in the adapter guides, not here.
+Reach for this to ship logs somewhere specific. To print to the console, use the prebuilt `consoleLog` adapter
+instead. That one lives in the adapter guides, not here.
 
 ## Parameters
 
@@ -18,7 +18,7 @@ createLoggerAdapter(adapter)
 
 ### `adapter`
 
-The handler — `(payload: LogPayload) => void | Promise<void>`. It receives one record per log call and does whatever
+The handler, `(payload: LogPayload) => void | Promise<void>`. It receives one record per log call and does whatever
 your platform needs (write, forward, drop). Apply any level filtering inside the handler.
 
 The record:
@@ -31,7 +31,7 @@ The record:
 
 ## Returns
 
-The handler, unchanged — `createLoggerAdapter` attaches the `LoggerAdapter` type for inference and gives you one
+The handler, unchanged. `createLoggerAdapter` only attaches the `LoggerAdapter` type so you get inference and one
 documented entry point.
 
 ## Examples
