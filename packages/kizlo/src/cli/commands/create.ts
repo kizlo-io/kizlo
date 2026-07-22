@@ -2,10 +2,11 @@ import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
-import { downloadTemplate } from "giget"
 import z from "zod/v4"
 import { printBanner } from "../banner"
 import { getPreset } from "../presets"
+import { fetchTemplate } from "../presets/source"
+import { readManifest } from "../presets/template"
 import { detectPackageManager, getVersion } from "../utils"
 import { dockerAvailable } from "../wp/docker"
 import {
@@ -18,9 +19,6 @@ import {
 	withApiPath,
 	writeEnv,
 } from "./_setup"
-
-/** GitHub repo the full templates are fetched from, matching the release-tag scheme. */
-const TEMPLATE_REPO = "github:kizlo-io/kizlo"
 
 /**
  * The templates `create` can scaffold from. Each id is both the `templates/<id>` folder and the
@@ -43,45 +41,34 @@ const projectNameSchema = z
 	)
 const projectName = validate(projectNameSchema)
 
-/**
- * Resolve where the template is fetched from. Defaults to the GitHub repo pinned to the release
- * tag matching this CLI version (`kizlo-v<version>`), so the template and the `kizlo` dependency it
- * pulls come from the same release. `KIZLO_TEMPLATE_REF` overrides the ref (e.g. `main`) and
- * `KIZLO_TEMPLATE_LOCAL_DIR` points at a local `templates/` directory for pre-release development.
- */
-function templateSource(template: TemplateId): { local?: string; remote?: string } {
-	const localDir = process.env.KIZLO_TEMPLATE_LOCAL_DIR
-	if (localDir) return { local: path.resolve(localDir, template) }
-	const ref = process.env.KIZLO_TEMPLATE_REF ?? `kizlo-v${getVersion()}`
-	return { remote: `${TEMPLATE_REPO}/templates/${template}#${ref}` }
-}
+/** Directory entries never copied into a scaffolded project — the internal manifest and build junk. */
+const SKIP_COPY = new Set(["template.json", "node_modules", ".next", ".turbo", ".git"])
 
 /**
- * Copy the template into `dir`, then make it a standalone project: rewrite the `workspace:*` Kizlo
- * dependency to this CLI's version and name the package after the project folder. The template's
- * `kizlo.template.json` is an internal build input, so it's removed once the copy lands.
+ * Copy the template into `dir`, then make it a standalone project: name the package after the
+ * project folder and resolve the monorepo-only `workspace:*` Kizlo dependency to the version the
+ * template declares (`kizloVersion` in its manifest, stamped at release), falling back to the running
+ * CLI's version. The version the project runs is the template's to decide, not a moving `latest` tag.
+ * The template's `template.json` is an internal input, so it's left out of the copy — as is
+ * local build junk (`node_modules`, `.next`, …) that only exists on the `KIZLO_TEMPLATE_LOCAL_DIR` path.
  */
 export async function scaffoldTemplate(template: TemplateId, dir: string, name: string): Promise<void> {
-	const source = templateSource(template)
-	if (source.local) {
-		if (!fs.existsSync(source.local)) throw new Error(`Local template not found: ${source.local}`)
-		fs.cpSync(source.local, dir, { recursive: true })
-	} else {
-		await downloadTemplate(source.remote as string, { dir, forceClean: true })
+	const { dir: src, cleanup } = await fetchTemplate(template)
+	let kizloVersion: string
+	try {
+		kizloVersion = readManifest(src).kizloVersion ?? `^${getVersion()}`
+		fs.cpSync(src, dir, { recursive: true, filter: (from) => !SKIP_COPY.has(path.basename(from)) })
+	} finally {
+		cleanup()
 	}
 
-	fs.rmSync(path.join(dir, "kizlo.template.json"), { force: true })
-
 	const pkgPath = path.join(dir, "package.json")
-	// giget resolves a missing subdir to an empty directory instead of throwing, so a ref that
-	// predates the `templates/` folder lands here with nothing to read. Turn that into an
-	// actionable message rather than a bare ENOENT on package.json.
+	// giget resolves a missing subdir to an empty directory instead of throwing, so a bad template
+	// name or a failed fetch lands here with nothing to read. Turn that into an actionable message
+	// rather than a bare ENOENT on package.json.
 	if (!fs.existsSync(pkgPath)) {
 		fs.rmSync(dir, { recursive: true, force: true })
-		throw new Error(
-			`Template "${template}" wasn't found at ${source.remote ?? source.local}. ` +
-				`This ref may predate the templates — retry with KIZLO_TEMPLATE_REF=main.`,
-		)
+		throw new Error(`Template "${template}" wasn't found. Check the template name and your network connection, then try again.`)
 	}
 	const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
 		name?: string
@@ -89,7 +76,7 @@ export async function scaffoldTemplate(template: TemplateId, dir: string, name: 
 		dependencies?: Record<string, string>
 	}
 	pkg.name = name
-	if (pkg.dependencies?.kizlo === "workspace:*") pkg.dependencies.kizlo = `^${getVersion()}`
+	if (pkg.dependencies?.kizlo === "workspace:*") pkg.dependencies.kizlo = kizloVersion
 	fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`)
 }
 

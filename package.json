@@ -28,6 +28,7 @@
 		"plugin:release": "node scripts/release.mjs",
 		"postinstall": "pnpm lint:ws && node scripts/postinstall.mjs",
 		"typecheck": "turbo run typecheck",
+		"changeset:version": "changeset version && node scripts/stamp-template-version.mjs && biome format --write templates/*/template.json",
 		"test": "turbo run test --filter \"./packages/*\"",
 		"test:only": "turbo run test --filter",
 		"test:watch": "vitest",

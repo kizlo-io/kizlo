@@ -11,7 +11,6 @@ export default defineConfig({
 	unbundle: true,
 	format: ["esm"],
 	plugins: [fixNextServerImport],
-	ignoreWatch: [/[\\/]presets[\\/]generated[\\/]/],
 	entry: {
 		index: "src/index.ts",
 		config: "src/config.ts",

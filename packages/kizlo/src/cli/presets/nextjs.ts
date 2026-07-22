@@ -1,4 +1,3 @@
-import { materializeTemplate } from "./template"
 import type { Preset } from "./types"
 
 export const nextjs: Preset = {
@@ -10,7 +9,6 @@ export const nextjs: Preset = {
 	},
 	baseUrlEnvKey: "NEXT_PUBLIC_KIZLO_BACKEND_URL",
 	apiPath: "/api/kizlo",
-	scaffolds(ctx) {
-		return materializeTemplate("nextjs", ctx)
-	},
+	// The wiring bodies live in the `nextjs` template folder; init fetches it and drives the manifest.
+	template: "nextjs",
 }

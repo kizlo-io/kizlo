@@ -15,7 +15,7 @@ const patch: Pick<ResolvedPatch, "imports" | "exports"> = {
 	],
 }
 
-const apply = (source: string, replaceConflicts = false) => applyPatchToSource(source, patch, { replaceConflicts })
+const apply = (source: string) => applyPatchToSource(source, patch)
 /** Whitespace-insensitive contains, so assertions don't hinge on magicast's exact print spacing. */
 const has = (text: string, snippet: string) => text.replace(/\s+/g, "").includes(snippet.replace(/\s+/g, ""))
 /** How many import statements pull from `module` — 1 proves imports merged rather than duplicated. */
@@ -113,7 +113,7 @@ export default function RootLayout() {
 		expect(text.indexOf('"use client"')).toBeLessThan(text.indexOf("createRootMetadata"))
 	})
 
-	it("keeps a conflicting export unless replaceConflicts is set", () => {
+	it("replaces a conflicting export with our wiring (upsert)", () => {
 		const src = `import type { ReactNode } from "react"
 
 export const generateMetadata = { title: "Mine" }
@@ -122,13 +122,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 	return <>{children}</>
 }
 `
-		const kept = apply(src, false)
-		expect(kept.changes.keptExports).toContain("generateMetadata")
-		expect(kept.changes.addedExports).toContain("generateViewport")
-		expect(kept.text).toContain('title: "Mine"')
-
-		const replaced = apply(src, true)
+		const replaced = apply(src)
 		expect(replaced.changes.replacedExports).toContain("generateMetadata")
+		expect(replaced.changes.addedExports).toContain("generateViewport")
 		expect(has(replaced.text, "export const generateMetadata = createRootMetadata(client)")).toBe(true)
 		expect(replaced.text).not.toContain('title: "Mine"')
 	})
@@ -145,7 +141,7 @@ export default function RootLayout() {
 	return null
 }
 `
-		const { text, changes } = apply(src, true)
+		const { text, changes } = apply(src)
 		expect(changes.replacedExports).toContain("generateMetadata")
 		expect(has(text, "export const generateMetadata = createRootMetadata(client)")).toBe(true)
 		// The whole old function (body included) is gone…
@@ -164,7 +160,7 @@ export default function RootLayout() {
 
 export const other = 1
 `
-		const { text, changes } = apply(src, true)
+		const { text, changes } = apply(src)
 		expect(changes.replacedExports).toContain("generateMetadata")
 		expect(has(text, "export const generateMetadata = createRootMetadata(client)")).toBe(true)
 		expect(text).not.toContain('title: "Mine"')
@@ -180,7 +176,7 @@ export default function RootLayout() {
 	return null
 }
 `
-		const { text, changes } = apply(src, true)
+		const { text, changes } = apply(src)
 		expect(changes.addedExports).toContain("generateMetadata")
 		// The comment is left intact; our export is added as live code.
 		expect(text).toContain('export const generateMetadata = { title: "Old" }')
@@ -196,11 +192,7 @@ export default function RootLayout() {
 	return null
 }
 `
-		const kept = apply(src, false)
-		expect(kept.changes.keptExports).toContain("generateMetadata")
-		expect(kept.text).toContain('title: "Mine"')
-
-		const replaced = apply(src, true)
+		const replaced = apply(src)
 		expect(replaced.changes.replacedExports).toContain("generateMetadata")
 		// The static export is gone (Next rejects both) and the dynamic one is in.
 		expect(replaced.text).not.toContain("export const metadata")
@@ -216,7 +208,7 @@ export default function RootLayout() {
 	return null
 }
 `
-		expect(() => apply(src, true)).toThrow()
+		expect(() => apply(src)).toThrow()
 	})
 })
 

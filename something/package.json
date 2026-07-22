@@ -1,5 +1,5 @@
 {
-	"name": "kizlo-nextjs-template",
+	"name": "something",
 	"version": "0.0.2",
 	"private": true,
 	"type": "module",
@@ -10,7 +10,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"kizlo": "workspace:*",
+		"kizlo": "^0.8.1",
 		"next": "^16.2.9",
 		"react": "^19.2.3",
 		"react-dom": "^19.2.3"

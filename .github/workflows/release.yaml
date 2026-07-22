@@ -34,6 +34,7 @@ jobs:
         id: changeset
         uses: changesets/action@v1.5.3
         with:
+          version: pnpm run changeset:version
           commit: "chore(release): 📦 version packages"
           title: "chore(release): 📦  version packages"
           publish: npx changeset publish

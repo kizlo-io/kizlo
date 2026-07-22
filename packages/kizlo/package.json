@@ -75,13 +75,12 @@
 		"access": "public"
 	},
 	"scripts": {
-		"generate:templates": "jiti src/cli/scripts/extract-templates.ts",
-		"build": "pnpm generate:templates && tsdown",
-		"dev": "pnpm generate:templates && tsdown -w",
+		"build": "tsdown",
+		"dev": "tsdown -w",
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
 		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
-		"typecheck": "pnpm generate:templates && tsc --noEmit",
-		"test": "pnpm generate:templates && vitest run --passWithNoTests"
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
 	},
 	"dependencies": {
 		"@clack/prompts": "^1.5.1",
