@@ -17,7 +17,7 @@
 	"packageManager": "pnpm@10.34.4",
 	"scripts": {
 		"build": "turbo run build",
-		"kizlo": "node packages/kizlo/dist/cli/index.js",
+		"kizlo": "KIZLO_TEMPLATE_LOCAL_DIR=./templates node packages/kizlo/dist/cli/index.js",
 		"dev": "turbo watch dev --continue",
 		"kill": "taskkill /f /im node.exe",
 		"clean": "git clean -xdf node_modules",
