@@ -24,7 +24,7 @@ const TEMPLATE_REPO = "github:kizlo-io/kizlo"
 
 /**
  * The templates `create` can scaffold from. Each id is both the `templates/<id>` folder and the
- * preset that drives its WordPress setup. When only one exists the template prompt auto-selects it.
+ * preset that drives its WordPress setup.
  */
 const TEMPLATES = ["nextjs"] as const
 type TemplateId = (typeof TEMPLATES)[number]
@@ -73,6 +73,16 @@ export async function scaffoldTemplate(template: TemplateId, dir: string, name: 
 	fs.rmSync(path.join(dir, "kizlo.template.json"), { force: true })
 
 	const pkgPath = path.join(dir, "package.json")
+	// giget resolves a missing subdir to an empty directory instead of throwing, so a ref that
+	// predates the `templates/` folder lands here with nothing to read. Turn that into an
+	// actionable message rather than a bare ENOENT on package.json.
+	if (!fs.existsSync(pkgPath)) {
+		fs.rmSync(dir, { recursive: true, force: true })
+		throw new Error(
+			`Template "${template}" wasn't found at ${source.remote ?? source.local}. ` +
+				`This ref may predate the templates — retry with KIZLO_TEMPLATE_REF=main.`,
+		)
+	}
 	const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
 		name?: string
 		private?: boolean
@@ -116,8 +126,6 @@ export const create = defineCommand({
 				process.exit(1)
 			}
 			template = requested
-		} else if (TEMPLATES.length === 1) {
-			template = TEMPLATES[0]
 		} else {
 			template = orCancel(
 				await p.select({
