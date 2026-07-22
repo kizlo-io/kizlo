@@ -9,6 +9,7 @@ const main = defineCommand({
 		description: "Kizlo CLI — headless WordPress framework",
 	},
 	subCommands: {
+		create: () => import("./commands/create").then((m) => m.create),
 		init: () => import("./commands/init").then((m) => m.init),
 		watch: () => import("./commands/watch").then((m) => m.watch),
 		generate: () => import("./commands/generate").then((m) => m.generate),

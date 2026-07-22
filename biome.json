@@ -33,6 +33,9 @@
 					"level": "on"
 				}
 			},
+			"security": {
+				"noDangerouslySetInnerHtml": "off"
+			},
 			"suspicious": {
 				"noConsole": "off",
 				"noExplicitAny": "off",

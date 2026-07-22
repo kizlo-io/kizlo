@@ -1,102 +1,39 @@
-import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
-import z from "zod/v4"
 import { printBanner } from "../banner"
-import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName } from "../daemon/config"
 import { CONTRACT_BARREL } from "../daemon/generate"
 import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldContext, type ScaffoldFile } from "../presets"
+import { applyPatchToSource, patchChanged, resolvePatch, resolvePatchTargetPath, templatePatches } from "../presets/patch"
 import {
 	addDependencyArgs,
 	detectImportAlias,
 	detectPackageManager,
 	ensureGitignored,
-	envGroups,
-	envKeysPresent,
 	getVersion,
 	loadEnvFiles,
-	mergeEnv,
-	pickStackPort,
 	resolveModuleImport,
 	runCommand,
 	writeFileIfAbsent,
 } from "../utils"
-import { createAdminAppPassword } from "../wp/bootstrap"
-import { bootstrapDev } from "../wp/dev"
-import { composeStop, createStack, dockerAvailable } from "../wp/docker"
-import { removeProjectContainers } from "../wp/session"
-import { syncSiteSettings } from "../wp/settings"
-import { devStack } from "../wp/stack"
+import { dockerAvailable } from "../wp/docker"
+import {
+	type Connection,
+	collectConnectionFromEnv,
+	collectConnectionInteractively,
+	dirPath,
+	nextStepsNote,
+	orCancel,
+	setupLocalWordPress,
+	syncRemote,
+	validate,
+	withApiPath,
+	writeEnv,
+} from "./_setup"
 
-/** Production connection keys — what a real deploy needs, and what `.env.example` always lists. */
-const PROD_WP_ENV_KEYS = [
-	"KIZLO_SITE_SECRET",
-	"KIZLO_WORDPRESS_URL",
-	"KIZLO_WORDPRESS_USERNAME",
-	"KIZLO_WORDPRESS_APPLICATION_PASSWORD",
-] as const
-
-/**
- * The `.env` keys init manages and the values to write, branched on the connection mode. A local
- * dev stack writes the `KIZLO_DEV_WORDPRESS_*` / `KIZLO_DEV_SITE_SECRET` set plus `KIZLO_TARGET=dev`, so it
- * never touches the production keys (a user can point those at a real site). A remote site writes the
- * bare production keys exactly as before — no `KIZLO_TARGET`, since `"production"` is the default target.
- */
-function managedEnv(preset: Preset, setup: Setup): { keys: string[]; values: Record<string, string> } {
-	if (setup.mode === "local") {
-		return {
-			keys: [
-				preset.baseUrlEnvKey,
-				"KIZLO_TARGET",
-				"KIZLO_DEV_SITE_SECRET",
-				"KIZLO_DEV_WORDPRESS_URL",
-				"KIZLO_DEV_WORDPRESS_USERNAME",
-				"KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD",
-			],
-			values: {
-				[preset.baseUrlEnvKey]: setup.baseUrl,
-				KIZLO_TARGET: "dev",
-				KIZLO_DEV_SITE_SECRET: setup.siteSecret,
-				KIZLO_DEV_WORDPRESS_URL: setup.wpUrl,
-				KIZLO_DEV_WORDPRESS_USERNAME: setup.wpUsername,
-				KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD: setup.wpPassword,
-			},
-		}
-	}
-	return {
-		keys: [preset.baseUrlEnvKey, ...PROD_WP_ENV_KEYS],
-		values: {
-			[preset.baseUrlEnvKey]: setup.baseUrl,
-			KIZLO_SITE_SECRET: setup.siteSecret,
-			KIZLO_WORDPRESS_URL: setup.wpUrl,
-			KIZLO_WORDPRESS_USERNAME: setup.wpUsername,
-			KIZLO_WORDPRESS_APPLICATION_PASSWORD: setup.wpPassword,
-		},
-	}
-}
-
-interface Setup {
-	/**
-	 * Where the WordPress connection comes from. `local` spins up a Docker dev stack during
-	 * init and fills the WP credentials from it; `remote` collects them from the user.
-	 */
-	mode: "local" | "remote"
-	/** The Kizlo backend URL (where the handler is mounted); the plugin's `backend_url`. */
-	baseUrl: string
-	/**
-	 * Canonical public site URL → plugin `url`. Set only for the base preset, where the backend can
-	 * live on a different origin than the site. Framework presets leave it unset (the site URL is the
-	 * backend's origin), and the local dev path never persists it.
-	 */
-	siteUrl?: string
-	siteSecret: string
-	wpUrl: string
-	wpUsername: string
-	wpPassword: string
-	/** Folder the local WordPress install lives in (`dev.path`); set only when `mode` is `local`. */
-	devPath?: string
+/** init's connection plus the framework-specific choices only init makes. */
+type Setup = Connection & {
 	/** Kizlo's home directory; Kizlo owns the `server/`, `client.ts`, `generated/` layout inside. */
 	dir: string
 	/** Import alias prefix (e.g. `@`); empty string means relative imports. */
@@ -123,19 +60,6 @@ export default defineConfig({
 `
 }
 
-/** Appends the API path to the base URL so the client and route handler agree. */
-function withApiPath(baseUrl: string, apiPath: string): string {
-	try {
-		const url = new URL(baseUrl)
-		const current = url.pathname.replace(/\/+$/, "")
-		if (current.endsWith(apiPath)) return url.toString().replace(/\/+$/, "")
-		url.pathname = `${current}${apiPath}`
-		return url.toString().replace(/\/+$/, "")
-	} catch {
-		return baseUrl
-	}
-}
-
 /** Whether two URLs share an origin (scheme + host + port); false when either can't be parsed. */
 function sameOrigin(a: string, b: string): boolean {
 	try {
@@ -149,25 +73,6 @@ function detectAppDir(cwd: string, hasSrcDir: boolean): string {
 	if (fs.existsSync(path.join(cwd, "src", "app"))) return "src/app"
 	if (fs.existsSync(path.join(cwd, "app"))) return "app"
 	return hasSrcDir ? "src/app" : "app"
-}
-
-const requiredString = z.string().trim().min(1, "Required")
-const urlString = requiredString.pipe(z.url("Must be a valid URL (e.g. https://example.com)"))
-const dirPath = requiredString.refine((value) => !value.endsWith(".ts"), "Enter a directory, not a file")
-
-function validate(schema: z.ZodType) {
-	return (value: string | undefined): string | undefined => {
-		const result = schema.safeParse(value ?? "")
-		return result.success ? undefined : result.error.issues[0]?.message
-	}
-}
-
-function orCancel<T>(value: T | symbol): T {
-	if (p.isCancel(value)) {
-		p.cancel("Setup cancelled.")
-		process.exit(0)
-	}
-	return value as T
 }
 
 type ScaffoldResult = "created" | "overwritten" | "kept"
@@ -204,59 +109,7 @@ function reportScaffold(file: ScaffoldFile, result: ScaffoldResult, yes: boolean
 }
 
 async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }): Promise<Setup> {
-	let siteUrl: string | undefined
-	let baseUrl: string
-	if (ctx.preset.apiPath) {
-		baseUrl = orCancel(await p.text({ message: "Public app URL", placeholder: "https://your-app.com", validate: validate(urlString) }))
-	} else {
-		siteUrl = orCancel(await p.text({ message: "Public site URL", placeholder: "https://your-app.com", validate: validate(urlString) }))
-		baseUrl = orCancel(
-			await p.text({
-				message: "Kizlo backend URL (where the handler is mounted)",
-				placeholder: "https://your-app.com/kizlo",
-				validate: validate(urlString),
-			}),
-		)
-	}
-
-	const secretMode = orCancel(
-		await p.select({
-			message: "Site secret (webhook signing key)",
-			initialValue: "generate" as const,
-			options: [
-				{ value: "generate" as const, label: "Generate a secure secret automatically", hint: "recommended" },
-				{ value: "enter" as const, label: "Enter my own" },
-			],
-		}),
-	)
-
-	const siteSecret =
-		secretMode === "enter"
-			? orCancel(await p.password({ message: "Enter the site secret", validate: validate(requiredString) }))
-			: randomBytes(32).toString("hex")
-
-	const mode = orCancel(
-		await p.select({
-			message: "WordPress connection",
-			initialValue: "local" as const,
-			options: [
-				{ value: "local" as const, label: "Set up a local dev environment", hint: "runs WordPress in Docker" },
-				{ value: "remote" as const, label: "Use my own WordPress", hint: "connect to an existing site" },
-			],
-		}),
-	)
-
-	let wpUrl = ""
-	let wpUsername = ""
-	let wpPassword = ""
-	let devPath: string | undefined
-	if (mode === "remote") {
-		wpUrl = orCancel(await p.text({ message: "WordPress URL", placeholder: "https://wp.your-app.com", validate: validate(urlString) }))
-		wpUsername = orCancel(await p.text({ message: "WordPress username", validate: validate(requiredString) }))
-		wpPassword = orCancel(await p.password({ message: "WordPress application password", validate: validate(requiredString) }))
-	} else {
-		devPath = orCancel(await p.text({ message: "Local WordPress folder", initialValue: "wordpress", validate: validate(dirPath) }))
-	}
+	const conn = await collectConnectionInteractively(ctx.preset)
 
 	const dir = orCancel(await p.text({ message: "Kizlo directory", initialValue: defaultDir(ctx.hasSrcDir), validate: validate(dirPath) }))
 
@@ -274,7 +127,7 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; pres
 		alias = answer.trim()
 	}
 
-	return { mode, baseUrl, siteUrl, siteSecret, wpUrl, wpUsername, wpPassword, devPath, dir, alias }
+	return { ...conn, dir, alias }
 }
 
 /**
@@ -283,14 +136,10 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; pres
  * later. Never fails — `--yes` always scaffolds a fillable project.
  */
 function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }): Setup {
+	const conn = collectConnectionFromEnv(ctx.preset)
 	const dir = defaultDir(ctx.hasSrcDir)
 	return {
-		mode: "remote",
-		baseUrl: process.env[ctx.preset.baseUrlEnvKey]?.trim() ?? "",
-		siteSecret: process.env.KIZLO_SITE_SECRET?.trim() || randomBytes(32).toString("hex"),
-		wpUrl: process.env.KIZLO_WORDPRESS_URL?.trim() ?? "",
-		wpUsername: process.env.KIZLO_WORDPRESS_USERNAME?.trim() ?? "",
-		wpPassword: process.env.KIZLO_WORDPRESS_APPLICATION_PASSWORD?.trim() ?? "",
+		...conn,
 		dir,
 		alias: ctx.preset.apiPath ? aliasWithSlash(detectImportAlias(ctx.cwd, path.join(dir, "server"))?.prefix) : "",
 	}
@@ -298,65 +147,6 @@ function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }
 
 function readPkg(pkgPath: string): Record<string, unknown> {
 	return JSON.parse(fs.readFileSync(pkgPath, "utf8")) as Record<string, unknown>
-}
-
-/** Build a {@link ResolvedDevConfig} from the chosen install folder, matching `resolveDevConfig`'s
- * defaults — built directly so init never has to round-trip through the config file it's writing. */
-function devConfigFor(cwd: string, devPath: string): ResolvedDevConfig {
-	return {
-		configDir: cwd,
-		project: `${resolveStackName(cwd)}-dev`,
-		port: DEFAULT_DEV_PORT,
-		portExplicit: false,
-		dbPort: DEFAULT_DEV_DB_PORT,
-		dbPortExplicit: false,
-		fixtures: [],
-		wordpressPath: devPath,
-		wordpressDir: path.resolve(cwd, devPath),
-	}
-}
-
-/** Connection details captured from a freshly provisioned local stack. */
-interface LocalStack {
-	url: string
-	username: string
-	/** REST application password minted for `.env` (the dev stack doesn't make one itself). */
-	appPassword: string
-	/** One-time wp-admin login password, shown only on a fresh install. */
-	adminPassword?: string
-	/** Set when pushing `KIZLO_DEV_SITE_SECRET` into the local plugin failed (warn-and-continue). */
-	secretSyncError?: string
-}
-
-/**
- * Boot the local dev stack once to produce working credentials, then stop it (volumes
- * persist, so a later `kizlo dev` resumes instantly). The dev stack mints no application
- * password — that's a test-stack concern — so we create one here for REST auth in `.env`.
- * While the stack is still up, push the dev site settings (`siteSecret` plus the Kizlo server's
- * `url`/`backend_url`, derived from `baseUrl`) into the plugin so webhook signing and event delivery
- * work.
- */
-async function provisionLocalStack(cfg: ResolvedDevConfig, siteSecret: string, baseUrl: string): Promise<LocalStack> {
-	await removeProjectContainers(cfg.project)
-	const port = await pickStackPort(cfg.port, { fixed: cfg.portExplicit, configKey: "dev.port" })
-	const dbPort = await pickStackPort(cfg.dbPort, { fixed: cfg.dbPortExplicit, host: "127.0.0.1", configKey: "dev.dbPort" })
-	const ready: ResolvedDevConfig = { ...cfg, port, dbPort }
-	createStack(devStack(ready))
-
-	const info = await bootstrapDev(ready)
-	const appPassword = info.appPassword ?? (await createAdminAppPassword("kizlo"))
-	const sync = await syncSiteSettings(
-		{ url: info.url, username: info.username, password: appPassword },
-		{ secret: siteSecret, backendUrl: baseUrl, containerized: true },
-	)
-	await composeStop()
-	return {
-		url: info.url,
-		username: info.username,
-		appPassword,
-		adminPassword: info.secrets?.password,
-		secretSyncError: sync.ok ? undefined : sync.error,
-	}
 }
 
 export const init = defineCommand({
@@ -444,72 +234,17 @@ export const init = defineCommand({
 
 		if (preset.apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, preset.apiPath)
 
-		let adminPassword: string | undefined
-		if (setup.mode === "local" && setup.devPath) {
-			ensureGitignored(cwd, setup.devPath)
-			const s = p.spinner()
-			s.start("Setting up local WordPress (first run downloads images, this can take a while)")
-			try {
-				const local = await provisionLocalStack(devConfigFor(cwd, setup.devPath), setup.siteSecret, setup.baseUrl)
-				setup.wpUrl = local.url
-				setup.wpUsername = local.username
-				setup.wpPassword = local.appPassword
-				adminPassword = local.adminPassword
-				s.stop("Local WordPress ready")
-				if (local.secretSyncError) p.log.warn(`Could not sync KIZLO_DEV_SITE_SECRET to the local plugin (${local.secretSyncError})`)
-			} catch (error) {
-				s.stop("Local WordPress setup failed")
-				p.cancel(error instanceof Error ? error.message : String(error))
-				process.exit(1)
-			}
-		}
+		await setupLocalWordPress(cwd, setup)
 
-		const { keys, values: envValues } = managedEnv(preset, setup)
-
-		const envPath = path.join(cwd, ".env")
-		const envExisted = fs.existsSync(envPath)
-		const existingEnv = envExisted ? fs.readFileSync(envPath, "utf8") : ""
-		const conflicts = envKeysPresent(existingEnv, keys)
-
-		let overwriteKeys = new Set<string>(keys)
-		if (conflicts.length && !force) {
-			if (yes) {
-				overwriteKeys = new Set()
-				p.log.info("Keeping existing .env values (pass --force to overwrite)")
-			} else {
-				p.log.warn("Some environment variables already exist in .env")
-				const overwrite = orCancel(await p.confirm({ message: "Overwrite their existing values?", initialValue: true }))
-				if (!overwrite) overwriteKeys = new Set()
-			}
-		}
-
-		const merge = mergeEnv(existingEnv, envValues, overwriteKeys, envGroups(preset.baseUrlEnvKey))
-		fs.writeFileSync(envPath, merge.content)
-
-		if (setup.mode === "remote" && setup.wpUrl && setup.wpUsername && setup.wpPassword) {
-			const sync = await syncSiteSettings(
-				{ url: setup.wpUrl, username: setup.wpUsername, password: setup.wpPassword },
-				{ secret: setup.siteSecret, siteUrl: setup.siteUrl, backendUrl: setup.baseUrl },
-			)
-			if (!sync.ok)
-				p.log.warn(
-					`Could not sync the site settings to WordPress (${sync.error}) — make sure the kizlo plugin is active, then set them from the Kizlo settings.`,
-				)
-		}
-
-		const exampleKeys = [preset.baseUrlEnvKey, ...PROD_WP_ENV_KEYS]
-		const exampleValues = Object.fromEntries(exampleKeys.map((key) => [key, ""]))
-		const { content: exampleEnv } = mergeEnv("", exampleValues, new Set(exampleKeys), envGroups(preset.baseUrlEnvKey))
-		const exampleBody = `${exampleEnv}\n# Point the app at a local dev stack (managed by \`kizlo dev\`) instead of the keys above:\n# KIZLO_TARGET=dev\n`
-		const exampleCreated = writeFileIfAbsent(path.join(cwd, ".env.example"), exampleBody)
+		await writeEnv(cwd, preset, setup, { force, yes })
+		await syncRemote(setup)
 
 		const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
-
 		const serverDirRel = path.join(dirRel, "server")
-
 		const clientUrl = setup.siteUrl && !sameOrigin(setup.siteUrl, setup.baseUrl) ? setup.baseUrl : undefined
 
 		const scaffold: ScaffoldContext = {
+			kizloDir: dirRel,
 			serverDirName: path.basename(serverDirRel),
 			serverEntryPath: path.join(serverDirRel, "index.ts"),
 			clientPath: path.join(dirRel, "client.ts"),
@@ -532,32 +267,55 @@ export const init = defineCommand({
 
 		const gitignore = ensureGitignored(cwd, ".env")
 
-		if (!envExisted) {
-			p.log.success("Created .env")
-		} else if (merge.updated.length || merge.added.length) {
-			p.log.success("Updated .env")
-		} else {
-			p.log.info("Left .env unchanged")
-		}
-		p.log.success(exampleCreated ? "Created .env.example" : "Skipped .env.example (exists)")
 		for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
+
+		// Merge Kizlo wiring into files the project already owns (e.g. the root layout's SEO
+		// metadata). Unlike scaffolded files, these are edited in place: additive changes always
+		// apply; an export the user already defines is only replaced with consent (force/confirm).
+		for (const patch of templatePatches(preset.id)) {
+			const resolved = resolvePatch(patch, scaffold)
+			const abs = resolvePatchTargetPath(cwd, resolved.relPath)
+			if (!abs) {
+				p.log.info(`Skipped ${resolved.label} wiring — ${resolved.relPath} not found (add it yourself)`)
+				continue
+			}
+			const relTarget = path.relative(cwd, abs)
+			const src = fs.readFileSync(abs, "utf8")
+			// A file we can't parse is one we must not guess at: stop rather than write corrupted source.
+			let text: string
+			let changes: ReturnType<typeof applyPatchToSource>["changes"]
+			try {
+				;({ text, changes } = applyPatchToSource(src, resolved, { replaceConflicts: force }))
+			} catch (err) {
+				p.log.error(
+					`Could not parse ${resolved.label} (${relTarget}) to wire Kizlo into it: ${err instanceof Error ? err.message : String(err)}`,
+				)
+				throw err
+			}
+			if (!force && !yes && changes.keptExports.length) {
+				p.log.warn(`${resolved.label} (${relTarget}) already defines ${changes.keptExports.join(", ")}`)
+				const replace = orCancel(await p.confirm({ message: "Replace with Kizlo's version?", initialValue: true }))
+				if (replace) ({ text, changes } = applyPatchToSource(src, resolved, { replaceConflicts: true }))
+			}
+			if (patchChanged(changes)) {
+				fs.writeFileSync(abs, text)
+				const parts = [
+					...(changes.replacedExports.length ? [`replaced ${changes.replacedExports.join(", ")}`] : []),
+					...(changes.addedExports.length ? [`added ${changes.addedExports.join(", ")}`] : []),
+					...(changes.addedImports.length ? ["imports"] : []),
+				]
+				p.log.success(`Wired Kizlo into your ${resolved.label} (${relTarget}) — ${parts.join(", ")}`)
+			}
+			if (changes.keptExports.length) {
+				p.log.info(`Kept your existing ${changes.keptExports.join(", ")} in ${resolved.label} — pass --force to replace`)
+			} else if (!patchChanged(changes)) {
+				p.log.info(`Your ${resolved.label} is already wired (${relTarget})`)
+			}
+		}
+
 		if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)
 
-		if (setup.mode === "local") {
-			p.log.success(`Local WordPress configured (${setup.devPath}) — .env points at ${setup.wpUrl}`)
-			if (adminPassword) p.log.warn(`wp-admin login: ${setup.wpUsername} / ${adminPassword} — save it, it's shown only once`)
-		}
-
-		p.note(
-			[
-				...(setup.mode === "local"
-					? [`Start your local WordPress dev stack (also watches your extensions):`, `  npx kizlo dev`, ``]
-					: [`Watch your extensions and regenerate the contract during development:`, `  npx kizlo watch`, ``]),
-				`Generate the contract once for production builds:`,
-				`  npx kizlo generate`,
-			].join("\n"),
-			"Next steps",
-		)
+		nextStepsNote(setup.mode)
 
 		p.outro("Kizlo is ready 🎉")
 	},

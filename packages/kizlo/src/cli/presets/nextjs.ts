@@ -1,3 +1,4 @@
+import { materializeTemplate } from "./template"
 import type { Preset } from "./types"
 
 export const nextjs: Preset = {
@@ -10,113 +11,6 @@ export const nextjs: Preset = {
 	baseUrlEnvKey: "NEXT_PUBLIC_KIZLO_BACKEND_URL",
 	apiPath: "/api/kizlo",
 	scaffolds(ctx) {
-		const apiDir = `${ctx.appDir}/api/kizlo/[[...rest]]`
-		const robotsDir = `${ctx.appDir}/robots.txt`
-		const sitemapDir = `${ctx.appDir}/sitemaps/[sitemap]`
-		const sitemapRedirectDir = `${ctx.appDir}/sitemap.xml`
-		const manifestDir = `${ctx.appDir}/site.webmanifest`
-		return [
-			{
-				label: "Kizlo server instance",
-				relPath: ctx.serverEntryPath,
-				contents: `import { createKizlo } from "kizlo/nextjs/server"
-
-export const { router, client, context, handler } = createKizlo()
-`,
-			},
-			{
-				label: "Browser client",
-				relPath: ctx.clientPath,
-				contents: `import { createKizloClient } from "kizlo/nextjs"
-import { contract } from "./${ctx.serverDirName}/generated"
-
-export const client = createKizloClient(contract)
-`,
-			},
-			{
-				label: "API route",
-				relPath: `${apiDir}/route.ts`,
-				contents: `import { handler } from "${ctx.serverImport(apiDir)}"
-
-export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS }
-`,
-			},
-			{
-				label: "robots.txt route",
-				relPath: `${robotsDir}/route.ts`,
-				contents: `import { createRobotsRoute } from "kizlo/nextjs/server"
-import { client } from "${ctx.serverImport(robotsDir)}"
-
-// Run on the edge: cheaper and faster than Node for a response this small.
-export const runtime = "edge"
-
-// Vercel treats special metadata files like robots.txt and sitemap.xml as completely static
-// files at build time, bypassing normal Incremental Static Regeneration (ISR) and on-demand
-// revalidatePath rules.
-//
-// While your revalidation logic executes perfectly in a local Node.js server, Vercel uploads
-// these routes directly to its Edge CDN as immutable assets. Subsequent on-demand revalidation
-// triggers will successfully clear the Data Cache but fail to purge the CDN-level Edge cache
-// for that file.
-//
-// force-dynamic opts out of that static treatment so CMS edits show up; the WordPress call is
-// cached, so requests stay cheap.
-export const dynamic = "force-dynamic"
-
-export const GET = createRobotsRoute(client)
-`,
-			},
-			{
-				label: "sitemap route",
-				relPath: `${sitemapDir}/route.ts`,
-				contents: `import { createSitemapRoute } from "kizlo/nextjs/server"
-import { client } from "${ctx.serverImport(sitemapDir)}"
-
-// Run on the edge: cheaper and faster than Node for a response this small.
-export const runtime = "edge"
-
-// Like robots.txt, Vercel bakes sitemap routes into immutable Edge CDN assets at build time,
-// bypassing ISR and on-demand revalidatePath. The index gets frozen with whatever WordPress
-// returned at build (often nothing, since the self-referential backend isn't reachable yet),
-// and revalidation can't purge that CDN copy.
-//
-// force-dynamic opts out of that static treatment. createSitemapRoute caches the WordPress calls
-// per sitemap and refreshes them on content changes (via revalidateTag), so requests stay cheap.
-export const dynamic = "force-dynamic"
-
-export const GET = createSitemapRoute(client)
-`,
-			},
-			{
-				label: "sitemap.xml redirect route",
-				relPath: `${sitemapRedirectDir}/route.ts`,
-				contents: `import { createSitemapRedirectRoute } from "kizlo/nextjs/server"
-
-// Many crawlers ignore robots.txt and probe the well-known /sitemap.xml directly. This route
-// permanently redirects (308) to the generated index at /sitemaps/index.xml. The response is a
-// fixed constant with no WordPress call or request input, so Next statically generates it at
-// build time (no runtime/edge function invoked per request).
-export const GET = createSitemapRedirectRoute()
-`,
-			},
-			{
-				label: "web manifest route",
-				relPath: `${manifestDir}/route.ts`,
-				contents: `import { createManifestRoute } from "kizlo/nextjs/server"
-import { client } from "${ctx.serverImport(manifestDir)}"
-
-// Run on the edge: cheaper and faster than Node for a response this small.
-export const runtime = "edge"
-
-// Like robots.txt, Vercel bakes this route into an immutable Edge CDN asset at build time,
-// bypassing ISR and on-demand revalidatePath. force-dynamic opts out of that static treatment
-// so brand-settings edits show up; createManifestRoute caches the WordPress call, so requests
-// stay cheap.
-export const dynamic = "force-dynamic"
-
-export const GET = createManifestRoute(client)
-`,
-			},
-		]
+		return materializeTemplate("nextjs", ctx)
 	},
 }

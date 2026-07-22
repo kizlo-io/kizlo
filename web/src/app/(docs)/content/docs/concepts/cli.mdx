@@ -38,12 +38,14 @@ stack is set up.
 scratch rather than adding to an app you already have. Give it a template and a directory name:
 
 ```package-install
-npx kizlo@latest create --template nextjs my-app
+npx kizlo@latest create nextjs my-app
 ```
 
-It creates `my-app/`, lays down a fully wired project for that template (currently `nextjs`), and runs the
-same WordPress credential prompts as [`init`](#kizlo-init). When it finishes, `cd my-app` and make your
-first call — the [Next.js quickstart](/docs/quickstarts/nextjs) walks it end to end.
+Both arguments are optional (`kizlo create [template] [project-name]`); `create` prompts for whichever you
+leave off, and the template auto-selects while `nextjs` is the only one. It creates `my-app/`, lays down a
+fully wired project for that template, and runs the same WordPress credential prompts as
+[`init`](#kizlo-init). When it finishes, `cd my-app`, install dependencies, and make your first call — the
+[Next.js quickstart](/docs/quickstarts/nextjs) walks it end to end.
 
 ## `kizlo init`
 
