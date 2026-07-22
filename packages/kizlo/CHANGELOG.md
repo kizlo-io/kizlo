@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.8.1
+
+### Patch Changes
+
+- [#68](https://github.com/kizlo-io/kizlo/pull/68) [`d3dff8b`](https://github.com/kizlo-io/kizlo/commit/d3dff8bc49cf1668605ea5123fc192c545411ca0) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix `kizlo create` failing with a confusing error when the template can't be fetched, and always prompt for the template.
+
 ## 0.8.0
 
 ### Minor Changes
