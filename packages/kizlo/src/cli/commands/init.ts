@@ -5,7 +5,17 @@ import { defineCommand } from "citty"
 import { printBanner } from "../banner"
 import { CONTRACT_BARREL } from "../daemon/generate"
 import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldContext, type ScaffoldFile } from "../presets"
-import { applyPatchToSource, patchChanged, resolvePatch, resolvePatchTargetPath, templatePatches } from "../presets/patch"
+import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode } from "../presets/patch"
+import { fetchTemplate } from "../presets/source"
+import {
+	adaptOwnFile,
+	findRootLayout,
+	ownEntries,
+	patchEntries,
+	readManifest,
+	resolvePatch,
+	type TemplateManifest,
+} from "../presets/template"
 import {
 	addDependencyArgs,
 	detectImportAlias,
@@ -149,6 +159,43 @@ function readPkg(pkgPath: string): Record<string, unknown> {
 	return JSON.parse(fs.readFileSync(pkgPath, "utf8")) as Record<string, unknown>
 }
 
+type Deps = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
+
+function kizloDep(pkg: Deps): string | undefined {
+	return pkg.dependencies?.kizlo ?? pkg.devDependencies?.kizlo
+}
+
+/** A bare `x.y.z` from a version spec (range prefix and pre-release/build metadata dropped); undefined if none. */
+function coerceVersion(spec: string): [number, number, number] | undefined {
+	const match = /(\d+)\.(\d+)\.(\d+)/.exec(spec)
+	return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : undefined
+}
+
+/** Whether `have` is a strictly older release than `want`; false when either can't be compared. */
+function isOlder(have: string, want: string): boolean {
+	const a = coerceVersion(have)
+	const b = coerceVersion(want)
+	if (!a || !b) return false
+	for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return (a[i] as number) < (b[i] as number)
+	return false
+}
+
+/**
+ * The template is authoritative for the kizlo version: it declares `kizloVersion` in its manifest
+ * (stamped at release), falling back to the running CLI's version in-repo before the first stamp.
+ * When the project's kizlo is older, upgrade the project up to it and say so — a deliberate pin is
+ * never changed silently. Never downgrades.
+ */
+function alignKizloVersion(cwd: string, pm: ReturnType<typeof detectPackageManager>, pkg: Deps, manifest: TemplateManifest): void {
+	const want = manifest.kizloVersion ?? `^${getVersion()}`
+	const have = kizloDep(pkg)
+	if (!have || !isOlder(have, want)) return
+	const s = p.spinner()
+	s.start(`Upgrading kizlo from ${have} to ${want}`)
+	const ok = runCommand(addDependencyArgs(pm, `kizlo@${want}`), cwd, "ignore")
+	s.stop(ok ? `Upgraded kizlo to ${want}` : `Could not upgrade kizlo automatically — install kizlo@${want} yourself`)
+}
+
 export const init = defineCommand({
 	meta: {
 		name: "init",
@@ -214,6 +261,14 @@ export const init = defineCommand({
 			if (preset.id !== "base") p.log.success(`${preset.label} detected`)
 		}
 
+		// Kizlo's Next.js wiring is App Router only. On a Pages-Router or non-App project the template's
+		// routes and layout patch have nowhere to land, so stop with a clear message rather than
+		// scattering App-Router files into a Pages project.
+		if (preset.template === "nextjs" && !fs.existsSync(path.join(cwd, "app")) && !fs.existsSync(path.join(cwd, "src/app"))) {
+			p.cancel("Kizlo needs the Next.js App Router — no `app` or `src/app` directory found. The Pages Router isn't supported.")
+			process.exit(1)
+		}
+
 		if (yes) loadEnvFiles(cwd)
 		const setup = yes ? collectFromEnv({ cwd, hasSrcDir, preset }) : await collectInteractively({ cwd, hasSrcDir, preset })
 		if (args.alias !== undefined) setup.alias = String(args.alias).trim()
@@ -225,11 +280,14 @@ export const init = defineCommand({
 		}
 
 		if (!hasKizlo) {
+			// Pin the running CLI's own version rather than the moving `latest` tag. A template preset may
+			// bump this up to the version it declares once its manifest is read (alignKizloVersion below).
+			const spec = `kizlo@^${getVersion()}`
 			const s = p.spinner()
 			s.start(`Installing kizlo with ${pm}`)
-			const ok = runCommand(addDependencyArgs(pm, "kizlo@latest"), cwd, "ignore")
+			const ok = runCommand(addDependencyArgs(pm, spec), cwd, "ignore")
 			s.stop(ok ? "Installed kizlo" : "Could not install kizlo automatically")
-			if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, "kizlo@latest").join(" ")}`)
+			if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, spec).join(" ")}`)
 		}
 
 		if (preset.apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, preset.apiPath)
@@ -255,8 +313,25 @@ export const init = defineCommand({
 
 		const files: ScaffoldFile[] = [
 			{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.devPath) },
-			...preset.scaffolds(scaffold),
 		]
+
+		// Collect the wiring files. Template presets fetch the template at runtime and adapt its own
+		// files from the manifest (bodies live only in the template, never baked into the CLI). Once the
+		// files are read and the manifest is in memory, the fetched copy is no longer needed. Presets
+		// without a template scaffold their files inline.
+		let manifest: TemplateManifest | undefined
+		if (preset.template) {
+			const fetched = await fetchTemplate(preset.template)
+			try {
+				manifest = readManifest(fetched.dir)
+				alignKizloVersion(cwd, pm, pkg, manifest)
+				for (const entry of ownEntries(manifest)) files.push(adaptOwnFile(fetched.dir, entry, manifest.tokens, scaffold))
+			} finally {
+				fetched.cleanup()
+			}
+		} else if (preset.scaffolds) {
+			files.push(...preset.scaffolds(scaffold))
+		}
 
 		const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
 		for (const file of files) scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force, yes }) })
@@ -269,48 +344,46 @@ export const init = defineCommand({
 
 		for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
 
-		// Merge Kizlo wiring into files the project already owns (e.g. the root layout's SEO
-		// metadata). Unlike scaffolded files, these are edited in place: additive changes always
-		// apply; an export the user already defines is only replaced with consent (force/confirm).
-		for (const patch of templatePatches(preset.id)) {
-			const resolved = resolvePatch(patch, scaffold)
-			const abs = resolvePatchTargetPath(cwd, resolved.relPath)
-			if (!abs) {
-				p.log.info(`Skipped ${resolved.label} wiring — ${resolved.relPath} not found (add it yourself)`)
+		// Merge Kizlo wiring into files the project already owns (the root layout's SEO exports). This
+		// step never aborts the command: the target is resolved by identity (the layout that renders
+		// `<html>`), and on any doubt — not found, not parseable — the resolved payload is collected and
+		// printed at the end with placement instructions rather than written to a guessed-at file. A
+		// confident apply is an idempotent upsert: it replaces our exports if present, adds them if not.
+		const manualSteps: ResolvedPatch[] = []
+		for (const entry of manifest ? patchEntries(manifest) : []) {
+			const resolved = resolvePatch(entry, (manifest as TemplateManifest).tokens, scaffold)
+			const target = findRootLayout(cwd, scaffold.appDir, resolved.relPath)
+			if (!target) {
+				manualSteps.push(resolved)
+				p.log.info(`Couldn't find your ${resolved.label} to wire Kizlo into — see the code to add below`)
 				continue
 			}
-			const relTarget = path.relative(cwd, abs)
-			const src = fs.readFileSync(abs, "utf8")
-			// A file we can't parse is one we must not guess at: stop rather than write corrupted source.
-			let text: string
-			let changes: ReturnType<typeof applyPatchToSource>["changes"]
+			const relTarget = path.relative(cwd, target)
+			const src = fs.readFileSync(target, "utf8")
+			let applied: ReturnType<typeof applyPatchToSource>
 			try {
-				;({ text, changes } = applyPatchToSource(src, resolved, { replaceConflicts: force }))
-			} catch (err) {
-				p.log.error(
-					`Could not parse ${resolved.label} (${relTarget}) to wire Kizlo into it: ${err instanceof Error ? err.message : String(err)}`,
-				)
-				throw err
+				applied = applyPatchToSource(src, resolved)
+			} catch {
+				manualSteps.push(resolved)
+				p.log.warn(`Couldn't parse your ${resolved.label} (${relTarget}) — see the code to add below`)
+				continue
 			}
-			if (!force && !yes && changes.keptExports.length) {
-				p.log.warn(`${resolved.label} (${relTarget}) already defines ${changes.keptExports.join(", ")}`)
-				const replace = orCancel(await p.confirm({ message: "Replace with Kizlo's version?", initialValue: true }))
-				if (replace) ({ text, changes } = applyPatchToSource(src, resolved, { replaceConflicts: true }))
-			}
+			const { text, changes } = applied
 			if (patchChanged(changes)) {
-				fs.writeFileSync(abs, text)
+				fs.writeFileSync(target, text)
 				const parts = [
 					...(changes.replacedExports.length ? [`replaced ${changes.replacedExports.join(", ")}`] : []),
 					...(changes.addedExports.length ? [`added ${changes.addedExports.join(", ")}`] : []),
 					...(changes.addedImports.length ? ["imports"] : []),
 				]
 				p.log.success(`Wired Kizlo into your ${resolved.label} (${relTarget}) — ${parts.join(", ")}`)
-			}
-			if (changes.keptExports.length) {
-				p.log.info(`Kept your existing ${changes.keptExports.join(", ")} in ${resolved.label} — pass --force to replace`)
-			} else if (!patchChanged(changes)) {
+			} else {
 				p.log.info(`Your ${resolved.label} is already wired (${relTarget})`)
 			}
+		}
+
+		for (const resolved of manualSteps) {
+			p.note(renderPatchCode(resolved), `Add these to your ${resolved.label} (the layout that renders <html>)`)
 		}
 
 		if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)

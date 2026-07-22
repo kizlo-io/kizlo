@@ -52,10 +52,16 @@ export interface Preset {
 	/** Path the API handler mounts at (e.g. `/api/kizlo`); appended to the base URL. */
 	apiPath?: string
 	/**
-	 * Every file this preset scaffolds, each a labeled {@link ScaffoldFile} with its own path. Always
-	 * includes the server entry and browser client; frameworks add the API route and SEO routes. Paths
-	 * for the server/client come from the context (they live under the user-chosen dir); framework
-	 * routes set their own fixed paths. init runs every file through the shared overwrite policy.
+	 * The template folder this preset scaffolds from (e.g. `nextjs`). When set, init fetches the
+	 * template at runtime and drives its wiring from the template's manifest — the file bodies live
+	 * only in the template, never baked into the CLI. Presets without a template (`base`) scaffold
+	 * their files inline via {@link scaffolds}.
 	 */
-	scaffolds(ctx: ScaffoldContext): ScaffoldFile[]
+	template?: string
+	/**
+	 * Files this preset scaffolds inline, each a labeled {@link ScaffoldFile} with its own path. Used
+	 * only by presets with no {@link template}; the server entry and browser client are written under
+	 * the user-chosen dir from the context. init runs every file through the shared overwrite policy.
+	 */
+	scaffolds?(ctx: ScaffoldContext): ScaffoldFile[]
 }

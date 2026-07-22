@@ -9,19 +9,19 @@ type Props = { params: Promise<{ slug: string }> }
 // you never hand-write meta tags. Missing/unpublished posts fall back to the layout metadata.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { slug } = await params
-	const post = await client.posts.get.call({ params: { identifier: slug } }).catch(() => null)
-	return post?.seo ? createPageMetadata(post.seo.head) : {}
+	const { data } = await client.posts.get({ params: { identifier: slug } })
+	return data?.seo ? createPageMetadata(data.seo.head) : {}
 }
 
 export default async function PostPage({ params }: Props) {
 	const { slug } = await params
-	const post = await client.posts.get.call({ params: { identifier: slug } }).catch(() => null)
-	if (!post) notFound()
+	const { data } = await client.posts.get({ params: { identifier: slug } })
+	if (!data) notFound()
 
 	return (
 		<article style={{ maxWidth: 720, margin: "0 auto", padding: "4rem 1.5rem" }}>
-			<h1>{post.title ?? "Untitled"}</h1>
-			<div dangerouslySetInnerHTML={{ __html: post.content ?? "" }} />
+			<h1>{data.title ?? "Untitled"}</h1>
+			<div dangerouslySetInnerHTML={{ __html: data.content ?? "" }} />
 		</article>
 	)
 }
