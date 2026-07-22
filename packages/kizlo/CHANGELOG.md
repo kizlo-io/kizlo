@@ -1,5 +1,13 @@
 # kizlo
 
+## 0.8.2
+
+### Patch Changes
+
+- [#70](https://github.com/kizlo-io/kizlo/pull/70) [`0adc16b`](https://github.com/kizlo-io/kizlo/commit/0adc16bf29e9f4e1eb21a7ea87550590f3fad131) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Pin the scaffolded `kizlo` dependency to a concrete version instead of the `latest` tag on `create` and `init`.
+
+- [#70](https://github.com/kizlo-io/kizlo/pull/70) [`0adc16b`](https://github.com/kizlo-io/kizlo/commit/0adc16bf29e9f4e1eb21a7ea87550590f3fad131) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix `create` and `init` to scaffold from a single template source so they stay in sync; `init` now supports the Next.js App Router only.
+
 ## 0.8.1
 
 ### Patch Changes

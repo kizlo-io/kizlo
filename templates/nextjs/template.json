@@ -6,26 +6,67 @@
 		"alias": "@"
 	},
 	"files": [
-		{ "kind": "own", "role": "server-entry", "path": "src/lib/kizlo/server/index.ts" },
-		{ "kind": "own", "role": "client", "path": "src/lib/kizlo/client.ts" },
-		{ "kind": "own", "role": "api-route", "path": "src/app/api/kizlo/[[...rest]]/route.ts" },
-		{ "kind": "own", "role": "robots", "path": "src/app/robots.txt/route.ts" },
-		{ "kind": "own", "role": "sitemap", "path": "src/app/sitemaps/[sitemap]/route.ts" },
-		{ "kind": "own", "role": "sitemap-redirect", "path": "src/app/sitemap.xml/route.ts" },
-		{ "kind": "own", "role": "manifest", "path": "src/app/site.webmanifest/route.ts" },
+		{
+			"kind": "own",
+			"role": "server-entry",
+			"path": "src/lib/kizlo/server/index.ts"
+		},
+		{
+			"kind": "own",
+			"role": "client",
+			"path": "src/lib/kizlo/client.ts"
+		},
+		{
+			"kind": "own",
+			"role": "api-route",
+			"path": "src/app/api/kizlo/[[...rest]]/route.ts"
+		},
+		{
+			"kind": "own",
+			"role": "robots",
+			"path": "src/app/robots.txt/route.ts"
+		},
+		{
+			"kind": "own",
+			"role": "sitemap",
+			"path": "src/app/sitemaps/[sitemap]/route.ts"
+		},
+		{
+			"kind": "own",
+			"role": "sitemap-redirect",
+			"path": "src/app/sitemap.xml/route.ts"
+		},
+		{
+			"kind": "own",
+			"role": "manifest",
+			"path": "src/app/site.webmanifest/route.ts"
+		},
 		{
 			"kind": "patch",
 			"role": "root-layout",
 			"label": "root layout",
 			"path": "src/app/layout.tsx",
 			"imports": [
-				{ "module": "kizlo/nextjs/server", "names": ["createRootMetadata", "createRootViewport"] },
-				{ "module": "{{serverImport}}", "names": ["client"] }
+				{
+					"module": "kizlo/nextjs/server",
+					"names": ["createRootMetadata", "createRootViewport"]
+				},
+				{
+					"module": "{{serverImport}}",
+					"names": ["client"]
+				}
 			],
 			"exports": [
-				{ "name": "generateMetadata", "value": "createRootMetadata(client)" },
-				{ "name": "generateViewport", "value": "createRootViewport(client)" }
+				{
+					"name": "generateMetadata",
+					"value": "createRootMetadata(client)"
+				},
+				{
+					"name": "generateViewport",
+					"value": "createRootViewport(client)"
+				}
 			]
 		}
-	]
+	],
+	"kizloVersion": "^0.8.2"
 }

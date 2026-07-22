@@ -1,5 +1,12 @@
 # kizlo-nextjs-template
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [[`0adc16b`](https://github.com/kizlo-io/kizlo/commit/0adc16bf29e9f4e1eb21a7ea87550590f3fad131), [`0adc16b`](https://github.com/kizlo-io/kizlo/commit/0adc16bf29e9f4e1eb21a7ea87550590f3fad131)]:
+  - kizlo@0.8.2
+
 ## 0.0.2
 
 ### Patch Changes
