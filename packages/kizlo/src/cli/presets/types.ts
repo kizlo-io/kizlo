@@ -14,6 +14,8 @@ export interface InitContext {
 }
 
 export interface ScaffoldContext {
+	/** Kizlo home directory relative to cwd (`src/lib/kizlo`); the `{{kizloDir}}` token in template paths. */
+	kizloDir: string
 	/** Last segment of the server directory, e.g. `server`. */
 	serverDirName: string
 	/** Server entry path relative to cwd (`<dir>/server/index.ts`); where the server file is written. */

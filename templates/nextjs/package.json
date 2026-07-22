@@ -1,0 +1,25 @@
+{
+	"name": "kizlo-nextjs-template",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "next dev",
+		"build": "next build",
+		"start": "next start",
+		"typecheck": "tsc --noEmit",
+		"kizlo": "kizlo"
+	},
+	"dependencies": {
+		"kizlo": "workspace:*",
+		"next": "^16.2.9",
+		"react": "^19.2.3",
+		"react-dom": "^19.2.3"
+	},
+	"devDependencies": {
+		"@types/node": "^22.18.12",
+		"@types/react": "^19.2.3",
+		"@types/react-dom": "^19.2.3",
+		"typescript": "^5.9.3"
+	}
+}

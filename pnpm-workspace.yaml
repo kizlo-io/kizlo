@@ -3,6 +3,7 @@ packages:
   - packages/*
   - tooling/*
   - plugins/*
+  - templates/*
 
 catalog:
   next: ^16.2.9

@@ -75,12 +75,13 @@
 		"access": "public"
 	},
 	"scripts": {
-		"build": "tsdown",
-		"dev": "tsdown -w",
+		"generate:templates": "jiti src/cli/scripts/extract-templates.ts",
+		"build": "pnpm generate:templates && tsdown",
+		"dev": "pnpm generate:templates && tsdown -w",
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
 		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
-		"typecheck": "tsc --noEmit",
-		"test": "vitest run --passWithNoTests"
+		"typecheck": "pnpm generate:templates && tsc --noEmit",
+		"test": "pnpm generate:templates && vitest run --passWithNoTests"
 	},
 	"dependencies": {
 		"@clack/prompts": "^1.5.1",
@@ -94,7 +95,9 @@
 		"citty": "^0.1.6",
 		"consola": "^3.2.3",
 		"cookie": "^1.0.2",
+		"giget": "^3.0.0",
 		"jiti": "^2.7.0",
+		"magicast": "^0.5.3",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
