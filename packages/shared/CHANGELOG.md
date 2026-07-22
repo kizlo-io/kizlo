@@ -1,5 +1,22 @@
 # @kizlo/shared
 
+## 0.5.0
+
+### Minor Changes
+
+- [#57](https://github.com/kizlo-io/kizlo/pull/57) [`fe57fa8`](https://github.com/kizlo-io/kizlo/commit/fe57fa812a8930b0e0806a329871d706cacb2bee) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add `resolveWpTimestamp`, a helper that converts a WordPress GMT date string to epoch milliseconds. It parses WordPress' timezone-less `*_gmt` fields as UTC, and returns `null` for null, undefined, or unparseable values instead of `NaN`, so callers get a clean sentinel for statuses like `auto-draft` that WordPress reports with a null date.
+
+  Add an optional `srcset` field to the `Media` schema, carrying a ready-to-use responsive `srcset` string alongside the structured `variants`.
+
+  Add a `lenient` schema helper that wraps an optional field so an invalid value is dropped (parsed to `undefined`) instead of throwing, for graceful-degradation read surfaces such as list-query filters.
+
+- [#61](https://github.com/kizlo-io/kizlo/pull/61) [`39d52a7`](https://github.com/kizlo-io/kizlo/commit/39d52a78b84cae98bda5d8ec31dceb4961da681d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Settings API improvements.
+
+  - Removed the `publicly_queryable` field from post type and taxonomy settings. It was a read-only runtime value that the server silently ignored on write, so it never belonged on the writable surface. It is gone from the `PostTypeSettings`/`TaxonomySettings` types, from the `settings` response, and from the update inputs.
+  - The settings update router is now nested per section: `settings.updateSite` becomes `settings.site.update` (and likewise `brand`, `identity`, `authors`, `crawling`, `webhook`, `uploads`, `postType`, `taxonomy`). This leaves room to add per-section reads such as `settings.site.get` later.
+  - Settings update calls now return the saved section instead of `null`, so callers can read back the persisted, fully-resolved state (media ids resolved to `{ id, src }` objects) without a follow-up `get`. Each update is typed to its section: `site.update` returns `SiteSettings`, `postType.update` returns the single updated `PostTypeSettings`, and so on.
+  - A WordPress `rest_forbidden` (403) from a settings write now surfaces as a `FORBIDDEN` error instead of a generic 500.
+
 ## 0.4.0
 
 ### Minor Changes

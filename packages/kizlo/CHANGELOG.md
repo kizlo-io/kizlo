@@ -1,5 +1,112 @@
 # kizlo
 
+## 0.8.0
+
+### Minor Changes
+
+- [#63](https://github.com/kizlo-io/kizlo/pull/63) [`09ef9e0`](https://github.com/kizlo-io/kizlo/commit/09ef9e011dc700e7dc073dac77ea8ec4b452e662) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a public category API (`categories.list` and `categories.get`).
+
+  `categories.list` is a lenient public listing over the category taxonomy with camelCase filters (`search`, `include`/`exclude`, `order`/`orderBy`, `hideEmpty`, `parent`, `post`, `slug`). `categories.get` resolves a category by either id or slug and carries the resolved SEO block. Each category exposes `id`, `name`, `slug`, `url`, `description`, `parent`, `postCount`, `seo`, and `meta`, reshaped from the raw WordPress term (WP internals like `taxonomy` and `_links` are dropped, `parent`/`description` are nulled when empty).
+
+- [#67](https://github.com/kizlo-io/kizlo/pull/67) [`a919066`](https://github.com/kizlo-io/kizlo/commit/a9190665cb23e4dcd4d45c3d2acdccdb3c848a02) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a `kizlo create` command and rework `init` to build from the same framework template.
+
+  `kizlo create [template] [project-name]` scaffolds a fresh, runnable project (currently Next.js) from a template pinned to the CLI version, prompting for whichever argument you omit. `kizlo init` no longer carries its own copies of the wiring files; it reconstructs them from that same template, so the two paths cannot drift.
+
+  When `init` merges Kizlo wiring into a file you already own (such as the root layout's metadata and viewport exports), it now parses the file with a real TypeScript parser and adds or replaces only the relevant exports, leaving the rest of your code untouched. If that file cannot be parsed, `init` stops rather than writing a guess.
+
+- [#62](https://github.com/kizlo-io/kizlo/pull/62) [`225017d`](https://github.com/kizlo-io/kizlo/commit/225017d1d2b9475e977b2077a525680bd6bcd7dc) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Flatten service clients onto the procedure context and rename `ServerContext` to `ProcedureContext`.
+
+  The `service` wrapper is gone from the handler context. Its members now live directly on the context: `context.service.wordpress` becomes `context.wordpress`, `context.service.settings` becomes `context.settings`, and `context.service.email` becomes `context.email`. Update any custom procedures or extensions accordingly.
+
+  The context type is renamed from `ServerContext` to `ProcedureContext` — the single type every procedure, middleware, event, and webhook handler receives. A procedure handler still gets this base plus whatever its middleware injected via `next({ context })`.
+
+  The `Service` class and its `ServiceConfig` type are no longer exported from `kizlo`. `EmailService` and `SettingsService` are now constructed from a `WordPressService` directly instead of the removed `Service` aggregate.
+
+- [#58](https://github.com/kizlo-io/kizlo/pull/58) [`bd5006d`](https://github.com/kizlo-io/kizlo/commit/bd5006d6d107f488ae9bfc67518e78a6a74f5c21) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Menu API improvements and fixes.
+
+  Output (`MenuItem` / group items) additions:
+
+  - `parent`: the parent menu-item id (`null` at the top level), so the flat list can be assembled into a hierarchy without the group endpoint.
+  - `target`: the link target (`"_blank"` or `""`), for rendering `<a target>`.
+  - `objectId`: the id of the linked post or term, to correlate a nav item back to its source resource.
+  - `order`: the item's sort position (WordPress' `menu_order`), so the flat list can be ordered without the group endpoint.
+  - `classes`: editor-assigned CSS classes (WordPress' empty-class `[""]` quirk filtered out), for theme styling hooks.
+  - `attrTitle`: the link's `title` attribute text.
+  - `xfn`: the anchor's XFN `rel` relationships (empty entries filtered out).
+  - `invalid`: whether the linked object no longer exists, so broken links can be hidden or badged.
+
+  List input (`menus.items.list` / `menus.group`) changes:
+
+  - Invalid list query values are now tolerated instead of throwing: each filter falls back to being ignored, and an invalid `page` falls back to `1`. Listing surfaces degrade gracefully rather than returning a 400.
+  - `perPage` is bounded to 1-100 and `offset` to a non-negative integer.
+  - `searchColumns` is constrained to `post_title`/`post_content`/`post_excerpt`.
+  - An `orderby` that WordPress would reject for a missing companion (`relevance` without `search`, `include` without `include`, `include_slugs` without `slug`) is now dropped so the list falls back to default ordering instead of returning a 400.
+
+  Fixes:
+
+  - A menu item whose linked `object` is a non-standard type (any custom post type or taxonomy, `tag`, etc.) no longer fails output validation with a 500. The item `type` is now a permissive string.
+  - `href` now returns the full path instead of only the last URL segment, so nested targets (e.g. `/about-us/team`) are no longer truncated to their leaf. Custom links keep the authored value (including absolute external URLs), and an internal path resolves to the same `href` whether the item is a custom link or a linked page.
+
+- [#57](https://github.com/kizlo-io/kizlo/pull/57) [`fe57fa8`](https://github.com/kizlo-io/kizlo/commit/fe57fa812a8930b0e0806a329871d706cacb2bee) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Posts API improvements and fixes.
+
+  Output (`Post`) additions:
+
+  - `url`: the post's resolved public URL, built by the plugin from the Kizlo site-URL setting (not WordPress' home URL).
+  - `parent`: parent post ID for hierarchical types (null for flat types like `post`).
+  - `preview`: whether the record was returned through the preview-token flow.
+  - `status`: the post status (`publish`/`future`/`draft`/`pending`/`private`), useful for rendering preview badges. The WP-internal `trash` status is normalized to `draft`.
+  - `author.slug`: the author's nicename, needed to build author archive links.
+  - `featuredMedia` now carries `width`, `height`, `mime`, responsive `variants`, and a ready-to-use `srcset` string (via the plugin's shared media resolver), so it can back `next/image` or a plain `<img srcset>` without layout shift.
+  - `title` is now `null` for posts with an empty title instead of an empty string.
+
+  List input (`posts.list`) changes:
+
+  - Invalid list query values are now tolerated instead of throwing: each filter falls back to being ignored, and an invalid `page` falls back to `1`. Listing surfaces degrade gracefully rather than returning a 400. (`posts.get` and future writes stay strict.)
+  - `perPage` is bounded to 1-100 (WordPress' own cap) and `offset` to a non-negative integer.
+  - `searchColumns` is constrained to `post_title`/`post_content`/`post_excerpt`.
+  - `orderby` gains `modified`, pairing with the `updatedAt` output for "recently updated" ordering. An `orderby` that WordPress would reject for a missing companion (`relevance` without `search`, `include` without `include`) is now dropped so the list falls back to default ordering instead of returning a 400. The `POST_SEARCH_REQUIRED` and `POST_ORDERBY_INCLUDE_MISSING` list errors are removed as a result.
+  - Added `modifiedAfter`/`modifiedBefore` date filters for incremental sync / ISR revalidation ("posts changed since X").
+
+  Fixes:
+
+  - `posts.get` now returns `POST_NOT_FOUND` for non-published posts unless a valid preview token is supplied. The underlying WordPress fetch runs with edit context and admin credentials, so without this guard an anonymous caller could read `draft`/`private`/`pending`/`future`/`trash` content by id. The preview-token flow remains the only way to read unpublished posts.
+  - Fetching a post by an unknown slug now returns a 404 (`POST_NOT_FOUND`) instead of a 500. The custom post-type route's `post_type_not_found` and `invalid_post_type` error codes are handled in `posts.get`, and the `PostTypeService` error-code unions widen the WordPress core codes to include them.
+  - `createdAt`/`updatedAt` are derived from the GMT date fields (parsed as UTC) instead of the site-local fields, fixing a timezone drift that depended on where the server ran. Posts with a null or unparseable date no longer fail output validation with a `NaN` timestamp.
+  - The `kizlo` enrichment type marks `url`/`categories`/`tags`/`author`/`featured_media` as optional, matching what the plugin actually returns.
+
+- [`bd67cbf`](https://github.com/kizlo-io/kizlo/commit/bd67cbf2d09703f3af2e5bfe2620c07c35c3a9d7) Thanks [@IDJGILL](https://github.com/IDJGILL)! - SEO head shape fixes and additions.
+
+  The `seo.homepage` output and the `seo` block embedded in `posts.get` are built from the same reshape (`deserializeSeo`), which is now the single source of truth. Several fields the plugin omits or types differently were mismatched against the schema and could fail output validation with a 500:
+
+  - `og.image.width` / `og.image.height` are numbers (not strings) and may be `null`; `og.image.type` may be `null`. Any page carrying an Open Graph image previously risked a 500.
+  - `og.description`, `twitter.description`, and every `article.*` field are omitted by the plugin when empty; they now degrade to `""` instead of producing an invalid `undefined`.
+  - `twitter.card` is now correctly typed as `"summary" | "summary_large_image"`.
+
+  Additions:
+
+  - `twitter.imageAlt` is now exposed (rendered as the Twitter card image alt).
+  - `article.tags` is now exposed (maps to `article:tag` Open Graph meta tags).
+
+- [#61](https://github.com/kizlo-io/kizlo/pull/61) [`39d52a7`](https://github.com/kizlo-io/kizlo/commit/39d52a78b84cae98bda5d8ec31dceb4961da681d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Settings API improvements.
+
+  - Removed the `publicly_queryable` field from post type and taxonomy settings. It was a read-only runtime value that the server silently ignored on write, so it never belonged on the writable surface. It is gone from the `PostTypeSettings`/`TaxonomySettings` types, from the `settings` response, and from the update inputs.
+  - The settings update router is now nested per section: `settings.updateSite` becomes `settings.site.update` (and likewise `brand`, `identity`, `authors`, `crawling`, `webhook`, `uploads`, `postType`, `taxonomy`). This leaves room to add per-section reads such as `settings.site.get` later.
+  - Settings update calls now return the saved section instead of `null`, so callers can read back the persisted, fully-resolved state (media ids resolved to `{ id, src }` objects) without a follow-up `get`. Each update is typed to its section: `site.update` returns `SiteSettings`, `postType.update` returns the single updated `PostTypeSettings`, and so on.
+  - A WordPress `rest_forbidden` (403) from a settings write now surfaces as a `FORBIDDEN` error instead of a generic 500.
+
+- [#55](https://github.com/kizlo-io/kizlo/pull/55) [`8a5e9b7`](https://github.com/kizlo-io/kizlo/commit/8a5e9b7e1df18659c39da353817f011954187d06) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add `createSitemapRedirectRoute`, a framework-agnostic handler that permanently redirects the well-known `/sitemap.xml` to the generated sitemap index at `/sitemaps/index.xml`. Many crawlers ignore robots.txt and probe the standard path directly, so this points them at the real index. It is a static 308 with no WordPress call, derived from the same `SITEMAP_BASE`/`SITEMAP_INDEX_SLUG` constants the sitemap route is mounted on. `kizlo init` now scaffolds a `sitemap.xml` route for the Next.js preset.
+
+  The sitemap index path is now fixed at `/sitemaps/index.xml` and is no longer configurable. `KizloCrawlingSettings` no longer includes the `sitemaps.pathname_structure` field.
+
+- [#64](https://github.com/kizlo-io/kizlo/pull/64) [`e422f3d`](https://github.com/kizlo-io/kizlo/commit/e422f3d897f71c08290c1cb56fbdb6baae07ba9f) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a public tag API (`tags.list` and `tags.get`).
+
+  `tags.list` is a lenient public listing over the `post_tag` taxonomy with camelCase filters (`search`, `include`/`exclude`, `order`/`orderBy`, `hideEmpty`, `post`, `slug`). `tags.get` resolves a tag by either id or slug and carries the resolved SEO block. Each tag exposes `id`, `name`, `slug`, `url`, `description`, `postCount`, `seo`, and `meta`, reshaped from the raw WordPress term (WP internals like `taxonomy` and `_links` are dropped, `description` is nulled when empty). Tags are non-hierarchical, so there is no `parent` field or `parent` filter.
+
+### Patch Changes
+
+- Updated dependencies [[`fe57fa8`](https://github.com/kizlo-io/kizlo/commit/fe57fa812a8930b0e0806a329871d706cacb2bee), [`39d52a7`](https://github.com/kizlo-io/kizlo/commit/39d52a78b84cae98bda5d8ec31dceb4961da681d)]:
+  - @kizlo/shared@0.5.0
+
 ## 0.7.0
 
 ### Minor Changes

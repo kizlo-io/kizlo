@@ -1,5 +1,12 @@
 # @kizlo/woocommerce
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`fe57fa8`](https://github.com/kizlo-io/kizlo/commit/fe57fa812a8930b0e0806a329871d706cacb2bee), [`39d52a7`](https://github.com/kizlo-io/kizlo/commit/39d52a78b84cae98bda5d8ec31dceb4961da681d)]:
+  - @kizlo/shared@0.5.0
+
 ## 0.1.6
 
 ### Patch Changes
