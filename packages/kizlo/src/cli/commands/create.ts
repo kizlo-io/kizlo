@@ -7,7 +7,7 @@ import { printBanner } from "../banner"
 import { getPreset } from "../presets"
 import { fetchTemplate } from "../presets/source"
 import { readManifest } from "../presets/template"
-import { detectPackageManager, getVersion } from "../utils"
+import { availablePackageManagers, detectInvokingPackageManager, getVersion, type PackageManager } from "../utils"
 import { dockerAvailable } from "../wp/docker"
 import {
 	collectConnectionInteractively,
@@ -41,6 +41,9 @@ const projectNameSchema = z
 	)
 const projectName = validate(projectNameSchema)
 
+/** Package managers `create` can wire the getting-started steps for, in display order. */
+const PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn", "bun"]
+
 /** Directory entries never copied into a scaffolded project — the internal manifest and build junk. */
 const SKIP_COPY = new Set(["template.json", "node_modules", ".next", ".turbo", ".git"])
 
@@ -63,9 +66,7 @@ export async function scaffoldTemplate(template: TemplateId, dir: string, name: 
 	}
 
 	const pkgPath = path.join(dir, "package.json")
-	// giget resolves a missing subdir to an empty directory instead of throwing, so a bad template
-	// name or a failed fetch lands here with nothing to read. Turn that into an actionable message
-	// rather than a bare ENOENT on package.json.
+
 	if (!fs.existsSync(pkgPath)) {
 		fs.rmSync(dir, { recursive: true, force: true })
 		throw new Error(`Template "${template}" wasn't found. Check the template name and your network connection, then try again.`)
@@ -103,8 +104,6 @@ export const create = defineCommand({
 		printBanner(getVersion())
 		p.intro("kizlo create")
 
-		// Resolve the template. An unknown first positional is a self-correcting error rather than a
-		// silent fallback, so a name typed where a template belongs reports the available list.
 		const requested = args.template as string | undefined
 		let template: TemplateId
 		if (requested) {
@@ -139,6 +138,17 @@ export const create = defineCommand({
 			process.exit(1)
 		}
 
+		const installed = availablePackageManagers(PACKAGE_MANAGERS)
+		const invokingPm = detectInvokingPackageManager()
+		const defaultPm = invokingPm && installed.includes(invokingPm) ? invokingPm : installed[0]
+		const pm = orCancel(
+			await p.select<PackageManager>({
+				message: "Package manager",
+				options: installed.map((id) => ({ value: id, label: id })),
+				initialValue: defaultPm,
+			}),
+		)
+
 		const preset = getPreset(template)
 		if (!preset) {
 			p.cancel(`No preset for template "${template}".`)
@@ -168,7 +178,6 @@ export const create = defineCommand({
 		await writeEnv(dir, preset, conn, { force: true, yes: false })
 		await syncRemote(conn)
 
-		const pm = detectPackageManager(dir)
 		p.note([`cd ${name}`, `${pm} install`].join("\n"), "Get started")
 		nextStepsNote(conn.mode)
 
