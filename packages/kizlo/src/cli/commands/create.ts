@@ -6,8 +6,16 @@ import z from "zod/v4"
 import { printBanner } from "../banner"
 import { getPreset } from "../presets"
 import { fetchTemplate } from "../presets/source"
-import { readManifest } from "../presets/template"
-import { availablePackageManagers, detectInvokingPackageManager, getVersion, type PackageManager } from "../utils"
+import { adaptOwnFile, ownEntries, readManifest, type TemplateManifest } from "../presets/template"
+import {
+	availablePackageManagers,
+	detectInvokingPackageManager,
+	ensureGitignored,
+	frameworkCreateArgs,
+	getVersion,
+	type PackageManager,
+	runCommandCaptured,
+} from "../utils"
 import { dockerAvailable } from "../wp/docker"
 import {
 	collectConnectionInteractively,
@@ -19,10 +27,18 @@ import {
 	withApiPath,
 	writeEnv,
 } from "./_setup"
+import {
+	applyLayoutPatches,
+	buildScaffoldContext,
+	kizloConfigTemplate,
+	reportScaffold,
+	scaffoldFile,
+	writeGeneratedContract,
+} from "./_wiring"
 
 /**
  * The templates `create` can scaffold from. Each id is both the `templates/<id>` folder and the
- * preset that drives its WordPress setup.
+ * preset that drives its WordPress setup and framework bootstrap.
  */
 const TEMPLATES = ["nextjs"] as const
 type TemplateId = (typeof TEMPLATES)[number]
@@ -44,41 +60,63 @@ const projectName = validate(projectNameSchema)
 /** Package managers `create` can wire the getting-started steps for, in display order. */
 const PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn", "bun"]
 
-/** Directory entries never copied into a scaffolded project — the internal manifest and build junk. */
-const SKIP_COPY = new Set(["template.json", "node_modules", ".next", ".turbo", ".git"])
+/**
+ * Pin the `kizlo` dependency in the freshly bootstrapped `package.json`. The template is
+ * authoritative for the version (`kizloVersion` in its manifest, stamped at release), falling back to
+ * the running CLI's version in-repo before the first stamp. The dependency is only recorded, not
+ * installed — the getting-started note tells the user to run install.
+ */
+function recordKizloDependency(dir: string, manifest: TemplateManifest): void {
+	const pkgPath = path.join(dir, "package.json")
+	const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { dependencies?: Record<string, string> }
+	pkg.dependencies ??= {}
+	pkg.dependencies.kizlo = manifest.kizloVersion ?? `^${getVersion()}`
+	fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`)
+}
 
 /**
- * Copy the template into `dir`, then make it a standalone project: name the package after the
- * project folder and resolve the monorepo-only `workspace:*` Kizlo dependency to the version the
- * template declares (`kizloVersion` in its manifest, stamped at release), falling back to the running
- * CLI's version. The version the project runs is the template's to decide, not a moving `latest` tag.
- * The template's `template.json` is an internal input, so it's left out of the copy — as is
- * local build junk (`node_modules`, `.next`, …) that only exists on the `KIZLO_TEMPLATE_LOCAL_DIR` path.
+ * The argv `create` runs to bootstrap a fresh base app with the framework's own official CLI, built
+ * from the template manifest's `bootstrap` (initializer + flags) — the template is the single source
+ * of truth for the framework. The CLI owns only the package-manager mechanics: {@link frameworkCreateArgs}
+ * assembles the `<pm> create …` invocation, and the `{{pm}}` token in the flags is substituted with the
+ * chosen manager (e.g. `--use-{{pm}}` → `--use-pnpm`).
  */
-export async function scaffoldTemplate(template: TemplateId, dir: string, name: string): Promise<void> {
-	const { dir: src, cleanup } = await fetchTemplate(template)
-	let kizloVersion: string
-	try {
-		kizloVersion = readManifest(src).kizloVersion ?? `^${getVersion()}`
-		fs.cpSync(src, dir, { recursive: true, filter: (from) => !SKIP_COPY.has(path.basename(from)) })
-	} finally {
-		cleanup()
-	}
+export function bootstrapArgs(manifest: TemplateManifest, pm: PackageManager, name: string): string[] | undefined {
+	if (!manifest.bootstrap) return undefined
+	const flags = manifest.bootstrap.flags.map((flag) => flag.replaceAll("{{pm}}", pm))
+	return frameworkCreateArgs(pm, manifest.bootstrap.initializer, name, flags)
+}
 
-	const pkgPath = path.join(dir, "package.json")
+/**
+ * Layer Kizlo's wiring onto a freshly bootstrapped app in `dir`, from an already-fetched template
+ * directory + manifest. The framework CLI has produced the base project (package.json, config,
+ * tsconfig, the root layout); this drives the manifest — the same engine `init` uses — to record the
+ * `kizlo` dependency, write `kizlo.config.ts`, scaffold the manifest's own files (wiring plus the demo
+ * starter pages), seed the generated contract, ignore `.env`, and patch the root layout's SEO exports.
+ * The target directory layout comes straight from the manifest tokens, which the bootstrap flags are
+ * chosen to match, so files land where the manifest expects. Fresh files are written with `force`,
+ * silently replacing the framework defaults.
+ */
+export async function applyManifestWiring(
+	dir: string,
+	templateDir: string,
+	manifest: TemplateManifest,
+	opts: { devPath?: string },
+): Promise<void> {
+	const { kizloDir, appDir, alias } = manifest.tokens
+	const scaffold = buildScaffoldContext(dir, { dirRel: kizloDir, appDir, alias, clientUrl: undefined })
 
-	if (!fs.existsSync(pkgPath)) {
-		fs.rmSync(dir, { recursive: true, force: true })
-		throw new Error(`Template "${template}" wasn't found. Check the template name and your network connection, then try again.`)
-	}
-	const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
-		name?: string
-		private?: boolean
-		dependencies?: Record<string, string>
-	}
-	pkg.name = name
-	if (pkg.dependencies?.kizlo === "workspace:*") pkg.dependencies.kizlo = kizloVersion
-	fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`)
+	recordKizloDependency(dir, manifest)
+
+	const files = [
+		{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(kizloDir, alias, opts.devPath) },
+		...ownEntries(manifest, { includeStarter: true }).map((entry) => adaptOwnFile(templateDir, entry, manifest.tokens, scaffold)),
+	]
+	for (const file of files) reportScaffold(file, await scaffoldFile(dir, file, { force: true, yes: false }), false)
+
+	writeGeneratedContract(dir, path.join(kizloDir, "server"))
+	ensureGitignored(dir, ".env")
+	applyLayoutPatches(dir, manifest, scaffold)
 }
 
 export const create = defineCommand({
@@ -138,6 +176,12 @@ export const create = defineCommand({
 			process.exit(1)
 		}
 
+		const preset = getPreset(template)
+		if (!preset) {
+			p.cancel(`No preset for template "${template}".`)
+			process.exit(1)
+		}
+
 		const installed = availablePackageManagers(PACKAGE_MANAGERS)
 		const invokingPm = detectInvokingPackageManager()
 		const defaultPm = invokingPm && installed.includes(invokingPm) ? invokingPm : installed[0]
@@ -149,12 +193,6 @@ export const create = defineCommand({
 			}),
 		)
 
-		const preset = getPreset(template)
-		if (!preset) {
-			p.cancel(`No preset for template "${template}".`)
-			process.exit(1)
-		}
-
 		const conn = await collectConnectionInteractively(preset)
 		if (preset.apiPath && conn.baseUrl) conn.baseUrl = withApiPath(conn.baseUrl, preset.apiPath)
 
@@ -163,16 +201,39 @@ export const create = defineCommand({
 			process.exit(1)
 		}
 
-		const s = p.spinner()
-		s.start(`Creating ${name} from the ${template} template`)
-		try {
-			await scaffoldTemplate(template, dir, name)
-			s.stop(`Created ${name}`)
-		} catch (error) {
-			s.stop("Could not create the project")
-			p.cancel(error instanceof Error ? error.message : String(error))
+		// The template is the single source of truth for the framework: fetch it once, then use its
+		// manifest to bootstrap the base app and to wire Kizlo in. Clean up the fetched copy on every
+		// exit — process.exit skips finally, so failures cancel through `fail`, which cleans up first.
+		const fetched = await fetchTemplate(template)
+		const fail = (message: string): never => {
+			fetched.cleanup()
+			p.cancel(message)
 			process.exit(1)
 		}
+
+		const manifest = readManifest(fetched.dir)
+		const bootstrap = bootstrapArgs(manifest, pm, name)
+		if (!bootstrap) {
+			fetched.cleanup()
+			p.cancel(`Template "${template}" can't be scaffolded — its manifest declares no framework bootstrap.`)
+			process.exit(1)
+		}
+
+		const s = p.spinner()
+		s.start(`Creating ${name} with the ${preset.label} CLI`)
+		const scaffold = runCommandCaptured(bootstrap, cwd)
+		s.stop(scaffold.ok ? `Created ${name} with the ${preset.label} CLI` : `${preset.label} setup failed`)
+		if (!scaffold.ok) {
+			if (scaffold.output) p.log.error(scaffold.output)
+			fail(`${preset.label} setup failed — see the output above and try again.`)
+		}
+
+		try {
+			await applyManifestWiring(dir, fetched.dir, manifest, { devPath: conn.devPath })
+		} catch (error) {
+			fail(error instanceof Error ? error.message : String(error))
+		}
+		fetched.cleanup()
 
 		await setupLocalWordPress(dir, conn)
 		await writeEnv(dir, preset, conn, { force: true, yes: false })

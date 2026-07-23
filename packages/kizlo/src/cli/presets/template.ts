@@ -6,15 +6,17 @@ import { resolvePatchTargetPath } from "./patch"
 import type { ScaffoldContext, ScaffoldFile } from "./types"
 
 /**
- * The template's `template.json`. It is the single declaration of which files are Kizlo wiring
- * and how each is applied. Every entry is one of a small closed set — deliberately no "patch an
- * arbitrary source file" kind, so a dangerous strategy is unrepresentable:
+ * The template's `template.json`. It is the single declaration of which files Kizlo lays onto a
+ * project and how each is applied — the same engine drives both `create` (onto a fresh app the
+ * framework CLI just bootstrapped) and `init` (onto the user's existing project). Every entry is one
+ * of a small closed set — deliberately no "patch an arbitrary source file" kind, so a dangerous
+ * strategy is unrepresentable:
  *
- * - `own` — a whole file Kizlo writes. Its path is authoritative; `create` copies it and `init`
- *   adapts + writes it through the overwrite policy.
- * - `patch` — a partial injection into a file the user owns (the root layout's SEO exports). `init`
- *   tries a confident apply, otherwise prints the payload with placement instructions. `create` never
- *   patches — its own template files already carry the wiring.
+ * - `own` — a whole file Kizlo writes, adapted to the project's directories and written through the
+ *   overwrite policy. `wiring`-scope files (the default) are laid down by both commands; `starter`
+ *   demo files are laid down only by `create` (see {@link ownEntries}).
+ * - `patch` — a partial injection into a file the framework owns (the root layout's SEO exports).
+ *   Both commands try a confident apply, otherwise print the payload with placement instructions.
  */
 const tokensSchema = z.object({
 	/** Kizlo home directory in the template, e.g. `src/lib/kizlo`. */
@@ -29,6 +31,12 @@ const ownSchema = z.object({
 	kind: z.literal("own"),
 	role: z.string(),
 	path: z.string(),
+	/**
+	 * What the file is for, which decides who writes it. `wiring` (the default) is Kizlo plumbing both
+	 * `create` and `init` lay down. `starter` is demo content only `create` scaffolds onto a fresh app;
+	 * `init` skips it so it never overwrites a file the user already owns (their home page, styles).
+	 */
+	scope: z.enum(["wiring", "starter"]).optional(),
 })
 
 const patchSchema = z.object({
@@ -40,6 +48,21 @@ const patchSchema = z.object({
 	exports: z.array(z.object({ name: z.string(), value: z.string() })),
 })
 
+const bootstrapSchema = z.object({
+	/**
+	 * The framework's official `create-*` initializer, e.g. `next-app@latest`. `create` runs it through
+	 * the chosen package manager (`<pm> create <initializer> <name> …`); the CLI owns only the argv
+	 * mechanics (the `create` verb, npm's `--` separator), so the template stays framework-authoritative.
+	 */
+	initializer: z.string(),
+	/**
+	 * Flags passed to the initializer. Must produce a project whose shape matches {@link tokensSchema}
+	 * (directory layout, import alias) so the wiring lands where the manifest expects. `{{pm}}` is
+	 * substituted with the chosen package manager (e.g. `--use-{{pm}}`).
+	 */
+	flags: z.array(z.string()).default([]),
+})
+
 const manifestSchema = z.object({
 	framework: z.string(),
 	/**
@@ -49,12 +72,18 @@ const manifestSchema = z.object({
 	 * the first stamped release; `create`/`init` fall back to the running CLI's version.
 	 */
 	kizloVersion: z.string().optional(),
+	/**
+	 * How `create` bootstraps the base app with the framework's own CLI. Absent on templates that only
+	 * `init` supports; `create` refuses a template whose manifest declares no bootstrap.
+	 */
+	bootstrap: bootstrapSchema.optional(),
 	tokens: tokensSchema,
 	files: z.array(z.discriminatedUnion("kind", [ownSchema, patchSchema])),
 })
 
 export type TemplateManifest = z.infer<typeof manifestSchema>
 export type TemplateTokens = z.infer<typeof tokensSchema>
+export type TemplateBootstrap = z.infer<typeof bootstrapSchema>
 export type OwnEntry = z.infer<typeof ownSchema>
 export type PatchEntry = z.infer<typeof patchSchema>
 
@@ -67,6 +96,9 @@ const ROLE_LABELS: Record<string, string> = {
 	sitemap: "sitemap route",
 	"sitemap-redirect": "sitemap.xml redirect route",
 	manifest: "web manifest route",
+	"home-page": "home page",
+	"blog-post": "blog post page",
+	styles: "global styles",
 }
 
 /** Read and validate the template's manifest from a fetched template directory. */
@@ -76,8 +108,13 @@ export function readManifest(templateDir: string): TemplateManifest {
 	return manifestSchema.parse(JSON.parse(fs.readFileSync(manifestPath, "utf8")))
 }
 
-export function ownEntries(manifest: TemplateManifest): OwnEntry[] {
-	return manifest.files.filter((file): file is OwnEntry => file.kind === "own")
+/**
+ * The `own` files to scaffold. By default only `wiring` files (the Kizlo plumbing) — this is what
+ * `init` lays onto an existing project, so it never touches the user's own pages. With
+ * `includeStarter`, demo `starter` files are added too, which is what `create` lays onto a fresh app.
+ */
+export function ownEntries(manifest: TemplateManifest, opts: { includeStarter?: boolean } = {}): OwnEntry[] {
+	return manifest.files.filter((file): file is OwnEntry => file.kind === "own" && (opts.includeStarter || file.scope !== "starter"))
 }
 
 export function patchEntries(manifest: TemplateManifest): PatchEntry[] {

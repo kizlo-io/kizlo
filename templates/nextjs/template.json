@@ -1,5 +1,21 @@
 {
 	"framework": "nextjs",
+	"bootstrap": {
+		"initializer": "next-app@latest",
+		"flags": [
+			"--ts",
+			"--app",
+			"--src-dir",
+			"--import-alias",
+			"@/*",
+			"--no-tailwind",
+			"--no-eslint",
+			"--no-turbopack",
+			"--skip-install",
+			"--use-{{pm}}",
+			"--yes"
+		]
+	},
 	"tokens": {
 		"kizloDir": "src/lib/kizlo",
 		"appDir": "src/app",
@@ -40,6 +56,24 @@
 			"kind": "own",
 			"role": "manifest",
 			"path": "src/app/site.webmanifest/route.ts"
+		},
+		{
+			"kind": "own",
+			"role": "home-page",
+			"scope": "starter",
+			"path": "src/app/page.tsx"
+		},
+		{
+			"kind": "own",
+			"role": "blog-post",
+			"scope": "starter",
+			"path": "src/app/blog/[slug]/page.tsx"
+		},
+		{
+			"kind": "own",
+			"role": "styles",
+			"scope": "starter",
+			"path": "src/app/globals.css"
 		},
 		{
 			"kind": "patch",

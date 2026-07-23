@@ -30,6 +30,18 @@ describe("readManifest / adaptOwnFile / resolvePatch", () => {
 		expect(patchEntries(manifest).map((e) => e.role)).toEqual(["root-layout"])
 	})
 
+	it("excludes starter files by default and includes them only when asked", () => {
+		// init lays down only wiring, so a user's own home page/styles are never clobbered.
+		const wiringRoles = ownEntries(manifest).map((e) => e.role)
+		expect(wiringRoles).toContain("api-route")
+		expect(wiringRoles).not.toContain("home-page")
+
+		// create scaffolds the demo starter files on top of a fresh app.
+		const allRoles = ownEntries(manifest, { includeStarter: true }).map((e) => e.role)
+		expect(allRoles).toContain("api-route")
+		expect(allRoles).toContain("home-page")
+	})
+
 	it("rewrites an own file's path prefix and server-import specifier to the project's", () => {
 		const apiRoute = ownEntries(manifest).find((e) => e.role === "api-route")
 		if (!apiRoute) throw new Error("api-route entry missing")
