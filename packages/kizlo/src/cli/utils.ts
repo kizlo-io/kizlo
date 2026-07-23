@@ -123,6 +123,34 @@ export function detectPackageManager(cwd: string): PackageManager {
 	return "npm"
 }
 
+/**
+ * The package manager that invoked the current process, read from `npm_config_user_agent`
+ * (e.g. `pnpm/9.0.0 npm/? node/v20`). Used to pre-select the most likely choice when a fresh
+ * project has no lockfile to detect from. Returns undefined when the agent is absent or unknown.
+ */
+export function detectInvokingPackageManager(): PackageManager | undefined {
+	const name = process.env.npm_config_user_agent?.split("/")[0]
+	return name === "pnpm" || name === "yarn" || name === "bun" || name === "npm" ? name : undefined
+}
+
+/**
+ * Whether `command` resolves to a runnable executable, probed with `--version`. Used to hide or
+ * disable package-manager choices the user can't actually run. A non-zero exit or a spawn error
+ * (the binary isn't on PATH) both count as unavailable.
+ */
+export function isCommandAvailable(command: string): boolean {
+	const result = spawnSync(command, ["--version"], {
+		stdio: "ignore",
+		shell: process.platform === "win32",
+	})
+	return !result.error && result.status === 0
+}
+
+/** The package managers currently installed on the host, in the given display order. */
+export function availablePackageManagers(order: readonly PackageManager[]): PackageManager[] {
+	return order.filter((pm) => isCommandAvailable(pm))
+}
+
 export function addDependencyArgs(pm: PackageManager, pkg: string): string[] {
 	if (pm === "npm") return ["npm", "install", pkg]
 	return [pm, "add", pkg]

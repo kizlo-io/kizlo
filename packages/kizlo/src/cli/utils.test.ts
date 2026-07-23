@@ -4,10 +4,13 @@ import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import {
 	addDependencyArgs,
+	availablePackageManagers,
 	detectImportAlias,
+	detectInvokingPackageManager,
 	detectPackageManager,
 	ensureGitignored,
 	envKeysPresent,
+	isCommandAvailable,
 	mergeEnv,
 	readTsconfigPaths,
 	resolveModuleImport,
@@ -184,6 +187,54 @@ describe("detectPackageManager", () => {
 
 	test("defaults to npm without a recognised lockfile", () => {
 		expect(detectPackageManager(dir)).toBe("npm")
+	})
+})
+
+describe("detectInvokingPackageManager", () => {
+	const prev = process.env.npm_config_user_agent
+
+	afterEach(() => {
+		if (prev === undefined) delete process.env.npm_config_user_agent
+		else process.env.npm_config_user_agent = prev
+	})
+
+	test.each([
+		["pnpm/9.0.0 npm/? node/v20.0.0 darwin arm64", "pnpm"],
+		["yarn/1.22.19 npm/? node/v20.0.0", "yarn"],
+		["bun/1.1.0 npm/? node/v20.0.0", "bun"],
+		["npm/10.0.0 node/v20.0.0", "npm"],
+	])("reads %s -> %s", (agent, expected) => {
+		process.env.npm_config_user_agent = agent
+		expect(detectInvokingPackageManager()).toBe(expected)
+	})
+
+	test("returns undefined when the agent is absent", () => {
+		delete process.env.npm_config_user_agent
+		expect(detectInvokingPackageManager()).toBeUndefined()
+	})
+
+	test("returns undefined for an unknown agent", () => {
+		process.env.npm_config_user_agent = "cnpm/1.0.0"
+		expect(detectInvokingPackageManager()).toBeUndefined()
+	})
+})
+
+describe("isCommandAvailable", () => {
+	test("resolves a runnable executable", () => {
+		expect(isCommandAvailable("node")).toBe(true)
+	})
+
+	test("reports a missing executable as unavailable", () => {
+		expect(isCommandAvailable("kizlo-not-a-real-binary")).toBe(false)
+	})
+})
+
+describe("availablePackageManagers", () => {
+	test("keeps only installed managers, preserving order", () => {
+		// npm ships with the Node.js that runs this suite, so it is always present.
+		const result = availablePackageManagers(["pnpm", "npm", "yarn", "bun"])
+		expect(result).toContain("npm")
+		expect(result).toEqual(["pnpm", "npm", "yarn", "bun"].filter((pm) => result.includes(pm as never)))
 	})
 })
 
