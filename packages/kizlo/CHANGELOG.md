@@ -1,5 +1,15 @@
 # kizlo
 
+## 0.8.3
+
+### Patch Changes
+
+- [#74](https://github.com/kizlo-io/kizlo/pull/74) [`7375af8`](https://github.com/kizlo-io/kizlo/commit/7375af8003b4d5b93964c0734f09e0b9fb98d36a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `create` now scaffolds with the framework's official CLI.
+
+- [#75](https://github.com/kizlo-io/kizlo/pull/75) [`f26d5c5`](https://github.com/kizlo-io/kizlo/commit/f26d5c5bb447fe0bacad4ccf179d63ed6a04d0b2) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `create` now offers to install dependencies for you, running the install with your chosen package manager.
+
+- [#72](https://github.com/kizlo-io/kizlo/pull/72) [`f3e51b5`](https://github.com/kizlo-io/kizlo/commit/f3e51b59083a573625b00fb7eaaf58da3863d251) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `create` now asks which package manager to use, listing only the ones installed on your system.
+
 ## 0.8.2
 
 ### Patch Changes
