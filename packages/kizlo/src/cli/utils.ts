@@ -156,6 +156,23 @@ export function addDependencyArgs(pm: PackageManager, pkg: string): string[] {
 	return [pm, "add", pkg]
 }
 
+/**
+ * The argv to run a framework's `create-*` initializer through a package manager, e.g.
+ * `pnpm create next-app@latest my-app --ts …`. The mechanics differ per manager: npm forwards
+ * flags to the initializer only after a `--` separator, and `yarn create` resolves the latest
+ * version itself so the `@latest` tag is dropped. `flags` are the initializer's own options.
+ */
+export function frameworkCreateArgs(pm: PackageManager, initializer: string, name: string, flags: string[]): string[] {
+	switch (pm) {
+		case "npm":
+			return ["npm", "create", initializer, name, "--", ...flags]
+		case "yarn":
+			return ["yarn", "create", initializer.replace(/@latest$/, ""), name, ...flags]
+		default:
+			return [pm, "create", initializer, name, ...flags]
+	}
+}
+
 export function runCommand(args: string[], cwd: string, stdio: "inherit" | "ignore" = "inherit"): boolean {
 	const [command, ...rest] = args
 	if (!command) return false
@@ -165,6 +182,22 @@ export function runCommand(args: string[], cwd: string, stdio: "inherit" | "igno
 		shell: process.platform === "win32",
 	})
 	return result.status === 0
+}
+
+/**
+ * Run a command capturing its combined output instead of streaming it, for a step that should stay
+ * quiet on success but whose logs are worth surfacing when it fails (e.g. the framework's scaffolder
+ * behind a spinner). Returns whether it succeeded and the trimmed stdout+stderr.
+ */
+export function runCommandCaptured(args: string[], cwd: string): { ok: boolean; output: string } {
+	const [command, ...rest] = args
+	if (!command) return { ok: false, output: "" }
+	const result = spawnSync(command, rest, {
+		cwd,
+		encoding: "utf8",
+		shell: process.platform === "win32",
+	})
+	return { ok: result.status === 0, output: `${result.stdout ?? ""}${result.stderr ?? ""}`.trim() }
 }
 
 export function writeFileIfAbsent(filePath: string, contents: string): boolean {

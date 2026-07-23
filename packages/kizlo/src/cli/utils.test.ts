@@ -10,6 +10,7 @@ import {
 	detectPackageManager,
 	ensureGitignored,
 	envKeysPresent,
+	frameworkCreateArgs,
 	isCommandAvailable,
 	mergeEnv,
 	readTsconfigPaths,
@@ -247,6 +248,52 @@ describe("addDependencyArgs", () => {
 		expect(addDependencyArgs("pnpm", "kizlo")).toEqual(["pnpm", "add", "kizlo"])
 		expect(addDependencyArgs("yarn", "kizlo")).toEqual(["yarn", "add", "kizlo"])
 		expect(addDependencyArgs("bun", "kizlo")).toEqual(["bun", "add", "kizlo"])
+	})
+})
+
+describe("frameworkCreateArgs", () => {
+	const flags = ["--ts", "--app"]
+
+	test("npm forwards initializer flags after a -- separator", () => {
+		expect(frameworkCreateArgs("npm", "next-app@latest", "my-app", flags)).toEqual([
+			"npm",
+			"create",
+			"next-app@latest",
+			"my-app",
+			"--",
+			"--ts",
+			"--app",
+		])
+	})
+
+	test("yarn drops the @latest tag and passes flags directly", () => {
+		expect(frameworkCreateArgs("yarn", "next-app@latest", "my-app", flags)).toEqual([
+			"yarn",
+			"create",
+			"next-app",
+			"my-app",
+			"--ts",
+			"--app",
+		])
+	})
+
+	test("pnpm and bun pass the tagged initializer and flags directly", () => {
+		expect(frameworkCreateArgs("pnpm", "next-app@latest", "my-app", flags)).toEqual([
+			"pnpm",
+			"create",
+			"next-app@latest",
+			"my-app",
+			"--ts",
+			"--app",
+		])
+		expect(frameworkCreateArgs("bun", "next-app@latest", "my-app", flags)).toEqual([
+			"bun",
+			"create",
+			"next-app@latest",
+			"my-app",
+			"--ts",
+			"--app",
+		])
 	})
 })
 

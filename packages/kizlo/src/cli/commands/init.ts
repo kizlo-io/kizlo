@@ -3,19 +3,9 @@ import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
 import { printBanner } from "../banner"
-import { CONTRACT_BARREL } from "../daemon/generate"
-import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldContext, type ScaffoldFile } from "../presets"
-import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode } from "../presets/patch"
+import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldFile } from "../presets"
 import { fetchTemplate } from "../presets/source"
-import {
-	adaptOwnFile,
-	findRootLayout,
-	ownEntries,
-	patchEntries,
-	readManifest,
-	resolvePatch,
-	type TemplateManifest,
-} from "../presets/template"
+import { adaptOwnFile, ownEntries, readManifest, type TemplateManifest } from "../presets/template"
 import {
 	addDependencyArgs,
 	detectImportAlias,
@@ -23,9 +13,7 @@ import {
 	ensureGitignored,
 	getVersion,
 	loadEnvFiles,
-	resolveModuleImport,
 	runCommand,
-	writeFileIfAbsent,
 } from "../utils"
 import { dockerAvailable } from "../wp/docker"
 import {
@@ -41,6 +29,15 @@ import {
 	withApiPath,
 	writeEnv,
 } from "./_setup"
+import {
+	applyLayoutPatches,
+	buildScaffoldContext,
+	kizloConfigTemplate,
+	reportScaffold,
+	type ScaffoldResult,
+	scaffoldFile,
+	writeGeneratedContract,
+} from "./_wiring"
 
 /** init's connection plus the framework-specific choices only init makes. */
 type Setup = Connection & {
@@ -59,17 +56,6 @@ function aliasWithSlash(alias: string | undefined): string {
 	return alias ? `${alias.replace(/\/+$/, "")}/` : ""
 }
 
-function kizloConfigTemplate(dir: string, alias: string, devPath?: string): string {
-	const aliasLine = alias ? `\n\talias: "${alias}",` : ""
-	const devLine = devPath ? `\n\tdev: { path: "${devPath}" },` : ""
-	return `import { defineConfig } from "kizlo/config"
-
-export default defineConfig({
-	dir: "${dir}",${aliasLine}${devLine}
-})
-`
-}
-
 /** Whether two URLs share an origin (scheme + host + port); false when either can't be parsed. */
 function sameOrigin(a: string, b: string): boolean {
 	try {
@@ -83,39 +69,6 @@ function detectAppDir(cwd: string, hasSrcDir: boolean): string {
 	if (fs.existsSync(path.join(cwd, "src", "app"))) return "src/app"
 	if (fs.existsSync(path.join(cwd, "app"))) return "app"
 	return hasSrcDir ? "src/app" : "app"
-}
-
-type ScaffoldResult = "created" | "overwritten" | "kept"
-
-/**
- * The single overwrite policy for every scaffolded file: create it when absent, overwrite on
- * `--force`, and otherwise ask before clobbering an existing file (keeping it when the user
- * declines or when running non-interactively with `--yes`). Every scaffolded file routes through
- * here rather than deciding for itself, so new files inherit the same behavior for free.
- */
-async function scaffoldFile(cwd: string, file: ScaffoldFile, opts: { force: boolean; yes: boolean }): Promise<ScaffoldResult> {
-	const absPath = path.join(cwd, file.relPath)
-	const existed = fs.existsSync(absPath)
-	if (existed) {
-		let overwrite = opts.force
-		if (!opts.force && !opts.yes) {
-			p.log.warn(`${file.label} already exists at ${file.relPath}`)
-			overwrite = orCancel(await p.confirm({ message: "Overwrite it?", initialValue: true }))
-		}
-		if (!overwrite) return "kept"
-	}
-	fs.mkdirSync(path.dirname(absPath), { recursive: true })
-	fs.writeFileSync(absPath, file.contents)
-	return existed ? "overwritten" : "created"
-}
-
-/** Report a {@link scaffoldFile} outcome in init's usual voice. */
-function reportScaffold(file: ScaffoldFile, result: ScaffoldResult, yes: boolean): void {
-	if (result === "kept") {
-		p.log.info(`Kept existing ${file.label} (${file.relPath})${yes ? " — pass --force to overwrite" : ""}`)
-	} else {
-		p.log.success(`${result === "overwritten" ? "Overwrote" : "Created"} ${file.label} (${file.relPath})`)
-	}
 }
 
 async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }): Promise<Setup> {
@@ -301,15 +254,7 @@ export const init = defineCommand({
 		const serverDirRel = path.join(dirRel, "server")
 		const clientUrl = setup.siteUrl && !sameOrigin(setup.siteUrl, setup.baseUrl) ? setup.baseUrl : undefined
 
-		const scaffold: ScaffoldContext = {
-			kizloDir: dirRel,
-			serverDirName: path.basename(serverDirRel),
-			serverEntryPath: path.join(serverDirRel, "index.ts"),
-			clientPath: path.join(dirRel, "client.ts"),
-			appDir: detectAppDir(cwd, hasSrcDir),
-			serverImport: (fromDir) => resolveModuleImport(cwd, serverDirRel, fromDir, setup.alias),
-			clientUrl,
-		}
+		const scaffold = buildScaffoldContext(cwd, { dirRel, appDir: detectAppDir(cwd, hasSrcDir), alias: setup.alias, clientUrl })
 
 		const files: ScaffoldFile[] = [
 			{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.devPath) },
@@ -336,55 +281,15 @@ export const init = defineCommand({
 		const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
 		for (const file of files) scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force, yes }) })
 
-		const generatedDirRel = path.join(serverDirRel, "generated")
-		writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")
-		writeFileIfAbsent(path.join(cwd, generatedDirRel, "index.ts"), CONTRACT_BARREL)
+		writeGeneratedContract(cwd, serverDirRel)
 
 		const gitignore = ensureGitignored(cwd, ".env")
 
 		for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
 
-		// Merge Kizlo wiring into files the project already owns (the root layout's SEO exports). This
-		// step never aborts the command: the target is resolved by identity (the layout that renders
-		// `<html>`), and on any doubt — not found, not parseable — the resolved payload is collected and
-		// printed at the end with placement instructions rather than written to a guessed-at file. A
-		// confident apply is an idempotent upsert: it replaces our exports if present, adds them if not.
-		const manualSteps: ResolvedPatch[] = []
-		for (const entry of manifest ? patchEntries(manifest) : []) {
-			const resolved = resolvePatch(entry, (manifest as TemplateManifest).tokens, scaffold)
-			const target = findRootLayout(cwd, scaffold.appDir, resolved.relPath)
-			if (!target) {
-				manualSteps.push(resolved)
-				p.log.info(`Couldn't find your ${resolved.label} to wire Kizlo into — see the code to add below`)
-				continue
-			}
-			const relTarget = path.relative(cwd, target)
-			const src = fs.readFileSync(target, "utf8")
-			let applied: ReturnType<typeof applyPatchToSource>
-			try {
-				applied = applyPatchToSource(src, resolved)
-			} catch {
-				manualSteps.push(resolved)
-				p.log.warn(`Couldn't parse your ${resolved.label} (${relTarget}) — see the code to add below`)
-				continue
-			}
-			const { text, changes } = applied
-			if (patchChanged(changes)) {
-				fs.writeFileSync(target, text)
-				const parts = [
-					...(changes.replacedExports.length ? [`replaced ${changes.replacedExports.join(", ")}`] : []),
-					...(changes.addedExports.length ? [`added ${changes.addedExports.join(", ")}`] : []),
-					...(changes.addedImports.length ? ["imports"] : []),
-				]
-				p.log.success(`Wired Kizlo into your ${resolved.label} (${relTarget}) — ${parts.join(", ")}`)
-			} else {
-				p.log.info(`Your ${resolved.label} is already wired (${relTarget})`)
-			}
-		}
-
-		for (const resolved of manualSteps) {
-			p.note(renderPatchCode(resolved), `Add these to your ${resolved.label} (the layout that renders <html>)`)
-		}
+		// Merge Kizlo wiring into the root layout's SEO exports. Never aborts — an unresolved or
+		// unparseable target falls back to a printed instruction (see applyLayoutPatches).
+		if (manifest) applyLayoutPatches(cwd, manifest, scaffold)
 
 		if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)
 

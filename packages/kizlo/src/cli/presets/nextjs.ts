@@ -9,6 +9,7 @@ export const nextjs: Preset = {
 	},
 	baseUrlEnvKey: "NEXT_PUBLIC_KIZLO_BACKEND_URL",
 	apiPath: "/api/kizlo",
-	// The wiring bodies live in the `nextjs` template folder; init fetches it and drives the manifest.
+	// The wiring bodies and the framework bootstrap command both live in the `nextjs` template folder;
+	// create/init fetch it and drive everything from the manifest.
 	template: "nextjs",
 }
