@@ -345,16 +345,18 @@ export async function syncRemote(conn: Connection): Promise<void> {
 		)
 }
 
+/** The "Next steps" lines, branched on whether a local dev stack was set up. */
+export function nextStepsLines(mode: Connection["mode"], prefix = ""): string[] {
+	return [
+		...(mode === "local"
+			? [`Start your local WordPress dev stack:`, `  ${prefix}npx kizlo dev`, ``]
+			: [`Watch your extensions and regenerate the contract during development:`, `  ${prefix}npx kizlo watch`, ``]),
+		`Generate the contract once for production builds:`,
+		`  ${prefix}npx kizlo generate`,
+	]
+}
+
 /** The shared "Next steps" note, branched on whether a local dev stack was set up. */
 export function nextStepsNote(mode: Connection["mode"], prefix = ""): void {
-	p.note(
-		[
-			...(mode === "local"
-				? [`Start your local WordPress dev stack (also watches your extensions):`, `  ${prefix}npx kizlo dev`, ``]
-				: [`Watch your extensions and regenerate the contract during development:`, `  ${prefix}npx kizlo watch`, ``]),
-			`Generate the contract once for production builds:`,
-			`  ${prefix}npx kizlo generate`,
-		].join("\n"),
-		"Next steps",
-	)
+	p.note(nextStepsLines(mode, prefix).join("\n"), "Next steps")
 }

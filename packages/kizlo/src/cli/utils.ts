@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -156,6 +156,11 @@ export function addDependencyArgs(pm: PackageManager, pkg: string): string[] {
 	return [pm, "add", pkg]
 }
 
+/** The argv to install a project's dependencies with `pm` — every supported manager spells it `<pm> install`. */
+export function installArgs(pm: PackageManager): string[] {
+	return [pm, "install"]
+}
+
 /**
  * The argv to run a framework's `create-*` initializer through a package manager, e.g.
  * `pnpm create next-app@latest my-app --ts …`. The mechanics differ per manager: npm forwards
@@ -182,6 +187,21 @@ export function runCommand(args: string[], cwd: string, stdio: "inherit" | "igno
 		shell: process.platform === "win32",
 	})
 	return result.status === 0
+}
+
+/**
+ * Async sibling of {@link runCommand}: runs a command without blocking the event loop, so a clack
+ * spinner can keep animating while it works (a synchronous `spawnSync` would freeze it on the first
+ * frame). Resolves whether it exited cleanly; a spawn error (binary off PATH) resolves false.
+ */
+export function runCommandAsync(args: string[], cwd: string, stdio: "inherit" | "ignore" = "inherit"): Promise<boolean> {
+	const [command, ...rest] = args
+	if (!command) return Promise.resolve(false)
+	return new Promise((resolve) => {
+		const child = spawn(command, rest, { cwd, stdio, shell: process.platform === "win32" })
+		child.on("error", () => resolve(false))
+		child.on("close", (code) => resolve(code === 0))
+	})
 }
 
 /**

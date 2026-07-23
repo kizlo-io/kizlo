@@ -13,13 +13,15 @@ import {
 	ensureGitignored,
 	frameworkCreateArgs,
 	getVersion,
+	installArgs,
 	type PackageManager,
+	runCommandAsync,
 	runCommandCaptured,
 } from "../utils"
 import { dockerAvailable } from "../wp/docker"
 import {
 	collectConnectionInteractively,
-	nextStepsNote,
+	nextStepsLines,
 	orCancel,
 	setupLocalWordPress,
 	syncRemote,
@@ -201,9 +203,6 @@ export const create = defineCommand({
 			process.exit(1)
 		}
 
-		// The template is the single source of truth for the framework: fetch it once, then use its
-		// manifest to bootstrap the base app and to wire Kizlo in. Clean up the fetched copy on every
-		// exit — process.exit skips finally, so failures cancel through `fail`, which cleans up first.
 		const fetched = await fetchTemplate(template)
 		const fail = (message: string): never => {
 			fetched.cleanup()
@@ -235,12 +234,20 @@ export const create = defineCommand({
 		}
 		fetched.cleanup()
 
+		let depsInstalled = false
+		if (orCancel(await p.confirm({ message: "Install dependencies now?", initialValue: true }))) {
+			const is = p.spinner()
+			is.start(`Installing dependencies with ${pm}`)
+			depsInstalled = await runCommandAsync(installArgs(pm), dir, "ignore")
+			is.stop(depsInstalled ? "Installed dependencies" : "Could not install dependencies")
+			if (!depsInstalled) p.log.warn(`Install them yourself: cd ${name} && ${installArgs(pm).join(" ")}`)
+		}
+
 		await setupLocalWordPress(dir, conn)
 		await writeEnv(dir, preset, conn, { force: true, yes: false })
 		await syncRemote(conn)
 
-		p.note([`cd ${name}`, `${pm} install`].join("\n"), "Get started")
-		nextStepsNote(conn.mode)
+		p.note([`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ``, ...nextStepsLines(conn.mode)].join("\n"), "Next steps")
 
 		p.outro("Kizlo is ready 🎉")
 	},
