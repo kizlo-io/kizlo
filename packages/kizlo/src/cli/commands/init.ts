@@ -189,7 +189,18 @@ export const init = defineCommand({
 		p.intro(`Let's configure Kizlo in your existing application`)
 
 		if (!fs.existsSync(pkgPath)) {
-			p.cancel("No package.json found — run `kizlo init` inside a project.")
+			p.note(
+				[
+					"`kizlo init` adds Kizlo to an existing app, but this directory has no package.json.",
+					"",
+					"Start a new project (scaffolds an app with Kizlo already wired):",
+					"  npx kizlo@latest create",
+					"",
+					"Already have an app? cd into it, then run `kizlo init` again.",
+				].join("\n"),
+				"Nothing to configure here",
+			)
+			p.cancel("No package.json found in this directory.")
 			process.exit(1)
 		}
 

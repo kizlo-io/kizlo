@@ -45,7 +45,7 @@ export default async function HomePage() {
 			</p>
 
 			<div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-				<Command command="npx kizlo init" />
+				<Command command="npx kizlo create" />
 
 				<Link
 					href={docsRoute}

@@ -361,6 +361,9 @@ importers:
         specifier: ^19.2.3
         version: 19.2.7(react@19.2.7)
     devDependencies:
+      '@tooling/typescript':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
       '@types/node':
         specifier: ^22.18.12
         version: 22.19.21
