@@ -1,5 +1,14 @@
 # @kizlo/cf7
 
+## 0.1.8
+
+### Patch Changes
+
+- [#81](https://github.com/kizlo-io/kizlo/pull/81) [`e9093ee`](https://github.com/kizlo-io/kizlo/commit/e9093ee9c5b00973a252ec502b707fdd4d5f283a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Relicense from MIT to Apache 2.0
+
+- Updated dependencies [[`e9093ee`](https://github.com/kizlo-io/kizlo/commit/e9093ee9c5b00973a252ec502b707fdd4d5f283a)]:
+  - @kizlo/shared@0.5.1
+
 ## 0.1.7
 
 ### Patch Changes
