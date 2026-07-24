@@ -2,10 +2,10 @@ import { randomBytes } from "node:crypto"
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { defineCommand } from "citty"
-import { palette, printBanner } from "../banner"
+import { palette } from "../banner"
 import { hasDevStack, type ResolvedDevConfig, resolveDevConfig } from "../daemon/config"
 import { startWatcher } from "../daemon/watch"
-import { ensureGitignored, envGroups, getVersion, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
+import { ensureGitignored, envGroups, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
 import { createStack, type DockerStack } from "../wp/docker"
 import { reapOrphans, registerSession, removeProjectContainers, spawnWatchdog, unregisterSession } from "../wp/session"
@@ -173,8 +173,8 @@ function armForegroundTeardown(cfg: ResolvedDevConfig): void {
 }
 
 /**
- * Boot the stack and run in the foreground until exit — the shared path behind bare
- * `kizlo dev` and `kizlo dev reset`. Arms teardown first (so a mid-startup cancel still
+ * Boot the stack and run in the foreground until exit — the path behind bare
+ * `kizlo dev`. Arms teardown first (so a mid-startup cancel still
  * stops partial containers), shows a timed spinner, prints the summary + stop hint, then
  * parks. A referenced timer holds the event loop open — an unresolved promise alone would
  * not, so without it Node would empty its loop and exit straight after printing.
@@ -252,8 +252,6 @@ async function watchOnly(cwd: string): Promise<void> {
  * (`dev.path` unset), there's nothing to boot, so it runs the contract watcher alone.
  */
 async function bringUp(): Promise<void> {
-	printBanner(getVersion())
-
 	const cwd = process.cwd()
 	if (!(await hasDevStack(cwd))) {
 		await watchOnly(cwd)
@@ -286,13 +284,12 @@ const down = defineCommand({
 })
 
 const reset = defineCommand({
-	meta: { name: "reset", description: "Wipe the database and the install folder, then rebuild fresh" },
+	meta: { name: "reset", description: "Wipe the database and the install folder so the next `kizlo dev` rebuilds fresh" },
 	async run() {
-		printBanner(getVersion())
 		const { cfg, stack } = await resolve(process.cwd())
-		await withSpinner("Wiping WordPress dev stack", () => stack.composeDown({ volumes: true }), "Stack wiped")
+		await withSpinner("Wiping WordPress dev stack", () => stack.composeDown({ volumes: true }), "Local WordPress reset successfully")
 		rmSync(cfg.wordpressDir, { recursive: true, force: true })
-		await startForeground(cfg)
+		note("Run `kizlo dev` to rebuild a fresh stack.")
 	},
 })
 

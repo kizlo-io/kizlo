@@ -68,10 +68,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		fs.rmSync(dir, { recursive: true, force: true })
 	})
 
-	it("scaffolds the wiring and starter files, records the kizlo dep, and patches the layout", async () => {
-		await applyManifestWiring(dir, templateDir, manifest, { devPath: "wordpress", includeStarter: true })
+	it("scaffolds the wiring and starter files, records the kizlo dep, and writes the wired layout", async () => {
+		await applyManifestWiring(dir, templateDir, manifest, { devPath: "wordpress", includeExamples: true })
 
-		// Wiring files land where the manifest tokens place them.
+		// Wiring files land where the manifest conventions place them.
 		expect(fs.existsSync(path.join(dir, "src/lib/kizlo/server/index.ts"))).toBe(true)
 		expect(fs.existsSync(path.join(dir, "src/app/api/kizlo/[[...rest]]/route.ts"))).toBe(true)
 		// Generated contract is seeded so imports resolve before the first watch/generate.
@@ -92,10 +92,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		expect(pkg.dependencies.kizlo).toBe(`^${getVersion()}`)
 		expect(pkg.dependencies.next).toBe("^16.0.0")
 
-		// The framework's root layout is patched: Kizlo's SEO exports replace the static `metadata`.
+		// On a fresh app Kizlo owns the layout, so create writes it whole, already SEO-wired — the
+		// framework's static `metadata` export is gone, replaced by Kizlo's `generateMetadata`.
 		const layout = fs.readFileSync(path.join(dir, "src/app/layout.tsx"), "utf8")
 		expect(layout).toContain("generateMetadata")
 		expect(layout).toContain("createRootMetadata")
 		expect(layout).not.toContain("export const metadata")
+	})
+
+	it("skips only the example pages when declined, still writing the core layout and styles", async () => {
+		await applyManifestWiring(dir, templateDir, manifest, { devPath: "wordpress", includeExamples: false })
+
+		// Core create wiring still lands: the SEO-wired layout (overwriting the framework's) and its styles.
+		const layout = fs.readFileSync(path.join(dir, "src/app/layout.tsx"), "utf8")
+		expect(layout).toContain("createRootMetadata")
+		expect(layout).not.toContain("export const metadata")
+		expect(fs.existsSync(path.join(dir, "src/app/globals.css"))).toBe(true)
+
+		// The `example`-flagged demo pages are the only thing skipped.
+		expect(fs.existsSync(path.join(dir, "src/app/page.tsx"))).toBe(false)
+		expect(fs.existsSync(path.join(dir, "src/app/blog/[slug]/page.tsx"))).toBe(false)
 	})
 })

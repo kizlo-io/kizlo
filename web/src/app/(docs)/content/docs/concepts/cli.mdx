@@ -129,7 +129,7 @@ test stack:
 | `kizlo dev` | Start the stack and provision it — idempotent, never wipes |
 | `kizlo dev stop` | Stop the stack, keeping everything for a fast resume |
 | `kizlo dev down` | Stop and remove the containers — keeps the database and your files (use `reset` to wipe) |
-| `kizlo dev reset` | Wipe the database **and** the `dev.path` folder, then rebuild fresh |
+| `kizlo dev reset` | Wipe the database **and** the `dev.path` folder — the next `kizlo dev` rebuilds fresh |
 
 On first install, `kizlo dev` mints a **random** admin password (not a guessable default) and prints it once
 so you can log into `wp-admin`. Save it then; it isn't stored on disk. Later runs are idempotent and leave

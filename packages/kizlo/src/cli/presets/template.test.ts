@@ -3,7 +3,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { adaptOwnFile, findRootLayout, ownEntries, patchEntries, readManifest, resolvePatch } from "./template"
+import { adaptFile, changesFor, fileEntries, findRootLayout, isExample, patchEntries, readManifest, resolvePatch } from "./template"
 import type { ScaffoldContext } from "./types"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -22,30 +22,41 @@ function ctx(): ScaffoldContext {
 	}
 }
 
-describe("readManifest / adaptOwnFile / resolvePatch", () => {
+describe("readManifest / adaptFile / resolvePatch", () => {
 	const manifest = readManifest(templateDir)
 
-	it("splits the manifest into own files and patches", () => {
-		expect(ownEntries(manifest).map((e) => e.role)).toContain("api-route")
-		expect(patchEntries(manifest).map((e) => e.role)).toEqual(["root-layout"])
+	it("splits a resolved change set into files and patches", () => {
+		const changes = changesFor(manifest, "init")
+		expect(fileEntries(changes).map((e) => e.role)).toContain("api-route")
+		expect(patchEntries(changes).map((e) => e.role)).toEqual(["root-layout"])
 	})
 
-	it("excludes starter files by default and includes them only when asked", () => {
-		// init lays down only wiring, so a user's own home page/styles are never clobbered.
-		const wiringRoles = ownEntries(manifest).map((e) => e.role)
-		expect(wiringRoles).toContain("api-route")
-		expect(wiringRoles).not.toContain("home-page")
+	it("gives init only base changes and create the demo pages on top", () => {
+		// init lays down only base wiring, so a user's own home page/styles are never clobbered.
+		const initRoles = fileEntries(changesFor(manifest, "init")).map((e) => e.role)
+		expect(initRoles).toContain("api-route")
+		expect(initRoles).not.toContain("home-page")
 
-		// create scaffolds the demo starter files on top of a fresh app.
-		const allRoles = ownEntries(manifest, { includeStarter: true }).map((e) => e.role)
-		expect(allRoles).toContain("api-route")
-		expect(allRoles).toContain("home-page")
+		// create scaffolds base plus the demo pages on top of a fresh app.
+		const createRoles = fileEntries(changesFor(manifest, "create")).map((e) => e.role)
+		expect(createRoles).toContain("api-route")
+		expect(createRoles).toContain("home-page")
 	})
 
-	it("rewrites an own file's path prefix and server-import specifier to the project's", () => {
-		const apiRoute = ownEntries(manifest).find((e) => e.role === "api-route")
+	it("flags the demo pages as examples and leaves the core layout/styles unflagged", () => {
+		const created = fileEntries(changesFor(manifest, "create"))
+		const examples = created.filter(isExample).map((e) => e.role)
+		// Only the opt-in demo pages carry the example flag; the layout and styles are core wiring.
+		expect(examples).toContain("home-page")
+		expect(examples).toContain("blog-post")
+		expect(examples).not.toContain("root-layout")
+		expect(examples).not.toContain("styles")
+	})
+
+	it("rewrites a file's path prefix and server-import specifier to the project's", () => {
+		const apiRoute = fileEntries(changesFor(manifest, "init")).find((e) => e.role === "api-route")
 		if (!apiRoute) throw new Error("api-route entry missing")
-		const file = adaptOwnFile(templateDir, apiRoute, manifest.tokens, ctx())
+		const file = adaptFile(templateDir, apiRoute, manifest.conventions, ctx())
 
 		// The template's `src/app/...` prefix becomes the project's `app/...`.
 		expect(file.relPath).toBe("app/api/kizlo/[[...rest]]/route.ts")
@@ -55,9 +66,9 @@ describe("readManifest / adaptOwnFile / resolvePatch", () => {
 	})
 
 	it("resolves a patch's import token against the project's server import", () => {
-		const patch = patchEntries(manifest)[0]
+		const patch = patchEntries(changesFor(manifest, "init"))[0]
 		if (!patch) throw new Error("patch entry missing")
-		const resolved = resolvePatch(patch, manifest.tokens, ctx())
+		const resolved = resolvePatch(patch, manifest.conventions, ctx())
 		expect(resolved.relPath).toBe("app/layout.tsx")
 		expect(resolved.imports.some((i) => i.module === "@/lib/kizlo/server" && i.names.includes("client"))).toBe(true)
 		expect(resolved.exports.map((e) => e.name)).toEqual(["generateMetadata", "generateViewport"])

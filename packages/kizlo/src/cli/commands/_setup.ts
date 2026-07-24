@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
+import getPort, { portNumbers } from "get-port"
 import z from "zod/v4"
 import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName } from "../daemon/config"
 import type { Preset } from "../presets"
@@ -46,6 +47,11 @@ export interface Connection {
 	wpPassword: string
 	/** Folder the local WordPress install lives in (`dev.path`); set only when `mode` is `local`. */
 	devPath?: string
+	/**
+	 * One-time wp-admin login password from a fresh local install, surfaced in the "Next steps" box.
+	 * Set by {@link setupLocalWordPress}; absent when resuming an existing stack (nothing to show).
+	 */
+	adminPassword?: string
 }
 
 /**
@@ -121,15 +127,37 @@ export function withApiPath(baseUrl: string, apiPath: string): string {
 	}
 }
 
+/** The conventional starting port a scaffolded app's dev server serves from. */
+const DEFAULT_APP_PORT = 3000
+
+/**
+ * Pick a free port for a freshly scaffolded app, preferring {@link DEFAULT_APP_PORT} and stepping
+ * upward when it's taken. `create` builds the app URL from this and writes it into `.env`, which is
+ * synced to WordPress as the event/webhook delivery target — so defaulting it to a port already in use
+ * would hand WordPress an unreachable URL, and it fails *silently* there (events just never arrive).
+ * `get-port` probes every loopback family (including the IPv6 `::1` a dev server often binds on macOS),
+ * so it never returns a port that's really in use. `init` doesn't use this — an existing project owns
+ * its own port, so it asks the user instead.
+ */
+export function pickAppPort(): Promise<number> {
+	return getPort({ port: portNumbers(DEFAULT_APP_PORT, DEFAULT_APP_PORT + 100) })
+}
+
 /**
  * Collect the WordPress connection interactively: the backend/site URLs, the webhook signing
  * secret, and either the local-dev folder or a remote site's credentials. The caller layers any
  * framework-specific prompts (directory, import alias) on top of what this returns.
+ *
+ * When `baseUrl` is supplied the public-URL prompt is skipped and that value is used verbatim —
+ * `create` scaffolds a brand-new app that has no public URL yet, so it defaults to the local dev
+ * origin and lets the user fill in production later.
  */
-export async function collectConnectionInteractively(preset: Preset): Promise<Connection> {
+export async function collectConnectionInteractively(preset: Preset, opts: { baseUrl?: string } = {}): Promise<Connection> {
 	let siteUrl: string | undefined
 	let baseUrl: string
-	if (preset.apiPath) {
+	if (opts.baseUrl !== undefined) {
+		baseUrl = opts.baseUrl
+	} else if (preset.apiPath) {
 		baseUrl = orCancel(await p.text({ message: "Public app URL", placeholder: "https://your-app.com", validate: validate(urlString) }))
 	} else {
 		siteUrl = orCancel(await p.text({ message: "Public site URL", placeholder: "https://your-app.com", validate: validate(urlString) }))
@@ -273,10 +301,9 @@ export async function setupLocalWordPress(cwd: string, conn: Connection): Promis
 		conn.wpUrl = local.url
 		conn.wpUsername = local.username
 		conn.wpPassword = local.appPassword
+		conn.adminPassword = local.adminPassword
 		s.stop("Local WordPress ready")
 		if (local.secretSyncError) p.log.warn(`Could not sync KIZLO_DEV_SITE_SECRET to the local plugin (${local.secretSyncError})`)
-		p.log.success(`Local WordPress configured (${conn.devPath}) — .env points at ${conn.wpUrl}`)
-		if (local.adminPassword) p.log.warn(`wp-admin login: ${conn.wpUsername} / ${local.adminPassword} — save it, it's shown only once`)
 	} catch (error) {
 		s.stop("Local WordPress setup failed")
 		p.cancel(error instanceof Error ? error.message : String(error))
@@ -345,20 +372,16 @@ export async function syncRemote(conn: Connection): Promise<void> {
 		)
 }
 
-/** The "Next steps" lines, branched on whether a local dev stack was set up. */
-export function nextStepsLines(mode: Connection["mode"], prefix = ""): string[] {
-	return [
-		...(mode === "local"
-			? [`Start your local WordPress dev stack and watch your extensions:`]
-			: [`Watch your extensions and regenerate the contract during development:`]),
-		`  ${prefix}npx kizlo dev`,
-		``,
-		`Generate the contract once for production builds:`,
-		`  ${prefix}npx kizlo generate`,
-	]
+/** The "Next steps" lines. `kizlo dev` is the single entry point for development. */
+export function nextStepsLines(conn: Connection, prefix = ""): string[] {
+	const login =
+		conn.mode === "local" && conn.adminPassword
+			? [``, `Log in to wp-admin (${conn.wpUrl}/wp-admin):`, `  ${conn.wpUsername} / ${conn.adminPassword} — save it, it's shown only once`]
+			: []
+	return [`Start developing:`, `  ${prefix}npx kizlo dev`, ...login]
 }
 
-/** The shared "Next steps" note, branched on whether a local dev stack was set up. */
-export function nextStepsNote(mode: Connection["mode"], prefix = ""): void {
-	p.note(nextStepsLines(mode, prefix).join("\n"), "Next steps")
+/** The shared "Next steps" note. */
+export function nextStepsNote(conn: Connection, prefix = ""): void {
+	p.note(nextStepsLines(conn, prefix).join("\n"), "Next steps")
 }
