@@ -198,10 +198,21 @@ export interface ResolvedDevConfig {
 }
 
 /**
+ * Whether a local WordPress dev stack is configured (`dev.path` is set). When false, `kizlo dev`
+ * has no stack to boot and runs the contract watcher alone — the path a bring-your-own-WordPress
+ * project takes. Loads `kizlo.config.*` from the config dir; a missing config counts as no stack.
+ */
+export async function hasDevStack(cwd: string): Promise<boolean> {
+	const fileConfig = await loadConfigFile(findConfigDir(cwd))
+	return Boolean(fileConfig?.dev?.path)
+}
+
+/**
  * Resolve the `dev` block from `kizlo.config.*` into concrete values for the `dev`
  * command, applying defaults (port 8080). `dev.path` is required — the whole
  * WordPress install lives there, so we make the user choose a real folder rather
- * than hide it under a default.
+ * than hide it under a default. Callers gate on {@link hasDevStack} first, since a
+ * project without a local stack runs the watcher alone rather than reaching here.
  */
 export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> {
 	const configDir = findConfigDir(cwd)

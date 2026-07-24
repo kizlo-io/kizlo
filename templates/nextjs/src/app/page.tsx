@@ -1,10 +1,6 @@
 import Link from "next/link"
 import { client } from "@/lib/kizlo/server"
 
-// A Server Component: the fetch runs on the server through your typed Kizlo client, so the
-// WordPress credentials never reach the browser. The result is fully typed from the contract.
-export const dynamic = "force-dynamic"
-
 export default async function Home() {
 	const { items } = await client.posts.list.call({ query: { perPage: 10 } })
 

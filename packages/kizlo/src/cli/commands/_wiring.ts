@@ -76,7 +76,7 @@ export function reportScaffold(file: ScaffoldFile, result: ScaffoldResult, yes: 
 	}
 }
 
-/** Seed the generated-contract directory so imports resolve before the first `kizlo watch`/`generate`. */
+/** Seed the generated-contract directory so imports resolve before the first `kizlo dev`/`generate`. */
 export function writeGeneratedContract(cwd: string, serverDirRel: string): void {
 	const generatedDirRel = path.join(serverDirRel, "generated")
 	writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")

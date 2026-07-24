@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { defineCommand } from "citty"
 import { palette, printBanner } from "../banner"
-import { type ResolvedDevConfig, resolveDevConfig } from "../daemon/config"
+import { hasDevStack, type ResolvedDevConfig, resolveDevConfig } from "../daemon/config"
 import { startWatcher } from "../daemon/watch"
 import { ensureGitignored, envGroups, getVersion, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
@@ -227,17 +227,43 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 }
 
 /**
+ * Run the contract watcher in the foreground until exit — the path bare `kizlo dev` takes when no
+ * local dev stack is configured (a bring-your-own-WordPress project). Generates once, then watches
+ * the server files and regenerates on save. Returns immediately when another watcher already holds
+ * the lock; otherwise the persistent watcher keeps the process alive on its own.
+ */
+async function watchOnly(cwd: string): Promise<void> {
+	const stop = await startWatcher(cwd)
+	if (!stop) return
+
+	process.on("exit", stop)
+	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+		process.on(signal, () => {
+			stop()
+			process.exit(0)
+		})
+	}
+}
+
+/**
  * Start (or resume) the dev stack. Backs bare `kizlo dev`. Always runs in the foreground
  * and stops the stack on exit, so it never outlives the session — the subcommands
- * (`stop`/`down`/`reset`) manage everything else.
+ * (`stop`/`down`/`reset`) manage everything else. Without a local dev stack configured
+ * (`dev.path` unset), there's nothing to boot, so it runs the contract watcher alone.
  */
 async function bringUp(): Promise<void> {
 	printBanner(getVersion())
 
+	const cwd = process.cwd()
+	if (!(await hasDevStack(cwd))) {
+		await watchOnly(cwd)
+		return
+	}
+
 	const reaped = await reapOrphans()
 	if (reaped.length) note(`Stopped ${reaped.length} orphaned dev stack${reaped.length === 1 ? "" : "s"}: ${reaped.join(", ")}`)
 
-	const cfg = await resolveDevConfig(process.cwd())
+	const cfg = await resolveDevConfig(cwd)
 	if (!cfg.wordpressPath.startsWith("..")) ensureGitignored(cfg.configDir, cfg.wordpressPath)
 
 	await startForeground(cfg)
@@ -273,7 +299,7 @@ const reset = defineCommand({
 const subCommands = { stop, down, reset }
 
 export const dev = defineCommand({
-	meta: { name: "dev", description: "Manage the local WordPress dev stack (stop | down | reset)" },
+	meta: { name: "dev", description: "Run the dev stack and contract watcher (stop | down | reset)" },
 	subCommands,
 	run: groupDefault(Object.keys(subCommands), bringUp),
 })

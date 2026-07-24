@@ -11,7 +11,6 @@ const main = defineCommand({
 	subCommands: {
 		create: () => import("./commands/create").then((m) => m.create),
 		init: () => import("./commands/init").then((m) => m.init),
-		watch: () => import("./commands/watch").then((m) => m.watch),
 		generate: () => import("./commands/generate").then((m) => m.generate),
 		dev: () => import("./commands/dev").then((m) => m.dev),
 		test: () => import("./commands/test").then((m) => m.test),

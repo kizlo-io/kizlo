@@ -349,8 +349,10 @@ export async function syncRemote(conn: Connection): Promise<void> {
 export function nextStepsLines(mode: Connection["mode"], prefix = ""): string[] {
 	return [
 		...(mode === "local"
-			? [`Start your local WordPress dev stack:`, `  ${prefix}npx kizlo dev`, ``]
-			: [`Watch your extensions and regenerate the contract during development:`, `  ${prefix}npx kizlo watch`, ``]),
+			? [`Start your local WordPress dev stack and watch your extensions:`]
+			: [`Watch your extensions and regenerate the contract during development:`]),
+		`  ${prefix}npx kizlo dev`,
+		``,
 		`Generate the contract once for production builds:`,
 		`  ${prefix}npx kizlo generate`,
 	]
