@@ -7,7 +7,7 @@ import type { ResolvedDevConfig } from "../daemon/config"
 import { createAdminAppPassword, seedUsers } from "./bootstrap"
 import { prepareByo } from "./byo"
 import { DEFAULT_PLUGINS, TEST_ADMIN } from "./constants"
-import { compose, composeUp, wpCli } from "./docker"
+import { compose, composePull, composeUp, wpCli } from "./docker"
 import type { SeedContext } from "./types"
 import { ensurePlugins } from "./utils"
 
@@ -103,6 +103,14 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 
 	const fresh = !existsSync(join(cfg.wordpressDir, "wp-includes", "version.php"))
 	const byo = fresh && cfg.byo ? await prepareByo(cfg.byo, cfg.wordpressDir, cfg.configDir) : undefined
+
+	// A fresh install copies WordPress out of the `wordpress:latest` image into the empty bind
+	// mount, so the version we get is whatever that tag resolves to locally. Docker won't re-pull a
+	// cached `latest`, which would pin new installs to a stale WordPress — so refresh it here, but
+	// only on a fresh install (a warm resume reuses the existing files and never pays this cost).
+	// Docker's own layer cache keeps this a cheap digest check when the tag hasn't moved, and it's
+	// best-effort: an offline pull failure falls back to the cached image so dev still works.
+	if (fresh && !byo) await composePull(["wordpress", "wp-cli"]).catch(() => undefined)
 
 	await composeUp()
 

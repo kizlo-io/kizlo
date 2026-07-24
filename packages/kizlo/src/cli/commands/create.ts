@@ -103,7 +103,7 @@ export async function applyManifestWiring(
 	dir: string,
 	templateDir: string,
 	manifest: TemplateManifest,
-	opts: { devPath?: string },
+	opts: { devPath?: string; includeStarter?: boolean },
 ): Promise<void> {
 	const { kizloDir, appDir, alias } = manifest.tokens
 	const scaffold = buildScaffoldContext(dir, { dirRel: kizloDir, appDir, alias, clientUrl: undefined })
@@ -112,7 +112,9 @@ export async function applyManifestWiring(
 
 	const files = [
 		{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(kizloDir, alias, opts.devPath) },
-		...ownEntries(manifest, { includeStarter: true }).map((entry) => adaptOwnFile(templateDir, entry, manifest.tokens, scaffold)),
+		...ownEntries(manifest, { includeStarter: opts.includeStarter }).map((entry) =>
+			adaptOwnFile(templateDir, entry, manifest.tokens, scaffold),
+		),
 	]
 	for (const file of files) reportScaffold(file, await scaffoldFile(dir, file, { force: true, yes: false }), false)
 
@@ -195,6 +197,8 @@ export const create = defineCommand({
 			}),
 		)
 
+		const includeStarter = orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
+
 		const conn = await collectConnectionInteractively(preset)
 		if (preset.apiPath && conn.baseUrl) conn.baseUrl = withApiPath(conn.baseUrl, preset.apiPath)
 
@@ -228,7 +232,7 @@ export const create = defineCommand({
 		}
 
 		try {
-			await applyManifestWiring(dir, fetched.dir, manifest, { devPath: conn.devPath })
+			await applyManifestWiring(dir, fetched.dir, manifest, { devPath: conn.devPath, includeStarter })
 		} catch (error) {
 			fail(error instanceof Error ? error.message : String(error))
 		}

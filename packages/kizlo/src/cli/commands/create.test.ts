@@ -69,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 	})
 
 	it("scaffolds the wiring and starter files, records the kizlo dep, and patches the layout", async () => {
-		await applyManifestWiring(dir, templateDir, manifest, { devPath: "wordpress" })
+		await applyManifestWiring(dir, templateDir, manifest, { devPath: "wordpress", includeStarter: true })
 
 		// Wiring files land where the manifest tokens place them.
 		expect(fs.existsSync(path.join(dir, "src/lib/kizlo/server/index.ts"))).toBe(true)
