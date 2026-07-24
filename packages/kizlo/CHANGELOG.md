@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.8.4
+
+### Patch Changes
+
+- [#76](https://github.com/kizlo-io/kizlo/pull/76) [`85932d3`](https://github.com/kizlo-io/kizlo/commit/85932d3ae5ee60886f044c400154597220532914) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add example pages in init and prompt before scaffolding them in both init and create (always added with --yes)
+
 ## 0.8.3
 
 ### Patch Changes
