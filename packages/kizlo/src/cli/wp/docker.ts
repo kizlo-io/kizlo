@@ -22,6 +22,8 @@ export interface Stack {
 /** Stack-bound docker helpers. */
 export interface DockerStack {
 	compose(args: string[], opts?: RunInput): Promise<RunResult>
+	/** Pull the latest images for the named services (all when omitted) — refreshes a cached tag like `wordpress:latest`. */
+	composePull(services?: string[]): Promise<RunResult>
 	composeUp(): Promise<void>
 	composeStop(opts?: { detached?: boolean }): Promise<void>
 	composeDown(opts?: { volumes?: boolean }): Promise<void>
@@ -75,6 +77,8 @@ function bind(stack: Stack): DockerStack {
 
 	const compose: DockerStack["compose"] = (args, opts) => run("docker", [...base, ...args], env, opts)
 
+	const composePull: DockerStack["composePull"] = (services = []) => compose(["pull", ...services])
+
 	const composeUp = async (): Promise<void> => {
 		const res = await compose(["up", "-d", "--wait"])
 		if (res.code !== 0) throw new Error(`docker compose up failed:\n${res.stderr}`)
@@ -104,7 +108,7 @@ function bind(stack: Stack): DockerStack {
 		return res.stdout.replace(/\r/g, "").trim()
 	}
 
-	return { compose, composeUp, composeStop, composeDown, publishedPort, wpCli }
+	return { compose, composePull, composeUp, composeStop, composeDown, publishedPort, wpCli }
 }
 
 /**
@@ -127,6 +131,9 @@ function activeStack(): DockerStack {
 
 /** `docker compose <args>` against the active stack. */
 export const compose: DockerStack["compose"] = (args, opts) => activeStack().compose(args, opts)
+
+/** Pull the latest images for the active stack's named services (all when omitted). */
+export const composePull = (services?: string[]): Promise<RunResult> => activeStack().composePull(services)
 
 /** Bring the active stack's services up detached and wait for health checks. */
 export const composeUp = (): Promise<void> => activeStack().composeUp()

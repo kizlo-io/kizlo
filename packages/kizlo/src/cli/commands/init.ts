@@ -13,7 +13,7 @@ import {
 	ensureGitignored,
 	getVersion,
 	loadEnvFiles,
-	runCommand,
+	runCommandAsync,
 } from "../utils"
 import { dockerAvailable } from "../wp/docker"
 import {
@@ -139,13 +139,18 @@ function isOlder(have: string, want: string): boolean {
  * When the project's kizlo is older, upgrade the project up to it and say so — a deliberate pin is
  * never changed silently. Never downgrades.
  */
-function alignKizloVersion(cwd: string, pm: ReturnType<typeof detectPackageManager>, pkg: Deps, manifest: TemplateManifest): void {
+async function alignKizloVersion(
+	cwd: string,
+	pm: ReturnType<typeof detectPackageManager>,
+	pkg: Deps,
+	manifest: TemplateManifest,
+): Promise<void> {
 	const want = manifest.kizloVersion ?? `^${getVersion()}`
 	const have = kizloDep(pkg)
 	if (!have || !isOlder(have, want)) return
 	const s = p.spinner()
 	s.start(`Upgrading kizlo from ${have} to ${want}`)
-	const ok = runCommand(addDependencyArgs(pm, `kizlo@${want}`), cwd, "ignore")
+	const ok = await runCommandAsync(addDependencyArgs(pm, `kizlo@${want}`), cwd, "ignore")
 	s.stop(ok ? `Upgraded kizlo to ${want}` : `Could not upgrade kizlo automatically — install kizlo@${want} yourself`)
 }
 
@@ -214,9 +219,6 @@ export const init = defineCommand({
 			if (preset.id !== "base") p.log.success(`${preset.label} detected`)
 		}
 
-		// Kizlo's Next.js wiring is App Router only. On a Pages-Router or non-App project the template's
-		// routes and layout patch have nowhere to land, so stop with a clear message rather than
-		// scattering App-Router files into a Pages project.
 		if (preset.template === "nextjs" && !fs.existsSync(path.join(cwd, "app")) && !fs.existsSync(path.join(cwd, "src/app"))) {
 			p.cancel("Kizlo needs the Next.js App Router — no `app` or `src/app` directory found. The Pages Router isn't supported.")
 			process.exit(1)
@@ -226,6 +228,8 @@ export const init = defineCommand({
 		const setup = yes ? collectFromEnv({ cwd, hasSrcDir, preset }) : await collectInteractively({ cwd, hasSrcDir, preset })
 		if (args.alias !== undefined) setup.alias = String(args.alias).trim()
 		setup.alias = aliasWithSlash(setup.alias)
+
+		const includeStarter = preset.template ? yes || orCancel(await p.confirm({ message: "Add example pages?", initialValue: true })) : false
 
 		if (setup.mode === "local" && !(await dockerAvailable())) {
 			p.cancel("Docker isn't available — start Docker (or install it) and re-run, or choose “Use my own WordPress”.")
@@ -238,7 +242,7 @@ export const init = defineCommand({
 			const spec = `kizlo@^${getVersion()}`
 			const s = p.spinner()
 			s.start(`Installing kizlo with ${pm}`)
-			const ok = runCommand(addDependencyArgs(pm, spec), cwd, "ignore")
+			const ok = await runCommandAsync(addDependencyArgs(pm, spec), cwd, "ignore")
 			s.stop(ok ? "Installed kizlo" : "Could not install kizlo automatically")
 			if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, spec).join(" ")}`)
 		}
@@ -260,17 +264,14 @@ export const init = defineCommand({
 			{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.devPath) },
 		]
 
-		// Collect the wiring files. Template presets fetch the template at runtime and adapt its own
-		// files from the manifest (bodies live only in the template, never baked into the CLI). Once the
-		// files are read and the manifest is in memory, the fetched copy is no longer needed. Presets
-		// without a template scaffold their files inline.
 		let manifest: TemplateManifest | undefined
 		if (preset.template) {
 			const fetched = await fetchTemplate(preset.template)
 			try {
 				manifest = readManifest(fetched.dir)
-				alignKizloVersion(cwd, pm, pkg, manifest)
-				for (const entry of ownEntries(manifest)) files.push(adaptOwnFile(fetched.dir, entry, manifest.tokens, scaffold))
+				await alignKizloVersion(cwd, pm, pkg, manifest)
+				for (const entry of ownEntries(manifest, { includeStarter }))
+					files.push(adaptOwnFile(fetched.dir, entry, manifest.tokens, scaffold))
 			} finally {
 				fetched.cleanup()
 			}
