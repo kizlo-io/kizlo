@@ -1,26 +1,29 @@
 {
+	"extends": "@tooling/typescript/base.json",
 	"compilerOptions": {
-		"target": "ES2022",
-		"lib": ["dom", "dom.iterable", "esnext"],
-		"allowJs": true,
-		"skipLibCheck": true,
-		"strict": true,
-		"noEmit": true,
-		"esModuleInterop": true,
-		"module": "esnext",
-		"moduleResolution": "bundler",
-		"resolveJsonModule": true,
-		"isolatedModules": true,
 		"jsx": "react-jsx",
-		"incremental": true,
+		"paths": {
+			"@/*": ["./src/*"],
+
+			// tsconfig `paths` do not merge across `extends` — this block fully
+			// overrides base.json's, so the workspace aliases below mirror
+			// tooling/typescript/base.json. Keep them in sync if base changes.
+			"kizlo": ["${configDir}../../packages/kizlo/src/index.ts"],
+			"kizlo/config": ["${configDir}../../packages/kizlo/src/config.ts"],
+			"kizlo/test": ["${configDir}../../packages/kizlo/src/test/index.ts"],
+			"kizlo/nextjs": ["${configDir}../../packages/kizlo/src/integrations/nextjs/index.ts"],
+			"kizlo/nextjs/server": ["${configDir}../../packages/kizlo/src/integrations/nextjs/server.ts"],
+			"@kizlo/cf7": ["${configDir}../../packages/cf7/src/index.ts"],
+			"@kizlo/cf7/test": ["${configDir}../../packages/cf7/src/test/index.ts"],
+			"@kizlo/shared": ["${configDir}../../packages/shared/src/index.ts"],
+			"@kizlo/woocommerce": ["${configDir}../../packages/woocommerce/src/index.ts"],
+			"@kizlo/woocommerce/test": ["${configDir}../../packages/woocommerce/src/test/index.ts"]
+		},
 		"plugins": [
 			{
 				"name": "next"
 			}
-		],
-		"paths": {
-			"@/*": ["./src/*"]
-		}
+		]
 	},
 	"include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
 	"exclude": ["node_modules"]

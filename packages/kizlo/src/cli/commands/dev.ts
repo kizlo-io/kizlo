@@ -17,6 +17,19 @@ async function resolve(cwd: string): Promise<{ cfg: ResolvedDevConfig; stack: Do
 	return { cfg, stack: createStack(devStack(cfg)) }
 }
 
+/**
+ * The stack lifecycle subcommands (`stop`/`down`/`reset`) only act on a local WordPress
+ * Docker stack. A bring-your-own-WordPress project (no `dev.path`) has no stack to manage,
+ * so — rather than fall through to `resolveDevConfig`'s hard "`dev.path` is required" error —
+ * print a plain note explaining there's nothing to do and exit cleanly. Returns true when a
+ * local stack is configured and the caller may proceed.
+ */
+async function requireDevStack(cwd: string): Promise<boolean> {
+	if (await hasDevStack(cwd)) return true
+	note("No local WordPress stack is configured (`dev.path` is unset) — nothing to manage here.")
+	return false
+}
+
 /** A dim, untagged one-liner (no consola timestamp) for the clean dev output. */
 function note(text: string): void {
 	const { dim, reset } = palette()
@@ -270,6 +283,7 @@ async function bringUp(): Promise<void> {
 const stop = defineCommand({
 	meta: { name: "stop", description: "Stop the dev stack, keeping the database volume" },
 	async run() {
+		if (!(await requireDevStack(process.cwd()))) return
 		const { stack } = await resolve(process.cwd())
 		await withSpinner("Stopping WordPress dev stack", () => stack.composeStop(), "Stack stopped (volumes kept)")
 	},
@@ -278,6 +292,7 @@ const stop = defineCommand({
 const down = defineCommand({
 	meta: { name: "down", description: "Stop and remove the dev stack containers (keeps the database and files)" },
 	async run() {
+		if (!(await requireDevStack(process.cwd()))) return
 		const { stack } = await resolve(process.cwd())
 		await withSpinner("Removing WordPress dev stack", () => stack.composeDown(), "Stack removed (database and files kept)")
 	},
@@ -286,6 +301,7 @@ const down = defineCommand({
 const reset = defineCommand({
 	meta: { name: "reset", description: "Wipe the database and the install folder so the next `kizlo dev` rebuilds fresh" },
 	async run() {
+		if (!(await requireDevStack(process.cwd()))) return
 		const { cfg, stack } = await resolve(process.cwd())
 		await withSpinner("Wiping WordPress dev stack", () => stack.composeDown({ volumes: true }), "Local WordPress reset successfully")
 		rmSync(cfg.wordpressDir, { recursive: true, force: true })
