@@ -99,7 +99,7 @@ export function resolveModuleImport(cwd: string, targetRel: string, fromDirRel: 
 
 /**
  * Loads the project's `.env` files into `process.env`. The single place env
- * values come from — shared by `init --yes` and the `kizlo watch`/`generate`
+ * values come from — shared by `init --yes` and the `kizlo dev`/`generate`
  * daemon so they always read the same source.
  */
 export function loadEnvFiles(cwd: string): void {

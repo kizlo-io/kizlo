@@ -4,7 +4,7 @@ import * as p from "@clack/prompts"
 import { CONTRACT_BARREL } from "../daemon/generate"
 import type { ScaffoldContext, ScaffoldFile } from "../presets"
 import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode } from "../presets/patch"
-import { findRootLayout, patchEntries, resolvePatch, type TemplateManifest } from "../presets/template"
+import { findRootLayout, type PatchEntry, resolvePatch, type TemplateConventions } from "../presets/template"
 import { resolveModuleImport, writeFileIfAbsent } from "../utils"
 import { orCancel } from "./_setup"
 
@@ -22,7 +22,7 @@ export default defineConfig({
 }
 
 /**
- * Build the {@link ScaffoldContext} that adapts a template's tokenized paths and imports to a real
+ * Build the {@link ScaffoldContext} that adapts a template's conventions (paths and imports) to a real
  * project. `dirRel` is the Kizlo home directory, `appDir` the App Router directory, and `alias` the
  * import-alias prefix (empty for relative imports). The server-entry import is resolved per calling
  * file so each scaffolded file references the server through the right specifier.
@@ -76,7 +76,7 @@ export function reportScaffold(file: ScaffoldFile, result: ScaffoldResult, yes: 
 	}
 }
 
-/** Seed the generated-contract directory so imports resolve before the first `kizlo watch`/`generate`. */
+/** Seed the generated-contract directory so imports resolve before the first `kizlo dev`/`generate`. */
 export function writeGeneratedContract(cwd: string, serverDirRel: string): void {
 	const generatedDirRel = path.join(serverDirRel, "generated")
 	writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")
@@ -90,10 +90,15 @@ export function writeGeneratedContract(cwd: string, serverDirRel: string): void 
  * rather than written to a guessed-at file. A confident apply is an idempotent upsert: it replaces
  * our exports if present, adds them if not.
  */
-export function applyLayoutPatches(cwd: string, manifest: TemplateManifest, scaffold: ScaffoldContext): void {
+export function applyLayoutPatches(
+	cwd: string,
+	patches: readonly PatchEntry[],
+	conventions: TemplateConventions,
+	scaffold: ScaffoldContext,
+): void {
 	const manualSteps: ResolvedPatch[] = []
-	for (const entry of patchEntries(manifest)) {
-		const resolved = resolvePatch(entry, manifest.tokens, scaffold)
+	for (const entry of patches) {
+		const resolved = resolvePatch(entry, conventions, scaffold)
 		const target = findRootLayout(cwd, scaffold.appDir, resolved.relPath)
 		if (!target) {
 			manualSteps.push(resolved)
@@ -113,12 +118,7 @@ export function applyLayoutPatches(cwd: string, manifest: TemplateManifest, scaf
 		const { text, changes } = applied
 		if (patchChanged(changes)) {
 			fs.writeFileSync(target, text)
-			const parts = [
-				...(changes.replacedExports.length ? [`replaced ${changes.replacedExports.join(", ")}`] : []),
-				...(changes.addedExports.length ? [`added ${changes.addedExports.join(", ")}`] : []),
-				...(changes.addedImports.length ? ["imports"] : []),
-			]
-			p.log.success(`Wired Kizlo into your ${resolved.label} (${relTarget}) — ${parts.join(", ")}`)
+			p.log.success(`Wired Kizlo into your ${resolved.label} (${relTarget})`)
 		} else {
 			p.log.info(`Your ${resolved.label} is already wired (${relTarget})`)
 		}

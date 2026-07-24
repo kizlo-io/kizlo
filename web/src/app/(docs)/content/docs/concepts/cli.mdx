@@ -25,8 +25,7 @@ A handful of commands cover the whole workflow, from first scaffold to a green t
 | [`kizlo create`](#kizlo-create) | Scaffold a new project with Kizlo already wired |
 | [`kizlo init`](#kizlo-init) | Set up Kizlo in the current project |
 | [`kizlo generate`](#kizlo-generate) | Generate the contract once — for builds and CI |
-| [`kizlo watch`](#kizlo-watch) | Regenerate the contract on every save, during development |
-| [`kizlo dev`](#kizlo-dev) | Run a local WordPress dev stack — bare starts it; `stop`, `down`, `reset` |
+| [`kizlo dev`](#kizlo-dev) | Watch and regenerate the contract as you edit, and run the local WordPress dev stack — bare starts it; `stop`, `down`, `reset` |
 | [`kizlo test`](#kizlo-test) | Boot a WordPress test stack, seed it, and run your tests — `stop`, `down`, `reset` |
 
 Every command reads [`kizlo.config.ts`](#configuration) to find where your server lives and how your test
@@ -91,39 +90,31 @@ npx kizlo generate
 ```
 
 It exits non-zero if it can't find a Kizlo server in your entry file or if generation fails, so a stale or
-broken contract fails the build rather than slipping through.
+broken contract fails the build rather than slipping through. It accepts `--dir` to point at a Kizlo
+directory other than the one in `kizlo.config.ts`.
 
 <Callout>
   Wire `kizlo generate` into your `build` script (e.g. `"build": "kizlo generate && next build"`) so the
   contract is always regenerated as part of every production build.
 </Callout>
 
-## `kizlo watch`
-
-`watch` is the development counterpart. It generates the contract once at startup, then watches your server
-directory and regenerates on every save — debounced, so a burst of saves collapses into one rebuild. Your
-client stays typed against the latest server without you thinking about it.
-
-```package-install
-npx kizlo watch
-```
-
-A broken server entry doesn't stop the watcher: it reports the error and keeps watching, so the next save can
-fix it. And only one watcher writes the contract at a time — a single-instance lock means a framework dev
-script and a manual `kizlo watch` won't fight over the same file.
-
-<Callout>
-  Run `kizlo watch` next to your framework's dev server — for example `"dev": "kizlo watch & next dev"` — so
-  the contract refreshes as you edit procedures.
-</Callout>
-
-Both `generate` and `watch` accept `--dir` to point at a Kizlo directory other than the one in
-`kizlo.config.ts`.
-
 ## `kizlo dev`
 
-`kizlo dev` runs a **local WordPress dev stack** — a long-lived Docker WordPress on
-`http://localhost:8080` you build your app against. What sets it apart from the test stack:
+`kizlo dev` is the command you run while developing. It **watches your server** and regenerates the
+[contract](/docs/concepts/client) on every save — debounced, so a burst of saves collapses into one rebuild,
+and your client stays typed against the latest server without you thinking about it. A broken server entry
+doesn't stop it: it reports the error and keeps watching, so the next save can fix it. Only one watcher writes
+the contract at a time — a single-instance lock means a framework dev script and `kizlo dev` won't fight over
+the same file.
+
+```package-install
+npx kizlo dev
+```
+
+When a [`dev.path`](#configuration) is set, `kizlo dev` also runs a **local WordPress dev stack** alongside
+the watcher — a long-lived Docker WordPress on `http://localhost:8080` you build your app against. Without one
+(a project pointed at your own WordPress), it runs the watcher alone. What sets the dev stack apart from the
+test stack:
 
 - **Every file is editable.** The whole install (core, themes, uploads, plugins) lives in your
   [`dev.path`](#configuration) folder, bind-mounted into the container — browse and edit it from your file
@@ -138,11 +129,7 @@ Both `generate` and `watch` accept `--dir` to point at a Kizlo directory other t
 | `kizlo dev` | Start the stack and provision it — idempotent, never wipes |
 | `kizlo dev stop` | Stop the stack, keeping everything for a fast resume |
 | `kizlo dev down` | Stop and remove the containers — keeps the database and your files (use `reset` to wipe) |
-| `kizlo dev reset` | Wipe the database **and** the `dev.path` folder, then rebuild fresh |
-
-```package-install
-npx kizlo dev
-```
+| `kizlo dev reset` | Wipe the database **and** the `dev.path` folder — the next `kizlo dev` rebuilds fresh |
 
 On first install, `kizlo dev` mints a **random** admin password (not a guessable default) and prints it once
 so you can log into `wp-admin`. Save it then; it isn't stored on disk. Later runs are idempotent and leave

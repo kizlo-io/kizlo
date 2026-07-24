@@ -3,10 +3,9 @@ import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
 import z from "zod/v4"
-import { printBanner } from "../banner"
 import { getPreset } from "../presets"
 import { fetchTemplate } from "../presets/source"
-import { adaptOwnFile, ownEntries, readManifest, type TemplateManifest } from "../presets/template"
+import { adaptFile, changesFor, fileEntries, isExample, patchEntries, readManifest, type TemplateManifest } from "../presets/template"
 import {
 	availablePackageManagers,
 	detectInvokingPackageManager,
@@ -23,6 +22,7 @@ import {
 	collectConnectionInteractively,
 	nextStepsLines,
 	orCancel,
+	pickAppPort,
 	setupLocalWordPress,
 	syncRemote,
 	validate,
@@ -93,34 +93,35 @@ export function bootstrapArgs(manifest: TemplateManifest, pm: PackageManager, na
  * Layer Kizlo's wiring onto a freshly bootstrapped app in `dir`, from an already-fetched template
  * directory + manifest. The framework CLI has produced the base project (package.json, config,
  * tsconfig, the root layout); this drives the manifest — the same engine `init` uses — to record the
- * `kizlo` dependency, write `kizlo.config.ts`, scaffold the manifest's own files (wiring plus the demo
- * starter pages), seed the generated contract, ignore `.env`, and patch the root layout's SEO exports.
- * The target directory layout comes straight from the manifest tokens, which the bootstrap flags are
- * chosen to match, so files land where the manifest expects. Fresh files are written with `force`,
- * silently replacing the framework defaults.
+ * `kizlo` dependency, write `kizlo.config.ts`, scaffold the manifest's files (the `base` plumbing and
+ * the `create` layout/styles always, the `example`-flagged demo pages only when `includeExamples`),
+ * seed the generated contract, and ignore `.env`. On a fresh app Kizlo owns the layout, so `create`
+ * writes it whole (already SEO-wired) rather than patching — `applyLayoutPatches` runs over `create`'s
+ * patches, which are none today. The target directory layout comes straight from the manifest's
+ * conventions, which the bootstrap flags are chosen to match, so files land where they expect. Fresh
+ * files are written with `force`, silently replacing the framework defaults.
  */
 export async function applyManifestWiring(
 	dir: string,
 	templateDir: string,
 	manifest: TemplateManifest,
-	opts: { devPath?: string; includeStarter?: boolean },
+	opts: { devPath?: string; includeExamples?: boolean },
 ): Promise<void> {
-	const { kizloDir, appDir, alias } = manifest.tokens
+	const { kizloDir, appDir, alias } = manifest.conventions
 	const scaffold = buildScaffoldContext(dir, { dirRel: kizloDir, appDir, alias, clientUrl: undefined })
 
 	recordKizloDependency(dir, manifest)
 
+	const changes = changesFor(manifest, "create").filter((change) => opts.includeExamples || !isExample(change))
 	const files = [
 		{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(kizloDir, alias, opts.devPath) },
-		...ownEntries(manifest, { includeStarter: opts.includeStarter }).map((entry) =>
-			adaptOwnFile(templateDir, entry, manifest.tokens, scaffold),
-		),
+		...fileEntries(changes).map((entry) => adaptFile(templateDir, entry, manifest.conventions, scaffold)),
 	]
 	for (const file of files) reportScaffold(file, await scaffoldFile(dir, file, { force: true, yes: false }), false)
 
 	writeGeneratedContract(dir, path.join(kizloDir, "server"))
 	ensureGitignored(dir, ".env")
-	applyLayoutPatches(dir, manifest, scaffold)
+	applyLayoutPatches(dir, patchEntries(changes), manifest.conventions, scaffold)
 }
 
 export const create = defineCommand({
@@ -143,8 +144,7 @@ export const create = defineCommand({
 	async run({ args }) {
 		const cwd = process.cwd()
 
-		printBanner(getVersion())
-		p.intro("kizlo create")
+		p.intro(`Let's create a new Kizlo application`)
 
 		const requested = args.template as string | undefined
 		let template: TemplateId
@@ -197,9 +197,9 @@ export const create = defineCommand({
 			}),
 		)
 
-		const includeStarter = orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
+		const includeExamples = orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
 
-		const conn = await collectConnectionInteractively(preset)
+		const conn = await collectConnectionInteractively(preset, { baseUrl: `http://localhost:${await pickAppPort()}` })
 		if (preset.apiPath && conn.baseUrl) conn.baseUrl = withApiPath(conn.baseUrl, preset.apiPath)
 
 		if (conn.mode === "local" && !(await dockerAvailable())) {
@@ -232,7 +232,7 @@ export const create = defineCommand({
 		}
 
 		try {
-			await applyManifestWiring(dir, fetched.dir, manifest, { devPath: conn.devPath, includeStarter })
+			await applyManifestWiring(dir, fetched.dir, manifest, { devPath: conn.devPath, includeExamples })
 		} catch (error) {
 			fail(error instanceof Error ? error.message : String(error))
 		}
@@ -251,7 +251,7 @@ export const create = defineCommand({
 		await writeEnv(dir, preset, conn, { force: true, yes: false })
 		await syncRemote(conn)
 
-		p.note([`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ``, ...nextStepsLines(conn.mode)].join("\n"), "Next steps")
+		p.note([`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ``, ...nextStepsLines(conn)].join("\n"), "Next steps")
 
 		p.outro("Kizlo is ready 🎉")
 	},

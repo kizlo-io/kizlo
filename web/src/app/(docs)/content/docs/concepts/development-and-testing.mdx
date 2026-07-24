@@ -113,7 +113,7 @@ Some setup the REST API can't express, like pretty permalinks or an option flag.
 You build against the dev stack like a site you installed yourself: it persists and stays editable (see the
 table above).
 
-What keeps that loop tight is [`kizlo watch`](/docs/concepts/cli#kizlo-watch): edit a
+What keeps that loop tight is [`kizlo dev`](/docs/concepts/cli#kizlo-dev): edit a
 [procedure](/docs/concepts/extension) and it regenerates the typed [contract](/docs/concepts/client) before you
 call it; change content in `wp-admin` and your app reads it on the next request. Nothing to restart to stay in
 sync.

@@ -2,10 +2,9 @@ import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
-import { printBanner } from "../banner"
 import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldFile } from "../presets"
 import { fetchTemplate } from "../presets/source"
-import { adaptOwnFile, ownEntries, readManifest, type TemplateManifest } from "../presets/template"
+import { adaptFile, changesFor, fileEntries, patchEntries, readManifest, type TemplateManifest } from "../presets/template"
 import {
 	addDependencyArgs,
 	detectImportAlias,
@@ -187,8 +186,7 @@ export const init = defineCommand({
 		const cwd = process.cwd()
 		const pkgPath = path.join(cwd, "package.json")
 
-		if (!yes) printBanner(getVersion())
-		p.intro("kizlo init")
+		p.intro(`Let's configure Kizlo in your existing application`)
 
 		if (!fs.existsSync(pkgPath)) {
 			p.cancel("No package.json found — run `kizlo init` inside a project.")
@@ -229,16 +227,12 @@ export const init = defineCommand({
 		if (args.alias !== undefined) setup.alias = String(args.alias).trim()
 		setup.alias = aliasWithSlash(setup.alias)
 
-		const includeStarter = preset.template ? yes || orCancel(await p.confirm({ message: "Add example pages?", initialValue: true })) : false
-
 		if (setup.mode === "local" && !(await dockerAvailable())) {
 			p.cancel("Docker isn't available — start Docker (or install it) and re-run, or choose “Use my own WordPress”.")
 			process.exit(1)
 		}
 
 		if (!hasKizlo) {
-			// Pin the running CLI's own version rather than the moving `latest` tag. A template preset may
-			// bump this up to the version it declares once its manifest is read (alignKizloVersion below).
 			const spec = `kizlo@^${getVersion()}`
 			const s = p.spinner()
 			s.start(`Installing kizlo with ${pm}`)
@@ -270,8 +264,8 @@ export const init = defineCommand({
 			try {
 				manifest = readManifest(fetched.dir)
 				await alignKizloVersion(cwd, pm, pkg, manifest)
-				for (const entry of ownEntries(manifest, { includeStarter }))
-					files.push(adaptOwnFile(fetched.dir, entry, manifest.tokens, scaffold))
+				for (const entry of fileEntries(changesFor(manifest, "init")))
+					files.push(adaptFile(fetched.dir, entry, manifest.conventions, scaffold))
 			} finally {
 				fetched.cleanup()
 			}
@@ -288,13 +282,11 @@ export const init = defineCommand({
 
 		for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
 
-		// Merge Kizlo wiring into the root layout's SEO exports. Never aborts — an unresolved or
-		// unparseable target falls back to a printed instruction (see applyLayoutPatches).
-		if (manifest) applyLayoutPatches(cwd, manifest, scaffold)
+		if (manifest) applyLayoutPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
 
 		if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)
 
-		nextStepsNote(setup.mode)
+		nextStepsNote(setup)
 
 		p.outro("Kizlo is ready 🎉")
 	},

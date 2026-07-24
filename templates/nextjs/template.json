@@ -16,65 +16,73 @@
 			"--yes"
 		]
 	},
-	"tokens": {
+	"conventions": {
 		"kizloDir": "src/lib/kizlo",
 		"appDir": "src/app",
 		"alias": "@"
 	},
-	"files": [
+	"base": [
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "server-entry",
 			"path": "src/lib/kizlo/server/index.ts"
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "client",
 			"path": "src/lib/kizlo/client.ts"
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "api-route",
 			"path": "src/app/api/kizlo/[[...rest]]/route.ts"
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "robots",
 			"path": "src/app/robots.txt/route.ts"
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "sitemap",
 			"path": "src/app/sitemaps/[sitemap]/route.ts"
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "sitemap-redirect",
 			"path": "src/app/sitemap.xml/route.ts"
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "manifest",
 			"path": "src/app/site.webmanifest/route.ts"
+		}
+	],
+	"create": [
+		{
+			"kind": "file",
+			"role": "root-layout",
+			"path": "src/app/layout.tsx"
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "home-page",
-			"scope": "starter",
-			"path": "src/app/page.tsx"
+			"path": "src/app/page.tsx",
+			"example": true
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "blog-post",
-			"scope": "starter",
-			"path": "src/app/blog/[slug]/page.tsx"
+			"path": "src/app/blog/[slug]/page.tsx",
+			"example": true
 		},
 		{
-			"kind": "own",
+			"kind": "file",
 			"role": "styles",
-			"scope": "starter",
 			"path": "src/app/globals.css"
-		},
+		}
+	],
+	"init": [
 		{
 			"kind": "patch",
 			"role": "root-layout",
