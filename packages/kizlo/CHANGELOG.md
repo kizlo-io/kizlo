@@ -1,5 +1,19 @@
 # kizlo
 
+## 0.9.0
+
+### Minor Changes
+
+- [#78](https://github.com/kizlo-io/kizlo/pull/78) [`253d30b`](https://github.com/kizlo-io/kizlo/commit/253d30b20b02dc356a9b091983198cf4568d44e4) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Merge `kizlo watch` into `kizlo dev`: `kizlo dev` now watches and regenerates the contract for every project, including those pointed at your own WordPress, so it's the single command for local development.
+
+- [#78](https://github.com/kizlo-io/kizlo/pull/78) [`253d30b`](https://github.com/kizlo-io/kizlo/commit/253d30b20b02dc356a9b091983198cf4568d44e4) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo dev reset` now only wipes the WordPress dev stack, leaving the rebuild to the next `kizlo dev`.
+
+### Patch Changes
+
+- [#78](https://github.com/kizlo-io/kizlo/pull/78) [`253d30b`](https://github.com/kizlo-io/kizlo/commit/253d30b20b02dc356a9b091983198cf4568d44e4) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo create` now picks a free port for the scaffolded app so the URL synced to WordPress for event and webhook delivery is reachable out of the box.
+
+- [#78](https://github.com/kizlo-io/kizlo/pull/78) [`253d30b`](https://github.com/kizlo-io/kizlo/commit/253d30b20b02dc356a9b091983198cf4568d44e4) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo create` now always writes the root layout and global styles, keeping only the demo pages behind the "Add example pages?" prompt.
+
 ## 0.8.4
 
 ### Patch Changes
