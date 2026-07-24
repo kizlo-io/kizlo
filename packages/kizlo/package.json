@@ -14,7 +14,7 @@
 		"nextjs",
 		"sdk"
 	],
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"author": "Kizlo",
 	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/kizlo#readme",
 	"bugs": "https://github.com/kizlo-io/kizlo/issues",

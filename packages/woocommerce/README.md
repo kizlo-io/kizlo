@@ -44,4 +44,4 @@ See the [docs](https://kizlo.io/docs) for setup and usage.
 
 ## License
 
-[MIT](./LICENSE) © Kizlo
+[Apache 2.0](./LICENSE) © Kizlo

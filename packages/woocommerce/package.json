@@ -12,7 +12,7 @@
 		"store-api",
 		"kizlo"
 	],
-	"license": "MIT",
+	"license": "Apache-2.0",
 	"author": "Kizlo",
 	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/woocommerce#readme",
 	"bugs": "https://github.com/kizlo-io/kizlo/issues",

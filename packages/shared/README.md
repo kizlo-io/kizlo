@@ -7,4 +7,4 @@ Internal shared types and utilities for [Kizlo](https://github.com/kizlo-io/kizl
 
 ## License
 
-[MIT](./LICENSE) © Kizlo
+[Apache 2.0](./LICENSE) © Kizlo
