@@ -121,6 +121,6 @@
 		}
 	},
 	"dependencies": {
-		"kizlo": "^0.9.1"
+		"kizlo": "^0.10.0"
 	}
 }

@@ -1,5 +1,13 @@
 # kizlo
 
+## 0.10.0
+
+### Minor Changes
+
+- [#83](https://github.com/kizlo-io/kizlo/pull/83) [`44fd06a`](https://github.com/kizlo-io/kizlo/commit/44fd06a969cce714e478a2a9b82a0d1b22df9b02) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Standardize on "local WordPress": rename `KIZLO_TARGET`→`KIZLO_CONNECT` (`local`/`remote`), the WordPress credential vars to `KIZLO_WP_*`/`KIZLO_LOCAL_WP_*`, and `KIZLO_BACKEND_URL`→`KIZLO_API_URL`; replace `dev.path` with `dev.local`/`test.local` (install now lives in `.kizlo/local`); and drop the `down` subcommands.
+
+- [#83](https://github.com/kizlo-io/kizlo/pull/83) [`44fd06a`](https://github.com/kizlo-io/kizlo/commit/44fd06a969cce714e478a2a9b82a0d1b22df9b02) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Remove the `dev.byo` option — seed local WordPress with a backup import/export plugin instead.
+
 ## 0.9.1
 
 ### Patch Changes
