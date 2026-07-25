@@ -69,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 	})
 
 	it("scaffolds the wiring and starter files, records the kizlo dep, and writes the wired layout", async () => {
-		await applyManifestWiring(dir, templateDir, manifest, { devPath: "wordpress", includeExamples: true })
+		await applyManifestWiring(dir, templateDir, manifest, { includeExamples: true })
 
 		// Wiring files land where the manifest conventions place them.
 		expect(fs.existsSync(path.join(dir, "src/lib/kizlo/server/index.ts"))).toBe(true)
@@ -80,12 +80,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		// Demo starter files come along on create (they are skipped by init).
 		expect(fs.existsSync(path.join(dir, "src/app/page.tsx"))).toBe(true)
 		expect(fs.existsSync(path.join(dir, "src/app/blog/[slug]/page.tsx"))).toBe(true)
-		expect(fs.existsSync(path.join(dir, "src/app/globals.css"))).toBe(true)
 
-		// kizlo.config.ts is written by create (not copied), with the local dev path.
+		// kizlo.config.ts is written by create (not copied). With no local WordPress chosen, there's no
+		// `dev`/`test` block: the install folder is fixed at `.kizlo/local`, and the `local` flags are only
+		// written when local WordPress is chosen.
 		const config = fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")
 		expect(config).toContain('dir: "src/lib/kizlo"')
-		expect(config).toContain('dev: { path: "wordpress" }')
+		expect(config).not.toContain("dev:")
+		expect(config).not.toContain("test:")
+
+		// The scaffold ignores `.env` and the `.kizlo/` working dir (which holds the local WordPress install).
+		const gitignore = fs.readFileSync(path.join(dir, ".gitignore"), "utf8").split(/\r?\n/)
+		expect(gitignore).toContain(".env")
+		expect(gitignore).toContain(".kizlo/")
 
 		// The kizlo dependency is recorded (from the template's stamped version) without installing.
 		const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"))
@@ -100,14 +107,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		expect(layout).not.toContain("export const metadata")
 	})
 
-	it("skips only the example pages when declined, still writing the core layout and styles", async () => {
-		await applyManifestWiring(dir, templateDir, manifest, { devPath: "wordpress", includeExamples: false })
+	it("enables local WordPress in the config when local WordPress is chosen", async () => {
+		await applyManifestWiring(dir, templateDir, manifest, { includeExamples: false, localDev: true })
 
-		// Core create wiring still lands: the SEO-wired layout (overwriting the framework's) and its styles.
+		const config = fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")
+		expect(config).toContain("dev: { local: true }")
+		expect(config).toContain("test: { local: true }")
+	})
+
+	it("skips only the example pages when declined, still writing the core layout", async () => {
+		await applyManifestWiring(dir, templateDir, manifest, { includeExamples: false })
+
+		// Core create wiring still lands: the SEO-wired layout (overwriting the framework's).
 		const layout = fs.readFileSync(path.join(dir, "src/app/layout.tsx"), "utf8")
 		expect(layout).toContain("createRootMetadata")
 		expect(layout).not.toContain("export const metadata")
-		expect(fs.existsSync(path.join(dir, "src/app/globals.css"))).toBe(true)
 
 		// The `example`-flagged demo pages are the only thing skipped.
 		expect(fs.existsSync(path.join(dir, "src/app/page.tsx"))).toBe(false)

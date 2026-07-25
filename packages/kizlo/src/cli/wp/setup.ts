@@ -8,7 +8,7 @@ import { credentialsPath } from "./utils"
 /**
  * Phase 2 — after bootstrap, build a `SeedContext` and run each `Fixture.seed`
  * over REST, collecting namespaced fixtures, then write the credentials artifact
- * at `<config-dir>/.kizlo/test-credentials.json`. Returns a teardown that runs
+ * at `<config-dir>/.kizlo/test.json`. Returns a teardown that runs
  * each fixture's `cleanup`.
  */
 export async function runSeeds(config: BootstrapConfig): Promise<() => Promise<void>> {

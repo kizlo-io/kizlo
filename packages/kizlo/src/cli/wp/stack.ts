@@ -15,7 +15,7 @@ function localMounts(fixtures: Fixture[]): string[] {
 /**
  * The test stack: the base compose file under a `<name>-test` project, plus a generated
  * mount override when any fixture carries a local (`{ path }`) plugin — so the same
- * fixtures bind-mount their live plugin source here exactly as in the dev stack.
+ * fixtures bind-mount their live plugin source here exactly as in local WordPress.
  */
 export function testStack(cfg: ResolvedTestConfig): Stack {
 	const mounts = localMounts(cfg.fixtures)
@@ -37,9 +37,9 @@ function detectHostUser(): { uid: number; gid: number } | undefined {
 }
 
 /**
- * The dev stack: the base compose file plus the generated mount override, under a
- * `<name>-dev` project. Building the stack (re)writes the override so it always
- * matches the current `dev.path` and the `dev.fixtures` local plugins.
+ * Local WordPress: the base compose file plus the generated mount override, under a
+ * `<name>-dev` project. Building it (re)writes the override so it always matches the
+ * install folder (`.kizlo/local`) and the `dev.fixtures` local plugins.
  */
 export function devStack(cfg: ResolvedDevConfig): Stack {
 	const override = writeDevOverride(cfg.configDir, {

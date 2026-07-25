@@ -1,11 +1,10 @@
 import { randomBytes } from "node:crypto"
-import { existsSync, rmSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { WordPressService } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
 import { createAdminAppPassword, seedUsers } from "./bootstrap"
-import { prepareByo } from "./byo"
 import { DEFAULT_PLUGINS, TEST_ADMIN } from "./constants"
 import { compose, composePull, composeUp, wpCli } from "./docker"
 import type { SeedContext } from "./types"
@@ -17,8 +16,6 @@ export interface DevStackInfo {
 	username: string
 	/** Host port the MySQL service is published on (loopback) for direct DB access. */
 	dbPort: number
-	/** True when this run hydrated an existing site from `dev.byo` (login is the imported site's). */
-	imported: boolean
 	/** Number of `dev.fixtures` seeded this run (0 unless a fresh stack was just seeded). */
 	seeded: number
 	/**
@@ -28,10 +25,10 @@ export interface DevStackInfo {
 	 */
 	secrets?: { password: string }
 	/**
-	 * A freshly minted REST application password, present only on a fresh default install.
-	 * The prior one (if any) died with the wiped database, so callers write this into `.env`
-	 * to keep REST auth working. A BYO import keeps its own users and a warm resume keeps the
-	 * existing credentials, so it's absent in those cases (nothing changed to invalidate them).
+	 * A freshly minted REST application password, present only on a fresh install. The prior
+	 * one (if any) died with the wiped database, so callers write this into `.env` to keep REST
+	 * auth working. A warm resume keeps the existing credentials, so it's absent then (nothing
+	 * changed to invalidate them).
 	 */
 	appPassword?: string
 }
@@ -52,7 +49,7 @@ function lanAddress(): string | undefined {
 }
 
 /**
- * The URL the dev stack is provisioned at. We prefer the router-assigned LAN address over `localhost`
+ * The URL local WordPress is provisioned at. We prefer the router-assigned LAN address over `localhost`
  * so it's reachable from off the host (the app in a container or on another device). Serving WordPress
  * under the request host is already handled by the container's `WORDPRESS_CONFIG_EXTRA` (it derives
  * `WP_HOME`/`WP_SITEURL` from `HTTP_HOST` per request), so this is only the address we write into `.env`
@@ -63,7 +60,7 @@ function devUrl(port: number): string {
 }
 
 /**
- * Seed `dev.fixtures` into a freshly installed dev stack, reusing the test seeding
+ * Seed `dev.fixtures` into freshly installed local WordPress, reusing the test seeding
  * primitives: seed the default subscriber so `ctx.userId` exists, then run each `seed`
  * over REST. Plugins are already active (`bootstrapDev` ensures them before seeding).
  * The application password is minted only to drive seeding here — it's never printed
@@ -87,22 +84,19 @@ async function seedDevFixtures(cfg: ResolvedDevConfig, url: string): Promise<num
 }
 
 /**
- * Boot the dev stack via docker + wp-cli. A fresh stack is provisioned one of two ways:
- * a default `wp core install`, or — when `dev.byo` points at an archive — hydrated from
- * that existing site (files + database). Either way it then sets permalinks and ensures
- * the `dev.fixtures` plugins (installed sources + bind-mounted locals). An already-provisioned
- * stack is left untouched (idempotent reruns).
+ * Boot local WordPress via docker + wp-cli. A fresh install is provisioned with a default
+ * `wp core install`, then sets permalinks and ensures the `dev.fixtures` plugins (installed
+ * sources + bind-mounted locals). An already-provisioned install is left untouched
+ * (idempotent reruns).
  *
- * Credentials are an output, not a stored file: a default fresh install mints a random
- * admin password and returns it once (to log into wp-admin); a BYO install uses the
- * imported site's own users. No application password is minted — that's a test-stack
- * concern.
+ * Credentials are an output, not a stored file: a fresh install mints a random admin
+ * password and returns it once (to log into wp-admin). No application password is minted —
+ * that's a test concern.
  */
 export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo> {
 	const url = devUrl(cfg.port)
 
 	const fresh = !existsSync(join(cfg.wordpressDir, "wp-includes", "version.php"))
-	const byo = fresh && cfg.byo ? await prepareByo(cfg.byo, cfg.wordpressDir, cfg.configDir) : undefined
 
 	// A fresh install copies WordPress out of the `wordpress:latest` image into the empty bind
 	// mount, so the version we get is whatever that tag resolves to locally. Docker won't re-pull a
@@ -110,26 +104,14 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 	// only on a fresh install (a warm resume reuses the existing files and never pays this cost).
 	// Docker's own layer cache keeps this a cheap digest check when the tag hasn't moved, and it's
 	// best-effort: an offline pull failure falls back to the cached image so dev still works.
-	if (fresh && !byo) await composePull(["wordpress", "wp-cli"]).catch(() => undefined)
+	if (fresh) await composePull(["wordpress", "wp-cli"]).catch(() => undefined)
 
 	await composeUp()
 
 	const installed = (await compose(["exec", "-T", "wp-cli", "wp", "core", "is-installed"])).code === 0
 	let password: string | undefined
-	let imported = false
 
-	if (!installed && byo) {
-		imported = true
-		if (byo.prefix !== "wp_") await wpCli(["config", "set", "table_prefix", byo.prefix, "--type=variable"])
-		const imp = await compose(["exec", "-T", "mysql", "mysql", "-uwordpress", "-pwppass", "wordpress"], { inputFile: byo.sqlPath })
-		if (imp.code !== 0) throw new Error(`importing dev.byo database failed:\n${imp.stderr || imp.stdout}`)
-		rmSync(byo.sqlPath, { force: true })
-		const oldUrl = await wpCli(["option", "get", "siteurl"]).catch(() => "")
-		if (oldUrl && oldUrl !== url) {
-			await wpCli(["search-replace", oldUrl, url, "--all-tables", "--skip-columns=guid", "--report-changed-only"])
-		}
-		await wpCli(["rewrite", "flush", "--hard"])
-	} else if (!installed) {
+	if (!installed) {
 		password = generatePassword()
 		await wpCli([
 			"core",
@@ -146,7 +128,7 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 
 	await ensurePlugins([...DEFAULT_PLUGINS, ...cfg.fixtures.flatMap((fixture) => fixture.plugins ?? [])])
 
-	const seeded = !installed && !byo && cfg.fixtures.length ? await seedDevFixtures(cfg, url) : 0
+	const seeded = !installed && cfg.fixtures.length ? await seedDevFixtures(cfg, url) : 0
 
 	const appPassword = password ? await createAdminAppPassword("kizlo-dev") : undefined
 
@@ -154,7 +136,6 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 		url,
 		username: TEST_ADMIN.username,
 		dbPort: cfg.dbPort,
-		imported,
 		seeded,
 		appPassword,
 		secrets: password ? { password } : undefined,

@@ -113,7 +113,7 @@ export default defineConfig({
 
 #### Create the server
 
-At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `KIZLO_SITE_SECRET` from `.env`:
+At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `KIZLO_WP_SECRET` from `.env`:
 
 ```ts title="src/lib/kizlo/server/index.ts"
 import { createKizlo } from "kizlo/nextjs/server"
@@ -186,14 +186,14 @@ to keep the contract in sync — one command for the whole local loop.
 For your hosted WordPress, add its credentials to `.env`:
 
 ```bash title=".env"
-KIZLO_WORDPRESS_URL=https://your-site.com
-KIZLO_WORDPRESS_USERNAME=admin
-KIZLO_WORDPRESS_APPLICATION_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
-KIZLO_SITE_SECRET=                       # a long random string
-NEXT_PUBLIC_KIZLO_BACKEND_URL=http://localhost:3000/api/kizlo
+KIZLO_WP_URL=https://your-site.com
+KIZLO_WP_USERNAME=admin
+KIZLO_WP_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
+KIZLO_WP_SECRET=                   # a long random string
+NEXT_PUBLIC_KIZLO_API_URL=http://localhost:3000/api/kizlo
 ```
 
-Generate `KIZLO_SITE_SECRET` with `openssl rand -hex 32`. While developing, run `npx kizlo dev` to keep
+Generate `KIZLO_WP_SECRET` with `openssl rand -hex 32`. While developing, run `npx kizlo dev` to keep
 the generated contract in sync as you edit your server files.
 
 </Step>

@@ -1,10 +1,10 @@
 ---
 title: getKizloTestInstance
-description: Wire a Kizlo instance against the seeded test stack for integration tests.
+description: Wire a Kizlo instance against seeded test WordPress for integration tests.
 ---
 
-`getKizloTestInstance` builds a Kizlo instance wired to the running test stack, with admin credentials read from the
-seeded test-credentials artifact and the adapter mocks in place. Call your
+`getKizloTestInstance` builds a Kizlo instance wired to running test WordPress, with admin credentials read from the
+seeded test connection artifact and the adapter mocks in place. Call your
 [procedures](/docs/reference/functions/create-procedure) directly through its `client` to test what they *do*
 against real WordPress responses.
 
@@ -24,8 +24,8 @@ Omit it to test only the core routes.
 
 A `KizloTestInstance`, a [`createKizlo`](/docs/reference/functions/create-kizlo) instance pre-configured for tests:
 
-- Credentials come from the seeded test stack (the admin user), read from the test-credentials artifact that
-  `kizlo test` writes, so the stack must be provisioned first.
+- Credentials come from seeded test WordPress (the admin user), read from the `.kizlo/test.json` connection
+  artifact that `kizlo test` writes, so it must be provisioned first.
 - Adapters are mocked: `geo`, `auth` (resolves the seeded user), and `captcha` (accepts test tokens). The logger is
   restricted to `warn` and `error`.
 

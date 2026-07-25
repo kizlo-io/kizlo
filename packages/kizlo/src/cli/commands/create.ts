@@ -5,24 +5,34 @@ import { defineCommand } from "citty"
 import z from "zod/v4"
 import { getPreset } from "../presets"
 import { fetchTemplate } from "../presets/source"
-import { adaptFile, changesFor, fileEntries, isExample, patchEntries, readManifest, type TemplateManifest } from "../presets/template"
+import {
+	adaptFile,
+	changesFor,
+	fileEntries,
+	isExample,
+	minCliError,
+	patchEntries,
+	readManifest,
+	resolveDependencies,
+	type TemplateManifest,
+} from "../presets/template"
 import {
 	availablePackageManagers,
 	detectInvokingPackageManager,
 	ensureGitignored,
 	frameworkCreateArgs,
-	getVersion,
 	installArgs,
 	type PackageManager,
 	runCommandAsync,
 	runCommandCaptured,
 } from "../utils"
-import { dockerAvailable } from "../wp/docker"
 import {
 	collectConnectionInteractively,
 	nextStepsLines,
 	orCancel,
 	pickAppPort,
+	readEnvExample,
+	resolveEnvKeys,
 	setupLocalWordPress,
 	syncRemote,
 	validate,
@@ -63,16 +73,20 @@ const projectName = validate(projectNameSchema)
 const PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn", "bun"]
 
 /**
- * Pin the `kizlo` dependency in the freshly bootstrapped `package.json`. The template is
- * authoritative for the version (`kizloVersion` in its manifest, stamped at release), falling back to
- * the running CLI's version in-repo before the first stamp. The dependency is only recorded, not
- * installed — the getting-started note tells the user to run install.
+ * Pin Kizlo's dependencies in the freshly bootstrapped `package.json`. The template is authoritative
+ * for the versions (its manifest's `dependencies`/`devDependencies`, stamped at release), falling back
+ * to the running CLI's version for `kizlo` in-repo before the first stamp. The deps are only recorded,
+ * not installed — the getting-started note tells the user to run install.
  */
-function recordKizloDependency(dir: string, manifest: TemplateManifest): void {
+function recordDependencies(dir: string, manifest: TemplateManifest): void {
 	const pkgPath = path.join(dir, "package.json")
-	const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { dependencies?: Record<string, string> }
-	pkg.dependencies ??= {}
-	pkg.dependencies.kizlo = manifest.kizloVersion ?? `^${getVersion()}`
+	const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as {
+		dependencies?: Record<string, string>
+		devDependencies?: Record<string, string>
+	}
+	const { dependencies, devDependencies } = resolveDependencies(manifest)
+	pkg.dependencies = { ...pkg.dependencies, ...dependencies }
+	if (Object.keys(devDependencies).length) pkg.devDependencies = { ...pkg.devDependencies, ...devDependencies }
 	fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`)
 }
 
@@ -95,7 +109,7 @@ export function bootstrapArgs(manifest: TemplateManifest, pm: PackageManager, na
  * tsconfig, the root layout); this drives the manifest — the same engine `init` uses — to record the
  * `kizlo` dependency, write `kizlo.config.ts`, scaffold the manifest's files (the `base` plumbing and
  * the `create` layout/styles always, the `example`-flagged demo pages only when `includeExamples`),
- * seed the generated contract, and ignore `.env`. On a fresh app Kizlo owns the layout, so `create`
+ * seed the generated contract, and ignore `.env` and the `.kizlo/` working dir (which holds the local WordPress install). On a fresh app Kizlo owns the layout, so `create`
  * writes it whole (already SEO-wired) rather than patching — `applyLayoutPatches` runs over `create`'s
  * patches, which are none today. The target directory layout comes straight from the manifest's
  * conventions, which the bootstrap flags are chosen to match, so files land where they expect. Fresh
@@ -105,22 +119,24 @@ export async function applyManifestWiring(
 	dir: string,
 	templateDir: string,
 	manifest: TemplateManifest,
-	opts: { devPath?: string; includeExamples?: boolean },
+	opts: { includeExamples?: boolean; localDev?: boolean },
 ): Promise<void> {
 	const { kizloDir, appDir, alias } = manifest.conventions
 	const scaffold = buildScaffoldContext(dir, { dirRel: kizloDir, appDir, alias, clientUrl: undefined })
 
-	recordKizloDependency(dir, manifest)
+	recordDependencies(dir, manifest)
 
 	const changes = changesFor(manifest, "create").filter((change) => opts.includeExamples || !isExample(change))
 	const files = [
-		{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(kizloDir, alias, opts.devPath) },
+		{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(kizloDir, alias, opts.localDev) },
 		...fileEntries(changes).map((entry) => adaptFile(templateDir, entry, manifest.conventions, scaffold)),
 	]
 	for (const file of files) reportScaffold(file, await scaffoldFile(dir, file, { force: true, yes: false }), false)
 
 	writeGeneratedContract(dir, path.join(kizloDir, "server"))
 	ensureGitignored(dir, ".env")
+	ensureGitignored(dir, ".kizlo/")
+
 	applyLayoutPatches(dir, patchEntries(changes), manifest.conventions, scaffold)
 }
 
@@ -197,15 +213,10 @@ export const create = defineCommand({
 			}),
 		)
 
-		const includeExamples = orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
-
 		const conn = await collectConnectionInteractively(preset, { baseUrl: `http://localhost:${await pickAppPort()}` })
 		if (preset.apiPath && conn.baseUrl) conn.baseUrl = withApiPath(conn.baseUrl, preset.apiPath)
 
-		if (conn.mode === "local" && !(await dockerAvailable())) {
-			p.cancel("Docker isn't available — start Docker (or install it) and re-run, or choose “Use my own WordPress”.")
-			process.exit(1)
-		}
+		const includeExamples = orCancel(await p.confirm({ message: "Add examples?", initialValue: true }))
 
 		const fetched = await fetchTemplate(template)
 		const fail = (message: string): never => {
@@ -215,6 +226,9 @@ export const create = defineCommand({
 		}
 
 		const manifest = readManifest(fetched.dir)
+		const minErr = minCliError(manifest)
+		if (minErr) fail(minErr)
+
 		const bootstrap = bootstrapArgs(manifest, pm, name)
 		if (!bootstrap) {
 			fetched.cleanup()
@@ -231,8 +245,10 @@ export const create = defineCommand({
 			fail(`${preset.label} setup failed — see the output above and try again.`)
 		}
 
+		const exampleTemplate = readEnvExample(fetched.dir)
+
 		try {
-			await applyManifestWiring(dir, fetched.dir, manifest, { devPath: conn.devPath, includeExamples })
+			await applyManifestWiring(dir, fetched.dir, manifest, { includeExamples, localDev: conn.mode === "local" })
 		} catch (error) {
 			fail(error instanceof Error ? error.message : String(error))
 		}
@@ -248,7 +264,7 @@ export const create = defineCommand({
 		}
 
 		await setupLocalWordPress(dir, conn)
-		await writeEnv(dir, preset, conn, { force: true, yes: false })
+		await writeEnv(dir, resolveEnvKeys(preset, manifest), conn, { force: true, yes: false, exampleTemplate })
 		await syncRemote(conn)
 
 		p.note([`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ``, ...nextStepsLines(conn)].join("\n"), "Next steps")

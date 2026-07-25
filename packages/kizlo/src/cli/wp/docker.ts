@@ -58,17 +58,44 @@ function run(cmd: string, args: string[], env: NodeJS.ProcessEnv, opts?: RunInpu
 }
 
 /**
- * Whether the Docker daemon is reachable. `docker version` contacts the server (not just
- * the client), so a non-zero exit means the daemon is down or Docker isn't installed —
- * the early check before a command that needs a stack (e.g. `init`'s local setup).
+ * Docker's readiness in three states, so callers can tell "not installed" from "installed but not
+ * running" and say the right thing:
+ * - `missing` — the `docker` binary isn't on PATH (`docker --version` errors).
+ * - `stopped` — the client is installed but the daemon is unreachable (`docker version` fails).
+ * - `running` — the daemon answered, so a stack can boot.
  */
-export async function dockerAvailable(): Promise<boolean> {
+export type DockerStatus = "missing" | "stopped" | "running"
+
+/**
+ * Probe Docker in two steps: `docker --version` only touches the client (is it installed?), then
+ * `docker version` contacts the server (is the daemon up?). Used before any command that needs local
+ * WordPress, so the caller can distinguish an install problem from a "start Docker" problem.
+ */
+export async function dockerStatus(): Promise<DockerStatus> {
 	try {
-		const res = await run("docker", ["version"], process.env)
-		return res.code === 0
+		const installed = await run("docker", ["--version"], process.env)
+		if (installed.code !== 0) return "missing"
 	} catch {
-		return false
+		return "missing"
 	}
+	try {
+		const daemon = await run("docker", ["version"], process.env)
+		return daemon.code === 0 ? "running" : "stopped"
+	} catch {
+		return "stopped"
+	}
+}
+
+/** The one-line fix to print when Docker isn't ready — install it, or start the daemon. */
+export function dockerHint(status: "missing" | "stopped"): string {
+	return status === "missing"
+		? "Docker isn't installed. Install it from https://docs.docker.com/get-docker/, then re-run."
+		: "Docker is installed but not running. Start Docker (Docker Desktop, or `sudo systemctl start docker`) and re-run."
+}
+
+/** Whether the Docker daemon is reachable — the early check before a command that needs a stack. */
+export async function dockerAvailable(): Promise<boolean> {
+	return (await dockerStatus()) === "running"
 }
 
 function bind(stack: Stack): DockerStack {

@@ -20,7 +20,7 @@ describe("writeDevOverride", () => {
 
 	test("bind-mounts the whole install on both services and creates the host dir", () => {
 		const file = writeDevOverride(dir, { wordpressDir, mounts: [] })
-		expect(file).toBe(path.join(dir, ".kizlo", "docker-compose.dev.override.yml"))
+		expect(file).toBe(path.join(dir, ".kizlo", "compose.local.yml"))
 		expect(fs.existsSync(wordpressDir)).toBe(true)
 
 		const body = fs.readFileSync(file, "utf8")
@@ -89,7 +89,7 @@ describe("writeTestOverride", () => {
 
 	test("mounts local plugin dirs by basename on both services", () => {
 		const file = writeTestOverride(dir, ["plugins/kizlo-woocommerce"])
-		expect(file).toBe(path.join(dir, ".kizlo", "docker-compose.test.override.yml"))
+		expect(file).toBe(path.join(dir, ".kizlo", "compose.test.yml"))
 
 		const body = fs.readFileSync(file, "utf8")
 		const pluginBind = `- "${path.join(dir, "plugins/kizlo-woocommerce")}:/var/www/html/wp-content/plugins/kizlo-woocommerce"`

@@ -22,14 +22,21 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 /** The docker-compose file shipped alongside this module (in both `src/` and `dist/`). */
 export const COMPOSE_FILE = resolve(HERE, "compose/docker-compose.yml")
-/** Dev PHP OPcache config, shipped alongside this module and bind-mounted into the dev stack. */
+/** PHP OPcache config, shipped alongside this module and bind-mounted into the local WordPress. */
 export const OPCACHE_INI = resolve(HERE, "compose/opcache.ini")
 /** Linux-only entrypoint that retags www-data to the host user (see the script for why). */
 export const REMAP_ENTRYPOINT = resolve(HERE, "compose/remap-entrypoint.sh")
 export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
 
-/** Credentials artifact location, relative to the config root. */
-export const CREDENTIALS_REL = ".kizlo/test-credentials.json"
+/** Test connection artifact location, relative to the config root. */
+export const CREDENTIALS_REL = ".kizlo/test.json"
+
+/**
+ * Fixed folder the local WordPress install lives in, relative to the config root. The whole install
+ * (core, themes, uploads, plugins) is bind-mounted here; `kizlo dev reset` wipes it. It sits under
+ * `.kizlo/` — the single gitignored working dir — so there's no folder to choose or configure.
+ */
+export const LOCAL_DIR_REL = ".kizlo/local"
 
 /**
  * DB-side marker written as the final bootstrap step and checked by `isSeeded`.

@@ -3,18 +3,28 @@ import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
 import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldFile } from "../presets"
-import { fetchTemplate } from "../presets/source"
-import { adaptFile, changesFor, fileEntries, patchEntries, readManifest, type TemplateManifest } from "../presets/template"
+import { type FetchedTemplate, fetchTemplate } from "../presets/source"
+import {
+	adaptFile,
+	changesFor,
+	fileEntries,
+	isOlderVersion,
+	minCliError,
+	patchEntries,
+	readManifest,
+	resolveDependencies,
+	type TemplateManifest,
+} from "../presets/template"
 import {
 	addDependencyArgs,
 	detectImportAlias,
 	detectPackageManager,
+	type EnvKeys,
 	ensureGitignored,
 	getVersion,
 	loadEnvFiles,
 	runCommandAsync,
 } from "../utils"
-import { dockerAvailable } from "../wp/docker"
 import {
 	type Connection,
 	collectConnectionFromEnv,
@@ -22,6 +32,8 @@ import {
 	dirPath,
 	nextStepsNote,
 	orCancel,
+	readEnvExample,
+	resolveEnvKeys,
 	setupLocalWordPress,
 	syncRemote,
 	validate,
@@ -71,8 +83,6 @@ function detectAppDir(cwd: string, hasSrcDir: boolean): string {
 }
 
 async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }): Promise<Setup> {
-	const conn = await collectConnectionInteractively(ctx.preset)
-
 	const dir = orCancel(await p.text({ message: "Kizlo directory", initialValue: defaultDir(ctx.hasSrcDir), validate: validate(dirPath) }))
 
 	let alias = ""
@@ -89,6 +99,8 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; pres
 		alias = answer.trim()
 	}
 
+	const conn = await collectConnectionInteractively(ctx.preset)
+
 	return { ...conn, dir, alias }
 }
 
@@ -97,8 +109,8 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; pres
  * environment are used; missing ones are left empty for the user to fill in
  * later. Never fails — `--yes` always scaffolds a fillable project.
  */
-function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }): Setup {
-	const conn = collectConnectionFromEnv(ctx.preset)
+function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset; envKeys: EnvKeys }): Setup {
+	const conn = collectConnectionFromEnv(ctx.envKeys)
 	const dir = defaultDir(ctx.hasSrcDir)
 	return {
 		...conn,
@@ -113,44 +125,28 @@ function readPkg(pkgPath: string): Record<string, unknown> {
 
 type Deps = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
 
-function kizloDep(pkg: Deps): string | undefined {
-	return pkg.dependencies?.kizlo ?? pkg.devDependencies?.kizlo
-}
-
-/** A bare `x.y.z` from a version spec (range prefix and pre-release/build metadata dropped); undefined if none. */
-function coerceVersion(spec: string): [number, number, number] | undefined {
-	const match = /(\d+)\.(\d+)\.(\d+)/.exec(spec)
-	return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : undefined
-}
-
-/** Whether `have` is a strictly older release than `want`; false when either can't be compared. */
-function isOlder(have: string, want: string): boolean {
-	const a = coerceVersion(have)
-	const b = coerceVersion(want)
-	if (!a || !b) return false
-	for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return (a[i] as number) < (b[i] as number)
-	return false
-}
-
 /**
- * The template is authoritative for the kizlo version: it declares `kizloVersion` in its manifest
- * (stamped at release), falling back to the running CLI's version in-repo before the first stamp.
- * When the project's kizlo is older, upgrade the project up to it and say so — a deliberate pin is
- * never changed silently. Never downgrades.
+ * The template is authoritative for the pinned versions: it declares `dependencies`/`devDependencies`
+ * in its manifest (stamped at release), falling back to the running CLI's version for `kizlo` in-repo
+ * before the first stamp. For each declared package the project already has at an older release, upgrade
+ * it up to the template's pin and say so — a deliberate pin is never changed silently. Never downgrades,
+ * and never adds a package the project doesn't already have (a missing `kizlo` is installed separately).
  */
-async function alignKizloVersion(
+async function alignDependencies(
 	cwd: string,
 	pm: ReturnType<typeof detectPackageManager>,
 	pkg: Deps,
 	manifest: TemplateManifest,
 ): Promise<void> {
-	const want = manifest.kizloVersion ?? `^${getVersion()}`
-	const have = kizloDep(pkg)
-	if (!have || !isOlder(have, want)) return
-	const s = p.spinner()
-	s.start(`Upgrading kizlo from ${have} to ${want}`)
-	const ok = await runCommandAsync(addDependencyArgs(pm, `kizlo@${want}`), cwd, "ignore")
-	s.stop(ok ? `Upgraded kizlo to ${want}` : `Could not upgrade kizlo automatically — install kizlo@${want} yourself`)
+	const { dependencies, devDependencies } = resolveDependencies(manifest)
+	for (const [name, want] of [...Object.entries(dependencies), ...Object.entries(devDependencies)]) {
+		const have = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name]
+		if (!have || !isOlderVersion(have, want)) continue
+		const s = p.spinner()
+		s.start(`Upgrading ${name} from ${have} to ${want}`)
+		const ok = await runCommandAsync(addDependencyArgs(pm, `${name}@${want}`), cwd, "ignore")
+		s.stop(ok ? `Upgraded ${name} to ${want}` : `Could not upgrade ${name} automatically — install ${name}@${want} yourself`)
+	}
 }
 
 export const init = defineCommand({
@@ -234,71 +230,82 @@ export const init = defineCommand({
 		}
 
 		if (yes) loadEnvFiles(cwd)
-		const setup = yes ? collectFromEnv({ cwd, hasSrcDir, preset }) : await collectInteractively({ cwd, hasSrcDir, preset })
-		if (args.alias !== undefined) setup.alias = String(args.alias).trim()
-		setup.alias = aliasWithSlash(setup.alias)
 
-		if (setup.mode === "local" && !(await dockerAvailable())) {
-			p.cancel("Docker isn't available — start Docker (or install it) and re-run, or choose “Use my own WordPress”.")
-			process.exit(1)
-		}
-
-		if (!hasKizlo) {
-			const spec = `kizlo@^${getVersion()}`
-			const s = p.spinner()
-			s.start(`Installing kizlo with ${pm}`)
-			const ok = await runCommandAsync(addDependencyArgs(pm, spec), cwd, "ignore")
-			s.stop(ok ? "Installed kizlo" : "Could not install kizlo automatically")
-			if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, spec).join(" ")}`)
-		}
-
-		if (preset.apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, preset.apiPath)
-
-		await setupLocalWordPress(cwd, setup)
-
-		await writeEnv(cwd, preset, setup, { force, yes })
-		await syncRemote(setup)
-
-		const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
-		const serverDirRel = path.join(dirRel, "server")
-		const clientUrl = setup.siteUrl && !sameOrigin(setup.siteUrl, setup.baseUrl) ? setup.baseUrl : undefined
-
-		const scaffold = buildScaffoldContext(cwd, { dirRel, appDir: detectAppDir(cwd, hasSrcDir), alias: setup.alias, clientUrl })
-
-		const files: ScaffoldFile[] = [
-			{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.devPath) },
-		]
-
+		// Fetch the template up front (when the preset has one) so the manifest drives the whole run: the
+		// `minCli` compatibility floor is checked before any work, and the `.env` key names plus pinned
+		// dependencies come from it. Kept alive until the wiring files are written, then cleaned up.
 		let manifest: TemplateManifest | undefined
+		let fetched: FetchedTemplate | undefined
 		if (preset.template) {
-			const fetched = await fetchTemplate(preset.template)
-			try {
-				manifest = readManifest(fetched.dir)
-				await alignKizloVersion(cwd, pm, pkg, manifest)
+			fetched = await fetchTemplate(preset.template)
+			manifest = readManifest(fetched.dir)
+			const minErr = minCliError(manifest)
+			if (minErr) {
+				fetched.cleanup()
+				p.cancel(minErr)
+				process.exit(1)
+			}
+		}
+		const envKeys = resolveEnvKeys(preset, manifest)
+
+		try {
+			const setup = yes ? collectFromEnv({ cwd, hasSrcDir, preset, envKeys }) : await collectInteractively({ cwd, hasSrcDir, preset })
+			if (args.alias !== undefined) setup.alias = String(args.alias).trim()
+			setup.alias = aliasWithSlash(setup.alias)
+
+			if (!hasKizlo) {
+				const spec = `kizlo@${manifest?.dependencies?.kizlo ?? `^${getVersion()}`}`
+				const s = p.spinner()
+				s.start(`Installing kizlo with ${pm}`)
+				const ok = await runCommandAsync(addDependencyArgs(pm, spec), cwd, "ignore")
+				s.stop(ok ? "Installed kizlo" : "Could not install kizlo automatically")
+				if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, spec).join(" ")}`)
+			}
+
+			if (preset.apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, preset.apiPath)
+
+			await setupLocalWordPress(cwd, setup)
+
+			await writeEnv(cwd, envKeys, setup, { force, yes, exampleTemplate: fetched ? readEnvExample(fetched.dir) : undefined })
+			await syncRemote(setup)
+
+			const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
+			const serverDirRel = path.join(dirRel, "server")
+			const clientUrl = setup.siteUrl && !sameOrigin(setup.siteUrl, setup.baseUrl) ? setup.baseUrl : undefined
+
+			const scaffold = buildScaffoldContext(cwd, { dirRel, appDir: detectAppDir(cwd, hasSrcDir), alias: setup.alias, clientUrl })
+
+			const files: ScaffoldFile[] = [
+				{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.mode === "local") },
+			]
+
+			if (manifest && fetched) {
+				await alignDependencies(cwd, pm, pkg, manifest)
 				for (const entry of fileEntries(changesFor(manifest, "init")))
 					files.push(adaptFile(fetched.dir, entry, manifest.conventions, scaffold))
-			} finally {
-				fetched.cleanup()
+			} else if (preset.scaffolds) {
+				files.push(...preset.scaffolds(scaffold))
 			}
-		} else if (preset.scaffolds) {
-			files.push(...preset.scaffolds(scaffold))
+
+			const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
+			for (const file of files) scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force, yes }) })
+
+			writeGeneratedContract(cwd, serverDirRel)
+
+			const gitignore = ensureGitignored(cwd, ".env")
+			ensureGitignored(cwd, ".kizlo/")
+
+			for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
+
+			if (manifest) applyLayoutPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
+
+			if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)
+
+			nextStepsNote(setup)
+
+			p.outro("Kizlo is ready 🎉")
+		} finally {
+			fetched?.cleanup()
 		}
-
-		const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
-		for (const file of files) scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force, yes }) })
-
-		writeGeneratedContract(cwd, serverDirRel)
-
-		const gitignore = ensureGitignored(cwd, ".env")
-
-		for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
-
-		if (manifest) applyLayoutPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
-
-		if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)
-
-		nextStepsNote(setup)
-
-		p.outro("Kizlo is ready 🎉")
 	},
 })

@@ -231,6 +231,11 @@ export function envKeysPresent(contents: string, keys: readonly string[]): strin
 	return keys.filter((key) => new RegExp(`^\\s*${key}\\s*=`, "m").test(contents))
 }
 
+/** Like {@link envKeysPresent}, but also matches commented-out placeholders (`# KEY=`). */
+export function envKeysDeclared(contents: string, keys: readonly string[]): string[] {
+	return keys.filter((key) => new RegExp(`^\\s*#?\\s*${key}\\s*=`, "m").test(contents))
+}
+
 export interface EnvMergeResult {
 	content: string
 	added: string[]
@@ -247,27 +252,61 @@ export interface EnvGroup {
 }
 
 /**
- * The grouped `.env` layout shared by `init` and `dev`, so both write the same sectioned file:
- * a target switch, the backend URL, then the production and dev connection blocks. `baseUrlEnvKey`
- * varies per preset (e.g. `NEXT_PUBLIC_KIZLO_BACKEND_URL`), so it's threaded in. Only sections whose
- * keys are actually being appended get a header, so a remote/prod run skips the dev block and vice versa.
+ * The `.env` key names the scaffold writes and the pinned runtime later reads — the wiring contract's
+ * one drift-prone surface, so the names are declared as data (the template's `env` section) rather than
+ * hardcoded here. This is the resolved shape both sides agree on: the public API URL key, plus the
+ * remote and local WordPress credential sets. Semantic slots, not values — the CLI still fills each
+ * from the connection.
  */
-export function envGroups(baseUrlEnvKey: string): EnvGroup[] {
+export interface EnvKeys {
+	/** Public Kizlo API URL key, e.g. `KIZLO_API_URL` or a framework-prefixed `NEXT_PUBLIC_KIZLO_API_URL`. */
+	baseUrl: string
+	/** Keys a real remote deploy reads. */
+	remote: { siteSecret: string; wpUrl: string; wpUsername: string; wpPassword: string }
+	/** Keys local WordPress (`kizlo dev`) manages, plus the `local | remote` connect switch. */
+	local: { connect: string; siteSecret: string; wpUrl: string; wpUsername: string; wpPassword: string }
+}
+
+/**
+ * The built-in key names, used by the generic `base` preset (no template, no separately-pinned
+ * runtime) and as the fallback when a template's manifest declares no `env` section (in-repo before the
+ * first stamped release). Real templates carry their own `env`, so this is the standard `KIZLO_*` set.
+ */
+export const DEFAULT_ENV_KEYS: EnvKeys = {
+	baseUrl: "KIZLO_API_URL",
+	remote: {
+		siteSecret: "KIZLO_WP_SECRET",
+		wpUrl: "KIZLO_WP_URL",
+		wpUsername: "KIZLO_WP_USERNAME",
+		wpPassword: "KIZLO_WP_APP_PASSWORD",
+	},
+	local: {
+		connect: "KIZLO_CONNECT",
+		siteSecret: "KIZLO_LOCAL_WP_SECRET",
+		wpUrl: "KIZLO_LOCAL_WP_URL",
+		wpUsername: "KIZLO_LOCAL_WP_USERNAME",
+		wpPassword: "KIZLO_LOCAL_WP_APP_PASSWORD",
+	},
+}
+
+/**
+ * The grouped `.env` layout shared by `init` and `dev`, so both write the same sectioned file:
+ * a connect switch, the API URL, then the remote and local connection blocks. The key names come from
+ * the resolved {@link EnvKeys} (the template's `env` contract), so the sections stay labelled correctly
+ * whatever a template calls them. Only sections whose keys are actually being appended get a header, so
+ * a remote run skips the local block and vice versa.
+ */
+export function envGroups(envKeys: EnvKeys): EnvGroup[] {
 	return [
-		{ comment: "Kizlo Target (dev | prod)", keys: ["KIZLO_TARGET"] },
-		{ comment: "Kizlo Backend URL", keys: [baseUrlEnvKey] },
+		{ comment: "Kizlo Connect (local | remote)", keys: [envKeys.local.connect] },
+		{ comment: "Kizlo API URL", keys: [envKeys.baseUrl] },
 		{
-			comment: "Kizlo Production Env",
-			keys: ["KIZLO_SITE_SECRET", "KIZLO_WORDPRESS_URL", "KIZLO_WORDPRESS_USERNAME", "KIZLO_WORDPRESS_APPLICATION_PASSWORD"],
+			comment: "Kizlo Remote",
+			keys: [envKeys.remote.siteSecret, envKeys.remote.wpUrl, envKeys.remote.wpUsername, envKeys.remote.wpPassword],
 		},
 		{
-			comment: "Kizlo Development Env",
-			keys: [
-				"KIZLO_DEV_SITE_SECRET",
-				"KIZLO_DEV_WORDPRESS_URL",
-				"KIZLO_DEV_WORDPRESS_USERNAME",
-				"KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD",
-			],
+			comment: "Kizlo Local",
+			keys: [envKeys.local.siteSecret, envKeys.local.wpUrl, envKeys.local.wpUsername, envKeys.local.wpPassword],
 		},
 	]
 }

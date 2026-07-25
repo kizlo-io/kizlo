@@ -2,43 +2,43 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { resolveKizloConfig } from "./kizlo"
 
 const KEYS = [
-	"KIZLO_TARGET",
-	"KIZLO_SITE_SECRET",
-	"KIZLO_DEV_SITE_SECRET",
-	"KIZLO_WORDPRESS_URL",
-	"KIZLO_WORDPRESS_USERNAME",
-	"KIZLO_WORDPRESS_APPLICATION_PASSWORD",
-	"KIZLO_DEV_WORDPRESS_URL",
-	"KIZLO_DEV_WORDPRESS_USERNAME",
-	"KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD",
+	"KIZLO_CONNECT",
+	"KIZLO_WP_SECRET",
+	"KIZLO_LOCAL_WP_SECRET",
+	"KIZLO_WP_URL",
+	"KIZLO_WP_USERNAME",
+	"KIZLO_WP_APP_PASSWORD",
+	"KIZLO_LOCAL_WP_URL",
+	"KIZLO_LOCAL_WP_USERNAME",
+	"KIZLO_LOCAL_WP_APP_PASSWORD",
 ] as const
 
-const PROD = {
-	KIZLO_SITE_SECRET: "prod-secret",
-	KIZLO_WORDPRESS_URL: "https://prod.example.com",
-	KIZLO_WORDPRESS_USERNAME: "prod-user",
-	KIZLO_WORDPRESS_APPLICATION_PASSWORD: "prod-pass",
+const REMOTE = {
+	KIZLO_WP_SECRET: "remote-secret",
+	KIZLO_WP_URL: "https://remote.example.com",
+	KIZLO_WP_USERNAME: "remote-user",
+	KIZLO_WP_APP_PASSWORD: "remote-pass",
 }
 
-const DEV = {
-	KIZLO_DEV_SITE_SECRET: "dev-secret",
-	KIZLO_DEV_WORDPRESS_URL: "http://localhost:8080",
-	KIZLO_DEV_WORDPRESS_USERNAME: "dev-user",
-	KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD: "dev-pass",
+const LOCAL = {
+	KIZLO_LOCAL_WP_SECRET: "local-secret",
+	KIZLO_LOCAL_WP_URL: "http://localhost:8080",
+	KIZLO_LOCAL_WP_USERNAME: "local-user",
+	KIZLO_LOCAL_WP_APP_PASSWORD: "local-pass",
 }
 
 const saved: Record<string, string | undefined> = {}
 
 const resolve = (options?: Parameters<typeof resolveKizloConfig>[0]) =>
-	resolveKizloConfig({ baseUrl: "https://app.example.com", ...options }, { baseUrlEnvKey: "KIZLO_BACKEND_URL" })
+	resolveKizloConfig({ baseUrl: "https://app.example.com", ...options }, { baseUrlEnvKey: "KIZLO_API_URL" })
 
-describe("resolveKizloConfig target selection", () => {
+describe("resolveKizloConfig connect selection", () => {
 	beforeEach(() => {
 		for (const key of KEYS) {
 			saved[key] = process.env[key]
 			delete process.env[key]
 		}
-		Object.assign(process.env, PROD, DEV)
+		Object.assign(process.env, REMOTE, LOCAL)
 	})
 
 	afterEach(() => {
@@ -48,36 +48,41 @@ describe("resolveKizloConfig target selection", () => {
 		}
 	})
 
-	test("defaults to production keys", () => {
+	test("defaults to remote keys", () => {
 		const config = resolve()
-		expect(config.target).toBe("production")
-		expect(config.siteSecret).toBe("prod-secret")
-		expect(config.credentials).toEqual({ url: PROD.KIZLO_WORDPRESS_URL, username: "prod-user", password: "prod-pass" })
+		expect(config.connect).toBe("remote")
+		expect(config.siteSecret).toBe("remote-secret")
+		expect(config.credentials).toEqual({ url: REMOTE.KIZLO_WP_URL, username: "remote-user", password: "remote-pass" })
 	})
 
-	test('target: "dev" reads the KIZLO_DEV_WORDPRESS_* / KIZLO_DEV_SITE_SECRET keys', () => {
-		const config = resolve({ target: "dev" })
-		expect(config.target).toBe("dev")
-		expect(config.siteSecret).toBe("dev-secret")
-		expect(config.credentials).toEqual({ url: DEV.KIZLO_DEV_WORDPRESS_URL, username: "dev-user", password: "dev-pass" })
+	test('connect: "local" reads the KIZLO_LOCAL_WP_* / KIZLO_LOCAL_WP_SECRET keys', () => {
+		const config = resolve({ connect: "local" })
+		expect(config.connect).toBe("local")
+		expect(config.siteSecret).toBe("local-secret")
+		expect(config.credentials).toEqual({ url: LOCAL.KIZLO_LOCAL_WP_URL, username: "local-user", password: "local-pass" })
 	})
 
-	test("KIZLO_TARGET=dev selects the dev set with no explicit option", () => {
-		process.env.KIZLO_TARGET = "dev"
+	test("KIZLO_CONNECT=local selects the local set with no explicit option", () => {
+		process.env.KIZLO_CONNECT = "local"
 		const config = resolve()
-		expect(config.target).toBe("dev")
-		expect(config.siteSecret).toBe("dev-secret")
+		expect(config.connect).toBe("local")
+		expect(config.siteSecret).toBe("local-secret")
 	})
 
-	test("the explicit option overrides KIZLO_TARGET", () => {
-		process.env.KIZLO_TARGET = "dev"
-		const config = resolve({ target: "production" })
-		expect(config.target).toBe("production")
-		expect(config.credentials.url).toBe(PROD.KIZLO_WORDPRESS_URL)
+	test("the explicit option overrides KIZLO_CONNECT", () => {
+		process.env.KIZLO_CONNECT = "local"
+		const config = resolve({ connect: "remote" })
+		expect(config.connect).toBe("remote")
+		expect(config.credentials.url).toBe(REMOTE.KIZLO_WP_URL)
 	})
 
-	test("a missing dev key throws an error naming the resolved key", () => {
-		delete process.env.KIZLO_DEV_WORDPRESS_URL
-		expect(() => resolve({ target: "dev" })).toThrow(/KIZLO_DEV_WORDPRESS_URL/)
+	test("an unrecognized KIZLO_CONNECT throws naming the bad value", () => {
+		process.env.KIZLO_CONNECT = "dev"
+		expect(() => resolve()).toThrow(/KIZLO_CONNECT must be "local" or "remote", got "dev"/)
+	})
+
+	test("a missing local key throws an error naming the resolved key", () => {
+		delete process.env.KIZLO_LOCAL_WP_URL
+		expect(() => resolve({ connect: "local" })).toThrow(/KIZLO_LOCAL_WP_URL/)
 	})
 })

@@ -72,6 +72,6 @@ describe("findConfigDir", () => {
 		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), "")
 		const nested = path.join(dir, "apps", "web")
 		fs.mkdirSync(nested, { recursive: true })
-		expect(credentialsPath(nested)).toBe(path.join(dir, ".kizlo", "test-credentials.json"))
+		expect(credentialsPath(nested)).toBe(path.join(dir, ".kizlo", "test.json"))
 	})
 })

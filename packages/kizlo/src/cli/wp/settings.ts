@@ -15,10 +15,10 @@ export interface SiteSettingsSync {
 	 */
 	siteUrl?: string
 	/**
-	 * The WordPress site runs in the dev Docker stack while the Kizlo server runs on the host. A loopback
+	 * Local WordPress runs in Docker while the Kizlo server runs on the host. A loopback
 	 * `backendUrl` host (`localhost`/`127.0.0.1`) is unreachable from inside the container, so `backend_url`
 	 * is rewritten to `host.docker.internal` for delivery. The public `url` keeps the original host (the
-	 * browser-facing origin). Set for the local dev/provision stack; left off for real remote sites.
+	 * browser-facing origin). Set for local WordPress; left off for real remote sites.
 	 */
 	containerized?: boolean
 }
@@ -36,7 +36,7 @@ function originOf(url: string): string | undefined {
 }
 
 /**
- * Rewrite a loopback host to `host.docker.internal` so the dockerized WordPress dev stack can reach a
+ * Rewrite a loopback host to `host.docker.internal` so the dockerized local WordPress can reach a
  * Kizlo server on the host (the container's own `localhost` is not the host). Non-loopback hosts (real
  * deployments) and unparseable URLs are returned unchanged.
  */

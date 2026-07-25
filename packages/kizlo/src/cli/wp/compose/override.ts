@@ -2,10 +2,10 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, resolve } from "node:path"
 import { OPCACHE_INI, REMAP_ENTRYPOINT } from "../constants"
 
-/** Generated dev override location, relative to the config root. */
-const OVERRIDE_REL = ".kizlo/docker-compose.dev.override.yml"
+/** Generated local WordPress override location, relative to the config root. */
+const OVERRIDE_REL = ".kizlo/compose.local.yml"
 /** Generated test override location (plugin mounts only), relative to the config root. */
-const TEST_OVERRIDE_REL = ".kizlo/docker-compose.test.override.yml"
+const TEST_OVERRIDE_REL = ".kizlo/compose.test.yml"
 
 const WP_ROOT = "/var/www/html"
 const PLUGINS_DIR = `${WP_ROOT}/wp-content/plugins`
