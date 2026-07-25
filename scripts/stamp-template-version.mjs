@@ -2,19 +2,27 @@ import fs from "node:fs"
 import path from "node:path"
 
 /**
- * Stamp the current `kizlo` version into every template's `template.json` as `kizloVersion`.
+ * Stamp the current kizlo-family versions into every template's `template.json`, pinning each
+ * kizlo-family entry in the manifest's `dependencies`/`devDependencies` to a caret range of that
+ * package's own version (and guaranteeing `kizlo` itself is pinned). This is the source of truth for
+ * the versions a scaffolded project installs.
  *
- * Runs as part of `changeset version` (see the root `version` script), so it reads the version that
- * `changeset version` has just written to `packages/kizlo/package.json` and pins each template to a
- * caret range of it. The changesets action then commits the stamped manifests into the Version
- * Packages PR; merging that PR is what lands the pin on `main`, which is where `create`/`init` fetch
- * templates from.
+ * Each package is independently versioned, so every `@kizlo/*` entry gets pinned to its own version —
+ * not to `kizlo`'s. Versions are read from each workspace package's `package.json` after
+ * `changeset version` has bumped them (see the root `version` script). The changesets action then
+ * commits the stamped manifests into the Version Packages PR; merging that PR is what lands the pins on
+ * `main`, which is where `create`/`init` fetch templates from.
  *
- * Fails loud: any missing file, unreadable version, bad JSON, failed write, or a run that stamps
- * zero manifests exits non-zero so the release step stops instead of shipping a stale pin.
+ * Left untouched on purpose: the `env` key names (static wiring data, not versions) and any third-party
+ * dependency pins. `minCli` is also left alone — it's a manually set compatibility floor a developer
+ * bumps only when a manifest change older CLIs can't apply lands, not the moving release version.
+ *
+ * Fails loud: any missing file, unreadable version, bad JSON, failed write, a kizlo-family dep with no
+ * matching workspace package, or a run that stamps zero manifests exits non-zero so the release step
+ * stops instead of shipping a stale or bogus pin.
  */
 const ROOT = process.cwd()
-const KIZLO_PKG = path.join(ROOT, "packages/kizlo/package.json")
+const PACKAGES_DIR = path.join(ROOT, "packages")
 const TEMPLATES_DIR = path.join(ROOT, "templates")
 
 function fail(message) {
@@ -22,16 +30,34 @@ function fail(message) {
 	process.exit(1)
 }
 
-let version
-try {
-	version = JSON.parse(fs.readFileSync(KIZLO_PKG, "utf8")).version
-} catch (error) {
-	fail(`could not read ${path.relative(ROOT, KIZLO_PKG)}: ${error.message}`)
+function isKizloFamily(name) {
+	return name === "kizlo" || name.startsWith("@kizlo/")
 }
-if (typeof version !== "string" || !/^\d+\.\d+\.\d+/.test(version)) {
-	fail(`packages/kizlo has no valid semver version (got ${JSON.stringify(version)})`)
+
+// Build a name -> "^version" map from every workspace package, so each kizlo-family dep can be pinned
+// to its own independently-versioned release rather than kizlo's.
+if (!fs.existsSync(PACKAGES_DIR)) fail(`packages directory not found at ${path.relative(ROOT, PACKAGES_DIR)}`)
+
+const ranges = new Map()
+for (const dir of fs.readdirSync(PACKAGES_DIR)) {
+	const pkgPath = path.join(PACKAGES_DIR, dir, "package.json")
+	if (!fs.existsSync(pkgPath)) continue
+
+	let pkg
+	try {
+		pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"))
+	} catch (error) {
+		fail(`invalid JSON in ${path.relative(ROOT, pkgPath)}: ${error.message}`)
+	}
+	if (!isKizloFamily(pkg.name)) continue
+	if (typeof pkg.version !== "string" || !/^\d+\.\d+\.\d+/.test(pkg.version)) {
+		fail(`${path.relative(ROOT, pkgPath)} has no valid semver version (got ${JSON.stringify(pkg.version)})`)
+	}
+	ranges.set(pkg.name, `^${pkg.version}`)
 }
-const range = `^${version}`
+
+const kizloRange = ranges.get("kizlo")
+if (!kizloRange) fail(`no workspace package named "kizlo" found under ${path.relative(ROOT, PACKAGES_DIR)}`)
 
 if (!fs.existsSync(TEMPLATES_DIR)) fail(`templates directory not found at ${path.relative(ROOT, TEMPLATES_DIR)}`)
 
@@ -47,15 +73,34 @@ for (const name of fs.readdirSync(TEMPLATES_DIR)) {
 		fail(`invalid JSON in ${path.relative(ROOT, manifestPath)}: ${error.message}`)
 	}
 
-	manifest.kizloVersion = range
+	// Pin every kizlo-family package (kizlo + @kizlo/*) across both dependency maps to its own version;
+	// leave third-party pins as they are. Guarantee kizlo itself is present so a template can't ship
+	// without its pin.
+	manifest.dependencies ??= {}
+	let pinned = 0
+	for (const map of [manifest.dependencies, manifest.devDependencies]) {
+		if (!map) continue
+		for (const dep of Object.keys(map)) {
+			if (!isKizloFamily(dep)) continue
+			const range = ranges.get(dep)
+			if (!range) fail(`${path.relative(ROOT, manifestPath)} depends on "${dep}" but no matching workspace package exists`)
+			map[dep] = range
+			pinned++
+		}
+	}
+	if (manifest.dependencies.kizlo !== kizloRange) {
+		manifest.dependencies.kizlo = kizloRange
+		pinned++
+	}
+
 	try {
 		fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, "\t")}\n`)
 	} catch (error) {
 		fail(`could not write ${path.relative(ROOT, manifestPath)}: ${error.message}`)
 	}
-	console.log(`stamp-template-version: ${path.relative(ROOT, manifestPath)} -> kizloVersion ${range}`)
+	console.log(`stamp-template-version: ${path.relative(ROOT, manifestPath)} -> ${pinned} dep(s) pinned`)
 	stamped++
 }
 
 if (stamped === 0) fail(`no template manifests found under ${path.relative(ROOT, TEMPLATES_DIR)} — nothing stamped`)
-console.log(`stamp-template-version: stamped ${stamped} manifest(s) with ${range}`)
+console.log(`stamp-template-version: stamped ${stamped} manifest(s)`)

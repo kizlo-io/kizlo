@@ -46,14 +46,14 @@ export const blogFixture = defineFixture({
 })
 ```
 
-Register it on the dev and test stacks:
+Register it on local WordPress for both `kizlo dev` and `kizlo test`:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 import { blogFixture } from "./fixtures/blog"
 
 export default defineConfig({
-  dev: { path: "wordpress", fixtures: [blogFixture] },
-  test: { fixtures: [blogFixture] },
+  dev: { local: true, fixtures: [blogFixture] },
+  test: { local: true, fixtures: [blogFixture] },
 })
 ```

@@ -4,6 +4,7 @@ import { createJiti } from "jiti"
 import z from "zod/v4"
 import type { KizloGlobalConfig } from "../../config"
 import { detectPackageManager, type PackageManager } from "../utils"
+import { LOCAL_DIR_REL } from "../wp/constants"
 import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
 import { log } from "./logger"
@@ -20,15 +21,15 @@ const configSchema = z.object({
 	name: z.string().optional(),
 	dev: z
 		.object({
-			path: z.string().optional(),
+			local: z.boolean().optional(),
 			port: z.number().int().positive().optional(),
 			dbPort: z.number().int().positive().optional(),
-			byo: z.string().optional(),
 			fixtures: z.array(fixtureSchema).optional(),
 		})
 		.optional(),
 	test: z
 		.object({
+			local: z.boolean().optional(),
 			port: z.number().int().positive().optional(),
 			fixtures: z.array(fixtureSchema).optional(),
 			packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]).optional(),
@@ -37,11 +38,7 @@ const configSchema = z.object({
 		.optional(),
 })
 
-/**
- * Parsed config shape. Looser than {@link KizloGlobalConfig} on purpose: the public
- * type marks `dev.path` required for good authoring DX, but a loaded file might omit
- * it — `resolveDevConfig` enforces it at runtime with a guiding message.
- */
+/** Parsed config shape — mirrors {@link KizloGlobalConfig}, with every block optional. */
 type LoadedConfig = z.infer<typeof configSchema>
 
 export interface ResolvedConfig {
@@ -140,6 +137,8 @@ export function resolveStackName(configDir: string, configName?: string): string
 export interface ResolvedTestConfig {
 	/** Directory holding `kizlo.config.*` (the credentials artifact root). */
 	configDir: string
+	/** True when `test.local` is set — `kizlo test` boots local WordPress before running the suite. */
+	local: boolean
 	/** Docker compose project name (`<name>-test`). */
 	project: string
 	/** Resolved credentials artifact path under `configDir`. */
@@ -165,6 +164,7 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 
 	return {
 		configDir,
+		local: Boolean(test.local),
 		project: `${resolveStackName(configDir, fileConfig?.name)}-test`,
 		command: test.command,
 		port: test.port ?? DEFAULT_TEST_PORT,
@@ -187,50 +187,46 @@ export interface ResolvedDevConfig {
 	dbPort: number
 	/** True when `dev.dbPort` was set in config — the user owns collisions, so don't auto-step. */
 	dbPortExplicit: boolean
-	/** Absolute path to a BYO archive (`wordpress/` + `.sql`) to hydrate a fresh stack from, if set. */
-	byo?: string
-	/** Fixtures to seed on a fresh stack (mutually exclusive with `byo`); also carry the stack's plugins. */
+	/** Fixtures to seed on a fresh install; also carry the plugins they need. */
 	fixtures: Fixture[]
-	/** Repo-relative folder holding the install (from `dev.path`); used for gitignore. */
+	/** Fixed repo-relative folder holding the install (`.kizlo/local`). */
 	wordpressPath: string
 	/** Absolute path the whole install is bind-mounted to; wiped by `reset`. */
 	wordpressDir: string
 }
 
 /**
- * Whether a local WordPress dev stack is configured (`dev.path` is set). When false, `kizlo dev`
- * has no stack to boot and runs the contract watcher alone — the path a bring-your-own-WordPress
- * project takes. Loads `kizlo.config.*` from the config dir; a missing config counts as no stack.
+ * Whether this project runs local WordPress under `kizlo dev` — `dev.local` is `true` in
+ * `kizlo.config.*`. When false, `kizlo dev` has nothing to boot and runs the contract watcher alone,
+ * the path a project pointing at its own WordPress takes. The flag is written by `create`/`init` when
+ * local WordPress is chosen, and lives next to the rest of the `dev` config, so it's committed and
+ * survives `kizlo dev reset`.
  */
-export async function hasDevStack(cwd: string): Promise<boolean> {
+export async function usesLocalWordPress(cwd: string): Promise<boolean> {
 	const fileConfig = await loadConfigFile(findConfigDir(cwd))
-	return Boolean(fileConfig?.dev?.path)
+	return Boolean(fileConfig?.dev?.local)
 }
 
 /**
- * Resolve the `dev` block from `kizlo.config.*` into concrete values for the `dev`
- * command, applying defaults (port 8080). `dev.path` is required — the whole
- * WordPress install lives there, so we make the user choose a real folder rather
- * than hide it under a default. Callers gate on {@link hasDevStack} first, since a
- * project without a local stack runs the watcher alone rather than reaching here.
+ * Whether this project runs local WordPress under `kizlo test` — `test.local` is `true` in
+ * `kizlo.config.*`. When false, `kizlo test` skips the Docker WordPress + seed and just runs the
+ * project's own test script.
+ */
+export async function testUsesLocalWordPress(cwd: string): Promise<boolean> {
+	const fileConfig = await loadConfigFile(findConfigDir(cwd))
+	return Boolean(fileConfig?.test?.local)
+}
+
+/**
+ * Resolve the `dev` block from `kizlo.config.*` into concrete values for the `dev` command, applying
+ * defaults (port 8080). The install folder is fixed at `.kizlo/local` — no longer a config choice — so
+ * there's nothing required here. Callers gate on {@link usesLocalWordPress} first, since a project
+ * without local WordPress runs the watcher alone rather than reaching here.
  */
 export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> {
 	const configDir = findConfigDir(cwd)
 	const fileConfig = await loadConfigFile(configDir)
 	const dev = fileConfig?.dev ?? {}
-
-	if (!dev.path) {
-		log.error(
-			"`dev.path` is required in kizlo.config — it's the folder your local WordPress lives in.\n" +
-				'Pick a real, visible folder (it persists your site between runs), e.g. dev: { path: "wordpress" }.',
-		)
-		process.exit(1)
-	}
-
-	if (dev.byo && dev.fixtures?.length) {
-		log.error("`dev.byo` and `dev.fixtures` are mutually exclusive — byo imports an existing site, so it brings its own data.")
-		process.exit(1)
-	}
 
 	return {
 		configDir,
@@ -239,9 +235,8 @@ export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> 
 		portExplicit: dev.port !== undefined,
 		dbPort: dev.dbPort ?? DEFAULT_DEV_DB_PORT,
 		dbPortExplicit: dev.dbPort !== undefined,
-		byo: dev.byo ? path.resolve(configDir, dev.byo) : undefined,
 		fixtures: dev.fixtures ?? [],
-		wordpressPath: dev.path,
-		wordpressDir: path.resolve(configDir, dev.path),
+		wordpressPath: LOCAL_DIR_REL,
+		wordpressDir: path.resolve(configDir, LOCAL_DIR_REL),
 	}
 }

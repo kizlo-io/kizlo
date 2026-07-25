@@ -2,49 +2,45 @@ import type { Fixture } from "./test"
 
 export interface KizloDevConfig {
 	/**
-	 * Folder where your local WordPress install lives, relative to the config dir.
-	 * The entire install (core, themes, uploads, plugins) is bind-mounted here, so
-	 * you browse and edit every file from your file manager and your changes are
-	 * live. This is your persistent dev site — pick a real, visible folder (e.g.
-	 * `"wordpress"`), not a hidden one, and don't delete it. `reset` wipes it.
+	 * Run local WordPress under `kizlo dev`. When `true`, `kizlo dev` boots a Docker WordPress in
+	 * `.kizlo/local` alongside the contract watcher; when unset or `false`, it runs the watcher alone
+	 * (for a project pointing at your own WordPress). Set for you by `kizlo create` / `kizlo init`
+	 * when you choose local WordPress.
 	 */
-	path: string
+	local?: boolean
 
 	/** Published WP port (default 8080). */
 	port?: number
 
 	/**
-	 * Adopt an existing WordPress site instead of provisioning a blank one. Points at a
-	 * `.tar.gz` archive (path relative to the config dir) whose root holds a `wordpress/`
-	 * directory (the install) and a single `.sql` dump (the database). Applied when the
-	 * stack is fresh — the first `kizlo dev`, or after a `kizlo dev reset` — and ignored
-	 * once the stack is provisioned. Keep the archive outside `path` (reset wipes that).
-	 */
-	byo?: string
-
-	/**
-	 * Host port the dev MySQL is published on (default 3307), bound to `127.0.0.1` so
+	 * Host port the local WordPress MySQL is published on (default 3307), bound to `127.0.0.1` so
 	 * you can point a SQL client (TablePlus, DBeaver, `mysql`) at the database to
 	 * inspect or edit tables directly. Connect with db `wordpress`, user `wordpress`,
-	 * password `wppass`. Pick a port that's free — change it if you run multiple stacks
+	 * password `wppass`. Pick a port that's free — change it if you run multiple projects
 	 * or already have MySQL on the default.
 	 */
 	dbPort?: number
 
 	/**
-	 * Code-defined seed data for a **fresh** dev stack — the same {@link Fixture}s the
-	 * test stack uses, so you can populate your dev site from versioned code instead of a
+	 * Code-defined seed data for a **fresh** local WordPress — the same {@link Fixture}s the
+	 * test environment uses, so you can populate your local site from versioned code instead of a
 	 * blank install. Each fixture also declares the plugins it needs — wp.org slugs / zip
 	 * sources to install, or `{ path }` local directories bind-mounted live so your edits
-	 * show up without a reinstall — which the dev stack ensures every run. Each fixture's
+	 * show up without a reinstall — which `kizlo dev` ensures every run. Each fixture's
 	 * `seed` runs once over REST (and may drop to wp-cli) on the first `kizlo dev` and
-	 * after `kizlo dev reset`; existing stacks are left alone. Mutually exclusive with
-	 * {@link byo} (which brings its own data).
+	 * after `kizlo dev reset`; an existing install is left alone.
 	 */
 	fixtures?: Fixture[]
 }
 
 export interface KizloTestConfig {
+	/**
+	 * Run local WordPress under `kizlo test`. When `true`, `kizlo test` boots a disposable Docker
+	 * WordPress, seeds it, and runs your suite against it; when unset or `false`, `kizlo test` just
+	 * runs your project's test script. Set for you by `kizlo create` / `kizlo init` when you choose
+	 * local WordPress.
+	 */
+	local?: boolean
 	/** Published WP port (default 8889). */
 	port?: number
 	/** Extension fixtures to install + seed. */
@@ -82,10 +78,10 @@ export interface KizloGlobalConfig {
 	 */
 	name?: string
 
-	/** Local WordPress dev stack used by `kizlo dev`. */
+	/** Local WordPress and contract watcher run by `kizlo dev`. */
 	dev?: KizloDevConfig
 
-	/** WordPress test environment used by `kizlo test`. */
+	/** WordPress test environment run by `kizlo test`. */
 	test?: KizloTestConfig
 }
 

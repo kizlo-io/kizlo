@@ -1,11 +1,11 @@
 ---
 title: defineConfig
-description: Define a fully typed kizlo.config.ts for the CLI's dev and test stacks.
+description: Define a fully typed kizlo.config.ts for the CLI's dev and test workflows.
 ---
 
 `defineConfig` wraps your `kizlo.config.ts` so it is fully typed. The config lives at your project root (`.js` and
 `.mjs` work too). `kizlo init` writes it for you, and you edit it as your project grows. It configures where your
-Kizlo server lives and the local WordPress stacks that `kizlo dev` and `kizlo test` provision.
+Kizlo server lives and the local WordPress that `kizlo dev` and `kizlo test` provision.
 
 ## Parameters
 
@@ -21,7 +21,7 @@ defineConfig(config)
 
 ### `dev`
 
-The local WordPress dev stack used by `kizlo dev`.
+The local WordPress and contract watcher run by `kizlo dev`.
 
 <AutoTypeTable
   path="../packages/kizlo/src/config.ts"
@@ -31,7 +31,7 @@ The local WordPress dev stack used by `kizlo dev`.
 
 ### `test`
 
-The WordPress test environment used by `kizlo test`.
+The WordPress test environment run by `kizlo test`.
 
 <AutoTypeTable
   path="../packages/kizlo/src/config.ts"
@@ -45,17 +45,20 @@ The same config object, unchanged. `defineConfig` is an identity function that e
 
 ## Examples
 
-A minimal config, where a dev path is all `kizlo dev` needs:
+Run local WordPress with `dev.local` and `test.local` (the install folder is fixed, so there's nothing else to
+set). `create`/`init` write these when you choose local WordPress:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
-  dev: { path: "wordpress" },
+  dir: "src/lib/kizlo",
+  dev: { local: true },
+  test: { local: true },
 })
 ```
 
-With shared fixtures seeding both stacks:
+Seed both from shared fixtures, and override ports where they clash:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
@@ -64,7 +67,7 @@ import { blogFixture } from "./fixtures/blog"
 export default defineConfig({
   dir: "src/lib/kizlo",
   alias: "@",
-  dev: { path: "wordpress", fixtures: [blogFixture] },
-  test: { fixtures: [blogFixture] },
+  dev: { local: true, fixtures: [blogFixture] },
+  test: { local: true, fixtures: [blogFixture] },
 })
 ```

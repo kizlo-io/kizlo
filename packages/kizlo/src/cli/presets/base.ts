@@ -1,10 +1,12 @@
+import { DEFAULT_ENV_KEYS } from "../utils"
 import type { Preset, ScaffoldContext } from "./types"
 
 export const base: Preset = {
 	id: "base",
 	label: "Generic (no framework detected)",
 	detect: () => 1,
-	baseUrlEnvKey: "KIZLO_BACKEND_URL",
+	// No template, no separately-pinned runtime — the base preset carries its own `.env` names.
+	envKeys: DEFAULT_ENV_KEYS,
 	scaffolds(ctx) {
 		return [
 			{
@@ -26,7 +28,7 @@ function clientEntry(ctx: ScaffoldContext): string {
 import { contract } from "./${ctx.serverDirName}/generated"
 
 // Your Kizlo backend runs on a different origin than this app. Swap in your bundler's
-// public env var (e.g. import.meta.env.VITE_KIZLO_BACKEND_URL) to set it per environment.
+// public env var (e.g. import.meta.env.VITE_KIZLO_API_URL) to set it per environment.
 export const client = createKizloClient(contract, { url: "${ctx.clientUrl}" })
 `
 	}

@@ -46,10 +46,10 @@ export function createCachedTextRoute(handler: (request: Request) => Promise<Res
 }
 
 export function getServerBaseUrl() {
-	const baseUrl = process.env.NEXT_PUBLIC_KIZLO_BACKEND_URL
+	const baseUrl = process.env.NEXT_PUBLIC_KIZLO_API_URL
 	if (!baseUrl) {
 		throw new KizloError("MISSING_ENV_VARIABLE", {
-			message: "Please define NEXT_PUBLIC_KIZLO_BACKEND_URL in your .env file.",
+			message: "Please define NEXT_PUBLIC_KIZLO_API_URL in your .env file.",
 		})
 	}
 	return baseUrl

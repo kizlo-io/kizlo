@@ -8,15 +8,16 @@ import { findRootLayout, type PatchEntry, resolvePatch, type TemplateConventions
 import { resolveModuleImport, writeFileIfAbsent } from "../utils"
 import { orCancel } from "./_setup"
 
-/** The kizlo.config.ts a scaffolded project gets: the Kizlo directory, optional import alias, and —
- *  for a local dev setup — the WordPress install folder so `kizlo dev` knows where it lives. */
-export function kizloConfigTemplate(dir: string, alias: string, devPath?: string): string {
+/** The kizlo.config.ts a scaffolded project gets: the Kizlo directory, an optional import alias, and —
+ *  when local WordPress is chosen — `dev.local` + `test.local` so `kizlo dev` and `kizlo test` boot the
+ *  fixed `.kizlo/local` install. */
+export function kizloConfigTemplate(dir: string, alias: string, localWordPress = false): string {
 	const aliasLine = alias ? `\n\talias: "${alias}",` : ""
-	const devLine = devPath ? `\n\tdev: { path: "${devPath}" },` : ""
+	const localLines = localWordPress ? `\n\tdev: { local: true },\n\ttest: { local: true },` : ""
 	return `import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
-	dir: "${dir}",${aliasLine}${devLine}
+	dir: "${dir}",${aliasLine}${localLines}
 })
 `
 }

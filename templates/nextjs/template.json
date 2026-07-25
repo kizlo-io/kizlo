@@ -8,7 +8,6 @@
 			"--src-dir",
 			"--import-alias",
 			"@/*",
-			"--no-tailwind",
 			"--no-eslint",
 			"--no-turbopack",
 			"--skip-install",
@@ -75,11 +74,6 @@
 			"role": "blog-post",
 			"path": "src/app/blog/[slug]/page.tsx",
 			"example": true
-		},
-		{
-			"kind": "file",
-			"role": "styles",
-			"path": "src/app/globals.css"
 		}
 	],
 	"init": [
@@ -110,5 +104,23 @@
 			]
 		}
 	],
-	"kizloVersion": "^0.9.1"
+	"env": {
+		"baseUrl": "NEXT_PUBLIC_KIZLO_API_URL",
+		"remote": {
+			"siteSecret": "KIZLO_WP_SECRET",
+			"wpUrl": "KIZLO_WP_URL",
+			"wpUsername": "KIZLO_WP_USERNAME",
+			"wpPassword": "KIZLO_WP_APP_PASSWORD"
+		},
+		"local": {
+			"connect": "KIZLO_CONNECT",
+			"siteSecret": "KIZLO_LOCAL_WP_SECRET",
+			"wpUrl": "KIZLO_LOCAL_WP_URL",
+			"wpUsername": "KIZLO_LOCAL_WP_USERNAME",
+			"wpPassword": "KIZLO_LOCAL_WP_APP_PASSWORD"
+		}
+	},
+	"dependencies": {
+		"kizlo": "^0.9.1"
+	}
 }

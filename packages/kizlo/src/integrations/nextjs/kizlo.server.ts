@@ -19,7 +19,7 @@ export function createKizlo<TExts extends readonly AnyExtension[] = []>(options?
 				...options,
 				extensions: extensions as unknown as TExts,
 			},
-			{ baseUrlEnvKey: "NEXT_PUBLIC_KIZLO_BACKEND_URL" },
+			{ baseUrlEnvKey: "NEXT_PUBLIC_KIZLO_API_URL" },
 		),
 	)
 }

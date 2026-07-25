@@ -6,21 +6,39 @@ import getPort, { portNumbers } from "get-port"
 import z from "zod/v4"
 import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName } from "../daemon/config"
 import type { Preset } from "../presets"
-import { ensureGitignored, envGroups, envKeysPresent, mergeEnv, pickStackPort, writeFileIfAbsent } from "../utils"
+import type { TemplateManifest } from "../presets/template"
+import {
+	DEFAULT_ENV_KEYS,
+	type EnvKeys,
+	ensureGitignored,
+	envGroups,
+	envKeysPresent,
+	mergeEnv,
+	pickStackPort,
+	writeFileIfAbsent,
+} from "../utils"
 import { createAdminAppPassword } from "../wp/bootstrap"
+import { LOCAL_DIR_REL } from "../wp/constants"
 import { bootstrapDev } from "../wp/dev"
-import { composeStop, createStack } from "../wp/docker"
+import { composeStop, createStack, dockerHint, dockerStatus } from "../wp/docker"
 import { removeProjectContainers } from "../wp/session"
 import { syncSiteSettings } from "../wp/settings"
 import { devStack } from "../wp/stack"
 
-/** Production connection keys — what a real deploy needs, and what `.env.example` always lists. */
-export const PROD_WP_ENV_KEYS = [
-	"KIZLO_SITE_SECRET",
-	"KIZLO_WORDPRESS_URL",
-	"KIZLO_WORDPRESS_USERNAME",
-	"KIZLO_WORDPRESS_APPLICATION_PASSWORD",
-] as const
+/**
+ * The resolved `.env` key names the scaffold writes: the template's declared `env` when it has one,
+ * else the preset's built-in `envKeys` (the generic `base` preset), else the {@link DEFAULT_ENV_KEYS}
+ * fallback for an in-repo template before the first stamped release. Threaded into `managedEnv`,
+ * `writeEnv`, and `collectConnectionFromEnv` so the scaffold writes the names the pinned runtime reads.
+ */
+export function resolveEnvKeys(preset: Preset, manifest?: TemplateManifest): EnvKeys {
+	return manifest?.env ?? preset.envKeys ?? DEFAULT_ENV_KEYS
+}
+
+/** Remote connection keys — what a real deploy needs, and what `.env.example` always lists. */
+function remoteKeys(envKeys: EnvKeys): string[] {
+	return [envKeys.remote.siteSecret, envKeys.remote.wpUrl, envKeys.remote.wpUsername, envKeys.remote.wpPassword]
+}
 
 /**
  * The WordPress connection both `init` and `create` collect. It carries everything the shared
@@ -29,7 +47,7 @@ export const PROD_WP_ENV_KEYS = [
  */
 export interface Connection {
 	/**
-	 * Where the WordPress connection comes from. `local` spins up a Docker dev stack during
+	 * Where the WordPress connection comes from. `local` spins up Docker WordPress during
 	 * setup and fills the WP credentials from it; `remote` collects them from the user.
 	 */
 	mode: "local" | "remote"
@@ -45,8 +63,6 @@ export interface Connection {
 	wpUrl: string
 	wpUsername: string
 	wpPassword: string
-	/** Folder the local WordPress install lives in (`dev.path`); set only when `mode` is `local`. */
-	devPath?: string
 	/**
 	 * One-time wp-admin login password from a fresh local install, surfaced in the "Next steps" box.
 	 * Set by {@link setupLocalWordPress}; absent when resuming an existing stack (nothing to show).
@@ -55,40 +71,35 @@ export interface Connection {
 }
 
 /**
- * The `.env` keys setup manages and the values to write, branched on the connection mode. A local
- * dev stack writes the `KIZLO_DEV_WORDPRESS_*` / `KIZLO_DEV_SITE_SECRET` set plus `KIZLO_TARGET=dev`, so it
- * never touches the production keys (a user can point those at a real site). A remote site writes the
- * bare production keys exactly as before — no `KIZLO_TARGET`, since `"production"` is the default target.
+ * The `.env` keys setup manages and the values to write, branched on the connection mode. Local
+ * WordPress writes the `KIZLO_LOCAL_WP_*` / `KIZLO_LOCAL_WP_SECRET` set plus `KIZLO_CONNECT=local`,
+ * so it never touches the remote keys (a user can point those at a real site). A remote site writes
+ * the bare remote keys exactly as before — no `KIZLO_CONNECT`, since `"remote"` is the default.
  */
-export function managedEnv(preset: Preset, conn: Connection): { keys: string[]; values: Record<string, string> } {
+export function managedEnv(envKeys: EnvKeys, conn: Connection): { keys: string[]; values: Record<string, string> } {
 	if (conn.mode === "local") {
+		const { connect, siteSecret, wpUrl, wpUsername, wpPassword } = envKeys.local
 		return {
-			keys: [
-				preset.baseUrlEnvKey,
-				"KIZLO_TARGET",
-				"KIZLO_DEV_SITE_SECRET",
-				"KIZLO_DEV_WORDPRESS_URL",
-				"KIZLO_DEV_WORDPRESS_USERNAME",
-				"KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD",
-			],
+			keys: [envKeys.baseUrl, connect, siteSecret, wpUrl, wpUsername, wpPassword],
 			values: {
-				[preset.baseUrlEnvKey]: conn.baseUrl,
-				KIZLO_TARGET: "dev",
-				KIZLO_DEV_SITE_SECRET: conn.siteSecret,
-				KIZLO_DEV_WORDPRESS_URL: conn.wpUrl,
-				KIZLO_DEV_WORDPRESS_USERNAME: conn.wpUsername,
-				KIZLO_DEV_WORDPRESS_APPLICATION_PASSWORD: conn.wpPassword,
+				[envKeys.baseUrl]: conn.baseUrl,
+				[connect]: "local",
+				[siteSecret]: conn.siteSecret,
+				[wpUrl]: conn.wpUrl,
+				[wpUsername]: conn.wpUsername,
+				[wpPassword]: conn.wpPassword,
 			},
 		}
 	}
+	const { siteSecret, wpUrl, wpUsername, wpPassword } = envKeys.remote
 	return {
-		keys: [preset.baseUrlEnvKey, ...PROD_WP_ENV_KEYS],
+		keys: [envKeys.baseUrl, siteSecret, wpUrl, wpUsername, wpPassword],
 		values: {
-			[preset.baseUrlEnvKey]: conn.baseUrl,
-			KIZLO_SITE_SECRET: conn.siteSecret,
-			KIZLO_WORDPRESS_URL: conn.wpUrl,
-			KIZLO_WORDPRESS_USERNAME: conn.wpUsername,
-			KIZLO_WORDPRESS_APPLICATION_PASSWORD: conn.wpPassword,
+			[envKeys.baseUrl]: conn.baseUrl,
+			[siteSecret]: conn.siteSecret,
+			[wpUrl]: conn.wpUrl,
+			[wpUsername]: conn.wpUsername,
+			[wpPassword]: conn.wpPassword,
 		},
 	}
 }
@@ -191,45 +202,53 @@ export async function collectConnectionInteractively(preset: Preset, opts: { bas
 			message: "WordPress connection",
 			initialValue: "local" as const,
 			options: [
-				{ value: "local" as const, label: "Set up a local dev environment", hint: "runs WordPress in Docker" },
-				{ value: "remote" as const, label: "Use my own WordPress", hint: "connect to an existing site" },
+				{ value: "local" as const, label: "Set up local WordPress", hint: "runs in Docker, for dev and test" },
+				{ value: "remote" as const, label: "Use my own WordPress", hint: "connect to your existing WordPress" },
 			],
 		}),
 	)
 
+	// Local WordPress needs a running Docker daemon. When it isn't ready we can't provision, so say
+	// exactly why (not installed vs. not running) and stop — re-run once Docker is up.
+	if (mode === "local") {
+		const status = await dockerStatus()
+		if (status !== "running") {
+			p.cancel(dockerHint(status))
+			process.exit(1)
+		}
+	}
+
 	let wpUrl = ""
 	let wpUsername = ""
 	let wpPassword = ""
-	let devPath: string | undefined
 	if (mode === "remote") {
 		wpUrl = orCancel(await p.text({ message: "WordPress URL", placeholder: "https://wp.your-app.com", validate: validate(urlString) }))
 		wpUsername = orCancel(await p.text({ message: "WordPress username", validate: validate(requiredString) }))
 		wpPassword = orCancel(await p.password({ message: "WordPress application password", validate: validate(requiredString) }))
-	} else {
-		devPath = orCancel(await p.text({ message: "Local WordPress folder", initialValue: "wordpress", validate: validate(dirPath) }))
 	}
+	// Local mode needs nothing more — the install folder is fixed (`.kizlo/local`) and provisioned on setup.
 
-	return { mode, baseUrl, siteUrl, siteSecret, wpUrl, wpUsername, wpPassword, devPath }
+	return { mode, baseUrl, siteUrl, siteSecret, wpUrl, wpUsername, wpPassword }
 }
 
 /**
  * Non-interactive connection: skip prompts and use env values where present. Missing ones are
  * left empty for the user to fill in later. Never fails — always yields a fillable project.
  */
-export function collectConnectionFromEnv(preset: Preset): Connection {
+export function collectConnectionFromEnv(envKeys: EnvKeys): Connection {
 	return {
 		mode: "remote",
-		baseUrl: process.env[preset.baseUrlEnvKey]?.trim() ?? "",
-		siteSecret: process.env.KIZLO_SITE_SECRET?.trim() || randomBytes(32).toString("hex"),
-		wpUrl: process.env.KIZLO_WORDPRESS_URL?.trim() ?? "",
-		wpUsername: process.env.KIZLO_WORDPRESS_USERNAME?.trim() ?? "",
-		wpPassword: process.env.KIZLO_WORDPRESS_APPLICATION_PASSWORD?.trim() ?? "",
+		baseUrl: process.env[envKeys.baseUrl]?.trim() ?? "",
+		siteSecret: process.env[envKeys.remote.siteSecret]?.trim() || randomBytes(32).toString("hex"),
+		wpUrl: process.env[envKeys.remote.wpUrl]?.trim() ?? "",
+		wpUsername: process.env[envKeys.remote.wpUsername]?.trim() ?? "",
+		wpPassword: process.env[envKeys.remote.wpPassword]?.trim() ?? "",
 	}
 }
 
-/** Build a {@link ResolvedDevConfig} from the chosen install folder, matching `resolveDevConfig`'s
+/** Build a {@link ResolvedDevConfig} for the fixed `.kizlo/local` install, matching `resolveDevConfig`'s
  * defaults — built directly so setup never has to round-trip through the config file it's writing. */
-function devConfigFor(cwd: string, devPath: string): ResolvedDevConfig {
+function devConfigFor(cwd: string): ResolvedDevConfig {
 	return {
 		configDir: cwd,
 		project: `${resolveStackName(cwd)}-dev`,
@@ -238,28 +257,28 @@ function devConfigFor(cwd: string, devPath: string): ResolvedDevConfig {
 		dbPort: DEFAULT_DEV_DB_PORT,
 		dbPortExplicit: false,
 		fixtures: [],
-		wordpressPath: devPath,
-		wordpressDir: path.resolve(cwd, devPath),
+		wordpressPath: LOCAL_DIR_REL,
+		wordpressDir: path.resolve(cwd, LOCAL_DIR_REL),
 	}
 }
 
-/** Connection details captured from a freshly provisioned local stack. */
+/** Connection details captured from freshly provisioned local WordPress. */
 interface LocalStack {
 	url: string
 	username: string
-	/** REST application password minted for `.env` (the dev stack doesn't make one itself). */
+	/** REST application password minted for `.env` (local WordPress doesn't make one itself). */
 	appPassword: string
 	/** One-time wp-admin login password, shown only on a fresh install. */
 	adminPassword?: string
-	/** Set when pushing `KIZLO_DEV_SITE_SECRET` into the local plugin failed (warn-and-continue). */
+	/** Set when pushing `KIZLO_LOCAL_WP_SECRET` into the local plugin failed (warn-and-continue). */
 	secretSyncError?: string
 }
 
 /**
- * Boot the local dev stack once to produce working credentials, then stop it (volumes
- * persist, so a later `kizlo dev` resumes instantly). The dev stack mints no application
- * password — that's a test-stack concern — so we create one here for REST auth in `.env`.
- * While the stack is still up, push the dev site settings (`siteSecret` plus the Kizlo server's
+ * Boot local WordPress once to produce working credentials, then stop it (volumes
+ * persist, so a later `kizlo dev` resumes instantly). Local WordPress mints no application
+ * password — that's a test concern — so we create one here for REST auth in `.env`.
+ * While it's still up, push the site settings (`siteSecret` plus the Kizlo server's
  * `url`/`backend_url`, derived from `baseUrl`) into the plugin so webhook signing and event delivery
  * work.
  */
@@ -287,23 +306,24 @@ async function provisionLocalStack(cfg: ResolvedDevConfig, siteSecret: string, b
 }
 
 /**
- * Provision the local WordPress dev stack and fill the connection's WP credentials from it, then
- * report the outcome. Mutates `conn` in place (wpUrl / wpUsername / wpPassword). Exits on failure,
- * matching the previous inline behavior. No-op for a remote connection.
+ * Provision local WordPress and fill the connection's WP credentials from it, then report the
+ * outcome. Mutates `conn` in place (wpUrl / wpUsername / wpPassword). Writing the `local` flags into
+ * `kizlo.config.ts` is the caller's job (the generated config for `create`/`init`). Exits on failure.
+ * No-op for a remote connection.
  */
 export async function setupLocalWordPress(cwd: string, conn: Connection): Promise<void> {
-	if (conn.mode !== "local" || !conn.devPath) return
-	ensureGitignored(cwd, conn.devPath)
+	if (conn.mode !== "local") return
+	ensureGitignored(cwd, ".kizlo/")
 	const s = p.spinner()
 	s.start("Setting up local WordPress (first run downloads images, this can take a while)")
 	try {
-		const local = await provisionLocalStack(devConfigFor(cwd, conn.devPath), conn.siteSecret, conn.baseUrl)
+		const local = await provisionLocalStack(devConfigFor(cwd), conn.siteSecret, conn.baseUrl)
 		conn.wpUrl = local.url
 		conn.wpUsername = local.username
 		conn.wpPassword = local.appPassword
 		conn.adminPassword = local.adminPassword
 		s.stop("Local WordPress ready")
-		if (local.secretSyncError) p.log.warn(`Could not sync KIZLO_DEV_SITE_SECRET to the local plugin (${local.secretSyncError})`)
+		if (local.secretSyncError) p.log.warn(`Could not sync KIZLO_LOCAL_WP_SECRET to the local plugin (${local.secretSyncError})`)
 	} catch (error) {
 		s.stop("Local WordPress setup failed")
 		p.cancel(error instanceof Error ? error.message : String(error))
@@ -312,12 +332,42 @@ export async function setupLocalWordPress(cwd: string, conn: Connection): Promis
 }
 
 /**
+ * The template's own `.env.example`, when it ships one. Templates own the framework-specific key names
+ * (e.g. `NEXT_PUBLIC_KIZLO_API_URL`) and the shared section layout, so their file is the source of the
+ * scaffold's `.env.example` — see {@link writeEnv}. Undefined for the base preset (no template dir).
+ */
+export function readEnvExample(templateDir: string): string | undefined {
+	const file = path.join(templateDir, ".env.example")
+	return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined
+}
+
+/**
+ * The `.env.example` body for the base preset, which ships no template file. Lists the API URL and the
+ * remote connection keys, then the commented `KIZLO_CONNECT=local` toggle for the local-dev path. Real
+ * templates carry their own `.env.example` (passed to {@link writeEnv}) so its structure and comments
+ * stay consistent with the `.env` the scaffold writes.
+ */
+function generatedEnvExample(envKeys: EnvKeys): string {
+	const exampleKeys = [envKeys.baseUrl, ...remoteKeys(envKeys)]
+	const exampleValues = Object.fromEntries(exampleKeys.map((key) => [key, ""]))
+	const { content } = mergeEnv("", exampleValues, new Set(exampleKeys), envGroups(envKeys))
+	return `${content}\n# Point the app at local WordPress (managed by \`kizlo dev\`) instead of the keys above:\n# ${envKeys.local.connect}=local\n`
+}
+
+/**
  * Write (or update) `.env` and `.env.example` for the managed keys and report the outcome.
  * Existing conflicting `.env` values are preserved unless `force`; interactively the user is asked,
- * and under `--yes` they are kept. `.env.example` is only written when absent.
+ * and under `--yes` they are kept. `.env.example` is only written when absent, and is sourced from the
+ * template's own file (`opts.exampleTemplate`) so it matches the `.env` structure, falling back to a
+ * generated block for the base preset.
  */
-export async function writeEnv(cwd: string, preset: Preset, conn: Connection, opts: { force: boolean; yes: boolean }): Promise<void> {
-	const { keys, values: envValues } = managedEnv(preset, conn)
+export async function writeEnv(
+	cwd: string,
+	envKeys: EnvKeys,
+	conn: Connection,
+	opts: { force: boolean; yes: boolean; exampleTemplate?: string },
+): Promise<void> {
+	const { keys, values: envValues } = managedEnv(envKeys, conn)
 
 	const envPath = path.join(cwd, ".env")
 	const envExisted = fs.existsSync(envPath)
@@ -336,13 +386,10 @@ export async function writeEnv(cwd: string, preset: Preset, conn: Connection, op
 		}
 	}
 
-	const merge = mergeEnv(existingEnv, envValues, overwriteKeys, envGroups(preset.baseUrlEnvKey))
+	const merge = mergeEnv(existingEnv, envValues, overwriteKeys, envGroups(envKeys))
 	fs.writeFileSync(envPath, merge.content)
 
-	const exampleKeys = [preset.baseUrlEnvKey, ...PROD_WP_ENV_KEYS]
-	const exampleValues = Object.fromEntries(exampleKeys.map((key) => [key, ""]))
-	const { content: exampleEnv } = mergeEnv("", exampleValues, new Set(exampleKeys), envGroups(preset.baseUrlEnvKey))
-	const exampleBody = `${exampleEnv}\n# Point the app at a local dev stack (managed by \`kizlo dev\`) instead of the keys above:\n# KIZLO_TARGET=dev\n`
+	const exampleBody = opts.exampleTemplate ?? generatedEnvExample(envKeys)
 	const exampleCreated = writeFileIfAbsent(path.join(cwd, ".env.example"), exampleBody)
 
 	if (!envExisted) {

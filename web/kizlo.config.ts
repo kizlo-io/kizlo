@@ -5,7 +5,7 @@ export default defineConfig({
 	dir: "src/lib/kizlo",
 	alias: "@/",
 	dev: {
-		path: "wordpress",
+		local: true,
 		fixtures: [defineFixture({ name: "kizlo-core", plugins: [{ path: "../plugins/kizlo" }] })],
 	},
 })

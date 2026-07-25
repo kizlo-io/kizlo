@@ -1,4 +1,4 @@
-import type { PackageManager } from "../utils"
+import type { EnvKeys, PackageManager } from "../utils"
 
 export interface PackageJson {
 	scripts?: Record<string, string>
@@ -47,8 +47,13 @@ export interface Preset {
 	label: string
 	/** Detection confidence: 0 = no match, higher wins. */
 	detect(ctx: InitContext): number
-	/** Env var holding the public server base URL. */
-	baseUrlEnvKey: string
+	/**
+	 * The `.env` key names this preset's scaffold writes, when it has no {@link template} to declare them
+	 * (the generic `base` preset). Template-backed presets omit this — the names come from the fetched
+	 * manifest's `env` section instead — and fall back to {@link DEFAULT_ENV_KEYS}. Resolved by
+	 * `resolveEnvKeys`.
+	 */
+	envKeys?: EnvKeys
 	/** Path the API handler mounts at (e.g. `/api/kizlo`); appended to the base URL. */
 	apiPath?: string
 	/**

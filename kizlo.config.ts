@@ -5,6 +5,7 @@ import { coreFixtures, defineFixture } from "kizlo/test"
 
 export default defineConfig({
 	test: {
+		local: true,
 		fixtures: [
 			defineFixture({ name: "kizlo-core", plugins: [{ path: "plugins/kizlo" }] }),
 			...coreFixtures,
