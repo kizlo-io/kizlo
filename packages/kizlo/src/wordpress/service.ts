@@ -32,8 +32,11 @@ export class WordPressService {
 	private readonly siteBase: string
 	private readonly authHeader: string
 	private readonly defaultTimeout: Duration
+	/** Called with the response headers of every non-transport-error response, so callers can observe
+	 * per-response signals (e.g. the plugin version header) without threading them through every method. */
+	private readonly onResponse?: (headers: Headers) => void
 
-	constructor(context: { credentials: WordPressCredentials; timeout?: Duration }) {
+	constructor(context: { credentials: WordPressCredentials; timeout?: Duration; onResponse?: (headers: Headers) => void }) {
 		const credentialBytes = new TextEncoder().encode(`${context.credentials.username}:${context.credentials.password}`)
 		let binary = ""
 		for (const byte of credentialBytes) binary += String.fromCharCode(byte)
@@ -41,6 +44,7 @@ export class WordPressService {
 		this.authHeader = `${WP_AUTH_TYPE} ${encoded}`
 		this.siteBase = context.credentials.url.endsWith("/") ? context.credentials.url : `${context.credentials.url}/`
 		this.defaultTimeout = context.timeout ?? SAFE_REQUEST_TIMEOUT
+		this.onResponse = context.onResponse
 	}
 
 	public async post<TData, TCode extends string = never>(
@@ -149,6 +153,8 @@ export class WordPressService {
 				error: new WP_Error<TCode>({ code: "unknown_error", message: transportErr.message }),
 			}
 		}
+
+		this.onResponse?.(response.headers)
 
 		const [readErr, text] = await tryCatch(response.text())
 

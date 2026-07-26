@@ -1,8 +1,9 @@
-import { createEventHandler, createExtension, createMiddleware, createProcedure } from "kizlo"
+import { consoleLog, createEventHandler, createExtension, createMiddleware, createProcedure } from "kizlo"
 import { createKizlo } from "kizlo/nextjs/server"
 import z from "zod"
 
 export const { router, client, context, handler } = createKizlo({
+	adapters: { logger: consoleLog() },
 	extensions: [
 		createExtension({
 			id: "test",
@@ -40,5 +41,3 @@ export const { router, client, context, handler } = createKizlo({
 		}),
 	],
 })
-
-// client.settings.postType.update({ key: "", data: {} })

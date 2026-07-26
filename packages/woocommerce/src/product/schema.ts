@@ -1,5 +1,5 @@
-import { arrayable, BooleanLike, Metadata, NumberLike } from "@kizlo/shared"
-import { CurrencyFormat, IdentifierInput, ListMetadata, Media, Seo } from "kizlo"
+import { arrayable, BooleanLike, Media, Metadata, NumberLike } from "@kizlo/shared"
+import { CurrencyFormat, IdentifierInput, ListMetadata, Seo } from "kizlo"
 import { z } from "zod/v4"
 
 export const SWATCH_TYPES = ["text", "color", "image"] as const

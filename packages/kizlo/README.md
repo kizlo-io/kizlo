@@ -23,16 +23,16 @@ Kizlo is an open-source framework for building content-driven applications with 
 
 ## Quick start
 
-Set up Kizlo in your project:
+Scaffold a new project with Kizlo already wired:
+
+```bash
+npx kizlo@latest create
+```
+
+Or add Kizlo to an existing project:
 
 ```bash
 npx kizlo@latest init
-```
-
-Start the local WordPress stack:
-
-```bash
-npx kizlo dev
 ```
 
 See the [docs](https://kizlo.io/docs) for the full guide.
