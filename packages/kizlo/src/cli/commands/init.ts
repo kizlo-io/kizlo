@@ -253,6 +253,9 @@ export const init = defineCommand({
 			if (args.alias !== undefined) setup.alias = String(args.alias).trim()
 			setup.alias = aliasWithSlash(setup.alias)
 
+			const includeExamples =
+				manifest && fetched ? (yes ? true : orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))) : false
+
 			if (!hasKizlo) {
 				const spec = `kizlo@${manifest?.dependencies?.kizlo ?? `^${getVersion()}`}`
 				const s = p.spinner()
@@ -281,7 +284,7 @@ export const init = defineCommand({
 
 			if (manifest && fetched) {
 				await alignDependencies(cwd, pm, pkg, manifest)
-				for (const entry of fileEntries(changesFor(manifest, "init")))
+				for (const entry of fileEntries(changesFor(manifest, "init", { includeExamples })))
 					files.push(adaptFile(fetched.dir, entry, manifest.conventions, scaffold))
 			} else if (preset.scaffolds) {
 				files.push(...preset.scaffolds(scaffold))

@@ -31,26 +31,34 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 		expect(patchEntries(changes).map((e) => e.role)).toEqual(["root-layout"])
 	})
 
-	it("gives init only base changes and create the demo pages on top", () => {
-		// init lays down only base wiring, so a user's own home page/styles are never clobbered.
-		const initRoles = fileEntries(changesFor(manifest, "init")).map((e) => e.role)
-		expect(initRoles).toContain("api-route")
-		expect(initRoles).not.toContain("home-page")
+	it("drops examples by default and includes them only on opt-in", () => {
+		// Core wiring is always present; the example-flagged demo pages appear only when asked for.
+		const core = fileEntries(changesFor(manifest, "create")).map((e) => e.role)
+		expect(core).toContain("api-route")
+		expect(core).not.toContain("home-page")
+		expect(core).not.toContain("blog-post")
 
-		// create scaffolds base plus the demo pages on top of a fresh app.
-		const createRoles = fileEntries(changesFor(manifest, "create")).map((e) => e.role)
-		expect(createRoles).toContain("api-route")
-		expect(createRoles).toContain("home-page")
+		const withExamples = fileEntries(changesFor(manifest, "create", { includeExamples: true })).map((e) => e.role)
+		expect(withExamples).toContain("home-page")
+		expect(withExamples).toContain("blog-post")
 	})
 
-	it("flags the demo pages as examples and leaves the core layout/styles unflagged", () => {
-		const created = fileEntries(changesFor(manifest, "create"))
-		const examples = created.filter(isExample).map((e) => e.role)
-		// Only the opt-in demo pages carry the example flag; the layout and styles are core wiring.
+	it("gives init the additive example (base) but never create's app-owned overwrite", () => {
+		// The blog route is additive, so it lives in base and init picks it up on opt-in; the home page
+		// overwrites a file the user owns, so it lives in create and init never sees it.
+		const roles = fileEntries(changesFor(manifest, "init", { includeExamples: true })).map((e) => e.role)
+		expect(roles).toContain("blog-post")
+		expect(roles).not.toContain("home-page")
+	})
+
+	it("flags the demo pages as examples and leaves core wiring unflagged", () => {
+		const all = fileEntries(changesFor(manifest, "create", { includeExamples: true }))
+		const examples = all.filter(isExample).map((e) => e.role)
+		// Only the opt-in demo pages carry the example flag; the layout and plumbing are core wiring.
 		expect(examples).toContain("home-page")
 		expect(examples).toContain("blog-post")
 		expect(examples).not.toContain("root-layout")
-		expect(examples).not.toContain("styles")
+		expect(examples).not.toContain("api-route")
 	})
 
 	it("rewrites a file's path prefix and server-import specifier to the project's", () => {

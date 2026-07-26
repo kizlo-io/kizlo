@@ -9,17 +9,25 @@ import type { ScaffoldContext, ScaffoldFile } from "./types"
 /**
  * The template's `template.json`. It is the single declaration of what Kizlo lays onto a project and
  * how — the same engine drives both `create` (onto a fresh app the framework CLI just bootstrapped)
- * and `init` (onto the user's existing project). Changes are grouped into three sections so a command
- * only ever applies what is safe for it:
+ * and `init` (onto the user's existing project). Changes are grouped into three sections by the one
+ * question that decides whether a command may safely apply them — *where is this safe to land?* — and
+ * no command ever reads another command's section:
  *
- * - `base` — applied by both commands: the Kizlo plumbing (server entry, client, routes). Every
- *   change here must be safe on an existing project, so it is limited to files Kizlo owns, which
- *   never collide with the user's pages.
- * - `create` — applied only by `create`, onto a freshly bootstrapped app it may freely overwrite:
- *   the root layout (written whole, already SEO-wired) and its styles as core wiring, plus the demo
- *   pages flagged `example`, which are written only when the user asks for example pages.
- * - `init` — applied only by `init`, onto the user's existing project. The root-layout SEO wiring
- *   lands here as a `patch` so it merges into the layout the user already owns instead of replacing it.
+ * - `base` — safe on any project: additive, Kizlo-owned paths that never collide with the user's own
+ *   files (the server entry, client, routes, and additive demo pages like a new blog route). Applied
+ *   by both commands.
+ * - `create` — safe only on a freshly bootstrapped app `create` may freely overwrite: the files the
+ *   framework CLI already scaffolded, like the root layout (written whole, SEO-wired) and the homepage
+ *   showcase. Applied only by `create`, never `init` — overwriting these on a real project would
+ *   clobber the user's work.
+ * - `init` — the non-destructive counterpart for the user's existing project: the root-layout SEO
+ *   wiring lands here as a `patch` that merges into the layout the user already owns.
+ *
+ * Cutting across all three is the orthogonal `example` flag: opt-in demo content, applied only when the
+ * user answers yes to "Add example pages?". A cross-cutting example (e.g. a blog) files each of its
+ * pieces in the section that matches its safety — the additive new route in `base`, the homepage
+ * showcase that overwrites an app-owned file in `create` — so `init` picks up only the additive half and
+ * never touches a file the user owns, while `create` gets the whole demo. See {@link changesFor}.
  *
  * Each section is a list of changes, every one a member of a small closed set — deliberately no
  * "patch an arbitrary source file" kind, so a dangerous strategy is unrepresentable:
@@ -44,10 +52,10 @@ const fileSchema = z.object({
 	role: z.string(),
 	path: z.string(),
 	/**
-	 * Opt-in demo content — a page the user can look at, not wiring they need. `create` writes it only
-	 * when the user answers yes to "Add examples?"; core files (the layout, its styles) omit this
-	 * and are always written. Only meaningful in the `create` section, since examples are a fresh-app
-	 * concept — laying a demo page onto an existing project would clobber the user's own.
+	 * Opt-in demo content — a page the user can look at, not wiring they need. Applied only when the user
+	 * answers yes to "Add example pages?"; core files omit this and are always written. Orthogonal to the
+	 * section it sits in: the section still governs *where* the change is safe to land (see the section
+	 * doc above), so an additive example lives in `base` and an app-owned overwrite lives in `create`.
 	 */
 	example: z.boolean().optional(),
 })
@@ -128,9 +136,9 @@ const manifestSchema = z.object({
 	bootstrap: bootstrapSchema.optional(),
 	/** The template's own directory layout and import alias, rewritten to the project's on apply. */
 	conventions: conventionsSchema,
-	/** Changes both commands apply: the Kizlo-owned plumbing files. */
+	/** Changes safe on any project — additive Kizlo-owned files, applied by both commands. */
 	base: z.array(changeSchema).default([]),
-	/** Changes only `create` applies onto a fresh app (the whole layout, demo pages, styles). */
+	/** Changes safe only on a fresh app — overwrites of framework-scaffolded files (the whole layout). */
 	create: z.array(changeSchema).default([]),
 	/** Changes only `init` applies onto the user's project (the root-layout patch). */
 	init: z.array(changeSchema).default([]),
@@ -212,12 +220,16 @@ export function minCliError(manifest: TemplateManifest): string | undefined {
 }
 
 /**
- * The changes a command applies: the shared `base` set plus the command's own section. `create` gets
- * `base + create` (plumbing plus the demo pages); `init` gets `base + init` (plumbing plus any
- * init-only surgical patches). `base` is applied first so a later section can override it.
+ * The changes a command applies: the shared `base` set plus the command's own section (`base` first, so
+ * a later section can override it). Section placement is the *safety* axis — `base` is additive and safe
+ * on any project, `create`/`init` carry the fresh-app-vs-existing-project halves — while the `example`
+ * flag is the orthogonal *opt-in* axis. Example changes are dropped unless `includeExamples`, so the same
+ * call serves both "core wiring only" and "plus the demo pages", and each command only ever sees its own
+ * section: init's opt-in examples are the additive ones in `base`, never create's homepage overwrite.
  */
-export function changesFor(manifest: TemplateManifest, command: Command): Change[] {
-	return [...manifest.base, ...manifest[command]]
+export function changesFor(manifest: TemplateManifest, command: Command, opts: { includeExamples?: boolean } = {}): Change[] {
+	const changes = [...manifest.base, ...manifest[command]]
+	return opts.includeExamples ? changes : changes.filter((change) => !isExample(change))
 }
 
 /** The whole-file changes in a resolved change list. */
@@ -230,7 +242,7 @@ export function patchEntries(changes: readonly Change[]): PatchEntry[] {
 	return changes.filter((change): change is PatchEntry => change.kind === "patch")
 }
 
-/** Whether a change is opt-in demo content — written by `create` only when example pages are requested. */
+/** Whether a change is opt-in demo content — applied only when example pages are requested. */
 export function isExample(change: Change): boolean {
 	return change.kind === "file" && change.example === true
 }

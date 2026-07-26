@@ -23,9 +23,9 @@ catalogs:
     '@types/react-dom': ^19.2.3
 
 onlyBuiltDependencies:
-  - esbuild
   - sharp
-  - "@parcel/watcher"
+  - esbuild
   - core-js
   - core-js-pure
   - unrs-resolver
+  - "@parcel/watcher"
