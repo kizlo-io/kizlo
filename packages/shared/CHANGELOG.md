@@ -1,5 +1,11 @@
 # @kizlo/shared
 
+## 0.6.0
+
+### Minor Changes
+
+- [#85](https://github.com/kizlo-io/kizlo/pull/85) [`265954e`](https://github.com/kizlo-io/kizlo/commit/265954e4fb950c0184fa8eadfe8e158e82ebf271) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Detect and warn when the connected WordPress plugin is older than kizlo supports.
+
 ## 0.5.1
 
 ### Patch Changes

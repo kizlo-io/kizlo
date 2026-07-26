@@ -1,5 +1,22 @@
 # kizlo
 
+## 0.11.0
+
+### Minor Changes
+
+- [#87](https://github.com/kizlo-io/kizlo/pull/87) [`2669348`](https://github.com/kizlo-io/kizlo/commit/26693483f795f1813cbd77db4926fb0bac9677b2) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Restart `kizlo dev` automatically when `.env` or `kizlo.config.*` changes.
+
+- [#85](https://github.com/kizlo-io/kizlo/pull/85) [`265954e`](https://github.com/kizlo-io/kizlo/commit/265954e4fb950c0184fa8eadfe8e158e82ebf271) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Detect and warn when the connected WordPress plugin is older than kizlo supports.
+
+### Patch Changes
+
+- [#87](https://github.com/kizlo-io/kizlo/pull/87) [`2669348`](https://github.com/kizlo-io/kizlo/commit/26693483f795f1813cbd77db4926fb0bac9677b2) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Ask before adding example pages during `kizlo init`, matching `kizlo create`.
+
+- [#87](https://github.com/kizlo-io/kizlo/pull/87) [`2669348`](https://github.com/kizlo-io/kizlo/commit/26693483f795f1813cbd77db4926fb0bac9677b2) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Reject hostless or non-http(s) values when prompting for the WordPress URL.
+
+- Updated dependencies [[`265954e`](https://github.com/kizlo-io/kizlo/commit/265954e4fb950c0184fa8eadfe8e158e82ebf271)]:
+  - @kizlo/shared@0.6.0
+
 ## 0.10.0
 
 ### Minor Changes
