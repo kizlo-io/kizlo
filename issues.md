@@ -1,0 +1,4 @@
+- [x] Fix missing minCli version in nextjs template.
+- [] Add Astro template.
+- [] Add Tanstack start template.
+- [] Add React + Vite template.
