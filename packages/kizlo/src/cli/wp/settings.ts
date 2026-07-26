@@ -1,3 +1,4 @@
+import { PLUGIN_VERSION_HEADER } from "@kizlo/shared"
 import { type WordPressCredentials, WordPressService, WP_KIZLO_BASE } from "../../wordpress"
 
 /** Site-level settings the CLI pushes into the plugin so it can reach and trust the Kizlo server. */
@@ -64,7 +65,7 @@ function toContainerHostUrl(url: string): string {
 export async function syncSiteSettings(
 	credentials: WordPressCredentials,
 	settings: SiteSettingsSync,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; pluginVersion: string | null }> {
 	const body: Record<string, string> = {}
 	if (settings.secret) body.secret = settings.secret
 	const url = settings.siteUrl ?? (settings.backendUrl ? originOf(settings.backendUrl) : undefined)
@@ -73,8 +74,9 @@ export async function syncSiteSettings(
 
 	const service = new WordPressService({ credentials })
 	const response = await service.put("settings/site", { base: WP_KIZLO_BASE, body })
-	if (response.error) return { ok: false, error: describeError(response.status, response.error) }
-	return { ok: true }
+	const pluginVersion = response.headers.get(PLUGIN_VERSION_HEADER)
+	if (response.error) return { ok: false, error: describeError(response.status, response.error), pluginVersion }
+	return { ok: true, pluginVersion }
 }
 
 /**

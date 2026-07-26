@@ -1,4 +1,12 @@
-import { base64Decode, type Cookie, type CookieOptions, tryCatchSync } from "@kizlo/shared"
+import {
+	base64Decode,
+	type Cookie,
+	type CookieOptions,
+	isPluginVersionSupported,
+	PLUGIN_VERSION_HEADER,
+	pluginUpdateMessage,
+	tryCatchSync,
+} from "@kizlo/shared"
 import { serialize } from "cookie"
 import type { AuthUser } from "./adapters/auth"
 import type { ConnInfo } from "./adapters/geo"
@@ -66,10 +74,27 @@ export class Context {
 
 	constructor(config: ContextConfig) {
 		this.config = config
-		this.wordpress = new WordPressService(config)
+		this.wordpress = new WordPressService({ ...config, onResponse: (headers) => this.warnIfPluginOutdated(headers) })
 		this.settings = new SettingsService(this.wordpress)
 		this.email = new EmailService(this.wordpress)
 		this.logger = this.createLogger()
+	}
+
+	/**
+	 * Warn when the WordPress plugin is older than {@link isPluginVersionSupported} allows, read from the
+	 * `X-Kizlo-Version` header the plugin stamps on every response. A version mismatch is a serious
+	 * contract break, so this fires on every WordPress response rather than once — the header rides
+	 * responses the runtime already makes, so it costs no extra request. Emitted through `console.warn`
+	 * rather than the logger adapter on purpose: the adapter is optional (it defaults to a no-op), and
+	 * this is a setup problem every user must see regardless of whether they've wired up logging.
+	 */
+	private warnIfPluginOutdated(headers: Headers): void {
+		const installed = headers.get(PLUGIN_VERSION_HEADER)
+		if (isPluginVersionSupported(installed)) return
+		// Bold yellow, boxed in dashes so it stands out in a busy dev console.
+		const inner = ` ${pluginUpdateMessage(installed)} `
+		const border = "-".repeat(inner.length + 2)
+		console.warn(`\n\x1b[1m\x1b[33m${border}\n|${inner}|\n${border}\x1b[0m\n`)
 	}
 
 	public createRestContext(request: Request) {

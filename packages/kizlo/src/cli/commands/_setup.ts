@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
+import { isPluginVersionSupported, pluginUpdateMessage } from "@kizlo/shared"
 import getPort, { portNumbers } from "get-port"
 import z from "zod/v4"
 import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName } from "../daemon/config"
@@ -413,10 +414,13 @@ export async function syncRemote(conn: Connection): Promise<void> {
 		{ url: conn.wpUrl, username: conn.wpUsername, password: conn.wpPassword },
 		{ secret: conn.siteSecret, siteUrl: conn.siteUrl, backendUrl: conn.baseUrl },
 	)
-	if (!sync.ok)
+	if (!sync.ok) {
 		p.log.warn(
 			`Could not sync the site settings to WordPress (${sync.error}) — make sure the kizlo plugin is active, then set them from the Kizlo settings.`,
 		)
+		return
+	}
+	if (!isPluginVersionSupported(sync.pluginVersion)) p.log.warn(pluginUpdateMessage(sync.pluginVersion))
 }
 
 /** The "Next steps" lines. `kizlo dev` is the single entry point for development. */

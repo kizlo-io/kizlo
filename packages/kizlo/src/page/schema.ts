@@ -1,7 +1,7 @@
-import { arrayable, lenient, Metadata, NumberLike } from "@kizlo/shared"
+import { arrayable, lenient, Media, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
-import { IdentifierInput, ListMetadata, ListOrder, Media } from "../shared/schema"
+import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
 import { WP_PAGE_ORDER_BYES, WP_PAGE_STATUSES } from "../wordpress/page/types"
 
 export const PageStatus = z.enum(WP_PAGE_STATUSES).exclude(["trash"])

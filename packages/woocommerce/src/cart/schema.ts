@@ -1,4 +1,5 @@
-import { CurrencyFormat, Media } from "kizlo"
+import { Media } from "@kizlo/shared"
+import { CurrencyFormat } from "kizlo"
 import z from "zod/v4"
 import { ProductPrices } from "../product/schema"
 import { BillingAddress, ItemTotals, ShippingAddress, Totals } from "../schema"

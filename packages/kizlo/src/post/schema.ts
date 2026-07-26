@@ -1,7 +1,7 @@
-import { arrayable, BooleanLike, lenient, Metadata, NumberLike } from "@kizlo/shared"
+import { arrayable, BooleanLike, lenient, Media, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
-import { IdentifierInput, ListMetadata, ListOrder, Media } from "../shared/schema"
+import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
 import { WP_POST_FORMATS, WP_POST_ORDER_BYES, WP_POST_STATUSES, WP_POST_TAX_RELATIONS } from "../wordpress/post/types"
 
 export const PostTypeFormat = z.enum(WP_POST_FORMATS)
