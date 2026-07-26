@@ -1,5 +1,5 @@
 {
-	"name": "web",
+	"name": "@apps/web",
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
@@ -8,7 +8,8 @@
 		"start": "next start",
 		"docs:sitemap": "node scripts/generate-docs-sitemap.mjs",
 		"postinstall": "fumadocs-mdx",
-		"typecheck": "pnpm docs:sitemap && fumadocs-mdx && next typegen && tsc --noEmit"
+		"typecheck": "pnpm docs:sitemap && fumadocs-mdx && next typegen && tsc --noEmit",
+		"clean": "git clean -xdf .cache .turbo .kizlo .next .source dist node_modules"
 	},
 	"dependencies": {
 		"@paper-design/shaders-react": "^0.0.76",
@@ -21,10 +22,10 @@
 		"fumadocs-ui": "16.10.4",
 		"kizlo": "workspace:*",
 		"lucide-react": "^1.20.0",
-		"next": "16.2.9",
+		"next": "catalog:",
 		"radix-ui": "^1.6.0",
-		"react": "^19.2.7",
-		"react-dom": "^19.2.7",
+		"react": "catalog:react19",
+		"react-dom": "catalog:react19",
 		"shadcn": "^4.11.0",
 		"simple-icons": "^16.24.0",
 		"tailwind-merge": "^3.6.0",
@@ -35,11 +36,11 @@
 		"@tailwindcss/postcss": "^4.3.1",
 		"@tooling/typescript": "workspace:*",
 		"@types/mdx": "^2.0.14",
-		"@types/node": "^25.9.3",
-		"@types/react": "^19.2.17",
-		"@types/react-dom": "^19.2.3",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:react19",
+		"@types/react-dom": "catalog:react19",
 		"postcss": "^8.5.15",
 		"tailwindcss": "^4.3.1",
-		"typescript": "^6.0.3"
+		"typescript": "catalog:"
 	}
 }

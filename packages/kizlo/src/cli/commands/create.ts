@@ -9,7 +9,6 @@ import {
 	adaptFile,
 	changesFor,
 	fileEntries,
-	isExample,
 	minCliError,
 	patchEntries,
 	readManifest,
@@ -107,8 +106,8 @@ export function bootstrapArgs(manifest: TemplateManifest, pm: PackageManager, na
  * Layer Kizlo's wiring onto a freshly bootstrapped app in `dir`, from an already-fetched template
  * directory + manifest. The framework CLI has produced the base project (package.json, config,
  * tsconfig, the root layout); this drives the manifest — the same engine `init` uses — to record the
- * `kizlo` dependency, write `kizlo.config.ts`, scaffold the manifest's files (the `base` plumbing and
- * the `create` layout/styles always, the `example`-flagged demo pages only when `includeExamples`),
+ * `kizlo` dependency, write `kizlo.config.ts`, scaffold the manifest's files (core wiring from `base`
+ * and `create` always, the `example`-flagged demo pages only when `includeExamples`),
  * seed the generated contract, and ignore `.env` and the `.kizlo/` working dir (which holds the local WordPress install). On a fresh app Kizlo owns the layout, so `create`
  * writes it whole (already SEO-wired) rather than patching — `applyLayoutPatches` runs over `create`'s
  * patches, which are none today. The target directory layout comes straight from the manifest's
@@ -126,7 +125,7 @@ export async function applyManifestWiring(
 
 	recordDependencies(dir, manifest)
 
-	const changes = changesFor(manifest, "create").filter((change) => opts.includeExamples || !isExample(change))
+	const changes = changesFor(manifest, "create", { includeExamples: opts.includeExamples })
 	const files = [
 		{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(kizloDir, alias, opts.localDev) },
 		...fileEntries(changes).map((entry) => adaptFile(templateDir, entry, manifest.conventions, scaffold)),

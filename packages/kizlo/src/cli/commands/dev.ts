@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { defineCommand } from "citty"
 import { palette } from "../banner"
 import { type ResolvedDevConfig, resolveDevConfig, usesLocalWordPress } from "../daemon/config"
+import { log } from "../daemon/logger"
+import { watchReload } from "../daemon/reload"
 import { startWatcher } from "../daemon/watch"
 import { DEFAULT_ENV_KEYS, ensureGitignored, envGroups, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
@@ -11,6 +13,7 @@ import { createStack, type DockerStack, dockerHint, dockerStatus } from "../wp/d
 import { reapOrphans, registerSession, removeProjectContainers, spawnWatchdog, unregisterSession } from "../wp/session"
 import { syncSiteSettings } from "../wp/settings"
 import { devStack } from "../wp/stack"
+import { findConfigDir } from "../wp/utils"
 
 async function resolve(cwd: string): Promise<{ cfg: ResolvedDevConfig; stack: DockerStack }> {
 	const cfg = await resolveDevConfig(cwd)
@@ -177,13 +180,13 @@ function armForegroundTeardown(cfg: ResolvedDevConfig): void {
 }
 
 /**
- * Boot local WordPress and run in the foreground until exit — the path behind bare
- * `kizlo dev`. Arms teardown first (so a mid-startup cancel still
- * stops partial containers), shows a timed spinner, prints the summary + stop hint, then
- * parks. A referenced timer holds the event loop open — an unresolved promise alone would
- * not, so without it Node would empty its loop and exit straight after printing.
+ * Bring the dev stack's containers up for `cfg`: clear any stale containers, resolve the published
+ * ports (stepping off a collision unless the port is pinned in config), write the compose files, and
+ * note any port that moved. Returns `cfg` with the resolved ports — the shape the rest of the boot
+ * and the teardown work against. Shared by the first boot and every reload reboot, so a changed
+ * `dev.port` in `kizlo.config.ts` is re-resolved the same way each time.
  */
-async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
+async function prepareStack(cfg: ResolvedDevConfig): Promise<ResolvedDevConfig> {
 	await removeProjectContainers(cfg.project)
 
 	const port = await pickStackPort(cfg.port, { fixed: cfg.portExplicit, configKey: "dev.port" })
@@ -192,13 +195,18 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	createStack(devStack(ready))
 	if (port !== cfg.port) note(`Port ${cfg.port} is in use — serving on ${port} instead.`)
 	if (dbPort !== cfg.dbPort) note(`Database port ${cfg.dbPort} is in use — using ${dbPort} instead.`)
+	return ready
+}
 
-	armForegroundTeardown(ready)
-
-	const start = Date.now()
-	const creds = await withSpinner("Starting local WordPress", () => bootstrapDev(ready))
+/**
+ * After a boot, sync the fresh credentials (or the current LAN URL) into `.env` and the plugin, print
+ * the connection summary, and print the timed ready line. `reloaded` swaps the wording and drops the
+ * one-time Ctrl+C hint. `start` is when the boot began, so the timing spans the whole reboot including
+ * the spinner. The `.env` writes here are why the caller pauses the reload watcher around a reboot.
+ */
+async function report(cfg: ResolvedDevConfig, creds: DevStackInfo, reloaded: boolean, start: number): Promise<void> {
 	if (creds.appPassword) {
-		const env = updateWpEnv(ready, creds)
+		const env = updateWpEnv(cfg, creds)
 		note("Updated .env with the new WordPress credentials")
 		if (env) {
 			const sync = await syncSiteSettings(
@@ -210,7 +218,7 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 					`Could not sync the site settings to WordPress (${sync.error}) — make sure the kizlo plugin is active, then set them from the Kizlo settings.`,
 				)
 		}
-	} else if (syncLocalUrl(ready, creds.url)) {
+	} else if (syncLocalUrl(cfg, creds.url)) {
 		note("Updated .env WordPress URL to the current network address — restart your app to pick it up")
 	}
 	printSummary(creds)
@@ -218,11 +226,79 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	const { green, dim, bold, reset } = palette()
 	const ms = Date.now() - start
 	const took = ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
-	process.stdout.write(`\n   ${dim}Press ${reset}${bold}Ctrl+C${reset}${dim} (or close the terminal) to stop local WordPress${reset}\n`)
-	process.stdout.write(`\n ${green}✓${reset} Ready in ${took}\n\n`)
+	if (!reloaded)
+		process.stdout.write(`\n   ${dim}Press ${reset}${bold}Ctrl+C${reset}${dim} (or close the terminal) to stop local WordPress${reset}\n`)
+	process.stdout.write(`\n ${green}✓${reset} ${reloaded ? "Reloaded" : "Ready"} in ${took}\n\n`)
+}
 
-	const stopWatcher = await startWatcher(ready.configDir)
-	if (stopWatcher) process.on("exit", stopWatcher)
+/**
+ * Boot local WordPress for an already-prepared `cfg` (ports resolved, teardown armed) behind a spinner,
+ * then report. The first-boot path only — reboots go through {@link rebootStack}, which also folds the
+ * prepare step under the spinner.
+ */
+async function bootAndReport(cfg: ResolvedDevConfig): Promise<void> {
+	const start = Date.now()
+	const creds = await withSpinner("Starting local WordPress", () => bootstrapDev(cfg))
+	await report(cfg, creds, false, start)
+}
+
+/**
+ * Reboot the whole stack in place after a config/env change: re-resolve the config, recreate the
+ * containers, and boot WordPress — all behind a single spinner labelled with the file that changed, so
+ * there's no loaderless gap between detecting the change and the boot. Teardown is already armed from
+ * the first boot, so this never re-arms. Returns the freshly resolved config (ports may have moved) so
+ * the caller can re-target its watchers.
+ */
+async function rebootStack(cwd: string, label: string): Promise<ResolvedDevConfig> {
+	const start = Date.now()
+	const { ready, creds } = await withSpinner(label, async () => {
+		const ready = await prepareStack(await resolveDevConfig(cwd))
+		return { ready, creds: await bootstrapDev(ready) }
+	})
+	await report(ready, creds, true, start)
+	return ready
+}
+
+/**
+ * Boot local WordPress and run in the foreground until exit — the path behind bare `kizlo dev`. Arms
+ * teardown first (so a mid-startup cancel still stops partial containers), boots and prints the
+ * summary, then parks. While parked it watches `.env` and `kizlo.config.*`: a change reboots the whole
+ * stack in place so a new port, connection, or fixture takes effect without rerunning the command. The
+ * reboot runs in the same process — the watchdog and session keep watching this PID throughout — and is
+ * guarded so the credential/URL writes it makes to `.env` don't trigger another reboot. A referenced
+ * timer holds the event loop open — an unresolved promise alone would not, so without it Node would
+ * empty its loop and exit straight after printing.
+ */
+async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
+	const cwd = process.cwd()
+	let ready = await prepareStack(cfg)
+	armForegroundTeardown(ready)
+	await bootAndReport(ready)
+
+	let stopContract = await startWatcher(ready.configDir)
+
+	let reloading = false
+	const reload = async (changed: string): Promise<void> => {
+		if (reloading) return
+		reloading = true
+		try {
+			stopContract?.()
+			ready = await rebootStack(cwd, `${changed} changed — restarting the session`)
+			stopContract = await startWatcher(ready.configDir)
+		} catch (error) {
+			log.error("Failed to reload the dev session:", error)
+		} finally {
+			setTimeout(() => {
+				reloading = false
+			}, 500)
+		}
+	}
+
+	const stopReload = watchReload(ready.configDir, (changed) => void reload(changed))
+	process.on("exit", () => {
+		stopContract?.()
+		stopReload()
+	})
 
 	setInterval(() => {}, 1 << 30)
 	await new Promise<never>(() => {})
@@ -231,17 +307,38 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 /**
  * Run the contract watcher in the foreground until exit — the path bare `kizlo dev` takes when local
  * WordPress isn't configured (a project pointing at its own WordPress). Generates once, then watches
- * the server files and regenerates on save. Returns immediately when another watcher already holds
- * the lock; otherwise the persistent watcher keeps the process alive on its own.
+ * the server files and regenerates on save. It also watches `.env` and `kizlo.config.*` and restarts
+ * the watcher on a change, so a new server dir or env value is picked up the same way the local path
+ * reboots its stack. Returns immediately when another watcher already holds the lock; otherwise the
+ * persistent watcher keeps the process alive on its own.
  */
 async function watchOnly(cwd: string): Promise<void> {
-	const stop = await startWatcher(cwd)
+	let stop = await startWatcher(cwd)
 	if (!stop) return
 
-	process.on("exit", stop)
+	let reloading = false
+	const reload = async (): Promise<void> => {
+		if (reloading) return
+		reloading = true
+		try {
+			stop?.()
+			stop = await startWatcher(cwd)
+		} finally {
+			setTimeout(() => {
+				reloading = false
+			}, 300)
+		}
+	}
+	const stopReload = watchReload(findConfigDir(cwd), () => void reload())
+
+	const shutdown = (): void => {
+		stop?.()
+		stopReload()
+	}
+	process.on("exit", shutdown)
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
 		process.on(signal, () => {
-			stop()
+			shutdown()
 			process.exit(0)
 		})
 	}

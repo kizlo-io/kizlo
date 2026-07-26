@@ -1,0 +1,24 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# local env files
+.env
+.env*.local
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# kizlo working dir (local WordPress install, test credentials, compose overrides, staged imports)
+.kizlo/
+
+# typescript
+*.tsbuildinfo

@@ -52,7 +52,7 @@ export interface ResolvedConfig {
 	barrelPath: string
 }
 
-const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
+export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
 
 export const DEFAULT_DEV_PORT = 8080
 export const DEFAULT_DEV_DB_PORT = 3307

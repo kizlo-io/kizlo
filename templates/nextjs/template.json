@@ -55,6 +55,12 @@
 			"kind": "file",
 			"role": "manifest",
 			"path": "src/app/site.webmanifest/route.ts"
+		},
+		{
+			"kind": "file",
+			"role": "blog-post",
+			"path": "src/app/blog/[slug]/page.tsx",
+			"example": true
 		}
 	],
 	"create": [
@@ -67,12 +73,6 @@
 			"kind": "file",
 			"role": "home-page",
 			"path": "src/app/page.tsx",
-			"example": true
-		},
-		{
-			"kind": "file",
-			"role": "blog-post",
-			"path": "src/app/blog/[slug]/page.tsx",
 			"example": true
 		}
 	],

@@ -106,7 +106,16 @@ export function managedEnv(envKeys: EnvKeys, conn: Connection): { keys: string[]
 }
 
 const requiredString = z.string().trim().min(1, "Required")
-const urlString = requiredString.pipe(z.url("Must be a valid URL (e.g. https://example.com)"))
+
+const httpProtocol = /^https?$/
+const reachableHostname = /^(localhost|(\d{1,3}\.){3}\d{1,3}|([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})$/
+const urlString = requiredString.pipe(
+	z.url({
+		protocol: httpProtocol,
+		hostname: reachableHostname,
+		error: "Must be a valid http(s) URL with a real host (e.g. https://example.com)",
+	}),
+)
 const dirPath = requiredString.refine((value) => !value.endsWith(".ts"), "Enter a directory, not a file")
 
 export { dirPath, requiredString, urlString }

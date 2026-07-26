@@ -29,9 +29,7 @@ export default async function HomePage() {
 
 			<div className="relative mb-8">
 				<div aria-hidden className="absolute -inset-5 rounded-full bg-fd-foreground/5 blur-2xl" />
-				{/* biome-ignore lint/performance/noImgElement: remote SVG; next/image needs dangerouslyAllowSVG (XSS risk) */}
 				<img src="https://cdn.kizlo.io/logo/icon-light.svg" alt={appName} className="relative hidden h-14 w-14 dark:block" />
-				{/* biome-ignore lint/performance/noImgElement: remote SVG; next/image needs dangerouslyAllowSVG (XSS risk) */}
 				<img src="https://cdn.kizlo.io/logo/icon-dark.svg" alt={appName} className="relative h-14 w-14 dark:hidden" />
 			</div>
 

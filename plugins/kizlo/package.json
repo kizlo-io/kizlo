@@ -7,7 +7,7 @@
 		"build": "wp-scripts build",
 		"dev": "wp-scripts start",
 		"typecheck": "tsc --noEmit && composer phpstan",
-		"clean": "git clean -xdf .cache .turbo vendor build node_modules"
+		"clean": "git clean -xdf .cache .turbo .fallow vendor build node_modules"
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^5.2.2",

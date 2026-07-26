@@ -77,10 +77,10 @@
 	"scripts": {
 		"build": "tsdown",
 		"dev": "tsdown -w",
-		"clean": "git clean -xdf .cache .turbo dist node_modules",
-		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run --passWithNoTests"
+		"test": "vitest run --passWithNoTests",
+		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
+		"clean": "git clean -xdf .cache .turbo .kizlo .fallow dist node_modules"
 	},
 	"dependencies": {
 		"@clack/prompts": "^1.5.1",
