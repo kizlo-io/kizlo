@@ -5,10 +5,11 @@ import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { readManifest } from "../presets/template"
 import { getVersion } from "../utils"
-import { applyManifestWiring, bootstrapArgs } from "./create"
+import { applyManifestWiring, bootstrapArgs, normalizeProjectName, projectName } from "./create"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const templateDir = path.resolve(here, "../../../../../templates/nextjs")
+const astroTemplateDir = path.resolve(here, "../../../../../templates/astro")
 
 describe("bootstrapArgs", () => {
 	const manifest = readManifest(templateDir)
@@ -25,6 +26,53 @@ describe("bootstrapArgs", () => {
 		const argv = bootstrapArgs(manifest, "npm", "my-app")
 		expect(argv?.slice(0, 5)).toEqual(["npm", "create", "next-app@latest", "my-app", "--"])
 		expect(argv).toContain("--use-npm")
+	})
+
+	it("builds the create-astro argv from the astro manifest (no {{pm}} token)", () => {
+		const astroManifest = readManifest(astroTemplateDir)
+		const argv = bootstrapArgs(astroManifest, "pnpm", "my-app")
+		expect(argv?.slice(0, 4)).toEqual(["pnpm", "create", "astro@latest", "my-app"])
+		expect(argv).toContain("--template")
+		expect(argv).toContain("minimal")
+		// create-astro infers the package manager from the invoker, so there is no {{pm}} substitution.
+		expect(argv?.some((arg) => arg.includes("{{pm}}"))).toBe(false)
+	})
+})
+
+describe("projectName", () => {
+	it("accepts a bare folder name", () => {
+		expect(projectName("my-app")).toBeUndefined()
+		expect(projectName("My_App.2")).toBeUndefined()
+	})
+
+	it("accepts relative and absolute paths, validating only the last segment", () => {
+		expect(projectName("apps/my-app")).toBeUndefined()
+		expect(projectName("./apps/my-app")).toBeUndefined()
+		expect(projectName("../sibling/my-app")).toBeUndefined()
+		expect(projectName("/srv/www/my-app")).toBeUndefined()
+		// A trailing separator still resolves to the real final segment.
+		expect(projectName("apps/my-app/")).toBeUndefined()
+	})
+
+	it("rejects an empty name or one whose final segment isn't a folder", () => {
+		expect(projectName("")).toBeDefined()
+		expect(projectName("apps/..")).toBeDefined()
+		expect(projectName("apps/.")).toBeDefined()
+		expect(projectName("apps/my app")).toBeDefined()
+	})
+})
+
+describe("normalizeProjectName", () => {
+	it("trims and drops a redundant leading ./ and trailing separator", () => {
+		expect(normalizeProjectName("  my-app  ")).toBe("my-app")
+		expect(normalizeProjectName("./templates/my-app")).toBe("templates/my-app")
+		expect(normalizeProjectName("templates/my-app/")).toBe("templates/my-app")
+		expect(normalizeProjectName("./templates/my-app/")).toBe("templates/my-app")
+	})
+
+	it("preserves ../ and absolute paths", () => {
+		expect(normalizeProjectName("../sibling/my-app")).toBe("../sibling/my-app")
+		expect(normalizeProjectName("/srv/www/my-app")).toBe("/srv/www/my-app")
 	})
 })
 
@@ -99,6 +147,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		expect(pkg.dependencies.kizlo).toBe(`^${getVersion()}`)
 		expect(pkg.dependencies.next).toBe("^16.0.0")
 
+		// Merged deps are re-sorted alphabetically so the scaffold passes sherif's unordered-dependencies check.
+		const depNames = Object.keys(pkg.dependencies)
+		expect(depNames).toEqual([...depNames].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)))
+
 		// On a fresh app Kizlo owns the layout, so create writes it whole, already SEO-wired — the
 		// framework's static `metadata` export is gone, replaced by Kizlo's `generateMetadata`.
 		const layout = fs.readFileSync(path.join(dir, "src/app/layout.tsx"), "utf8")
@@ -126,5 +178,80 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		// The `example`-flagged demo pages are the only thing skipped.
 		expect(fs.existsSync(path.join(dir, "src/app/page.tsx"))).toBe(false)
 		expect(fs.existsSync(path.join(dir, "src/app/blog/[slug]/page.tsx"))).toBe(false)
+	})
+})
+
+/**
+ * The wiring half of `create` for the Astro template. A temp directory is seeded to look like
+ * create-astro's minimal output (a bare `astro.config.mjs`, a `package.json` with `astro`, a
+ * placeholder tsconfig and page), then `applyManifestWiring` layers Kizlo on top. Asserts that the
+ * endpoints land under `src/pages`, Kizlo owns the SSR config + `@/*` tsconfig on a fresh app, and the
+ * `@astrojs/node` adapter dep is recorded.
+ */
+describe("applyManifestWiring (astro)", () => {
+	const manifest = readManifest(astroTemplateDir)
+	let dir: string
+
+	function seedAstroApp(): void {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "my-app", dependencies: { astro: "^7.1.3" } }, null, 2))
+		fs.writeFileSync(path.join(dir, "astro.config.mjs"), "import { defineConfig } from 'astro/config'\nexport default defineConfig({})\n")
+		fs.writeFileSync(path.join(dir, "tsconfig.json"), JSON.stringify({ extends: "astro/tsconfigs/strict" }))
+		fs.mkdirSync(path.join(dir, "src/pages"), { recursive: true })
+	}
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-create-astro-"))
+		seedAstroApp()
+	})
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
+	it("scaffolds Astro wiring, owns the SSR config + tsconfig alias, and records the node adapter", async () => {
+		await applyManifestWiring(dir, astroTemplateDir, manifest, { includeExamples: true })
+
+		// Wiring lands under the Astro conventions (src/pages, src/lib/kizlo, src/components).
+		expect(fs.existsSync(path.join(dir, "src/lib/kizlo/server/index.ts"))).toBe(true)
+		expect(fs.existsSync(path.join(dir, "src/pages/api/kizlo/[...rest].ts"))).toBe(true)
+		expect(fs.existsSync(path.join(dir, "src/pages/robots.txt.ts"))).toBe(true)
+		expect(fs.existsSync(path.join(dir, "src/components/BaseHead.astro"))).toBe(true)
+		expect(fs.existsSync(path.join(dir, "src/lib/kizlo/server/generated/contract.json"))).toBe(true)
+
+		// Demo starters come along on create.
+		expect(fs.existsSync(path.join(dir, "src/pages/index.astro"))).toBe(true)
+		expect(fs.existsSync(path.join(dir, "src/pages/blog/[slug].astro"))).toBe(true)
+
+		// On a fresh app Kizlo owns the framework config, overwriting the seeded `defineConfig({})` with
+		// the template's SSR + node adapter setup (the engine force-writes over the framework default).
+		const config = fs.readFileSync(path.join(dir, "astro.config.mjs"), "utf8")
+		expect(config).toContain('output: "server"')
+		expect(config).toContain("@astrojs/node")
+
+		// And the tsconfig, so the scaffolded `@/*` imports resolve.
+		const tsconfig = fs.readFileSync(path.join(dir, "tsconfig.json"), "utf8")
+		expect(tsconfig).toContain("@/*")
+
+		// The kizlo + node adapter deps are recorded without installing.
+		const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"))
+		expect(pkg.dependencies.kizlo).toBe(`^${getVersion()}`)
+		expect(pkg.dependencies["@astrojs/node"]).toBe("^11.0.2")
+		expect(pkg.dependencies.astro).toBe("^7.1.3")
+
+		// The root layout renders the SEO head component.
+		const layout = fs.readFileSync(path.join(dir, "src/layouts/Layout.astro"), "utf8")
+		expect(layout).toContain("BaseHead")
+	})
+
+	it("skips only the example pages when declined, still writing the core config and layout", async () => {
+		await applyManifestWiring(dir, astroTemplateDir, manifest, { includeExamples: false })
+
+		expect(fs.readFileSync(path.join(dir, "astro.config.mjs"), "utf8")).toContain('output: "server"')
+		expect(fs.existsSync(path.join(dir, "src/layouts/Layout.astro"))).toBe(true)
+
+		// The `example`-flagged demo pages are skipped; core wiring (robots endpoint) still lands.
+		expect(fs.existsSync(path.join(dir, "src/pages/index.astro"))).toBe(false)
+		expect(fs.existsSync(path.join(dir, "src/pages/blog/[slug].astro"))).toBe(false)
+		expect(fs.existsSync(path.join(dir, "src/pages/robots.txt.ts"))).toBe(true)
 	})
 })

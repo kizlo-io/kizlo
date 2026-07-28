@@ -1,4 +1,4 @@
-import type { Seo, Sitemap, SitemapUrl } from "./schema"
+import type { Seo, SeoSchema, Sitemap, SitemapUrl } from "./schema"
 import type { WPK_Seo } from "./types"
 
 export function deserializeSeo(data: WPK_Seo): Seo {
@@ -44,6 +44,15 @@ export function deserializeSeo(data: WPK_Seo): Seo {
 		},
 		schema: data.schema,
 	}
+}
+
+/**
+ * Serialize a post's JSON-LD (`data.seo.schema`) for a `<script type="application/ld+json">` tag.
+ * Returns `null` when the `@graph` is empty so the template can skip the tag entirely. The result
+ * is JSON, safe to inject as script-element text content.
+ */
+export function renderJsonLd(schema: SeoSchema): string | null {
+	return schema["@graph"].length ? JSON.stringify(schema) : null
 }
 
 export type SitemapIndexEntry = Pick<Sitemap, "key" | "pages" | "lastmod">

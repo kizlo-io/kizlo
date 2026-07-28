@@ -1,0 +1,116 @@
+{
+	"framework": "astro",
+	"name": "Astro",
+	"minCli": "0.11.0",
+	"apiPath": "/api/kizlo",
+	"detect": {
+		"dependencies": ["astro"]
+	},
+	"notes": [
+		{
+			"title": "Add Kizlo's SEO tags to your root layout's <head>",
+			"body": "---\nimport BaseHead from \"{{importPrefix}}components/BaseHead.astro\"\n---\n<head>\n\t<BaseHead />\n</head>"
+		}
+	],
+	"bootstrap": {
+		"initializer": "astro@latest",
+		"flags": ["--template", "minimal", "--no-install", "--no-git", "--no-ai", "--skip-houston", "--yes"]
+	},
+	"conventions": {
+		"kizloDir": "src/lib/kizlo",
+		"appDir": "src/pages",
+		"alias": "@"
+	},
+	"base": [
+		{
+			"kind": "file",
+			"role": "server-entry",
+			"path": "src/lib/kizlo/server/index.ts"
+		},
+		{
+			"kind": "file",
+			"role": "client",
+			"path": "src/lib/kizlo/client.ts"
+		},
+		{
+			"kind": "file",
+			"role": "api-route",
+			"path": "src/pages/api/kizlo/[...rest].ts"
+		},
+		{
+			"kind": "file",
+			"role": "robots",
+			"path": "src/pages/robots.txt.ts"
+		},
+		{
+			"kind": "file",
+			"role": "sitemap",
+			"path": "src/pages/sitemaps/[sitemap].xml.ts"
+		},
+		{
+			"kind": "file",
+			"role": "sitemap-redirect",
+			"path": "src/pages/sitemap.xml.ts"
+		},
+		{
+			"kind": "file",
+			"role": "manifest",
+			"path": "src/pages/site.webmanifest.ts"
+		},
+		{
+			"kind": "file",
+			"role": "head-component",
+			"path": "src/components/BaseHead.astro"
+		},
+		{
+			"kind": "file",
+			"role": "blog-post",
+			"path": "src/pages/blog/[slug].astro",
+			"example": true
+		}
+	],
+	"create": [
+		{
+			"kind": "file",
+			"role": "framework-config",
+			"path": "astro.config.mjs"
+		},
+		{
+			"kind": "file",
+			"role": "tsconfig",
+			"path": "tsconfig.json"
+		},
+		{
+			"kind": "file",
+			"role": "root-layout",
+			"path": "src/layouts/Layout.astro"
+		},
+		{
+			"kind": "file",
+			"role": "home-page",
+			"path": "src/pages/index.astro",
+			"example": true
+		}
+	],
+	"init": [],
+	"env": {
+		"baseUrl": "PUBLIC_KIZLO_API_URL",
+		"remote": {
+			"siteSecret": "KIZLO_WP_SECRET",
+			"wpUrl": "KIZLO_WP_URL",
+			"wpUsername": "KIZLO_WP_USERNAME",
+			"wpPassword": "KIZLO_WP_APP_PASSWORD"
+		},
+		"local": {
+			"connect": "KIZLO_CONNECT",
+			"siteSecret": "KIZLO_LOCAL_WP_SECRET",
+			"wpUrl": "KIZLO_LOCAL_WP_URL",
+			"wpUsername": "KIZLO_LOCAL_WP_USERNAME",
+			"wpPassword": "KIZLO_LOCAL_WP_APP_PASSWORD"
+		}
+	},
+	"dependencies": {
+		"kizlo": "^0.11.0",
+		"@astrojs/node": "^11.0.2"
+	}
+}

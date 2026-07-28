@@ -3,7 +3,17 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { adaptFile, changesFor, fileEntries, findRootLayout, isExample, patchEntries, readManifest, resolvePatch } from "./template"
+import {
+	adaptFile,
+	changesFor,
+	fileEntries,
+	findRootLayout,
+	isExample,
+	patchEntries,
+	readManifest,
+	renderNote,
+	resolvePatch,
+} from "./template"
 import type { ScaffoldContext } from "./types"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -80,6 +90,23 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 		expect(resolved.relPath).toBe("app/layout.tsx")
 		expect(resolved.imports.some((i) => i.module === "@/lib/kizlo/server" && i.names.includes("client"))).toBe(true)
 		expect(resolved.exports.map((e) => e.name)).toEqual(["generateMetadata", "generateViewport"])
+	})
+})
+
+describe("renderNote", () => {
+	const note = { title: "Add the head component", body: 'import BaseHead from "{{importPrefix}}components/BaseHead.astro"' }
+
+	it("substitutes {{importPrefix}} with the alias form when an alias is set", () => {
+		// The alias arrives already slash-normalized (`@/`); the token resolves to that prefix verbatim.
+		expect(renderNote(note, "@/").body).toBe('import BaseHead from "@/components/BaseHead.astro"')
+	})
+
+	it("substitutes {{importPrefix}} with a relative prefix when there is no alias", () => {
+		expect(renderNote(note, "").body).toBe('import BaseHead from "../components/BaseHead.astro"')
+	})
+
+	it("passes the title through unchanged", () => {
+		expect(renderNote(note, "@/").title).toBe("Add the head component")
 	})
 })
 

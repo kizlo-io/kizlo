@@ -1,6 +1,15 @@
 {
 	"framework": "nextjs",
+	"name": "Next.js",
 	"minCli": "0.11.0",
+	"apiPath": "/api/kizlo",
+	"detect": {
+		"dependencies": ["next"]
+	},
+	"requires": {
+		"anyDir": ["app", "src/app"],
+		"message": "Kizlo needs the Next.js App Router — no `app` or `src/app` directory found. The Pages Router isn't supported."
+	},
 	"bootstrap": {
 		"initializer": "next-app@latest",
 		"flags": [

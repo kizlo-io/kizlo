@@ -17,6 +17,10 @@ export const generate = defineCommand({
 	async run({ args }) {
 		const cwd = process.cwd()
 		const cfg = await resolveConfig(cwd, { dir: args.dir })
+		if (!cfg) {
+			log.info("No Kizlo server directory configured, nothing to generate. Set `dir` in kizlo.config.ts or pass --dir.")
+			return
+		}
 		let ok: boolean
 		try {
 			ok = await generateOnce(cfg)

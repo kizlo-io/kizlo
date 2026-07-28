@@ -1,12 +1,7 @@
-import { DEFAULT_ENV_KEYS } from "../utils"
-import type { Preset, ScaffoldContext } from "./types"
+import type { Fallback, ScaffoldContext } from "./types"
 
-export const base: Preset = {
-	id: "base",
+export const base: Fallback = {
 	label: "Generic (no framework detected)",
-	detect: () => 1,
-	// No template, no separately-pinned runtime — the base preset carries its own `.env` names.
-	envKeys: DEFAULT_ENV_KEYS,
 	scaffolds(ctx) {
 		return [
 			{

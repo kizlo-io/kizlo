@@ -1,0 +1,25 @@
+---
+import { renderJsonLd, resolvePageHead } from "kizlo/astro/server"
+import Layout from "@/layouts/Layout.astro"
+import { client } from "@/lib/kizlo/server"
+
+const { slug } = Astro.params
+const { data } = await client.posts.get({ params: { identifier: slug ?? "" } })
+
+if (!data) {
+	return new Response(null, { status: 404 })
+}
+
+// SEO tags (title, canonical, Open Graph, Twitter) mapped straight from the post's SEO head, so you
+// never hand-write meta tags. Missing/unpublished posts fall back to the layout defaults.
+const head = data.seo ? resolvePageHead(data.seo.head) : undefined
+// JSON-LD structured data (schema.org) from the post's SEO, rendered as a <script> tag in <head>.
+const jsonLd = data.seo ? renderJsonLd(data.seo.schema) : undefined
+---
+
+<Layout head={head} jsonLd={jsonLd}>
+	<article style="max-width: 720px; margin: 0 auto; padding: 4rem 1.5rem;">
+		<h1>{data.title ?? "Untitled"}</h1>
+		<div set:html={data.content ?? ""} />
+	</article>
+</Layout>

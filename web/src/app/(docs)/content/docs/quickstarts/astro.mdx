@@ -1,0 +1,285 @@
+---
+title: Astro
+description: Wire Kizlo into an Astro app and make your first call.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+import { File, Folder, Files } from 'fumadocs-ui/components/files'
+
+<Callout>
+  This quickstart covers the app side. Make sure WordPress is ready first (see
+  [Installation](/docs/installation)) — either connect your own WordPress with the plugin and an
+  Application Password, or let Kizlo run one locally in Docker.
+</Callout>
+
+## Set up Kizlo in a new project
+
+Starting fresh? Scaffold an Astro app with Kizlo already wired:
+
+```package-install
+npx kizlo@latest create astro my-app
+```
+
+It scaffolds a fully wired project and walks you through your WordPress credentials. When it
+finishes, `cd my-app`.
+
+## Set up Kizlo in an existing project
+
+Add Kizlo to an app you already have. Use the CLI (recommended) or wire the files by hand —
+both produce the same result.
+
+<Callout>
+  Kizlo renders on demand, so the Astro project runs on the server. Make sure your `astro.config.mjs`
+  sets `output: "server"` with a server adapter (e.g. `@astrojs/node`) — `create` and `init` handle
+  this for you.
+</Callout>
+
+### CLI setup (recommended)
+
+Run the initializer in your project root:
+
+```package-install
+npx kizlo@latest init
+```
+
+It detects your framework, `src` dir (if present), package manager, import alias, etc. and scaffolds:
+
+<Files>
+  <Folder name="src" defaultOpen>
+    <Folder name="pages" defaultOpen>
+      <Folder name="api" defaultOpen>
+        <Folder name="kizlo" defaultOpen>
+          <File name="[...rest].ts" />
+        </Folder>
+      </Folder>
+    </Folder>
+    <Folder name="components" defaultOpen>
+      <File name="BaseHead.astro" />
+    </Folder>
+    <Folder name="lib" defaultOpen>
+      <Folder name="kizlo" defaultOpen>
+        <Folder name="server" defaultOpen>
+          <File name="index.ts" />
+            <Folder name="generated">
+              <File name="contract.json" />
+              <File name="index.ts" />
+            </Folder>
+        </Folder>
+        <File name="client.ts" />
+      </Folder>
+    </Folder>
+  </Folder>
+  <File name="kizlo.config.ts" />
+  <File name=".env" />
+</Files>
+
+Along the way it asks whether to run WordPress locally in Docker or connect your own, writes
+the matching credentials to `.env`, and generates the contract — so when `init` finishes you're
+ready to make your first call.
+
+Kizlo's SEO tags render through a `BaseHead.astro` component you drop into your layout's `<head>`.
+`init` can't edit a layout you own, so it prints one manual step at the end: add `BaseHead` to your
+root layout's `<head>`.
+
+```astro title="src/layouts/Layout.astro"
+---
+import BaseHead from "@/components/BaseHead.astro"
+---
+<head>
+	<BaseHead />
+</head>
+```
+
+<Callout>
+  Feel free to customize this folder structure however you like — just point the `dir` option in
+  `kizlo.config.ts` at it, so kizlo knows where your server files and kizlo instance live and can
+  generate the server contract.
+</Callout>
+
+### Manual setup
+
+Prefer to wire it yourself? Create the same files the CLI would.
+
+<Steps>
+
+<Step>
+
+#### Install the package
+
+```package-install
+npm install kizlo@latest
+```
+
+</Step>
+
+<Step>
+
+#### Add `kizlo.config.ts`
+
+At your project root — it tells the CLI where Kizlo lives and which import alias to use:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  alias: "@",
+})
+```
+
+</Step>
+
+<Step>
+
+#### Enable server output
+
+Kizlo renders on demand, so Astro runs on the server. In `astro.config.mjs`, set `output: "server"`
+and add a server adapter:
+
+```js title="astro.config.mjs"
+// @ts-check
+import node from "@astrojs/node"
+import { defineConfig } from "astro/config"
+
+export default defineConfig({
+  output: "server",
+  adapter: node({ mode: "standalone" }),
+})
+```
+
+</Step>
+
+<Step>
+
+#### Create the server
+
+At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials through Astro's native
+`astro:env/server`, so pass its `getSecret`:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { getSecret } from "astro:env/server"
+import { createKizlo } from "kizlo/astro/server"
+
+export const { router, client, context, handler } = createKizlo({ getSecret })
+```
+
+</Step>
+
+<Step>
+
+#### Mount the route handler
+
+At `src/pages/api/kizlo/[...rest].ts` — `ALL` forwards every HTTP method to the server's `handler`:
+
+```ts title="src/pages/api/kizlo/[...rest].ts"
+import type { APIRoute } from "astro"
+import { handler } from "@/lib/kizlo/server"
+
+export const ALL: APIRoute = ({ request }) => handler(request)
+```
+
+</Step>
+
+<Step>
+
+#### Generate the contract
+
+So `server/generated/` exists before the client imports it:
+
+```package-install
+npx kizlo generate
+```
+
+</Step>
+
+<Step>
+
+#### Create the client
+
+At `src/lib/kizlo/client.ts` from the generated contract — it's typed automatically. Pass the public
+API URL at the call site so Vite inlines it into the browser bundle:
+
+```ts title="src/lib/kizlo/client.ts"
+import { createKizloClient } from "kizlo/astro"
+import { contract } from "./server/generated"
+
+export const client = createKizloClient(contract, { url: import.meta.env.PUBLIC_KIZLO_API_URL })
+```
+
+</Step>
+
+<Step>
+
+#### Environment
+
+Finally, connect WordPress — a local stack while you build, your hosted WordPress in production.
+
+#### Local
+
+Let Kizlo run WordPress for you — nothing to fill in:
+
+```package-install
+npx kizlo dev
+```
+
+It starts WordPress in Docker, writes its dev credentials to `.env` for you, and watches your server files
+to keep the contract in sync — one command for the whole local loop.
+
+#### Remote
+
+For your hosted WordPress, add its credentials to `.env`:
+
+```bash title=".env"
+KIZLO_WP_URL=https://your-site.com
+KIZLO_WP_USERNAME=admin
+KIZLO_WP_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
+KIZLO_WP_SECRET=                   # a long random string
+PUBLIC_KIZLO_API_URL=http://localhost:4321/api/kizlo
+```
+
+Generate `KIZLO_WP_SECRET` with `openssl rand -hex 32`. While developing, run `npx kizlo dev` to keep
+the generated contract in sync as you edit your server files.
+
+</Step>
+
+</Steps>
+
+## Render a post
+
+That's it 🎉 — here's the payoff: a complete dynamic blog post route. A single page fetches the post
+by slug and maps its SEO straight into the document `<head>`:
+
+- **`resolvePageHead`** — turns the post's SEO head into the flat descriptors `BaseHead.astro` renders
+  as `<title>`, canonical, Open Graph, and Twitter tags, so you never hand-write meta tags.
+- **`BaseHead.astro`** — the shared head component `init` wires into your layout; brand and site data
+  (icons, web manifest, theme color) come from WordPress settings.
+
+Each route renders on demand for its slug, so there's no build-time list step.
+
+```astro title="src/pages/blog/[slug].astro"
+---
+import { resolvePageHead } from "kizlo/astro/server"
+import Layout from "@/layouts/Layout.astro"
+import { client } from "@/lib/kizlo/server"
+
+const { slug } = Astro.params
+const { data } = await client.posts.get({ params: { identifier: slug ?? "" } })
+
+if (!data) {
+  return new Response(null, { status: 404 })
+}
+
+// SEO tags (title, canonical, Open Graph, Twitter) mapped straight from the post's SEO head.
+const head = data.seo ? resolvePageHead(data.seo.head) : undefined
+---
+
+<Layout head={head}>
+  <article>
+    <h1>{data.title ?? "Untitled"}</h1>
+    <div set:html={data.content ?? ""} />
+  </article>
+</Layout>
+```
+
+From here, head to [Concepts](/docs/concepts/extension) to see how procedures, extensions, and adapters
+compose into something production-ready.

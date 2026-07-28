@@ -1,7 +1,7 @@
 import { expect, test } from "vitest"
 import { ListSitemapUrlInput, Seo } from "./schema"
 import type { WPK_Seo } from "./types"
-import { deserializeSeo } from "./utils"
+import { deserializeSeo, renderJsonLd } from "./utils"
 
 /** The shape the plugin emits for a page with no optional SEO data populated. */
 function minimalSeo(): WPK_Seo {
@@ -101,6 +101,13 @@ test("deserializeSeo coalesces a partially populated article block", () => {
 		tags: [],
 	})
 	expect(() => Seo.parse(result)).not.toThrow()
+})
+
+test("renderJsonLd serializes a populated graph and skips an empty one", () => {
+	expect(renderJsonLd(minimalSeo().schema)).toBeNull()
+
+	const schema = { "@context": "https://schema.org" as const, "@graph": [{ "@type": "Article", headline: "Hello" }] }
+	expect(renderJsonLd(schema)).toBe(JSON.stringify(schema))
 })
 
 test("ListSitemapUrlInput requires a key for keyed types but not for author", () => {

@@ -1,0 +1,23 @@
+{
+	"name": "@templates/astro",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro preview",
+		"typecheck": "astro check",
+		"clean": "git clean -xdf .cache .turbo .kizlo .astro dist node_modules"
+	},
+	"dependencies": {
+		"@astrojs/node": "catalog:",
+		"astro": "catalog:",
+		"kizlo": "workspace:*"
+	},
+	"devDependencies": {
+		"@astrojs/check": "^0.9.9",
+		"@tooling/typescript": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

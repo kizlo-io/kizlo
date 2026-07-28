@@ -14,7 +14,7 @@
 		"/docs/php/functions/include-post-type",
 		"/docs/php/functions/register-route",
 		"/docs/php/functions/register-route-interceptor",
-		"/docs/quickstarts",
+		"/docs/quickstarts/astro",
 		"/docs/quickstarts/nextjs",
 		"/docs/reference/functions/create-auth-adapter",
 		"/docs/reference/functions/create-captcha-adapter",

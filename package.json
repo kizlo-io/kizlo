@@ -17,7 +17,9 @@
 	"packageManager": "pnpm@10.34.4",
 	"scripts": {
 		"build": "turbo run build",
-		"kizlo": "KIZLO_TEMPLATE_LOCAL_DIR=/Users/inderjeet.gill3icloud.com/code/kizlo/templates node packages/kizlo/dist/cli/index.js",
+		"kizlo": "node packages/kizlo/dist/cli/index.js",
+		"kizlo:create": "node packages/kizlo/dist/cli/index.js create --source ./templates",
+		"kizlo:init": "node packages/kizlo/dist/cli/index.js init --source ./templates",
 		"dev": "turbo watch dev --continue",
 		"kill": "taskkill /f /im node.exe",
 		"clean:workspaces": "turbo run clean",

@@ -1,16 +1,7 @@
-import type { EnvKeys, PackageManager } from "../utils"
-
 export interface PackageJson {
 	scripts?: Record<string, string>
 	dependencies?: Record<string, string>
 	devDependencies?: Record<string, string>
-}
-
-export interface InitContext {
-	cwd: string
-	pkg: PackageJson
-	pm: PackageManager
-	hasSrcDir: boolean
 }
 
 export interface ScaffoldContext {
@@ -42,31 +33,20 @@ export interface ScaffoldFile {
 	contents: string
 }
 
-export interface Preset {
-	id: string
+/**
+ * The generic no-template fallback `init` uses when a project matches no template in the registry — the
+ * *absence* of a framework, not framework logic, so it doesn't recreate the template/CLI split. It writes
+ * its own server entry and browser client inline (framework templates carry those as real files instead),
+ * and its `.env` names come from {@link DEFAULT_ENV_KEYS}, so it declares no `apiPath`, no `env`, and no
+ * detection signal. There is exactly one, `base`.
+ */
+export interface Fallback {
+	/** Human label used in logs, e.g. `Generic (no framework detected)`. */
 	label: string
-	/** Detection confidence: 0 = no match, higher wins. */
-	detect(ctx: InitContext): number
 	/**
-	 * The `.env` key names this preset's scaffold writes, when it has no {@link template} to declare them
-	 * (the generic `base` preset). Template-backed presets omit this — the names come from the fetched
-	 * manifest's `env` section instead — and fall back to {@link DEFAULT_ENV_KEYS}. Resolved by
-	 * `resolveEnvKeys`.
+	 * Files the fallback scaffolds inline, each a labeled {@link ScaffoldFile} with its own path — the
+	 * server entry and browser client, written under the user-chosen dir from the context. init runs
+	 * every file through the shared overwrite policy.
 	 */
-	envKeys?: EnvKeys
-	/** Path the API handler mounts at (e.g. `/api/kizlo`); appended to the base URL. */
-	apiPath?: string
-	/**
-	 * The template folder this preset scaffolds from (e.g. `nextjs`). When set, init fetches the
-	 * template at runtime and drives its wiring from the template's manifest — the file bodies live
-	 * only in the template, never baked into the CLI. Presets without a template (`base`) scaffold
-	 * their files inline via {@link scaffolds}.
-	 */
-	template?: string
-	/**
-	 * Files this preset scaffolds inline, each a labeled {@link ScaffoldFile} with its own path. Used
-	 * only by presets with no {@link template}; the server entry and browser client are written under
-	 * the user-chosen dir from the context. init runs every file through the shared overwrite policy.
-	 */
-	scaffolds?(ctx: ScaffoldContext): ScaffoldFile[]
+	scaffolds(ctx: ScaffoldContext): ScaffoldFile[]
 }

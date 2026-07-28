@@ -19,6 +19,8 @@ export default defineConfig({
 		"cli/wp/watchdog": "src/cli/wp/watchdog.ts",
 		nextjs: "src/integrations/nextjs/index.ts",
 		"nextjs/server": "src/integrations/nextjs/server.ts",
+		astro: "src/integrations/astro/index.ts",
+		"astro/server": "src/integrations/astro/server.ts",
 	},
 	copy: [{ from: "src/cli/wp/compose", to: "dist/cli/wp/compose" }],
 	dts: { tsconfig: "tsconfig.build.json" },

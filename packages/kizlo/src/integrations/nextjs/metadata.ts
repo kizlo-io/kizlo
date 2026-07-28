@@ -5,6 +5,8 @@ import { WEB_MANIFEST_ROUTE } from "../../brand/manifest"
 import type { S2SClient } from "../../kizlo"
 import type { SeoHead } from "../../seo/schema"
 
+export { renderJsonLd } from "../../seo/utils"
+
 export function createRootMetadata(client: S2SClient<[]>) {
 	return async function generateMetadata(): Promise<Metadata> {
 		const settings = await client.settings.get.call()
