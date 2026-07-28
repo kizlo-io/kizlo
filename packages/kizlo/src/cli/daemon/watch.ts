@@ -43,9 +43,9 @@ async function watch(cfg: ResolvedConfig): Promise<FSWatcher> {
  * Acquire the single-instance lock, generate the contract once, and start the file
  * watcher. Returns a synchronous `stop()` that closes the watcher and releases the
  * lock — or `undefined` when another watcher already holds the lock (a framework dev
- * script, or a second `kizlo dev`), in which case the caller carries on without
- * watching. Used by `kizlo dev`, both when it boots a local stack and when it runs
- * the watcher alone, so a single terminal covers the whole dev loop.
+ * script, or a second `kizlo dev`), or when no server `dir` is configured, in which case
+ * the caller carries on without watching. Used by `kizlo dev`, both when it boots a local
+ * stack and when it runs the watcher alone, so a single terminal covers the whole dev loop.
  */
 export async function startWatcher(cwd: string, opts?: { dir?: string }): Promise<(() => void) | undefined> {
 	const lock = lockPath(cwd)
@@ -55,6 +55,10 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 	}
 
 	const cfg = await resolveConfig(cwd, { dir: opts?.dir })
+	if (!cfg) {
+		log.info("skipping the contract generation.")
+		return undefined
+	}
 	acquire(lock)
 
 	try {

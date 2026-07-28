@@ -1,0 +1,23 @@
+---
+import type { PageHead } from "kizlo/astro/server"
+import BaseHead from "@/components/BaseHead.astro"
+
+interface Props {
+	/** Per-page SEO for WordPress-backed pages. */
+	head?: PageHead
+	/** Fallback title for pages without a WordPress SEO head. */
+	title?: string
+}
+
+const { head, title } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead head={head} title={title} />
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>

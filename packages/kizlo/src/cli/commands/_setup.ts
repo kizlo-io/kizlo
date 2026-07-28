@@ -6,7 +6,6 @@ import { isPluginVersionSupported, pluginUpdateMessage } from "@kizlo/shared"
 import getPort, { portNumbers } from "get-port"
 import z from "zod/v4"
 import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName } from "../daemon/config"
-import type { Preset } from "../presets"
 import type { TemplateManifest } from "../presets/template"
 import {
 	DEFAULT_ENV_KEYS,
@@ -27,13 +26,13 @@ import { syncSiteSettings } from "../wp/settings"
 import { devStack } from "../wp/stack"
 
 /**
- * The resolved `.env` key names the scaffold writes: the template's declared `env` when it has one,
- * else the preset's built-in `envKeys` (the generic `base` preset), else the {@link DEFAULT_ENV_KEYS}
- * fallback for an in-repo template before the first stamped release. Threaded into `managedEnv`,
- * `writeEnv`, and `collectConnectionFromEnv` so the scaffold writes the names the pinned runtime reads.
+ * The resolved `.env` key names the scaffold writes: the template's declared `env` when it has one, else
+ * the {@link DEFAULT_ENV_KEYS} fallback — for an in-repo template before the first stamped release, and
+ * for the base no-template fallback (which has no manifest). Threaded into `managedEnv`, `writeEnv`, and
+ * `collectConnectionFromEnv` so the scaffold writes the names the pinned runtime reads.
  */
-export function resolveEnvKeys(preset: Preset, manifest?: TemplateManifest): EnvKeys {
-	return manifest?.env ?? preset.envKeys ?? DEFAULT_ENV_KEYS
+export function resolveEnvKeys(manifest?: TemplateManifest): EnvKeys {
+	return manifest?.env ?? DEFAULT_ENV_KEYS
 }
 
 /** Remote connection keys — what a real deploy needs, and what `.env.example` always lists. */
@@ -173,12 +172,12 @@ export function pickAppPort(): Promise<number> {
  * `create` scaffolds a brand-new app that has no public URL yet, so it defaults to the local dev
  * origin and lets the user fill in production later.
  */
-export async function collectConnectionInteractively(preset: Preset, opts: { baseUrl?: string } = {}): Promise<Connection> {
+export async function collectConnectionInteractively(apiPath: string | undefined, opts: { baseUrl?: string } = {}): Promise<Connection> {
 	let siteUrl: string | undefined
 	let baseUrl: string
 	if (opts.baseUrl !== undefined) {
 		baseUrl = opts.baseUrl
-	} else if (preset.apiPath) {
+	} else if (apiPath) {
 		baseUrl = orCancel(await p.text({ message: "Public app URL", placeholder: "https://your-app.com", validate: validate(urlString) }))
 	} else {
 		siteUrl = orCancel(await p.text({ message: "Public site URL", placeholder: "https://your-app.com", validate: validate(urlString) }))

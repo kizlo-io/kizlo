@@ -1,10 +1,10 @@
 import fs from "node:fs"
 import path from "node:path"
-import { createJiti } from "jiti"
 import { generateContract } from "../../shared/contract"
 import type { AnyProcedureRouter } from "../../shared/procedure"
 import { loadEnvFiles } from "../utils"
 import type { ResolvedConfig } from "./config"
+import { importIgnoringVirtualModules } from "./jiti"
 
 /** The generated contract barrel — also written as a stub by `kizlo init`. */
 export const CONTRACT_BARREL = [
@@ -28,9 +28,8 @@ function atomicWrite(file: string, data: string): void {
  */
 export async function generateOnce(cfg: ResolvedConfig): Promise<boolean> {
 	loadEnvFiles(cfg.cwd)
-	const jiti = createJiti(cfg.cwd, { moduleCache: false })
 	const entry = path.resolve(cfg.cwd, cfg.serverEntry)
-	const { router } = await jiti.import<{ router?: AnyProcedureRouter }>(entry)
+	const { router } = await importIgnoringVirtualModules<{ router?: AnyProcedureRouter }>(cfg.cwd, entry)
 
 	if (!router) return false
 

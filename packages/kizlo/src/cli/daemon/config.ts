@@ -1,12 +1,12 @@
 import fs from "node:fs"
 import path from "node:path"
-import { createJiti } from "jiti"
 import z from "zod/v4"
 import type { KizloGlobalConfig } from "../../config"
 import { detectPackageManager, type PackageManager } from "../utils"
 import { LOCAL_DIR_REL } from "../wp/constants"
 import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
+import { importIgnoringVirtualModules } from "./jiti"
 import { log } from "./logger"
 
 const fixtureSchema = z.custom<Fixture>(
@@ -58,18 +58,13 @@ export const DEFAULT_DEV_PORT = 8080
 export const DEFAULT_DEV_DB_PORT = 3307
 const DEFAULT_TEST_PORT = 8889
 
-function defaultDir(cwd: string): string {
-	return fs.existsSync(path.join(cwd, "src")) ? "src/lib/kizlo" : "lib/kizlo"
-}
-
 async function loadConfigFile(cwd: string): Promise<LoadedConfig | undefined> {
 	const file = CONFIG_FILES.map((name) => path.join(cwd, name)).find((p) => fs.existsSync(p))
 	if (!file) return undefined
 
 	let raw: unknown
 	try {
-		const jiti = createJiti(cwd, { moduleCache: false })
-		const mod = await jiti.import<{ default?: KizloGlobalConfig } & KizloGlobalConfig>(file)
+		const mod = await importIgnoringVirtualModules<{ default?: KizloGlobalConfig } & KizloGlobalConfig>(cwd, file)
 		raw = mod.default ?? mod
 	} catch (error) {
 		log.error(`Could not load ${path.basename(file)}:`, error)
@@ -84,9 +79,17 @@ async function loadConfigFile(cwd: string): Promise<LoadedConfig | undefined> {
 	return result.data
 }
 
-export async function resolveConfig(cwd: string, flags?: { dir?: string }): Promise<ResolvedConfig> {
+/**
+ * Resolve the Kizlo server layout from an explicit `dir` — the `--dir` flag or `dir` in
+ * `kizlo.config.*`. Returns `undefined` when neither is set: there's no Kizlo server to
+ * generate a contract from, so callers skip generation and (for `dev`) run local WordPress
+ * alone. There's intentionally no default path — a missing `dir` means "no server", not
+ * "look under `lib/kizlo`".
+ */
+export async function resolveConfig(cwd: string, flags?: { dir?: string }): Promise<ResolvedConfig | undefined> {
 	const fileConfig = await loadConfigFile(cwd)
-	const raw = flags?.dir ?? fileConfig?.dir ?? defaultDir(cwd)
+	const raw = flags?.dir ?? fileConfig?.dir
+	if (!raw) return undefined
 	const dir = raw.replace(/^\.\//, "").replace(/\/+$/, "")
 	const serverDir = path.join(dir, "server")
 	const generatedDir = path.join(serverDir, "generated")

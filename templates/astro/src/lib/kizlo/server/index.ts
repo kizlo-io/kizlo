@@ -1,0 +1,4 @@
+import { getSecret } from "astro:env/server"
+import { createKizlo } from "kizlo/astro/server"
+
+export const { router, client, context, handler } = createKizlo({ getSecret })

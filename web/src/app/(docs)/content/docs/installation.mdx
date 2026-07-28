@@ -4,6 +4,8 @@ icon: DownloadSimple
 description: Point Kizlo at your own WordPress, or let it run one locally in Docker.
 ---
 
+import { brandIcons } from "@/components/icons"
+import { QuickstartCard } from "@/components/quickstart-card"
 import { Step, Steps } from 'fumadocs-ui/components/steps'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
@@ -75,5 +77,19 @@ locally in Docker for development. Pick the one that fits — both end at the sa
   </TabsContent>
 </Tabs>
 
-With WordPress ready either way, head to the [Next.js quickstart](/docs/quickstarts/nextjs) to add
-Kizlo to your app and make your first call.
+## Quickstarts
+
+Once WordPress is ready, pick your framework of choice to wire Kizlo into your app and make your first call. More are on the way.
+
+<Cards>
+  <QuickstartCard href="/docs/quickstarts/nextjs" icon={<brandIcons.NextJs />} title="Next.js" />
+  <QuickstartCard icon={<brandIcons.React />} title="React" comingSoon />
+  <QuickstartCard icon={<brandIcons.Astro />} title="Astro" comingSoon />
+  <QuickstartCard icon={<brandIcons.Vue />} title="Vue" comingSoon />
+  <QuickstartCard icon={<brandIcons.SvelteKit />} title="SvelteKit" comingSoon />
+  <QuickstartCard icon={<brandIcons.SolidStart />} title="SolidStart" comingSoon />
+  <QuickstartCard icon={<brandIcons.TanStackStart />} title="TanStack Start" comingSoon />
+    <QuickstartCard icon={<brandIcons.Node />} title="Node.js" comingSoon />
+  <QuickstartCard icon={<brandIcons.Bun />} title="Bun" comingSoon />
+  <QuickstartCard icon={<brandIcons.Deno />} title="Deno" comingSoon />
+</Cards>

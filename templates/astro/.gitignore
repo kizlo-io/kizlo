@@ -1,0 +1,24 @@
+# build output
+dist/
+
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# local env files
+.env
+.env.production
+
+# kizlo working dir (local WordPress install, test credentials, compose overrides, staged imports)
+.kizlo/
+
+# macOS-specific files
+.DS_Store

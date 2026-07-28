@@ -1,0 +1,60 @@
+---
+import { type PageHead, resolveRootHead } from "kizlo/astro/server"
+import { client } from "@/lib/kizlo/server"
+
+interface Props {
+	/** Per-page SEO, mapped from a post's SEO head via `resolvePageHead`. */
+	head?: PageHead
+	/** Fallback title for pages not backed by a WordPress post (e.g. the home page). */
+	title?: string
+}
+
+const { head, title } = Astro.props
+
+// Brand + site settings (icons, web manifest, theme color) come from WordPress — edit them in
+// wp-admin, not here.
+const root = await resolveRootHead(client)
+const documentTitle = head?.title ?? title
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+{documentTitle ? <title>{documentTitle}</title> : null}
+
+<link rel="manifest" href={root.manifest} />
+{root.icons.icon.map((icon) => <link rel="icon" href={icon.url} type={icon.type} sizes={icon.sizes} />)}
+{root.icons.appleTouch.map((icon) => <link rel="apple-touch-icon" href={icon.url} type={icon.type} sizes={icon.sizes} />)}
+{root.themeColor.map((theme) => <meta name="theme-color" content={theme.color} media={theme.media} />)}
+
+{
+	head ? (
+		<>
+			{head.description ? <meta name="description" content={head.description} /> : null}
+			<link rel="canonical" href={head.canonical} />
+			<meta name="robots" content={head.robots} />
+
+			<meta property="og:type" content={head.og.type} />
+			<meta property="og:title" content={head.og.title} />
+			{head.og.description ? <meta property="og:description" content={head.og.description} /> : null}
+			<meta property="og:url" content={head.og.url} />
+			<meta property="og:site_name" content={head.og.siteName} />
+			<meta property="og:locale" content={head.og.locale} />
+			{head.og.image ? (
+				<>
+					<meta property="og:image" content={head.og.image.url} />
+					{head.og.image.width ? <meta property="og:image:width" content={String(head.og.image.width)} /> : null}
+					{head.og.image.height ? <meta property="og:image:height" content={String(head.og.image.height)} /> : null}
+					{head.og.image.alt ? <meta property="og:image:alt" content={head.og.image.alt} /> : null}
+				</>
+			) : null}
+
+			<meta name="twitter:card" content={head.twitter.card} />
+			<meta name="twitter:title" content={head.twitter.title} />
+			{head.twitter.description ? <meta name="twitter:description" content={head.twitter.description} /> : null}
+			{head.twitter.site ? <meta name="twitter:site" content={head.twitter.site} /> : null}
+			{head.twitter.creator ? <meta name="twitter:creator" content={head.twitter.creator} /> : null}
+			{head.twitter.image ? <meta name="twitter:image" content={head.twitter.image} /> : null}
+			{head.twitter.imageAlt ? <meta name="twitter:image:alt" content={head.twitter.imageAlt} /> : null}
+		</>
+	) : null
+}

@@ -102,11 +102,39 @@ const envSchema = z.object({
 /** A package name → version-range map, package.json's own vocabulary. */
 const depsSchema = z.record(z.string(), z.string())
 
+/**
+ * The package names whose presence in a project's dependencies identify this framework — how `init`
+ * recognizes which template to apply to an existing project (e.g. `["next"]`, `["astro"]`). Detection is
+ * data, so a community template declares its own signal and needs no CLI change. See {@link detectTemplate}.
+ */
+const detectSchema = z.object({ dependencies: z.array(z.string()).default([]) })
+
+/**
+ * An `init` precondition on the project's shape: at least one of `anyDir` must exist in the project,
+ * else `init` stops with `message`. Replaces framework-specific `if` branches — e.g. Next.js needs an
+ * `app` or `src/app` directory (the App Router), which the Pages Router lacks. Dormant when absent.
+ */
+const requiresSchema = z.object({ anyDir: z.array(z.string()), message: z.string() })
+
+/**
+ * A post-setup manual step `init` prints after wiring — the piece Kizlo can't auto-wire into a file the
+ * user owns (e.g. Astro's SEO tags render through a `.astro` component, not a patchable export). `create`
+ * owns files whole, so it never prints these. `body` may carry one token, `{{importPrefix}}`, substituted
+ * by {@link renderNote} with the project's source-root import prefix (an alias like `@/`, else `../`).
+ */
+const noteSchema = z.object({ title: z.string(), body: z.string() })
+
 /** The command a set of changes is being applied for: the shared `base` plus this section. */
 export type Command = "create" | "init"
 
 const manifestSchema = z.object({
 	framework: z.string(),
+	/**
+	 * Display label for template pickers and logs (e.g. `Next.js`). Optional — registry listing falls
+	 * back to {@link manifestSchema.shape.framework} and then the template's directory name — so a
+	 * community template that omits it still shows up, just under its folder id. See `listTemplates`.
+	 */
+	name: z.string().optional(),
 	/**
 	 * The `.env` key names a scaffolded project uses. Read by `managedEnv`/`writeEnv` so the scaffold
 	 * writes the names the pinned runtime reads. Absent in-repo before the first stamped release;
@@ -130,6 +158,18 @@ const manifestSchema = z.object({
 	 */
 	minCli: z.string().optional(),
 	/**
+	 * The path the API handler mounts at (e.g. `/api/kizlo`), appended to the base URL so the client and
+	 * route handler agree. Read generically by `create`/`init` — the CLI hardcodes no framework path.
+	 * Absent on templates whose client resolves the backend URL itself. See {@link withApiPath}.
+	 */
+	apiPath: z.string().optional(),
+	/** The dependency signal that identifies this framework for `init`'s detection. See {@link detectSchema}. */
+	detect: detectSchema.optional(),
+	/** An `init` precondition on the project's directory layout. See {@link requiresSchema}. */
+	requires: requiresSchema.optional(),
+	/** Manual steps `init` prints after wiring — what Kizlo can't auto-wire. See {@link noteSchema}. */
+	notes: z.array(noteSchema).default([]),
+	/**
 	 * How `create` bootstraps the base app with the framework's own CLI. Absent on templates that only
 	 * `init` supports; `create` refuses a template whose manifest declares no bootstrap.
 	 */
@@ -147,9 +187,23 @@ const manifestSchema = z.object({
 export type TemplateManifest = z.infer<typeof manifestSchema>
 export type TemplateConventions = z.infer<typeof conventionsSchema>
 export type TemplateBootstrap = z.infer<typeof bootstrapSchema>
+export type TemplateDetect = z.infer<typeof detectSchema>
+export type TemplateRequires = z.infer<typeof requiresSchema>
+export type TemplateNote = z.infer<typeof noteSchema>
 export type FileEntry = z.infer<typeof fileSchema>
 export type PatchEntry = z.infer<typeof patchSchema>
 export type Change = z.infer<typeof changeSchema>
+
+/**
+ * Render a manual-step note for display, substituting the `{{importPrefix}}` token with the project's
+ * source-root import prefix — the configured alias (normalized to a trailing slash, e.g. `@/`) when one
+ * is set, else the relative `../`. Reproduces the old `alias ? "@/…" : "../…"` behavior exactly, so a
+ * template's note reads correctly whichever import style the project uses.
+ */
+export function renderNote(note: TemplateNote, alias: string): { title: string; body: string } {
+	const importPrefix = alias ? `${alias.replace(/\/+$/, "")}/` : "../"
+	return { title: note.title, body: note.body.replaceAll("{{importPrefix}}", importPrefix) }
+}
 
 /** Role → the human label init uses in prompts and logs. */
 const ROLE_LABELS: Record<string, string> = {
@@ -163,6 +217,9 @@ const ROLE_LABELS: Record<string, string> = {
 	"root-layout": "root layout",
 	"home-page": "home page",
 	"blog-post": "blog post page",
+	"head-component": "SEO head component",
+	"framework-config": "framework config",
+	tsconfig: "TypeScript config",
 	styles: "global styles",
 }
 

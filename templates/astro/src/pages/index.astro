@@ -1,0 +1,27 @@
+---
+import Layout from "@/layouts/Layout.astro"
+import { client } from "@/lib/kizlo/server"
+
+const { items } = await client.posts.list.call({ query: { perPage: 10 } })
+---
+
+<Layout title="Kizlo + Astro">
+	<main style="max-width: 640px; margin: 0 auto; padding: 4rem 1.5rem;">
+		<h1>Kizlo + Astro</h1>
+		{
+			items.length === 0 ? (
+				<p>
+					No published posts yet. Add one in WordPress (run <code>npx kizlo dev</code> for a local stack), then refresh.
+				</p>
+			) : (
+				<ul>
+					{items.map((post) => (
+						<li>
+							<a href={`/blog/${post.slug}`}>{post.title ?? "Untitled"}</a>
+						</li>
+					))}
+				</ul>
+			)
+		}
+	</main>
+</Layout>

@@ -8,7 +8,7 @@ import type { GeoAdapter } from "./adapters/geo"
 import type { Environment, LoggerAdapter } from "./adapters/logger"
 import { Context, type ProcedureContext } from "./context"
 import { ROUTER_MAP, type RouterMap } from "./router"
-import { RPC_PROTOCOL_HEADER } from "./shared/constants"
+import { CONTRACT_GENERATION_ENV, RPC_PROTOCOL_HEADER } from "./shared/constants"
 import { KizloError } from "./shared/error"
 import type { AnyExtension, InferExtensionRouter } from "./shared/extension"
 import type { InvocationScope } from "./shared/procedure"
@@ -191,15 +191,27 @@ export interface CreateKizloOptions<TExts extends readonly AnyExtension[] = []> 
 	wordpress?: { credentials?: Partial<WordPressCredentials> }
 }
 
-function requireEnv(name: string): string {
-	const value = process.env[name]?.trim()
-	if (!value) throw new KizloError("MISSING_ENV_VARIABLE", { message: `Please define ${name} in your .env file.` })
-	return value
+/**
+ * Reads a single environment variable by name. Defaults to `process.env`, but framework factories can
+ * pass their own source: the Astro factory hands in `getSecret` from `astro:env/server`, so `.env` is
+ * resolved the Astro-native way (through the dev server / adapter) rather than through `process.env`.
+ */
+export type EnvReader = (name: string) => string | undefined
+
+const processEnvReader: EnvReader = (name) => process.env[name]
+
+function requireEnv(name: string, env: EnvReader): string {
+	const value = env(name)?.trim()
+	if (value) return value
+	// Contract generation imports this module only for the router's exported shape, which no env
+	// value affects. A placeholder lets the import complete; a real request never runs in this mode.
+	if (process.env[CONTRACT_GENERATION_ENV]) return `__kizlo_contract_generation__:${name}`
+	throw new KizloError("MISSING_ENV_VARIABLE", { message: `Please define ${name} in your .env file.` })
 }
 
-function resolveConnect(option?: KizloConnect): KizloConnect {
+function resolveConnect(option: KizloConnect | undefined, env: EnvReader): KizloConnect {
 	if (option) return option
-	const value = process.env.KIZLO_CONNECT?.trim()
+	const value = env("KIZLO_CONNECT")?.trim()
 	if (!value) return "remote"
 	if (value !== "local" && value !== "remote") {
 		throw new KizloError("INVALID_ENV_VARIABLE", {
@@ -227,22 +239,23 @@ function connectEnvKeys(connect: KizloConnect) {
  */
 export function resolveKizloConfig<TExts extends readonly AnyExtension[]>(
 	options: CreateKizloOptions<TExts> | undefined,
-	defaults: { baseUrlEnvKey: string; adapters?: ServiceAdapters },
+	defaults: { baseUrlEnvKey: string; adapters?: ServiceAdapters; env?: EnvReader },
 ): KizloConfig<TExts> {
+	const env = defaults.env ?? processEnvReader
 	const credentials = options?.wordpress?.credentials
-	const connect = resolveConnect(options?.connect)
+	const connect = resolveConnect(options?.connect, env)
 	const keys = connectEnvKeys(connect)
 	return {
-		baseUrl: options?.baseUrl ?? requireEnv(defaults.baseUrlEnvKey),
-		siteSecret: options?.siteSecret ?? requireEnv(keys.siteSecret),
+		baseUrl: options?.baseUrl ?? requireEnv(defaults.baseUrlEnvKey, env),
+		siteSecret: options?.siteSecret ?? requireEnv(keys.siteSecret, env),
 		environment: options?.environment ?? (process.env.NODE_ENV as Environment) ?? "development",
 		connect,
 		extensions: options?.extensions,
 		adapters: { ...defaults.adapters, ...options?.adapters },
 		credentials: {
-			url: credentials?.url ?? requireEnv(keys.url),
-			username: credentials?.username ?? requireEnv(keys.username),
-			password: credentials?.password ?? requireEnv(keys.password),
+			url: credentials?.url ?? requireEnv(keys.url, env),
+			username: credentials?.username ?? requireEnv(keys.username, env),
+			password: credentials?.password ?? requireEnv(keys.password, env),
 		},
 	}
 }

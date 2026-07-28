@@ -2,8 +2,16 @@ import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
-import { detectPreset, getPreset, type InitContext, PRESETS, type Preset, type ScaffoldFile } from "../presets"
-import { type FetchedTemplate, fetchTemplate } from "../presets/source"
+import type { ScaffoldFile } from "../presets"
+import {
+	DEFAULT_REGISTRY,
+	detectTemplates,
+	fetchRegistry,
+	isSingleTemplate,
+	listTemplates,
+	resolveRegistry,
+	type TemplateEntry,
+} from "../presets/source"
 import {
 	adaptFile,
 	changesFor,
@@ -12,6 +20,7 @@ import {
 	minCliError,
 	patchEntries,
 	readManifest,
+	renderNote,
 	resolveDependencies,
 	type TemplateManifest,
 } from "../presets/template"
@@ -76,17 +85,30 @@ function sameOrigin(a: string, b: string): boolean {
 	}
 }
 
-function detectAppDir(cwd: string, hasSrcDir: boolean): string {
+/**
+ * The framework's route directory in the user's project. When a template is present its
+ * `conventions.appDir` (e.g. `src/app` for Next, `src/pages` for Astro) is the expected layout; we
+ * probe that path and its no-`src` variant so a project that keeps routes at the top level is still
+ * found, falling back to whether the project has a `src` dir. With no known template appDir we keep the
+ * App Router default.
+ */
+function detectAppDir(cwd: string, hasSrcDir: boolean, templateAppDir?: string): string {
+	if (templateAppDir) {
+		const withoutSrc = templateAppDir.replace(/^src\//, "")
+		if (fs.existsSync(path.join(cwd, templateAppDir))) return templateAppDir
+		if (fs.existsSync(path.join(cwd, withoutSrc))) return withoutSrc
+		return hasSrcDir ? templateAppDir : withoutSrc
+	}
 	if (fs.existsSync(path.join(cwd, "src", "app"))) return "src/app"
 	if (fs.existsSync(path.join(cwd, "app"))) return "app"
 	return hasSrcDir ? "src/app" : "app"
 }
 
-async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset }): Promise<Setup> {
+async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; apiPath?: string }): Promise<Setup> {
 	const dir = orCancel(await p.text({ message: "Kizlo directory", initialValue: defaultDir(ctx.hasSrcDir), validate: validate(dirPath) }))
 
 	let alias = ""
-	if (ctx.preset.apiPath) {
+	if (ctx.apiPath) {
 		const serverDir = path.join(dir.replace(/^\.\//, "").replace(/\/+$/, ""), "server")
 		const detected = detectImportAlias(ctx.cwd, serverDir)?.prefix
 		const answer = orCancel(
@@ -99,7 +121,7 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; pres
 		alias = answer.trim()
 	}
 
-	const conn = await collectConnectionInteractively(ctx.preset)
+	const conn = await collectConnectionInteractively(ctx.apiPath)
 
 	return { ...conn, dir, alias }
 }
@@ -109,13 +131,13 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; pres
  * environment are used; missing ones are left empty for the user to fill in
  * later. Never fails — `--yes` always scaffolds a fillable project.
  */
-function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; preset: Preset; envKeys: EnvKeys }): Setup {
+function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; apiPath?: string; envKeys: EnvKeys }): Setup {
 	const conn = collectConnectionFromEnv(ctx.envKeys)
 	const dir = defaultDir(ctx.hasSrcDir)
 	return {
 		...conn,
 		dir,
-		alias: ctx.preset.apiPath ? aliasWithSlash(detectImportAlias(ctx.cwd, path.join(dir, "server"))?.prefix) : "",
+		alias: ctx.apiPath ? aliasWithSlash(detectImportAlias(ctx.cwd, path.join(dir, "server"))?.prefix) : "",
 	}
 }
 
@@ -167,13 +189,14 @@ export const init = defineCommand({
 			description: "Overwrite existing .env values and server entry without asking",
 			default: false,
 		},
-		preset: {
-			type: "string",
-			description: `Force a setup preset (${PRESETS.map((preset) => preset.id).join(", ")})`,
-		},
 		alias: {
 			type: "string",
 			description: "Import alias prefix for generated imports (e.g. @); blank for relative",
+		},
+		source: {
+			type: "string",
+			description:
+				"Where to wire from — a local dir or giget source, either a registry of templates or a single template (default: Kizlo's GitHub templates)",
 		},
 	},
 	async run({ args }) {
@@ -209,55 +232,92 @@ export const init = defineCommand({
 		const hasKizlo = Boolean(pkg.dependencies?.kizlo) || Boolean(pkg.devDependencies?.kizlo)
 		const hasSrcDir = fs.existsSync(path.join(cwd, "src"))
 
-		const initCtx: InitContext = { cwd, pkg, pm, hasSrcDir }
+		if (yes) loadEnvFiles(cwd)
 
-		let preset: Preset
-		if (args.preset) {
-			const chosen = getPreset(String(args.preset))
-			if (!chosen) {
-				p.cancel(`Unknown preset "${args.preset}". Available: ${PRESETS.map((pr) => pr.id).join(", ")}`)
-				process.exit(1)
-			}
-			preset = chosen
-		} else {
-			preset = detectPreset(initCtx)
-			if (preset.id !== "base") p.log.success(`${preset.label} detected`)
-		}
-
-		if (preset.template === "nextjs" && !fs.existsSync(path.join(cwd, "app")) && !fs.existsSync(path.join(cwd, "src/app"))) {
-			p.cancel("Kizlo needs the Next.js App Router — no `app` or `src/app` directory found. The Pages Router isn't supported.")
+		const registry = resolveRegistry(args.source ? String(args.source) : undefined)
+		let fetchedRegistry: Awaited<ReturnType<typeof fetchRegistry>>
+		try {
+			fetchedRegistry = await fetchRegistry(registry)
+		} catch (error) {
+			p.cancel(error instanceof Error ? error.message : String(error))
 			process.exit(1)
 		}
 
-		if (yes) loadEnvFiles(cwd)
-
-		// Fetch the template up front (when the preset has one) so the manifest drives the whole run: the
-		// `minCli` compatibility floor is checked before any work, and the `.env` key names plus pinned
-		// dependencies come from it. Kept alive until the wiring files are written, then cleaned up.
-		let manifest: TemplateManifest | undefined
-		let fetched: FetchedTemplate | undefined
-		if (preset.template) {
-			fetched = await fetchTemplate(preset.template)
-			manifest = readManifest(fetched.dir)
-			const minErr = minCliError(manifest)
-			if (minErr) {
-				fetched.cleanup()
-				p.cancel(minErr)
-				process.exit(1)
-			}
+		const cancelFrom = (message: string): never => {
+			fetchedRegistry.cleanup()
+			p.cancel(message)
+			process.exit(1)
 		}
-		const envKeys = resolveEnvKeys(preset, manifest)
 
 		try {
-			const setup = yes ? collectFromEnv({ cwd, hasSrcDir, preset, envKeys }) : await collectInteractively({ cwd, hasSrcDir, preset })
+			const entries = listTemplates(fetchedRegistry.dir)
+			if (entries.length === 0) cancelFrom(`No templates found in ${registry.source}. Each template needs a template.json.`)
+
+			const projectDeps = { ...pkg.dependencies, ...pkg.devDependencies }
+			let entry: TemplateEntry | undefined
+
+			if (isSingleTemplate(fetchedRegistry.dir)) {
+				const [only] = entries
+				entry = only
+				if (only && detectTemplates(entries, projectDeps).length === 0) {
+					p.log.warn(`The ${only.label} template doesn't match this project's dependencies — detection may be off on either side.`)
+					const proceed = yes || orCancel(await p.confirm({ message: `Apply ${only.label} anyway?`, initialValue: false }))
+					if (!proceed) cancelFrom("Cancelled. Point --source at a template that matches this project, or omit it to auto-detect.")
+				}
+			} else {
+				const matched = detectTemplates(entries, projectDeps)
+				const [first] = matched
+				if (matched.length === 0) {
+					p.log.warn(
+						`Couldn't find a template matching this project's framework ${registry.source === DEFAULT_REGISTRY ? "in Kizlo templates" : `at your provided source ${registry.source}`}.`,
+					)
+					if (yes) cancelFrom(`Re-run with --source pointing at the single template you want, or run without --yes to pick one manually.`)
+					const proceed = orCancel(await p.confirm({ message: "Pick a template manually anyway?", initialValue: false }))
+					if (!proceed) cancelFrom("Cancelled.")
+					const id = orCancel(
+						await p.select({
+							message: "Choose a template to apply",
+							options: entries.map((e) => ({ value: e.id, label: e.label })),
+						}),
+					)
+					entry = entries.find((e) => e.id === id)
+				} else if (matched.length === 1 && first) {
+					entry = first
+					p.log.success(`${first.label} detected`)
+				} else {
+					const ids = matched.map((e) => e.id).join(", ")
+					if (yes)
+						cancelFrom(`Multiple templates match this project (${ids}). Re-run with --source pointing at the single template you want.`)
+					const id = orCancel(
+						await p.select({
+							message: "Multiple templates match this project — pick one",
+							options: matched.map((e) => ({ value: e.id, label: e.label })),
+						}),
+					)
+					entry = matched.find((e) => e.id === id)
+				}
+			}
+
+			if (!entry) return cancelFrom("No template selected.")
+
+			const manifest = readManifest(entry.dir)
+			const minErr = minCliError(manifest)
+			if (minErr) cancelFrom(minErr)
+			if (manifest.requires && !manifest.requires.anyDir.some((rel) => fs.existsSync(path.join(cwd, rel)))) {
+				cancelFrom(manifest.requires.message)
+			}
+
+			const apiPath = manifest.apiPath
+			const envKeys = resolveEnvKeys(manifest)
+
+			const setup = yes ? collectFromEnv({ cwd, hasSrcDir, apiPath, envKeys }) : await collectInteractively({ cwd, hasSrcDir, apiPath })
 			if (args.alias !== undefined) setup.alias = String(args.alias).trim()
 			setup.alias = aliasWithSlash(setup.alias)
 
-			const includeExamples =
-				manifest && fetched ? (yes ? true : orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))) : false
+			const includeExamples = yes ? true : orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
 
 			if (!hasKizlo) {
-				const spec = `kizlo@${manifest?.dependencies?.kizlo ?? `^${getVersion()}`}`
+				const spec = `kizlo@${manifest.dependencies?.kizlo ?? `^${getVersion()}`}`
 				const s = p.spinner()
 				s.start(`Installing kizlo with ${pm}`)
 				const ok = await runCommandAsync(addDependencyArgs(pm, spec), cwd, "ignore")
@@ -265,30 +325,27 @@ export const init = defineCommand({
 				if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, spec).join(" ")}`)
 			}
 
-			if (preset.apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, preset.apiPath)
+			if (apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, apiPath)
 
 			await setupLocalWordPress(cwd, setup)
 
-			await writeEnv(cwd, envKeys, setup, { force, yes, exampleTemplate: fetched ? readEnvExample(fetched.dir) : undefined })
+			await writeEnv(cwd, envKeys, setup, { force, yes, exampleTemplate: readEnvExample(entry.dir) })
 			await syncRemote(setup)
 
 			const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
 			const serverDirRel = path.join(dirRel, "server")
 			const clientUrl = setup.siteUrl && !sameOrigin(setup.siteUrl, setup.baseUrl) ? setup.baseUrl : undefined
 
-			const scaffold = buildScaffoldContext(cwd, { dirRel, appDir: detectAppDir(cwd, hasSrcDir), alias: setup.alias, clientUrl })
+			const appDir = detectAppDir(cwd, hasSrcDir, manifest.conventions.appDir)
+			const scaffold = buildScaffoldContext(cwd, { dirRel, appDir, alias: setup.alias, clientUrl })
 
 			const files: ScaffoldFile[] = [
 				{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.mode === "local") },
 			]
 
-			if (manifest && fetched) {
-				await alignDependencies(cwd, pm, pkg, manifest)
-				for (const entry of fileEntries(changesFor(manifest, "init", { includeExamples })))
-					files.push(adaptFile(fetched.dir, entry, manifest.conventions, scaffold))
-			} else if (preset.scaffolds) {
-				files.push(...preset.scaffolds(scaffold))
-			}
+			await alignDependencies(cwd, pm, pkg, manifest)
+			for (const fileEntry of fileEntries(changesFor(manifest, "init", { includeExamples })))
+				files.push(adaptFile(entry.dir, fileEntry, manifest.conventions, scaffold))
 
 			const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
 			for (const file of files) scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force, yes }) })
@@ -300,7 +357,12 @@ export const init = defineCommand({
 
 			for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
 
-			if (manifest) applyLayoutPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
+			applyLayoutPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
+
+			for (const note of manifest.notes ?? []) {
+				const rendered = renderNote(note, setup.alias)
+				p.note(rendered.body, rendered.title)
+			}
 
 			if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)
 
@@ -308,7 +370,7 @@ export const init = defineCommand({
 
 			p.outro("Kizlo is ready 🎉")
 		} finally {
-			fetched?.cleanup()
+			fetchedRegistry.cleanup()
 		}
 	},
 })

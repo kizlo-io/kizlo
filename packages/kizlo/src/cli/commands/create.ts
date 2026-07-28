@@ -3,8 +3,7 @@ import path from "node:path"
 import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
 import z from "zod/v4"
-import { getPreset } from "../presets"
-import { fetchTemplate } from "../presets/source"
+import { fetchRegistry, listTemplates, resolveRegistry, type TemplateEntry } from "../presets/source"
 import {
 	adaptFile,
 	changesFor,
@@ -47,26 +46,39 @@ import {
 	writeGeneratedContract,
 } from "./_wiring"
 
-/**
- * The templates `create` can scaffold from. Each id is both the `templates/<id>` folder and the
- * preset that drives its WordPress setup and framework bootstrap.
- */
-const TEMPLATES = ["nextjs"] as const
-type TemplateId = (typeof TEMPLATES)[number]
-
-function isTemplate(value: string): value is TemplateId {
-	return (TEMPLATES as readonly string[]).includes(value)
+/** The final path segment of a project name — the app folder itself; everything before it is where it lands. */
+function folderSegment(value: string): string {
+	const segments = value.replace(/\\/g, "/").split("/").filter(Boolean)
+	return segments[segments.length - 1] ?? ""
 }
 
+/**
+ * Tidy the entered name/path for both the target dir and the display: trim, drop a leading `./`, and drop a
+ * trailing separator, so `cd`, the spinner, and the warning lines read as `templates/my-app`, not
+ * `./templates/my-app/`. Preserves `../` and absolute paths (only a leading `./` is redundant).
+ */
+export function normalizeProjectName(value: string): string {
+	return value
+		.trim()
+		.replace(/^\.\/+/, "")
+		.replace(/[/\\]+$/, "")
+}
+
+/**
+ * A project name may be a bare folder (`my-app`) or a path to scaffold somewhere other than the current
+ * dir — relative (`apps/my-app`, `../my-app`) or absolute (`/srv/my-app`). Only the last segment is the
+ * app folder, so that's what's validated as a name; the parent dirs (which may not exist yet) are created
+ * by the framework's own CLI. `.`/`..` as the final segment, or a name with no real segment, is rejected.
+ */
 const projectNameSchema = z
 	.string()
 	.trim()
 	.min(1, "Required")
-	.refine(
-		(value) => !value.startsWith(".") && !value.includes("/") && !value.includes("\\"),
-		"Enter a folder name (letters, numbers, dashes)",
-	)
-const projectName = validate(projectNameSchema)
+	.refine((value) => {
+		const base = folderSegment(value)
+		return base.length > 0 && base !== "." && base !== ".." && /^[A-Za-z0-9._-]+$/.test(base)
+	}, "The app folder (last path segment) can only contain letters, numbers, dots, and dashes")
+export const projectName = validate(projectNameSchema)
 
 /** Package managers `create` can wire the getting-started steps for, in display order. */
 const PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn", "bun"]
@@ -84,9 +96,18 @@ function recordDependencies(dir: string, manifest: TemplateManifest): void {
 		devDependencies?: Record<string, string>
 	}
 	const { dependencies, devDependencies } = resolveDependencies(manifest)
-	pkg.dependencies = { ...pkg.dependencies, ...dependencies }
-	if (Object.keys(devDependencies).length) pkg.devDependencies = { ...pkg.devDependencies, ...devDependencies }
+	pkg.dependencies = sortDependencies({ ...pkg.dependencies, ...dependencies })
+	if (Object.keys(devDependencies).length) pkg.devDependencies = sortDependencies({ ...pkg.devDependencies, ...devDependencies })
 	fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`)
+}
+
+/**
+ * Alphabetize a dependency map by package name. The framework CLI writes its deps sorted, but merging
+ * Kizlo's pins on top appends them out of order — sherif flags unsorted dependency keys, so re-sort the
+ * whole map before writing.
+ */
+function sortDependencies(deps: Record<string, string>): Record<string, string> {
+	return Object.fromEntries(Object.entries(deps).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
 }
 
 /**
@@ -148,12 +169,17 @@ export const create = defineCommand({
 		template: {
 			type: "positional",
 			required: false,
-			description: `Template to scaffold from (${TEMPLATES.join(", ")})`,
+			description: "Template to scaffold from (discovered from the registry)",
 		},
 		name: {
 			type: "positional",
 			required: false,
-			description: "Project folder to create",
+			description: "Project folder to create — a bare name or a path (e.g. apps/my-app, ../my-app, /srv/my-app)",
+		},
+		source: {
+			type: "string",
+			description:
+				"Where to scaffold from — a local dir or giget source, either a registry of templates or a single template (default: Kizlo's GitHub templates)",
 		},
 	},
 	async run({ args }) {
@@ -161,45 +187,67 @@ export const create = defineCommand({
 
 		p.intro(`Let's create a new Kizlo application`)
 
-		const requested = args.template as string | undefined
-		let template: TemplateId
-		if (requested) {
-			if (!isTemplate(requested)) {
-				p.cancel(`Unknown template "${requested}". Available: ${TEMPLATES.join(", ")}`)
-				process.exit(1)
-			}
-			template = requested
-		} else {
-			template = orCancel(
-				await p.select({
-					message: "Template",
-					options: TEMPLATES.map((id) => ({ value: id, label: id })),
-				}),
-			)
+		const registry = resolveRegistry(args.source ? String(args.source) : undefined)
+		let fetchedRegistry: Awaited<ReturnType<typeof fetchRegistry>>
+		try {
+			fetchedRegistry = await fetchRegistry(registry)
+		} catch (error) {
+			p.cancel(error instanceof Error ? error.message : String(error))
+			process.exit(1)
 		}
 
-		const name = args.name
-			? String(args.name).trim()
-			: orCancel(await p.text({ message: "Project name", placeholder: "my-app", validate: projectName }))
-		if (!args.name) {
-			const check = projectName(name)
-			if (check) {
-				p.cancel(check)
-				process.exit(1)
-			}
+		const templates = listTemplates(fetchedRegistry.dir)
+		if (templates.length === 0) {
+			fetchedRegistry.cleanup()
+			p.cancel(`No templates found in the registry (${registry.source}). Each template needs a template.json.`)
+			process.exit(1)
+		}
+
+		const cancelFrom = (message: string): never => {
+			fetchedRegistry.cleanup()
+			p.cancel(message)
+			process.exit(1)
+		}
+
+		const requested = args.template as string | undefined
+		let selected: TemplateEntry | undefined
+		if (requested) {
+			selected = templates.find((entry) => entry.id === requested)
+			if (!selected) return cancelFrom(`Unknown template "${requested}". Available: ${templates.map((entry) => entry.id).join(", ")}`)
+		} else {
+			const id = orCancel(
+				await p.select({
+					message: "Template",
+					options: templates.map((entry) => ({ value: entry.id, label: entry.label })),
+				}),
+			)
+			selected = templates.find((entry) => entry.id === id)
+		}
+		if (!selected) return cancelFrom("No template selected.")
+		const template = selected.id
+		const templateDir = selected.dir
+		const label = selected.label
+		const fail = cancelFrom
+
+		// Read the manifest up front so its data (`apiPath`, `minCli`, `bootstrap`) drives the run — the CLI
+		// hardcodes nothing framework-specific; every template, including a community one, works the same.
+		const manifest = readManifest(templateDir)
+		const minErr = minCliError(manifest)
+		if (minErr) return fail(minErr)
+
+		const name = normalizeProjectName(
+			args.name
+				? String(args.name)
+				: orCancel(await p.text({ message: "What is your project named?", placeholder: "my-app", validate: projectName })),
+		)
+		const invalid = projectName(name)
+		if (invalid) {
+			p.cancel(invalid)
+			process.exit(1)
 		}
 
 		const dir = path.resolve(cwd, name)
-		if (fs.existsSync(dir)) {
-			p.cancel(`${name} already exists — pick a different name or remove it.`)
-			process.exit(1)
-		}
-
-		const preset = getPreset(template)
-		if (!preset) {
-			p.cancel(`No preset for template "${template}".`)
-			process.exit(1)
-		}
+		if (fs.existsSync(dir)) return cancelFrom(`${name} already exists — pick a different name or remove it.`)
 
 		const installed = availablePackageManagers(PACKAGE_MANAGERS)
 		const invokingPm = detectInvokingPackageManager()
@@ -212,46 +260,31 @@ export const create = defineCommand({
 			}),
 		)
 
-		const conn = await collectConnectionInteractively(preset, { baseUrl: `http://localhost:${await pickAppPort()}` })
-		if (preset.apiPath && conn.baseUrl) conn.baseUrl = withApiPath(conn.baseUrl, preset.apiPath)
+		const conn = await collectConnectionInteractively(manifest.apiPath, { baseUrl: `http://localhost:${await pickAppPort()}` })
+		if (manifest.apiPath && conn.baseUrl) conn.baseUrl = withApiPath(conn.baseUrl, manifest.apiPath)
 
 		const includeExamples = orCancel(await p.confirm({ message: "Add examples?", initialValue: true }))
 
-		const fetched = await fetchTemplate(template)
-		const fail = (message: string): never => {
-			fetched.cleanup()
-			p.cancel(message)
-			process.exit(1)
-		}
-
-		const manifest = readManifest(fetched.dir)
-		const minErr = minCliError(manifest)
-		if (minErr) fail(minErr)
-
 		const bootstrap = bootstrapArgs(manifest, pm, name)
-		if (!bootstrap) {
-			fetched.cleanup()
-			p.cancel(`Template "${template}" can't be scaffolded — its manifest declares no framework bootstrap.`)
-			process.exit(1)
-		}
+		if (!bootstrap) return fail(`Template "${template}" can't be scaffolded — its manifest declares no framework bootstrap.`)
 
 		const s = p.spinner()
-		s.start(`Creating ${name} with the ${preset.label} CLI`)
+		s.start(`Creating ${name} with the ${label} CLI`)
 		const scaffold = runCommandCaptured(bootstrap, cwd)
-		s.stop(scaffold.ok ? `Created ${name} with the ${preset.label} CLI` : `${preset.label} setup failed`)
+		s.stop(scaffold.ok ? `Created ${name} with the ${label} CLI` : `${label} setup failed`)
 		if (!scaffold.ok) {
 			if (scaffold.output) p.log.error(scaffold.output)
-			fail(`${preset.label} setup failed — see the output above and try again.`)
+			fail(`${label} setup failed — see the output above and try again.`)
 		}
 
-		const exampleTemplate = readEnvExample(fetched.dir)
+		const exampleTemplate = readEnvExample(templateDir)
 
 		try {
-			await applyManifestWiring(dir, fetched.dir, manifest, { includeExamples, localDev: conn.mode === "local" })
+			await applyManifestWiring(dir, templateDir, manifest, { includeExamples, localDev: conn.mode === "local" })
 		} catch (error) {
 			fail(error instanceof Error ? error.message : String(error))
 		}
-		fetched.cleanup()
+		fetchedRegistry.cleanup()
 
 		let depsInstalled = false
 		if (orCancel(await p.confirm({ message: "Install dependencies now?", initialValue: true }))) {
@@ -263,7 +296,7 @@ export const create = defineCommand({
 		}
 
 		await setupLocalWordPress(dir, conn)
-		await writeEnv(dir, resolveEnvKeys(preset, manifest), conn, { force: true, yes: false, exampleTemplate })
+		await writeEnv(dir, resolveEnvKeys(manifest), conn, { force: true, yes: false, exampleTemplate })
 		await syncRemote(conn)
 
 		p.note([`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ``, ...nextStepsLines(conn)].join("\n"), "Next steps")
