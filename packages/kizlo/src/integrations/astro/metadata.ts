@@ -4,6 +4,8 @@ import { WEB_MANIFEST_ROUTE } from "../../brand/manifest"
 import type { S2SClient } from "../../kizlo"
 import type { SeoHead } from "../../seo/schema"
 
+export { renderJsonLd } from "../../seo/utils"
+
 /** A `<meta name="theme-color">` entry, optionally scoped to a `prefers-color-scheme` media query. */
 export interface ThemeColor {
 	media?: string

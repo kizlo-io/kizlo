@@ -3,19 +3,19 @@ import type { PageHead } from "kizlo/astro/server"
 import BaseHead from "@/components/BaseHead.astro"
 
 interface Props {
-	/** Per-page SEO for WordPress-backed pages. */
+	/** Per-page SEO for WordPress-backed pages, mapped via `resolvePageHead`. */
 	head?: PageHead
-	/** Fallback title for pages without a WordPress SEO head. */
-	title?: string
+	/** Serialized JSON-LD for WordPress-backed pages, from `renderJsonLd`. */
+	jsonLd?: string | null
 }
 
-const { head, title } = Astro.props
+const { head, jsonLd } = Astro.props
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead head={head} title={title} />
+		<BaseHead head={head} jsonLd={jsonLd} />
 	</head>
 	<body>
 		<slot />

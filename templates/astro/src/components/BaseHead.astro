@@ -3,23 +3,23 @@ import { type PageHead, resolveRootHead } from "kizlo/astro/server"
 import { client } from "@/lib/kizlo/server"
 
 interface Props {
-	/** Per-page SEO, mapped from a post's SEO head via `resolvePageHead`. */
+	/** Per-page SEO, mapped from a WordPress SEO head via `resolvePageHead`. */
 	head?: PageHead
-	/** Fallback title for pages not backed by a WordPress post (e.g. the home page). */
-	title?: string
+	/** Serialized JSON-LD structured data, from `renderJsonLd`; rendered as a `<script>` tag. */
+	jsonLd?: string | null
 }
 
-const { head, title } = Astro.props
+const { head, jsonLd } = Astro.props
 
 // Brand + site settings (icons, web manifest, theme color) come from WordPress — edit them in
 // wp-admin, not here.
 const root = await resolveRootHead(client)
-const documentTitle = head?.title ?? title
 ---
 
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-{documentTitle ? <title>{documentTitle}</title> : null}
+{head?.title ? <title>{head.title}</title> : null}
+{jsonLd ? <script type="application/ld+json" is:inline set:html={jsonLd} /> : null}
 
 <link rel="manifest" href={root.manifest} />
 {root.icons.icon.map((icon) => <link rel="icon" href={icon.url} type={icon.type} sizes={icon.sizes} />)}
