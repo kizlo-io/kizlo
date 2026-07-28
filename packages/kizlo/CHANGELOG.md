@@ -1,5 +1,15 @@
 # kizlo
 
+## 0.12.0
+
+### Minor Changes
+
+- [#88](https://github.com/kizlo-io/kizlo/pull/88) [`6587fe6`](https://github.com/kizlo-io/kizlo/commit/6587fe6d1ec320751d9d67341d73a26707ad83ca) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add Astro support: a `kizlo/astro` integration, an Astro starter template, and `kizlo create astro`.
+
+- [#88](https://github.com/kizlo-io/kizlo/pull/88) [`6587fe6`](https://github.com/kizlo-io/kizlo/commit/6587fe6d1ec320751d9d67341d73a26707ad83ca) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo create` now discovers templates from a registry, accepts a custom `--source`, and takes a path as the project name.
+
+- [#88](https://github.com/kizlo-io/kizlo/pull/88) [`6587fe6`](https://github.com/kizlo-io/kizlo/commit/6587fe6d1ec320751d9d67341d73a26707ad83ca) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo generate` and `kizlo dev` now skip contract generation when no server `dir` is configured, instead of assuming `lib/kizlo`.
+
 ## 0.11.0
 
 ### Minor Changes
