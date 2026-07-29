@@ -1,4 +1,5 @@
-- [x] Fix missing minCli version in nextjs template.
-- [] Add Astro template.
+- [x] Nextjs template home missing the metadata and jsonld.
+- [x] Prefix docker name with kizlo for better filtration in kizlo.
 - [] Add Tanstack start template.
 - [] Add React + Vite template.
+- [] Cookie version conflict: kizlo (and @orpc/server) import `serialize`/`parse` from `cookie@^1`, but the ecosystem hoists `cookie@2` (renamed to `stringifyCookie`/`parseCookie`). Harmless while kizlo stays external, but crashes at runtime (`does not provide an export named 'serialize'`) whenever kizlo gets bundled (workspace symlink locally, or a bundling deploy adapter). Fix via a repo-level pnpm `cookie` override or aligning kizlo + @orpc on one major.

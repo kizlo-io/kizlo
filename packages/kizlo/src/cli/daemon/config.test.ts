@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { resolveStackName } from "./config"
+import { resolveStackName, stackProject } from "./config"
 
 describe("resolveStackName", () => {
 	let dir: string
@@ -44,5 +44,12 @@ describe("resolveStackName", () => {
 				.toLowerCase()
 				.replace(/[^a-z0-9_-]/g, ""),
 		)
+	})
+})
+
+describe("stackProject", () => {
+	test("prefixes with kizlo- and suffixes with the kind", () => {
+		expect(stackProject("my-app", "dev")).toBe("kizlo-my-app-dev")
+		expect(stackProject("my-app", "test")).toBe("kizlo-my-app-test")
 	})
 })

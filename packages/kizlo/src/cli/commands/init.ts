@@ -50,7 +50,7 @@ import {
 	writeEnv,
 } from "./_setup"
 import {
-	applyLayoutPatches,
+	applyProjectPatches,
 	buildScaffoldContext,
 	kizloConfigTemplate,
 	reportScaffold,
@@ -357,7 +357,7 @@ export const init = defineCommand({
 
 			for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
 
-			applyLayoutPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
+			applyProjectPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
 
 			for (const note of manifest.notes ?? []) {
 				const rendered = renderNote(note, setup.alias)

@@ -51,6 +51,18 @@ function toNextIcon(icon: IconDescriptor): IconDescriptor {
 	return { url: icon.url, type: icon.type, sizes: icon.sizes }
 }
 
+/**
+ * Home `generateMetadata` for `app/page.tsx`, resolving the homepage SEO head from WordPress.
+ * A factory (rather than the inline call the `create` template shows) so `init` can wire it into
+ * an existing home page as a single `export const generateMetadata = createHomeMetadata(client)`.
+ */
+export function createHomeMetadata(client: S2SClient<[]>) {
+	return async function generateMetadata(): Promise<Metadata> {
+		const { head } = await client.seo.homepage.call()
+		return createPageMetadata(head)
+	}
+}
+
 export function createPageMetadata(head: SeoHead): Metadata {
 	return {
 		title: { absolute: head.title },

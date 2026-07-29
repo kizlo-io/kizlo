@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { ScaffoldContext } from "../presets"
 import { changesFor, patchEntries, readManifest } from "../presets/template"
-import { applyLayoutPatches } from "./_wiring"
+import { applyProjectPatches } from "./_wiring"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const templateDir = path.resolve(here, "../../../../../templates/nextjs")
@@ -16,7 +16,7 @@ const templateDir = path.resolve(here, "../../../../../templates/nextjs")
  * this asserts it resolves to the project's real `app/layout.tsx` via the `appDir` token swap and lands
  * there, never creating a stray `src/` path.
  */
-describe("applyLayoutPatches on a no-src project", () => {
+describe("applyProjectPatches on a no-src project", () => {
 	const manifest = readManifest(templateDir)
 	let dir: string
 
@@ -57,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 `,
 		)
 
-		applyLayoutPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold())
+		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold())
 
 		// No stray src/ path is created — the patch resolves to the project's real app dir.
 		expect(fs.existsSync(path.join(dir, "src/app/layout.tsx"))).toBe(false)
@@ -69,5 +69,45 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		expect(layout).toContain("generateViewport")
 		// The {{serverImport}} token resolved to the project's specifier.
 		expect(layout).toContain('from "@/lib/kizlo/server"')
+	})
+
+	it("wires homepage SEO metadata into the user's own home page", () => {
+		fs.mkdirSync(path.join(dir, "app"), { recursive: true })
+		fs.writeFileSync(
+			path.join(dir, "app/page.tsx"),
+			`export default function Home() {
+	return <main>Hello</main>
+}
+`,
+		)
+
+		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold())
+
+		const home = fs.readFileSync(path.join(dir, "app/page.tsx"), "utf8")
+		expect(home).toContain("createHomeMetadata")
+		expect(home).toContain("generateMetadata")
+		expect(home).toContain('from "@/lib/kizlo/server"')
+	})
+
+	it("never scans for a stand-in: an absent home page is left for the user, not wired elsewhere", () => {
+		// Only a layout exists — the home page is missing from its declared path.
+		fs.mkdirSync(path.join(dir, "app"), { recursive: true })
+		fs.writeFileSync(
+			path.join(dir, "app/layout.tsx"),
+			`export default function RootLayout({ children }: { children: React.ReactNode }) {
+	return (
+		<html lang="en">
+			<body>{children}</body>
+		</html>
+	)
+}
+`,
+		)
+
+		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold())
+
+		// No stray page.tsx is created, and the layout is never used as a stand-in for the home page.
+		expect(fs.existsSync(path.join(dir, "app/page.tsx"))).toBe(false)
+		expect(fs.readFileSync(path.join(dir, "app/layout.tsx"), "utf8")).not.toContain("createHomeMetadata")
 	})
 })

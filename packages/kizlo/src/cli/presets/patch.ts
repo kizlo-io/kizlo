@@ -75,6 +75,46 @@ function sameExpr(a: string, b: string): boolean {
 	return a.replace(/\s+/g, "") === b.replace(/\s+/g, "")
 }
 
+/** Minimal structural view of the Babel AST magicast exposes via `$ast` — enough to reorder the body. */
+interface AstNode {
+	type: string
+	[key: string]: unknown
+}
+
+/** The module's statement list (magicast's `$ast` is a `Program`, but tolerate a `File` wrapper too). */
+function programBody(mod: ReturnType<typeof parseModule>): AstNode[] {
+	const ast = mod.$ast as AstNode
+	const program = (ast.type === "File" ? (ast.program as AstNode) : ast) as AstNode & { body: AstNode[] }
+	return program.body
+}
+
+/** The name of an `export const <name> = …` statement, or undefined for any other node. */
+function exportedConstName(node: AstNode): string | undefined {
+	if (node.type !== "ExportNamedDeclaration") return undefined
+	const decl = node.declaration as AstNode | null | undefined
+	if (decl?.type !== "VariableDeclaration") return undefined
+	const id = (decl.declarations as AstNode[] | undefined)?.[0]?.id as AstNode | undefined
+	return id?.type === "Identifier" ? (id.name as string) : undefined
+}
+
+/**
+ * Move the just-inserted exports (named in `names`) up to sit right after the import block, so wiring
+ * lands near the top of the file instead of appended below the component. magicast always appends a new
+ * export to the end of the program; this re-splices those nodes in after the last import, preserving
+ * their declared order. Exports we replaced in place are untouched — only nodes we added this run move.
+ */
+function hoistExportsAfterImports(mod: ReturnType<typeof parseModule>, names: readonly string[]): void {
+	const body = programBody(mod)
+	const moved: AstNode[] = []
+	for (const name of names) {
+		const idx = body.findIndex((node) => exportedConstName(node) === name)
+		if (idx !== -1) moved.push(body.splice(idx, 1)[0] as AstNode)
+	}
+	let insertAt = 0
+	for (let i = 0; i < body.length; i++) if (body[i]?.type === "ImportDeclaration") insertAt = i + 1
+	body.splice(insertAt, 0, ...moved)
+}
+
 /**
  * Merge a resolved patch into `source` by parsing it with magicast (a real TS/JS/JSX parser via Babel,
  * so declarations are bounded exactly — never by a text heuristic). Missing imports are added; each
@@ -84,6 +124,10 @@ function sameExpr(a: string, b: string): boolean {
  * stale copy of ours, and those values come from WordPress (edited in wp-admin, not the file), so the
  * export body isn't meant to be hand-customized. Idempotent: an export already equal to ours is left
  * untouched, so re-running never churns the file.
+ *
+ * magicast appends new exports to the end of the file; we then hoist the ones we added this run up to
+ * sit right after the import block, so wiring reads near the top instead of below the component. Exports
+ * replaced in place keep their position — only nodes newly inserted this run move.
  *
  * Throws if the target cannot be parsed or regenerated. Callers must NOT swallow that — a file we
  * can't parse is one we must not guess at, so wiring falls back to a printed instruction instead.
@@ -95,6 +139,8 @@ export function applyPatchToSource(
 	const format = detectCodeFormat(source)
 	const mod = parseModule(source, { sourceFileName: "layout.tsx", ...format })
 	const changes: PatchChanges = { addedImports: [], addedExports: [], replacedExports: [] }
+	// Exports magicast appended to the end this run (new or counterpart-swapped) — hoisted after imports below.
+	const insertedNames: string[] = []
 
 	for (const imp of patch.imports) {
 		for (const name of imp.names) {
@@ -119,12 +165,16 @@ export function applyPatchToSource(
 			delete mod.exports[counterpart]
 			mod.exports[exp.name] = builders.raw(exp.value)
 			changes.replacedExports.push(exp.name)
+			insertedNames.push(exp.name)
 			continue
 		}
 
 		mod.exports[exp.name] = builders.raw(exp.value)
 		changes.addedExports.push(exp.name)
+		insertedNames.push(exp.name)
 	}
+
+	if (insertedNames.length) hoistExportsAfterImports(mod, insertedNames)
 
 	return { text: generateCode(mod, { format }).code, changes }
 }

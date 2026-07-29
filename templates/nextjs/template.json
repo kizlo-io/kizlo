@@ -112,6 +112,28 @@
 					"value": "createRootViewport(client)"
 				}
 			]
+		},
+		{
+			"kind": "patch",
+			"role": "home-page",
+			"label": "home page",
+			"path": "src/app/page.tsx",
+			"imports": [
+				{
+					"module": "kizlo/nextjs/server",
+					"names": ["createHomeMetadata"]
+				},
+				{
+					"module": "{{serverImport}}",
+					"names": ["client"]
+				}
+			],
+			"exports": [
+				{
+					"name": "generateMetadata",
+					"value": "createHomeMetadata(client)"
+				}
+			]
 		}
 	],
 	"env": {

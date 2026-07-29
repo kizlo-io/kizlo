@@ -137,12 +137,21 @@ export function resolveStackName(configDir: string, configName?: string): string
 	return sanitizeProjectName(pkgName ?? path.basename(configDir))
 }
 
+/**
+ * Compose project id for a stack: `kizlo-<name>-<kind>`. The leading `kizlo-` is what
+ * lets every stack this tool starts be filtered together in Docker (e.g.
+ * `docker ps --filter name=kizlo-`), independent of each project's own name.
+ */
+export function stackProject(baseName: string, kind: "dev" | "test"): string {
+	return `kizlo-${baseName}-${kind}`
+}
+
 export interface ResolvedTestConfig {
 	/** Directory holding `kizlo.config.*` (the credentials artifact root). */
 	configDir: string
 	/** True when `test.local` is set — `kizlo test` boots local WordPress before running the suite. */
 	local: boolean
-	/** Docker compose project name (`<name>-test`). */
+	/** Docker compose project name (`kizlo-<name>-test`). */
 	project: string
 	/** Resolved credentials artifact path under `configDir`. */
 	credentialsPath: string
@@ -168,7 +177,7 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 	return {
 		configDir,
 		local: Boolean(test.local),
-		project: `${resolveStackName(configDir, fileConfig?.name)}-test`,
+		project: stackProject(resolveStackName(configDir, fileConfig?.name), "test"),
 		command: test.command,
 		port: test.port ?? DEFAULT_TEST_PORT,
 		portExplicit: test.port !== undefined,
@@ -181,7 +190,7 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 export interface ResolvedDevConfig {
 	/** Directory holding `kizlo.config.*`. */
 	configDir: string
-	/** Docker compose project name (`<name>-dev`). */
+	/** Docker compose project name (`kizlo-<name>-dev`). */
 	project: string
 	port: number
 	/** True when `dev.port` was set in config — the user owns collisions, so don't auto-step. */
@@ -233,7 +242,7 @@ export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> 
 
 	return {
 		configDir,
-		project: `${resolveStackName(configDir, fileConfig?.name)}-dev`,
+		project: stackProject(resolveStackName(configDir, fileConfig?.name), "dev"),
 		port: dev.port ?? DEFAULT_DEV_PORT,
 		portExplicit: dev.port !== undefined,
 		dbPort: dev.dbPort ?? DEFAULT_DEV_DB_PORT,

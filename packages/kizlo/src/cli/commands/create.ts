@@ -38,7 +38,7 @@ import {
 	writeEnv,
 } from "./_setup"
 import {
-	applyLayoutPatches,
+	applyProjectPatches,
 	buildScaffoldContext,
 	kizloConfigTemplate,
 	reportScaffold,
@@ -130,7 +130,7 @@ export function bootstrapArgs(manifest: TemplateManifest, pm: PackageManager, na
  * `kizlo` dependency, write `kizlo.config.ts`, scaffold the manifest's files (core wiring from `base`
  * and `create` always, the `example`-flagged demo pages only when `includeExamples`),
  * seed the generated contract, and ignore `.env` and the `.kizlo/` working dir (which holds the local WordPress install). On a fresh app Kizlo owns the layout, so `create`
- * writes it whole (already SEO-wired) rather than patching — `applyLayoutPatches` runs over `create`'s
+ * writes it whole (already SEO-wired) rather than patching — `applyProjectPatches` runs over `create`'s
  * patches, which are none today. The target directory layout comes straight from the manifest's
  * conventions, which the bootstrap flags are chosen to match, so files land where they expect. Fresh
  * files are written with `force`, silently replacing the framework defaults.
@@ -157,7 +157,7 @@ export async function applyManifestWiring(
 	ensureGitignored(dir, ".env")
 	ensureGitignored(dir, ".kizlo/")
 
-	applyLayoutPatches(dir, patchEntries(changes), manifest.conventions, scaffold)
+	applyProjectPatches(dir, patchEntries(changes), manifest.conventions, scaffold)
 }
 
 export const create = defineCommand({

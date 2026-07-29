@@ -73,7 +73,7 @@ export interface KizloGlobalConfig {
 	alias?: string
 
 	/**
-	 * Base name for the local Docker stacks (`<name>-dev`, `<name>-test`). Defaults
+	 * Base name for the local Docker stacks (`kizlo-<name>-dev`, `kizlo-<name>-test`). Defaults
 	 * to the sanitized `package.json` name, falling back to the config dir basename.
 	 */
 	name?: string

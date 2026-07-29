@@ -1,19 +1,7 @@
-import fs from "node:fs"
-import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import {
-	adaptFile,
-	changesFor,
-	fileEntries,
-	findRootLayout,
-	isExample,
-	patchEntries,
-	readManifest,
-	renderNote,
-	resolvePatch,
-} from "./template"
+import { describe, expect, it } from "vitest"
+import { adaptFile, changesFor, fileEntries, isExample, patchEntries, readManifest, renderNote, resolvePatch } from "./template"
 import type { ScaffoldContext } from "./types"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -38,7 +26,7 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 	it("splits a resolved change set into files and patches", () => {
 		const changes = changesFor(manifest, "init")
 		expect(fileEntries(changes).map((e) => e.role)).toContain("api-route")
-		expect(patchEntries(changes).map((e) => e.role)).toEqual(["root-layout"])
+		expect(patchEntries(changes).map((e) => e.role)).toEqual(["root-layout", "home-page"])
 	})
 
 	it("drops examples by default and includes them only on opt-in", () => {
@@ -107,43 +95,5 @@ describe("renderNote", () => {
 
 	it("passes the title through unchanged", () => {
 		expect(renderNote(note, "@/").title).toBe("Add the head component")
-	})
-})
-
-describe("findRootLayout", () => {
-	let tmp: string
-	beforeEach(() => {
-		tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-layout-"))
-	})
-	afterEach(() => fs.rmSync(tmp, { recursive: true, force: true }))
-
-	const write = (rel: string, body: string) => {
-		const abs = path.join(tmp, rel)
-		fs.mkdirSync(path.dirname(abs), { recursive: true })
-		fs.writeFileSync(abs, body)
-		return abs
-	}
-	const htmlLayout = "export default function L(){return <html><body/></html>}\n"
-
-	it("uses the hint path when it renders <html>", () => {
-		const abs = write("app/layout.tsx", htmlLayout)
-		expect(findRootLayout(tmp, "app", "app/layout.tsx")).toBe(abs)
-	})
-
-	it("scans for the single <html> layout when the hint misses", () => {
-		write("app/layout.tsx", "export default function L(){return <div/>}\n") // not a root layout
-		const abs = write("app/(marketing)/layout.tsx", htmlLayout)
-		expect(findRootLayout(tmp, "app", "app/layout.tsx")).toBe(abs)
-	})
-
-	it("returns undefined on zero matches", () => {
-		write("app/layout.tsx", "export default function L(){return <div/>}\n")
-		expect(findRootLayout(tmp, "app", "app/layout.tsx")).toBeUndefined()
-	})
-
-	it("returns undefined when more than one layout renders <html>", () => {
-		write("app/(a)/layout.tsx", htmlLayout)
-		write("app/(b)/layout.tsx", htmlLayout)
-		expect(findRootLayout(tmp, "app", "app/layout.tsx")).toBeUndefined()
 	})
 })

@@ -45,6 +45,23 @@ describe("applyPatchToSource", () => {
 		expect(text).toContain('<html lang="en">')
 	})
 
+	it("hoists added exports above the component, right after the imports", () => {
+		const src = `import Link from "next/link"
+import { client } from "@/lib/kizlo/server"
+
+export default function RootLayout({ children }) {
+	return <html lang="en"><body>{children}</body></html>
+}
+`
+		const { text } = apply(src)
+		const lastImportIdx = text.lastIndexOf("import ")
+		const metaIdx = text.indexOf("export const generateMetadata")
+		const componentIdx = text.indexOf("export default function RootLayout")
+		// Wiring lands in the middle — after the imports, before the component — not appended at the end.
+		expect(lastImportIdx).toBeLessThan(metaIdx)
+		expect(metaIdx).toBeLessThan(componentIdx)
+	})
+
 	it("is a no-op when the file is already wired", () => {
 		const once = apply(FRESH)
 		const twice = apply(once.text)

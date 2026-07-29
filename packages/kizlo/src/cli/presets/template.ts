@@ -3,7 +3,6 @@ import path from "node:path"
 import z from "zod/v4"
 import { type EnvKeys, getVersion } from "../utils"
 import type { ResolvedPatch } from "./patch"
-import { resolvePatchTargetPath } from "./patch"
 import type { ScaffoldContext, ScaffoldFile } from "./types"
 
 /**
@@ -352,42 +351,4 @@ export function resolvePatch(entry: PatchEntry, conventions: TemplateConventions
 		names: imp.names,
 	}))
 	return { label: entry.label, relPath, imports, exports: entry.exports }
-}
-
-const LAYOUT_FILE = /^layout\.(tsx|jsx|ts|js|mjs|cjs)$/
-/** A root layout is the one that renders `<html>` — its identity, not its path. */
-const RENDERS_HTML = /<html[\s/>]/
-
-/** Every file under `dir`, recursively (files only). Missing dir yields nothing. */
-function walk(dir: string): string[] {
-	if (!fs.existsSync(dir)) return []
-	const out: string[] = []
-	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-		const full = path.join(dir, entry.name)
-		if (entry.isDirectory()) out.push(...walk(full))
-		else out.push(full)
-	}
-	return out
-}
-
-/**
- * Resolve the root layout by identity, not path. Try the manifest hint first; if it exists and
- * renders `<html>`, use it. Otherwise scan the App Router directory for a layout that renders `<html>`
- * and use it only when there is exactly one. On zero, many, or an unreadable file, return undefined so
- * the caller prints the wiring for the user to place. Never guesses.
- */
-export function findRootLayout(cwd: string, appDir: string, hintRelPath: string): string | undefined {
-	const hint = resolvePatchTargetPath(cwd, hintRelPath)
-	if (hint && rendersHtml(hint)) return hint
-
-	const matches = walk(path.join(cwd, appDir)).filter((file) => LAYOUT_FILE.test(path.basename(file)) && rendersHtml(file))
-	return matches.length === 1 ? matches[0] : undefined
-}
-
-function rendersHtml(file: string): boolean {
-	try {
-		return RENDERS_HTML.test(fs.readFileSync(file, "utf8"))
-	} catch {
-		return false
-	}
 }
