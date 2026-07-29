@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.13.1
+
+### Patch Changes
+
+- [#95](https://github.com/kizlo-io/kizlo/pull/95) [`3cdcd80`](https://github.com/kizlo-io/kizlo/commit/3cdcd8010617696f047f958efa77cdb091d878aa) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Detect the package manager reliably across all lockfiles and monorepo workspaces so init and test pick the right one
+
 ## 0.13.0
 
 ### Minor Changes
