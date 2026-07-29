@@ -221,45 +221,47 @@ describe("detectPackageManager", () => {
 		["pnpm-lock.yaml", "pnpm"],
 		["yarn.lock", "yarn"],
 		["bun.lock", "bun"],
-	])("detects %s -> %s", (lockfile, expected) => {
+		["package-lock.json", "npm"],
+		["npm-shrinkwrap.json", "npm"],
+	])("detects %s -> %s", async (lockfile, expected) => {
 		fs.writeFileSync(path.join(dir, lockfile), "")
-		expect(detectPackageManager(dir)).toBe(expected)
+		expect(await detectPackageManager(dir)).toBe(expected)
 	})
 
-	test("reads the corepack packageManager field when there's no lockfile", () => {
+	test("reads the corepack packageManager field when there's no lockfile", async () => {
 		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ packageManager: "pnpm@9.0.0" }))
-		expect(detectPackageManager(dir)).toBe("pnpm")
+		expect(await detectPackageManager(dir)).toBe("pnpm")
 	})
 
-	test("a lockfile beats the packageManager field", () => {
-		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ packageManager: "npm@10.0.0" }))
+	test("a lockfile alone settles the manager", async () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({}))
 		fs.writeFileSync(path.join(dir, "pnpm-lock.yaml"), "")
-		expect(detectPackageManager(dir)).toBe("pnpm")
+		expect(await detectPackageManager(dir)).toBe("pnpm")
 	})
 
-	test("ignores an unsupported packageManager field", () => {
+	test("ignores an unsupported packageManager field", async () => {
 		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ packageManager: "cnpm@1.0.0" }))
-		expect(detectPackageManager(dir)).toBeUndefined()
+		expect(await detectPackageManager(dir)).toBeUndefined()
 	})
 
-	test("does not guess from the invoking manager", () => {
+	test("does not guess from the invoking manager", async () => {
 		process.env.npm_config_user_agent = "pnpm/9.0.0 npm/? node/v20.0.0 darwin arm64"
-		expect(detectPackageManager(dir)).toBeUndefined()
+		expect(await detectPackageManager(dir)).toBeUndefined()
 	})
 
-	test("returns undefined without any project signal", () => {
-		expect(detectPackageManager(dir)).toBeUndefined()
+	test("returns undefined without any project signal", async () => {
+		expect(await detectPackageManager(dir)).toBeUndefined()
 	})
 })
 
 describe("persistPackageManagerField", () => {
-	test("stamps the field so a later detect settles on it", () => {
+	test("stamps the field so a later detect settles on it", async () => {
 		const pkgPath = path.join(dir, "package.json")
 		fs.writeFileSync(pkgPath, JSON.stringify({ name: "app" }))
 		persistPackageManagerField(dir, "npm")
 		const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { packageManager?: string }
 		expect(pkg.packageManager?.startsWith("npm")).toBe(true)
-		expect(detectPackageManager(dir)).toBe("npm")
+		expect(await detectPackageManager(dir)).toBe("npm")
 	})
 
 	test("leaves an existing field untouched", () => {

@@ -163,6 +163,9 @@ importers:
       magicast:
         specifier: ^0.5.3
         version: 0.5.3
+      package-manager-detector:
+        specifier: ^1.8.0
+        version: 1.8.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3

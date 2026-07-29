@@ -261,7 +261,7 @@ export const init = defineCommand({
 		// A lockfile or corepack field settles the manager outright; otherwise we don't guess (the invoking
 		// manager lies under `npx`) — interactively we ask, and `--yes` opts out of prompts so it takes the
 		// invoking manager as its best non-interactive guess, falling back to npm.
-		const detectedPm = detectPackageManager(cwd)
+		const detectedPm = await detectPackageManager(cwd)
 		const pm =
 			detectedPm ??
 			(yes

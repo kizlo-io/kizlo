@@ -4,6 +4,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import * as p from "@clack/prompts"
 import type { ArgsDef, CommandContext } from "citty"
+import { detect } from "package-manager-detector/detect"
 import { log } from "./daemon/logger"
 import { PortInUseError, resolveHostPort } from "./wp/ports"
 
@@ -149,34 +150,19 @@ export function getVersion(): string {
 }
 
 /**
- * The manager a project pins via package.json's corepack `packageManager` field (e.g. `"pnpm@9.0.0"`
- * → `pnpm`). Declared intent that's present *before* the first install, so it's a reliable signal on a
- * freshly bootstrapped project that has no lockfile yet. Undefined when the field is absent, unparseable,
- * or names an unsupported manager.
- */
-function packageManagerField(cwd: string): PackageManager | undefined {
-	try {
-		const pkg = JSON.parse(fs.readFileSync(path.join(cwd, "package.json"), "utf8")) as { packageManager?: string }
-		const name = pkg.packageManager?.split("@")[0]
-		return name === "pnpm" || name === "yarn" || name === "bun" || name === "npm" ? name : undefined
-	} catch {
-		return undefined
-	}
-}
-
-/**
  * The package manager a project uses, from evidence in the project itself — a lockfile (the strongest
- * signal, it reflects an actual install), else package.json's corepack `packageManager` field (declared
- * intent, present before the first install). Returns `undefined` when neither is present rather than
- * guessing: the invoking manager is unreliable (`npx` reports `npm` whatever the user really uses), and a
- * missing lockfile can just mean a freshly bootstrapped project in a monorepo. Callers that can't proceed
- * without one should ask the user (see `selectPackageManager`) instead of defaulting.
+ * signal, it reflects an actual install), else package.json's corepack `packageManager` /
+ * `devEngines.packageManager` field (declared intent, present before the first install). Delegates to
+ * `package-manager-detector` so every lockfile variant is recognised (npm's `package-lock.json` and
+ * `npm-shrinkwrap.json` included). `stopDir` pins the search to `cwd` so a subfolder never inherits a
+ * monorepo parent's manager. Returns `undefined` when neither signal is present, or the manager isn't one
+ * Kizlo supports, rather than guessing: the invoking manager is unreliable (`npx` reports `npm` whatever
+ * the user really uses), and a missing lockfile can just mean a freshly bootstrapped project. Callers that
+ * can't proceed without one should ask the user (see `selectPackageManager`) instead of defaulting.
  */
-export function detectPackageManager(cwd: string): PackageManager | undefined {
-	if (fs.existsSync(path.join(cwd, "pnpm-lock.yaml"))) return "pnpm"
-	if (fs.existsSync(path.join(cwd, "yarn.lock"))) return "yarn"
-	if (fs.existsSync(path.join(cwd, "bun.lockb")) || fs.existsSync(path.join(cwd, "bun.lock"))) return "bun"
-	return packageManagerField(cwd)
+export async function detectPackageManager(cwd: string): Promise<PackageManager | undefined> {
+	const name = (await detect({ cwd, stopDir: cwd }))?.name
+	return name === "pnpm" || name === "yarn" || name === "bun" || name === "npm" ? name : undefined
 }
 
 /** The installed version of `pm`, from `pm --version` (e.g. `"9.0.0"`). Undefined when it can't be run. */

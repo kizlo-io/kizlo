@@ -110,6 +110,7 @@
 		"giget": "^3.0.0",
 		"jiti": "^2.7.0",
 		"magicast": "^0.5.3",
+		"package-manager-detector": "^1.8.0",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
