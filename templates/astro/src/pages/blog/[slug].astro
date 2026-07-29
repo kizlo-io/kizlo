@@ -10,10 +10,7 @@ if (!data) {
 	return new Response(null, { status: 404 })
 }
 
-// SEO tags (title, canonical, Open Graph, Twitter) mapped straight from the post's SEO head, so you
-// never hand-write meta tags. Missing/unpublished posts fall back to the layout defaults.
 const head = data.seo ? resolvePageHead(data.seo.head) : undefined
-// JSON-LD structured data (schema.org) from the post's SEO, rendered as a <script> tag in <head>.
 const jsonLd = data.seo ? renderJsonLd(data.seo.schema) : undefined
 ---
 

@@ -5,7 +5,7 @@ import * as p from "@clack/prompts"
 import { isPluginVersionSupported, pluginUpdateMessage } from "@kizlo/shared"
 import getPort, { portNumbers } from "get-port"
 import z from "zod/v4"
-import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName } from "../daemon/config"
+import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName, stackProject } from "../daemon/config"
 import type { TemplateManifest } from "../presets/template"
 import {
 	DEFAULT_ENV_KEYS,
@@ -260,7 +260,7 @@ export function collectConnectionFromEnv(envKeys: EnvKeys): Connection {
 function devConfigFor(cwd: string): ResolvedDevConfig {
 	return {
 		configDir: cwd,
-		project: `${resolveStackName(cwd)}-dev`,
+		project: stackProject(resolveStackName(cwd), "dev"),
 		port: DEFAULT_DEV_PORT,
 		portExplicit: false,
 		dbPort: DEFAULT_DEV_DB_PORT,

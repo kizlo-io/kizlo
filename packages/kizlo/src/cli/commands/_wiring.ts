@@ -3,8 +3,8 @@ import path from "node:path"
 import * as p from "@clack/prompts"
 import { CONTRACT_BARREL } from "../daemon/generate"
 import type { ScaffoldContext, ScaffoldFile } from "../presets"
-import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode } from "../presets/patch"
-import { findRootLayout, type PatchEntry, resolvePatch, type TemplateConventions } from "../presets/template"
+import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode, resolvePatchTargetPath } from "../presets/patch"
+import { type PatchEntry, resolvePatch, type TemplateConventions } from "../presets/template"
 import { resolveModuleImport, writeFileIfAbsent } from "../utils"
 import { orCancel } from "./_setup"
 
@@ -85,13 +85,15 @@ export function writeGeneratedContract(cwd: string, serverDirRel: string): void 
 }
 
 /**
- * Merge Kizlo wiring into files the project already owns (the root layout's SEO exports). Never
- * aborts: the target is resolved by identity (the layout that renders `<html>`), and on any doubt —
- * not found, not parseable — the resolved payload is printed at the end with placement instructions
- * rather than written to a guessed-at file. A confident apply is an idempotent upsert: it replaces
- * our exports if present, adds them if not.
+ * Apply every patch a template declares, merging Kizlo wiring into files the project already owns
+ * (today: the root layout and home page SEO exports — but the loop is role-agnostic, so a new patch
+ * needs no change here). Never aborts: the target is the exact path the template declares (extension-
+ * probed so a JS project's `.js`/`.jsx` is found), and on any doubt — the file isn't at that path, or
+ * won't parse — the resolved payload is printed at the end with placement instructions rather than
+ * written to a guessed-at file. We never scan the tree to find a stand-in. A confident apply is an
+ * idempotent upsert: it replaces our exports if present, adds them if not.
  */
-export function applyLayoutPatches(
+export function applyProjectPatches(
 	cwd: string,
 	patches: readonly PatchEntry[],
 	conventions: TemplateConventions,
@@ -100,7 +102,7 @@ export function applyLayoutPatches(
 	const manualSteps: ResolvedPatch[] = []
 	for (const entry of patches) {
 		const resolved = resolvePatch(entry, conventions, scaffold)
-		const target = findRootLayout(cwd, scaffold.appDir, resolved.relPath)
+		const target = resolvePatchTargetPath(cwd, resolved.relPath)
 		if (!target) {
 			manualSteps.push(resolved)
 			p.log.info(`Couldn't find your ${resolved.label} to wire Kizlo into — see the code to add below`)
@@ -126,6 +128,6 @@ export function applyLayoutPatches(
 	}
 
 	for (const resolved of manualSteps) {
-		p.note(renderPatchCode(resolved), `Add these to your ${resolved.label} (the layout that renders <html>)`)
+		p.note(renderPatchCode(resolved), `Add these to your ${resolved.label} (${resolved.relPath})`)
 	}
 }
