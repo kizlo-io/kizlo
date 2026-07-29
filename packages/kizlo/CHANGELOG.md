@@ -1,5 +1,27 @@
 # kizlo
 
+## 0.13.0
+
+### Minor Changes
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a "Skip for now" option to the WordPress connection prompt, writing the connection keys to `.env` empty to fill in later.
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Offer to initialize a git repository when scaffolding a new project with `kizlo create`.
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo init` now asks which package manager to use when it can't detect one, and records the choice in package.json so later runs don't ask again.
+
+### Patch Changes
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Surface the build-scripts approval command (`pnpm approve-builds` / `bun pm trust`) as a next step when the package manager blocks install build scripts.
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo init` now prints the required Astro SSR output and adapter change as a manual step instead of failing to wire it.
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo init` now installs template-declared dependencies the project is missing, not just `kizlo`.
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - `kizlo init` now respects and persists your chosen import alias, and rewrites scaffolded template imports to match it.
+
+- [#93](https://github.com/kizlo-io/kizlo/pull/93) [`fa384b3`](https://github.com/kizlo-io/kizlo/commit/fa384b3cf9f8e379b3c982298162cdd2cdb18803) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Print copy-paste manual steps without a bordered box, so selecting the code no longer drags border characters into the clipboard.
+
 ## 0.12.1
 
 ### Patch Changes
