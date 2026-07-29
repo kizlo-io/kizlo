@@ -183,7 +183,7 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 		portExplicit: test.port !== undefined,
 		fixtures: test.fixtures ?? [],
 		credentialsPath: credentialsPath(cwd),
-		packageManager: test.packageManager ?? detectPackageManager(configDir),
+		packageManager: test.packageManager ?? detectPackageManager(configDir) ?? "npm",
 	}
 }
 

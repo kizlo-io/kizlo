@@ -39,8 +39,12 @@ export interface ResolvedPatch {
 	label: string
 	/** Hint target file relative to cwd, with `{{kizloDir}}` / `{{appDir}}` substituted. */
 	relPath: string
+	/** `apply` merges into the file (default); `note` always prints {@link ResolvedPatch.note} instead. */
+	mode: "apply" | "note"
 	imports: PatchImport[]
 	exports: PatchExport[]
+	/** Verbatim manual-step body printed in `note` mode; unused in `apply` mode. */
+	note?: string
 }
 
 export interface PatchChanges {
@@ -182,9 +186,11 @@ export function applyPatchToSource(
 /**
  * Render a resolved patch as source the user can paste in, for the printed fallback when the target
  * can't be resolved or parsed. The same declared payload the confident apply upserts, so what we tell
- * the user to add never drifts from what we would have written.
+ * the user to add never drifts from what we would have written. A `note`-mode patch carries its own
+ * verbatim body (its change isn't an import/`export const`), so that is printed as-is when present.
  */
-export function renderPatchCode(patch: Pick<ResolvedPatch, "imports" | "exports">): string {
+export function renderPatchCode(patch: Pick<ResolvedPatch, "imports" | "exports" | "note">): string {
+	if (patch.note) return patch.note.endsWith("\n") ? patch.note : `${patch.note}\n`
 	const imports = patch.imports.map((imp) => `import { ${imp.names.join(", ")} } from "${imp.module}"`)
 	const exports = patch.exports.map((exp) => `export const ${exp.name} = ${exp.value}`)
 	return `${[...imports, "", ...exports].join("\n")}\n`

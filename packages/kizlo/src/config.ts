@@ -67,8 +67,9 @@ export interface KizloGlobalConfig {
 	dir?: string
 
 	/**
-	 * Import alias prefix for generated imports (e.g. `@`). Detected from
-	 * tsconfig at init; omit (or empty) to use relative imports.
+	 * Import alias prefix for generated imports (e.g. `@`). Recorded by `kizlo init`
+	 * from your `--alias` flag or its prompt, so later runs reuse it instead of asking
+	 * again; an empty string (`""`) is the recorded choice to use relative imports.
 	 */
 	alias?: string
 

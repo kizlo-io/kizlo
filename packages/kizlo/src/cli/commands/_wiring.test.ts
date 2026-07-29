@@ -35,6 +35,7 @@ describe("applyProjectPatches on a no-src project", () => {
 			appDir: "app",
 			// Fixed so the assertion is stable regardless of tsconfig resolution.
 			serverImport: () => "@/lib/kizlo/server",
+			importFrom: (targetRel: string) => `@/${targetRel.replace(/^src\//, "")}`,
 		}
 	}
 
@@ -109,5 +110,47 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		// No stray page.tsx is created, and the layout is never used as a stand-in for the home page.
 		expect(fs.existsSync(path.join(dir, "app/page.tsx"))).toBe(false)
 		expect(fs.readFileSync(path.join(dir, "app/layout.tsx"), "utf8")).not.toContain("createHomeMetadata")
+	})
+})
+
+/**
+ * A `note`-mode patch (Astro's `output: "server"` + adapter, which lives inside `defineConfig(...)` and
+ * so can't be auto-merged) must never touch the target file — it is a printed manual step only. This
+ * guards that even when the target exists, `applyProjectPatches` leaves it byte-for-byte unchanged.
+ */
+describe("applyProjectPatches with a note-mode patch", () => {
+	const astroTemplateDir = path.resolve(here, "../../../../../templates/astro")
+	const manifest = readManifest(astroTemplateDir)
+	let dir: string
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-init-note-"))
+	})
+	afterEach(() => fs.rmSync(dir, { recursive: true, force: true }))
+
+	function scaffold(): ScaffoldContext {
+		return {
+			kizloDir: "src/lib/kizlo",
+			serverDirName: "server",
+			serverEntryPath: "src/lib/kizlo/server/index.ts",
+			clientPath: "src/lib/kizlo/client.ts",
+			appDir: "src/pages",
+			serverImport: () => "@/lib/kizlo/server",
+			importFrom: (targetRel: string) => `@/${targetRel.replace(/^src\//, "")}`,
+		}
+	}
+
+	it("leaves the user's astro.config.mjs untouched", () => {
+		const original = `import { defineConfig } from "astro/config"\n\nexport default defineConfig({})\n`
+		fs.writeFileSync(path.join(dir, "astro.config.mjs"), original)
+
+		const notePatches = patchEntries(changesFor(manifest, "init"))
+		// The astro template declares exactly one init patch, and it is note-mode.
+		expect(notePatches).toHaveLength(1)
+		expect(notePatches[0]?.mode).toBe("note")
+
+		applyProjectPatches(dir, notePatches, manifest.conventions, scaffold())
+
+		expect(fs.readFileSync(path.join(dir, "astro.config.mjs"), "utf8")).toBe(original)
 	})
 })

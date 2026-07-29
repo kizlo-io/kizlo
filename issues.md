@@ -1,3 +1,10 @@
-- [x] Cookie version conflict: kizlo (and @orpc/server) import `serialize`/`parse` from `cookie@^1`, but the ecosystem hoists `cookie@2` (renamed to `stringifyCookie`/`parseCookie`). Harmless while kizlo stays external, but crashes at runtime (`does not provide an export named 'serialize'`) whenever kizlo gets bundled (workspace symlink locally, or a bundling deploy adapter). Fix via a repo-level pnpm `cookie` override or aligning kizlo + @orpc on one major.
+- [x] add a explicit mode option to template patches to either log the patch or apply it.
+- [x] CLI kizlo init not installing the dependencies templates says to install, it adds them during create but ignoring in init.
+- [x] The template patch log should not be wrapped with a box, since coping it also copies the pipes and dashes that make the box layout in the terminal.
+- [x] When we couldn't detect the package manager we ask for it but we never fix why we couldn't for future detection, we can add the package manager field in package.json for them so future runs dont ask for it.
+- [x] kizlo init not respecting the project's/chosen import alias from cli prompt and fixing import alias for imports of files/patches.  
+- [x] add a skip option in WordPress connection prompt.
+- [x] If package manager fails to install the deps due to build scripts then show their command in next step block.
+- [x] Add a prompt for initializing the git.
 - [] Add React + Vite template.
 - [] Add Tanstack start template.

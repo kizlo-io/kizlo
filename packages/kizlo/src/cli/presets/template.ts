@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import z from "zod/v4"
-import { type EnvKeys, getVersion } from "../utils"
+import { type EnvKeys, getVersion, readTsconfigPaths } from "../utils"
 import type { ResolvedPatch } from "./patch"
 import type { ScaffoldContext, ScaffoldFile } from "./types"
 
@@ -35,7 +35,9 @@ import type { ScaffoldContext, ScaffoldFile } from "./types"
  *   overwrite policy.
  * - `patch` — a partial injection into a file the framework owns (the root layout's SEO exports):
  *   it adds or replaces individual modules (imports/exports) inside the file, never the whole file.
- *   Both commands try a confident apply, otherwise print the payload with placement instructions.
+ *   Both commands try a confident apply, otherwise print the payload with placement instructions. A
+ *   patch may instead set `mode: "note"` to always print its instructions rather than edit the file —
+ *   for a change too shaped-unlike an import/export to auto-merge (Astro's `defineConfig` output/adapter).
  */
 const conventionsSchema = z.object({
 	/** Kizlo home directory in the template, e.g. `src/lib/kizlo`. */
@@ -64,8 +66,23 @@ const patchSchema = z.object({
 	role: z.string(),
 	label: z.string(),
 	path: z.string(),
-	imports: z.array(z.object({ module: z.string(), names: z.array(z.string()) })),
-	exports: z.array(z.object({ name: z.string(), value: z.string() })),
+	/**
+	 * How the patch is applied — the explicit author's choice between merging into the file and just
+	 * telling the user what to change:
+	 *
+	 * - `apply` (default): merge the declared {@link patchSchema.shape.imports}/{@link patchSchema.shape.exports}
+	 *   into the file with magicast, printing the payload as a fallback only when the target can't be found
+	 *   or parsed. The existing behavior.
+	 * - `note`: never touch the file — always print {@link patchSchema.shape.note} as a manual step. For a
+	 *   change Kizlo can't safely auto-merge because it isn't an import/`export const` (e.g. Astro's
+	 *   `defineConfig({ output, adapter })`, which lives inside the default-export call argument). Anchored
+	 *   to a real target file + label, so the instruction reads against the file the user must edit.
+	 */
+	mode: z.enum(["apply", "note"]).default("apply"),
+	imports: z.array(z.object({ module: z.string(), names: z.array(z.string()) })).default([]),
+	exports: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
+	/** The manual-step body printed verbatim in `note` mode; ignored in `apply` mode. */
+	note: z.string().optional(),
 })
 
 const bootstrapSchema = z.object({
@@ -303,10 +320,43 @@ export function isExample(change: Change): boolean {
 	return change.kind === "file" && change.example === true
 }
 
-/** The specifier the template's files use to reach the server entry, e.g. `@/lib/kizlo/server`. */
-function serverImportSpecifier(conventions: TemplateConventions): string {
-	const withoutSrc = conventions.kizloDir.replace(/^src\//, "")
-	return `${conventions.alias.replace(/\/+$/, "")}/${withoutSrc}/server`
+/** Escape a string so its characters are matched literally inside a RegExp. */
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/**
+ * The directory the template's alias resolves to — the maintainer's own preference, read straight from
+ * the template's tsconfig `paths` (e.g. `@/* → ./src/*` yields `src`). This is the root stripped to turn
+ * an alias import back into a real template path before it's remapped to the project. Falls back to the
+ * `src`/root heuristic when the template declares no matching alias, staying consistent with the rest of
+ * the alias handling.
+ */
+function templateAliasBase(templateDir: string, conventions: TemplateConventions): string {
+	const alias = conventions.alias.replace(/\/+$/, "")
+	const mapping = readTsconfigPaths(templateDir)?.[`${alias}/*`]?.[0]
+	if (mapping) return mapping.replace(/^\.\//, "").replace(/\/\*$/, "").replace(/\/+$/, "")
+	return conventions.kizloDir.startsWith("src/") ? "src" : ""
+}
+
+/**
+ * Rewrite every template-alias import in a file to the project's chosen import style — the one place that
+ * translates the maintainer's import preference into the user's. A template writes its cross-file imports
+ * against its own alias (`@/layouts/Layout.astro`, `@/lib/kizlo/server`), rooted at the directory its
+ * tsconfig maps the alias to (`base`). On apply each such specifier is resolved back to the imported
+ * file's real location in the project (via {@link adaptTemplatePath}, so a relocated Kizlo dir is honored)
+ * and re-emitted through the project's alias — or a relative import when the user wants no alias at all.
+ * Only quoted specifiers that begin with the template alias are touched, so an unrelated string can't be
+ * corrupted. Subsumes the server-entry import: it is simply the alias import that lands in the Kizlo dir.
+ */
+function rewriteAliasImports(body: string, fromDir: string, base: string, conventions: TemplateConventions, ctx: ScaffoldContext): string {
+	const alias = conventions.alias.replace(/\/+$/, "")
+	if (!alias) return body
+	const pattern = new RegExp(`(["'])${escapeRegExp(alias)}/([^"']+)\\1`, "g")
+	return body.replace(pattern, (_match, quote: string, rest: string) => {
+		const targetRel = adaptTemplatePath(base ? `${base}/${rest}` : rest, conventions, ctx)
+		return `${quote}${ctx.importFrom(targetRel, fromDir)}${quote}`
+	})
 }
 
 /**
@@ -324,11 +374,11 @@ function adaptTemplatePath(relPath: string, conventions: TemplateConventions, ct
 
 /**
  * Turn a `file` manifest entry into the {@link ScaffoldFile} init writes: read the template's real
- * file, rewrite its path prefix to the project's directories, and swap the server-entry import
- * specifier for the one resolved at the file's new location (tsconfig alias or relative). The swap is
- * surgical — it replaces the exact specifier the template uses, not a loose directory substring — so
- * an unrelated occurrence can't be corrupted. This is the job the old build-time extractor did; it
- * moves to runtime and stays as precise.
+ * file, rewrite its path prefix to the project's directories, and retarget every template-alias import
+ * (the server entry plus any sibling like Astro's `@/layouts/Layout.astro`) to the specifier resolved
+ * at the file's new location — the project's alias or a relative import. Only the exact alias specifiers
+ * the template uses are rewritten, not a loose directory substring, so an unrelated occurrence can't be
+ * corrupted. This is the job the old build-time extractor did; it moves to runtime and stays as precise.
  */
 export function adaptFile(templateDir: string, entry: FileEntry, conventions: TemplateConventions, ctx: ScaffoldContext): ScaffoldFile {
 	const abs = path.join(templateDir, entry.path)
@@ -338,7 +388,7 @@ export function adaptFile(templateDir: string, entry: FileEntry, conventions: Te
 	const body = fs.readFileSync(abs, "utf8")
 	const relPath = adaptTemplatePath(entry.path, conventions, ctx)
 	const fromDir = path.posix.dirname(relPath)
-	const contents = body.split(serverImportSpecifier(conventions)).join(ctx.serverImport(fromDir))
+	const contents = rewriteAliasImports(body, fromDir, templateAliasBase(templateDir, conventions), conventions, ctx)
 	return { label: ROLE_LABELS[entry.role] ?? entry.role, relPath, contents }
 }
 
@@ -350,5 +400,5 @@ export function resolvePatch(entry: PatchEntry, conventions: TemplateConventions
 		module: imp.module.replaceAll("{{serverImport}}", ctx.serverImport(fromDir)),
 		names: imp.names,
 	}))
-	return { label: entry.label, relPath, imports, exports: entry.exports }
+	return { label: entry.label, relPath, mode: entry.mode, imports, exports: entry.exports, note: entry.note }
 }

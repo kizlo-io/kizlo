@@ -5,14 +5,16 @@ import { CONTRACT_BARREL } from "../daemon/generate"
 import type { ScaffoldContext, ScaffoldFile } from "../presets"
 import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode, resolvePatchTargetPath } from "../presets/patch"
 import { type PatchEntry, resolvePatch, type TemplateConventions } from "../presets/template"
-import { resolveModuleImport, writeFileIfAbsent } from "../utils"
+import { aliasWithSlash, resolveModuleImport, writeFileIfAbsent } from "../utils"
 import { orCancel } from "./_setup"
 
-/** The kizlo.config.ts a scaffolded project gets: the Kizlo directory, an optional import alias, and —
+/** The kizlo.config.ts a scaffolded project gets: the Kizlo directory, the import-alias preference, and —
  *  when local WordPress is chosen — `dev.local` + `test.local` so `kizlo dev` and `kizlo test` boot the
- *  fixed `.kizlo/local` install. */
+ *  fixed `.kizlo/local` install. The alias is always written — `""` for relative imports included — so it
+ *  records a made decision a later `kizlo init` reads back instead of prompting for it again. The alias
+ *  is written in its canonical `@/` form (never a bare `@`) so it reads like the imports it produces. */
 export function kizloConfigTemplate(dir: string, alias: string, localWordPress = false): string {
-	const aliasLine = alias ? `\n\talias: "${alias}",` : ""
+	const aliasLine = `\n\talias: "${aliasWithSlash(alias)}",`
 	const localLines = localWordPress ? `\n\tdev: { local: true },\n\ttest: { local: true },` : ""
 	return `import { defineConfig } from "kizlo/config"
 
@@ -25,21 +27,24 @@ export default defineConfig({
 /**
  * Build the {@link ScaffoldContext} that adapts a template's conventions (paths and imports) to a real
  * project. `dirRel` is the Kizlo home directory, `appDir` the App Router directory, and `alias` the
- * import-alias prefix (empty for relative imports). The server-entry import is resolved per calling
- * file so each scaffolded file references the server through the right specifier.
+ * import-alias prefix (empty for relative imports). Imports are resolved per calling file so each
+ * scaffolded file references its targets through the right specifier — `importFrom` for any project
+ * path (used to retarget every template-alias import), `serverImport` the server-entry shorthand.
  */
 export function buildScaffoldContext(
 	cwd: string,
 	{ dirRel, appDir, alias, clientUrl }: { dirRel: string; appDir: string; alias: string; clientUrl?: string },
 ): ScaffoldContext {
 	const serverDirRel = path.join(dirRel, "server")
+	const importFrom = (targetRel: string, fromDir: string) => resolveModuleImport(cwd, targetRel, fromDir, alias)
 	return {
 		kizloDir: dirRel,
 		serverDirName: path.basename(serverDirRel),
 		serverEntryPath: path.join(serverDirRel, "index.ts"),
 		clientPath: path.join(dirRel, "client.ts"),
 		appDir,
-		serverImport: (fromDir) => resolveModuleImport(cwd, serverDirRel, fromDir, alias),
+		serverImport: (fromDir) => importFrom(serverDirRel, fromDir),
+		importFrom,
 		clientUrl,
 	}
 }
@@ -102,6 +107,13 @@ export function applyProjectPatches(
 	const manualSteps: ResolvedPatch[] = []
 	for (const entry of patches) {
 		const resolved = resolvePatch(entry, conventions, scaffold)
+		// A `note`-mode patch is a change Kizlo can't safely auto-merge (e.g. Astro's defineConfig
+		// output/adapter): never read or write the file — always print the instruction at the end.
+		if (resolved.mode === "note") {
+			manualSteps.push(resolved)
+			p.log.info(`Update your ${resolved.label} to finish wiring Kizlo — see the change to make below`)
+			continue
+		}
 		const target = resolvePatchTargetPath(cwd, resolved.relPath)
 		if (!target) {
 			manualSteps.push(resolved)
@@ -128,6 +140,22 @@ export function applyProjectPatches(
 	}
 
 	for (const resolved of manualSteps) {
-		p.note(renderPatchCode(resolved), `Add these to your ${resolved.label} (${resolved.relPath})`)
+		const heading =
+			resolved.mode === "note"
+				? `Update your ${resolved.label} (${resolved.relPath})`
+				: `Add these to your ${resolved.label} (${resolved.relPath})`
+		printManualStep(heading, renderPatchCode(resolved))
 	}
+}
+
+/**
+ * Print a manual-step code block the user copies into a file. Deliberately avoids `p.note`: clack
+ * draws a `│`/`─` box around the body, so selecting the block in a terminal drags those border
+ * characters into the clipboard alongside the code. We print the heading through clack for the usual
+ * voice, then the code verbatim with no gutter so a terminal selection yields exactly the source.
+ */
+export function printManualStep(heading: string, code: string): void {
+	p.log.step(heading)
+	const body = code.endsWith("\n") ? code.slice(0, -1) : code
+	process.stdout.write(`\n${body}\n\n`)
 }
