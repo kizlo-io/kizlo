@@ -53,6 +53,29 @@ export function readTsconfigPaths(cwd: string): Record<string, string[]> | undef
 	return json.compilerOptions?.paths
 }
 
+/**
+ * The kizlo.config file names, in resolution order. Mirrors `CONFIG_FILES` in daemon/config — kept here
+ * to avoid an import cycle, since daemon/config already depends on this module.
+ */
+const KIZLO_CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
+
+/**
+ * The import alias a previous `kizlo init` recorded in kizlo.config — the persisted preference a re-run
+ * reuses so it never asks again. Returns the prefix (`""` for the deliberate relative-imports choice),
+ * or `undefined` when there's no config or it declares no `alias` at all (the choice was never made, so
+ * the caller must prompt or default). A light text scan of the generated file, so setup never has to
+ * import the TS config — or resolve `kizlo` — just to read one field back.
+ */
+export function readPersistedAlias(cwd: string): string | undefined {
+	for (const name of KIZLO_CONFIG_FILES) {
+		const file = path.join(cwd, name)
+		if (!fs.existsSync(file)) continue
+		const match = fs.readFileSync(file, "utf8").match(/\balias\s*:\s*["']([^"']*)["']/)
+		return match ? match[1] : undefined
+	}
+	return undefined
+}
+
 function relativeImport(targetRel: string, fromDirRel: string): string {
 	const rel = path.relative(fromDirRel, targetRel).split(path.sep).join("/")
 	return rel.startsWith(".") ? rel : `./${rel}`
@@ -77,6 +100,15 @@ export function detectImportAlias(cwd: string, targetRel: string): { prefix: str
 		}
 	}
 	return undefined
+}
+
+/**
+ * Normalize an alias prefix to the canonical `@/` form — the way an import alias is actually written and
+ * declared in tsconfig `paths` (`@/*`), so the persisted preference reads like the imports it produces.
+ * A trailing slash is enforced (`@` → `@/`); empty stays empty, the recorded "relative imports" choice.
+ */
+export function aliasWithSlash(alias: string | undefined): string {
+	return alias ? `${alias.replace(/\/+$/, "")}/` : ""
 }
 
 /**
@@ -116,11 +148,68 @@ export function getVersion(): string {
 	return pkg.version
 }
 
-export function detectPackageManager(cwd: string): PackageManager {
+/**
+ * The manager a project pins via package.json's corepack `packageManager` field (e.g. `"pnpm@9.0.0"`
+ * → `pnpm`). Declared intent that's present *before* the first install, so it's a reliable signal on a
+ * freshly bootstrapped project that has no lockfile yet. Undefined when the field is absent, unparseable,
+ * or names an unsupported manager.
+ */
+function packageManagerField(cwd: string): PackageManager | undefined {
+	try {
+		const pkg = JSON.parse(fs.readFileSync(path.join(cwd, "package.json"), "utf8")) as { packageManager?: string }
+		const name = pkg.packageManager?.split("@")[0]
+		return name === "pnpm" || name === "yarn" || name === "bun" || name === "npm" ? name : undefined
+	} catch {
+		return undefined
+	}
+}
+
+/**
+ * The package manager a project uses, from evidence in the project itself — a lockfile (the strongest
+ * signal, it reflects an actual install), else package.json's corepack `packageManager` field (declared
+ * intent, present before the first install). Returns `undefined` when neither is present rather than
+ * guessing: the invoking manager is unreliable (`npx` reports `npm` whatever the user really uses), and a
+ * missing lockfile can just mean a freshly bootstrapped project in a monorepo. Callers that can't proceed
+ * without one should ask the user (see `selectPackageManager`) instead of defaulting.
+ */
+export function detectPackageManager(cwd: string): PackageManager | undefined {
 	if (fs.existsSync(path.join(cwd, "pnpm-lock.yaml"))) return "pnpm"
 	if (fs.existsSync(path.join(cwd, "yarn.lock"))) return "yarn"
 	if (fs.existsSync(path.join(cwd, "bun.lockb")) || fs.existsSync(path.join(cwd, "bun.lock"))) return "bun"
-	return "npm"
+	return packageManagerField(cwd)
+}
+
+/** The installed version of `pm`, from `pm --version` (e.g. `"9.0.0"`). Undefined when it can't be run. */
+function packageManagerVersion(pm: PackageManager): string | undefined {
+	const result = spawnSync(pm, ["--version"], {
+		encoding: "utf8",
+		shell: process.platform === "win32",
+	})
+	if (result.error || result.status !== 0) return undefined
+	const version = result.stdout.trim()
+	return version.length > 0 ? version : undefined
+}
+
+/**
+ * Record `pm` as package.json's corepack `packageManager` field so a later `detectPackageManager` settles on
+ * it instead of asking again — the fix for a project that gave no signal and had to be prompted for. Stamps
+ * the installed version (`pm --version`) to keep the field corepack-valid, dropping it only when the version
+ * can't be read. Leaves an existing field untouched, preserves the file's indentation, and swallows any
+ * read/write failure: persisting the choice is a convenience, not worth failing the command over.
+ */
+export function persistPackageManagerField(cwd: string, pm: PackageManager): void {
+	const pkgPath = path.join(cwd, "package.json")
+	try {
+		const raw = fs.readFileSync(pkgPath, "utf8")
+		const pkg = JSON.parse(raw) as { packageManager?: string }
+		if (pkg.packageManager) return
+		const version = packageManagerVersion(pm)
+		pkg.packageManager = version ? `${pm}@${version}` : pm
+		const indent = raw.match(/\n([ \t]+)/)?.[1] ?? "\t"
+		fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, indent)}\n`)
+	} catch {
+		// Best-effort: a project we can't read or write just gets asked again next time.
+	}
 }
 
 /**
@@ -151,14 +240,33 @@ export function availablePackageManagers(order: readonly PackageManager[]): Pack
 	return order.filter((pm) => isCommandAvailable(pm))
 }
 
-export function addDependencyArgs(pm: PackageManager, pkg: string): string[] {
-	if (pm === "npm") return ["npm", "install", pkg]
-	return [pm, "add", pkg]
+/**
+ * The argv to add a single package with `pm`, e.g. `pnpm add kizlo`. `dev: true` installs it as a
+ * dev dependency — npm spells that `--save-dev`, every other supported manager `--dev`.
+ */
+export function addDependencyArgs(pm: PackageManager, pkg: string, opts: { dev?: boolean } = {}): string[] {
+	const base = pm === "npm" ? ["npm", "install", pkg] : [pm, "add", pkg]
+	if (!opts.dev) return base
+	return [...base, pm === "npm" ? "--save-dev" : "--dev"]
 }
 
 /** The argv to install a project's dependencies with `pm` — every supported manager spells it `<pm> install`. */
 export function installArgs(pm: PackageManager): string[] {
 	return [pm, "install"]
+}
+
+/**
+ * pnpm (v10+) and bun refuse to run dependencies' build/lifecycle scripts on install by default, leaving
+ * those packages unbuilt — pnpm prints an `Ignored build scripts:` warning, bun a `Blocked N postinstall`
+ * one. The install still exits 0, so nothing else flags it. Scan an install's captured output for that
+ * warning and, when present, return the command that runs the blocked scripts (`pnpm approve-builds` /
+ * `bun pm trust --all`) so the caller can surface it as a follow-up step. Undefined when the output shows
+ * none, or the manager runs scripts on install anyway (npm, yarn) so there's nothing to approve.
+ */
+export function approveBuildsCommand(pm: PackageManager, output: string): string | undefined {
+	if (pm === "pnpm" && /ignored build scripts/i.test(output)) return "pnpm approve-builds"
+	if (pm === "bun" && /blocked \d+ postinstall/i.test(output)) return "bun pm trust --all"
+	return undefined
 }
 
 /**
@@ -218,6 +326,29 @@ export function runCommandCaptured(args: string[], cwd: string): { ok: boolean; 
 		shell: process.platform === "win32",
 	})
 	return { ok: result.status === 0, output: `${result.stdout ?? ""}${result.stderr ?? ""}`.trim() }
+}
+
+/**
+ * Async sibling of {@link runCommandCaptured}: captures a command's combined output without blocking the
+ * event loop, so a clack spinner keeps animating while it runs (the synchronous `runCommandCaptured` would
+ * freeze it on the first frame). Resolves whether it exited cleanly plus the trimmed stdout+stderr; a
+ * spawn error (binary off PATH) resolves `{ ok: false, output: "" }`.
+ */
+export function runCommandCapturedAsync(args: string[], cwd: string): Promise<{ ok: boolean; output: string }> {
+	const [command, ...rest] = args
+	if (!command) return Promise.resolve({ ok: false, output: "" })
+	return new Promise((resolve) => {
+		const child = spawn(command, rest, { cwd, shell: process.platform === "win32" })
+		let output = ""
+		child.stdout?.on("data", (chunk) => {
+			output += chunk
+		})
+		child.stderr?.on("data", (chunk) => {
+			output += chunk
+		})
+		child.on("error", () => resolve({ ok: false, output: "" }))
+		child.on("close", (code) => resolve({ ok: code === 0, output: output.trim() }))
+	})
 }
 
 export function writeFileIfAbsent(filePath: string, contents: string): boolean {
@@ -362,6 +493,35 @@ export function mergeEnv(
 	for (const key of remaining.keys()) append(key)
 
 	return { content: `${next.join("\n")}\n`, added, updated, kept }
+}
+
+/**
+ * Whether `dir` already sits inside a git work tree — true when the framework CLI ran `git init`, or
+ * when scaffolding into a subfolder of an existing repo (e.g. a monorepo). Used to skip offering
+ * `git init` where a repo is already present rather than nesting one. A missing `git` binary (spawn
+ * error) reads as "not a repo".
+ */
+export function isGitRepository(dir: string): boolean {
+	const result = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], {
+		cwd: dir,
+		stdio: "ignore",
+		shell: process.platform === "win32",
+	})
+	return !result.error && result.status === 0
+}
+
+/**
+ * Initialize a git repository in `dir` with an initial commit. Best-effort: returns whether the repo
+ * was created (`git init` succeeded). The commit is attempted but not required — it needs a configured
+ * `user.name`/`user.email` a bare machine may lack, and a repo with staged-but-uncommitted files is
+ * still a usable starting point. Returns false when `git` isn't installed.
+ */
+export function initGitRepository(dir: string): boolean {
+	if (!isCommandAvailable("git")) return false
+	if (!runCommand(["git", "init"], dir, "ignore")) return false
+	runCommand(["git", "add", "-A"], dir, "ignore")
+	runCommand(["git", "commit", "-m", "Initial commit"], dir, "ignore")
+	return true
 }
 
 export function ensureGitignored(cwd: string, entry: string): "created" | "added" | "present" {

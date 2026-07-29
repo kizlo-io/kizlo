@@ -15,14 +15,16 @@ import {
 	type TemplateManifest,
 } from "../presets/template"
 import {
-	availablePackageManagers,
-	detectInvokingPackageManager,
+	approveBuildsCommand,
 	ensureGitignored,
 	frameworkCreateArgs,
+	initGitRepository,
 	installArgs,
+	isCommandAvailable,
+	isGitRepository,
 	type PackageManager,
-	runCommandAsync,
 	runCommandCaptured,
+	runCommandCapturedAsync,
 } from "../utils"
 import {
 	collectConnectionInteractively,
@@ -31,6 +33,7 @@ import {
 	pickAppPort,
 	readEnvExample,
 	resolveEnvKeys,
+	selectPackageManager,
 	setupLocalWordPress,
 	syncRemote,
 	validate,
@@ -79,9 +82,6 @@ const projectNameSchema = z
 		return base.length > 0 && base !== "." && base !== ".." && /^[A-Za-z0-9._-]+$/.test(base)
 	}, "The app folder (last path segment) can only contain letters, numbers, dots, and dashes")
 export const projectName = validate(projectNameSchema)
-
-/** Package managers `create` can wire the getting-started steps for, in display order. */
-const PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn", "bun"]
 
 /**
  * Pin Kizlo's dependencies in the freshly bootstrapped `package.json`. The template is authoritative
@@ -249,16 +249,7 @@ export const create = defineCommand({
 		const dir = path.resolve(cwd, name)
 		if (fs.existsSync(dir)) return cancelFrom(`${name} already exists — pick a different name or remove it.`)
 
-		const installed = availablePackageManagers(PACKAGE_MANAGERS)
-		const invokingPm = detectInvokingPackageManager()
-		const defaultPm = invokingPm && installed.includes(invokingPm) ? invokingPm : installed[0]
-		const pm = orCancel(
-			await p.select<PackageManager>({
-				message: "Package manager",
-				options: installed.map((id) => ({ value: id, label: id })),
-				initialValue: defaultPm,
-			}),
-		)
+		const pm = await selectPackageManager("Package manager")
 
 		const conn = await collectConnectionInteractively(manifest.apiPath, { baseUrl: `http://localhost:${await pickAppPort()}` })
 		if (manifest.apiPath && conn.baseUrl) conn.baseUrl = withApiPath(conn.baseUrl, manifest.apiPath)
@@ -287,10 +278,15 @@ export const create = defineCommand({
 		fetchedRegistry.cleanup()
 
 		let depsInstalled = false
+		// When the manager blocks dependencies' build scripts on install (pnpm does by default), the install
+		// still succeeds but those packages stay unbuilt — surface the approval command as a next step.
+		let approveBuilds: string | undefined
 		if (orCancel(await p.confirm({ message: "Install dependencies now?", initialValue: true }))) {
 			const is = p.spinner()
 			is.start(`Installing dependencies with ${pm}`)
-			depsInstalled = await runCommandAsync(installArgs(pm), dir, "ignore")
+			const install = await runCommandCapturedAsync(installArgs(pm), dir)
+			depsInstalled = install.ok
+			if (depsInstalled) approveBuilds = approveBuildsCommand(pm, install.output)
 			is.stop(depsInstalled ? "Installed dependencies" : "Could not install dependencies")
 			if (!depsInstalled) p.log.warn(`Install them yourself: cd ${name} && ${installArgs(pm).join(" ")}`)
 		}
@@ -299,7 +295,22 @@ export const create = defineCommand({
 		await writeEnv(dir, resolveEnvKeys(manifest), conn, { force: true, yes: false, exampleTemplate })
 		await syncRemote(conn)
 
-		p.note([`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ``, ...nextStepsLines(conn)].join("\n"), "Next steps")
+		// The framework bootstrap runs with git disabled, so Kizlo owns the first commit — offered last so
+		// it captures the whole wired project (`.env` and `.kizlo/` are already gitignored). Skipped when
+		// git isn't installed, or when scaffolding into an existing repo (a monorepo) so we never nest one.
+		if (isCommandAvailable("git") && !isGitRepository(dir) && orCancel(await p.confirm({ message: "Initialize a git repository?", initialValue: true }))) {
+			const gs = p.spinner()
+			gs.start("Initializing git repository")
+			const ok = initGitRepository(dir)
+			gs.stop(ok ? "Initialized git repository" : "Could not initialize git repository")
+		}
+
+		p.note(
+			[`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ...(approveBuilds ? [approveBuilds] : []), ``, ...nextStepsLines(conn)].join(
+				"\n",
+			),
+			"Next steps",
+		)
 
 		p.outro("Kizlo is ready 🎉")
 	},

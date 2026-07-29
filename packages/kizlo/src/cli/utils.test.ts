@@ -1,9 +1,11 @@
+import { spawnSync } from "node:child_process"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import {
 	addDependencyArgs,
+	approveBuildsCommand,
 	availablePackageManagers,
 	detectImportAlias,
 	detectInvokingPackageManager,
@@ -11,8 +13,12 @@ import {
 	ensureGitignored,
 	envKeysPresent,
 	frameworkCreateArgs,
+	initGitRepository,
 	isCommandAvailable,
+	isGitRepository,
 	mergeEnv,
+	persistPackageManagerField,
+	readPersistedAlias,
 	readTsconfigPaths,
 	resolveModuleImport,
 	stripJsonComments,
@@ -119,6 +125,29 @@ describe("readTsconfigPaths", () => {
 	})
 })
 
+describe("readPersistedAlias", () => {
+	test("returns undefined when there is no kizlo.config", () => {
+		expect(readPersistedAlias(dir)).toBeUndefined()
+	})
+
+	test("returns undefined when the config declares no alias (choice never made)", () => {
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), 'export default defineConfig({\n\tdir: "src/lib/kizlo",\n})\n')
+		expect(readPersistedAlias(dir)).toBeUndefined()
+	})
+
+	test("reads a persisted alias prefix", () => {
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), 'export default defineConfig({\n\tdir: "src/lib/kizlo",\n\talias: "@/",\n})\n')
+		expect(readPersistedAlias(dir)).toBe("@/")
+	})
+
+	test("reads an empty alias as the recorded relative-imports choice", () => {
+		// An empty string is a made decision (relative imports), distinct from an absent key — so a re-run
+		// reuses it and never re-prompts.
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), 'export default defineConfig({\n\tdir: "src/lib/kizlo",\n\talias: "",\n})\n')
+		expect(readPersistedAlias(dir)).toBe("")
+	})
+})
+
 describe("envKeysPresent", () => {
 	test("reports declared keys and ignores commented or absent ones", () => {
 		const contents = "A=1\n#B=2\n  C = 3\n"
@@ -177,6 +206,17 @@ describe("resolveModuleImport", () => {
 })
 
 describe("detectPackageManager", () => {
+	const prevAgent = process.env.npm_config_user_agent
+
+	beforeEach(() => {
+		delete process.env.npm_config_user_agent
+	})
+
+	afterEach(() => {
+		if (prevAgent === undefined) delete process.env.npm_config_user_agent
+		else process.env.npm_config_user_agent = prevAgent
+	})
+
 	test.each([
 		["pnpm-lock.yaml", "pnpm"],
 		["yarn.lock", "yarn"],
@@ -186,8 +226,60 @@ describe("detectPackageManager", () => {
 		expect(detectPackageManager(dir)).toBe(expected)
 	})
 
-	test("defaults to npm without a recognised lockfile", () => {
+	test("reads the corepack packageManager field when there's no lockfile", () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ packageManager: "pnpm@9.0.0" }))
+		expect(detectPackageManager(dir)).toBe("pnpm")
+	})
+
+	test("a lockfile beats the packageManager field", () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ packageManager: "npm@10.0.0" }))
+		fs.writeFileSync(path.join(dir, "pnpm-lock.yaml"), "")
+		expect(detectPackageManager(dir)).toBe("pnpm")
+	})
+
+	test("ignores an unsupported packageManager field", () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ packageManager: "cnpm@1.0.0" }))
+		expect(detectPackageManager(dir)).toBeUndefined()
+	})
+
+	test("does not guess from the invoking manager", () => {
+		process.env.npm_config_user_agent = "pnpm/9.0.0 npm/? node/v20.0.0 darwin arm64"
+		expect(detectPackageManager(dir)).toBeUndefined()
+	})
+
+	test("returns undefined without any project signal", () => {
+		expect(detectPackageManager(dir)).toBeUndefined()
+	})
+})
+
+describe("persistPackageManagerField", () => {
+	test("stamps the field so a later detect settles on it", () => {
+		const pkgPath = path.join(dir, "package.json")
+		fs.writeFileSync(pkgPath, JSON.stringify({ name: "app" }))
+		persistPackageManagerField(dir, "npm")
+		const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { packageManager?: string }
+		expect(pkg.packageManager?.startsWith("npm")).toBe(true)
 		expect(detectPackageManager(dir)).toBe("npm")
+	})
+
+	test("leaves an existing field untouched", () => {
+		const pkgPath = path.join(dir, "package.json")
+		fs.writeFileSync(pkgPath, JSON.stringify({ packageManager: "yarn@4.0.0" }))
+		persistPackageManagerField(dir, "npm")
+		const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { packageManager?: string }
+		expect(pkg.packageManager).toBe("yarn@4.0.0")
+	})
+
+	test("preserves the file's indentation", () => {
+		const pkgPath = path.join(dir, "package.json")
+		fs.writeFileSync(pkgPath, `${JSON.stringify({ name: "app" }, null, 2)}\n`)
+		persistPackageManagerField(dir, "npm")
+		expect(fs.readFileSync(pkgPath, "utf8")).toContain('\n  "packageManager":')
+	})
+
+	test("is a no-op when there's no package.json", () => {
+		expect(() => persistPackageManagerField(dir, "npm")).not.toThrow()
+		expect(fs.existsSync(path.join(dir, "package.json"))).toBe(false)
 	})
 })
 
@@ -248,6 +340,43 @@ describe("addDependencyArgs", () => {
 		expect(addDependencyArgs("pnpm", "kizlo")).toEqual(["pnpm", "add", "kizlo"])
 		expect(addDependencyArgs("yarn", "kizlo")).toEqual(["yarn", "add", "kizlo"])
 		expect(addDependencyArgs("bun", "kizlo")).toEqual(["bun", "add", "kizlo"])
+	})
+
+	test("dev uses --save-dev on npm and --dev elsewhere", () => {
+		expect(addDependencyArgs("npm", "kizlo", { dev: true })).toEqual(["npm", "install", "kizlo", "--save-dev"])
+		expect(addDependencyArgs("pnpm", "kizlo", { dev: true })).toEqual(["pnpm", "add", "kizlo", "--dev"])
+		expect(addDependencyArgs("yarn", "kizlo", { dev: true })).toEqual(["yarn", "add", "kizlo", "--dev"])
+		expect(addDependencyArgs("bun", "kizlo", { dev: true })).toEqual(["bun", "add", "kizlo", "--dev"])
+	})
+})
+
+describe("approveBuildsCommand", () => {
+	const pnpmWarning = 'Ignored build scripts: better-sqlite3, esbuild.\nRun "pnpm approve-builds" to pick which dependencies should run scripts.'
+	const bunWarning = "1 package installed [468.00ms]\n\nBlocked 3 postinstalls. Run `bun pm untrusted` for details."
+
+	test("returns the pnpm approval command when pnpm blocked build scripts", () => {
+		expect(approveBuildsCommand("pnpm", pnpmWarning)).toBe("pnpm approve-builds")
+	})
+
+	test("returns the bun trust command when bun blocked postinstalls", () => {
+		expect(approveBuildsCommand("bun", bunWarning)).toBe("bun pm trust --all")
+	})
+
+	test("matches each manager's warning regardless of case", () => {
+		expect(approveBuildsCommand("pnpm", "ignored build scripts: sharp.")).toBe("pnpm approve-builds")
+		expect(approveBuildsCommand("bun", "blocked 1 postinstall.")).toBe("bun pm trust --all")
+	})
+
+	test("returns undefined when the output has no blocked-scripts warning", () => {
+		expect(approveBuildsCommand("pnpm", "Done in 3s")).toBeUndefined()
+		expect(approveBuildsCommand("bun", "2 packages installed [468.00ms]")).toBeUndefined()
+	})
+
+	test("returns undefined for managers that run scripts on install (npm, yarn)", () => {
+		// A blocked-scripts warning from one manager never triggers another's command.
+		expect(approveBuildsCommand("npm", pnpmWarning)).toBeUndefined()
+		expect(approveBuildsCommand("yarn", pnpmWarning)).toBeUndefined()
+		expect(approveBuildsCommand("npm", bunWarning)).toBeUndefined()
 	})
 })
 
@@ -328,5 +457,27 @@ describe("ensureGitignored", () => {
 		fs.writeFileSync(path.join(dir, ".gitignore"), ".env\n")
 		expect(ensureGitignored(dir, ".env")).toBe("present")
 		expect(fs.readFileSync(path.join(dir, ".gitignore"), "utf8")).toBe(".env\n")
+	})
+})
+
+describe("isGitRepository / initGitRepository", () => {
+	test("a fresh directory is not a repo until initialized", () => {
+		expect(isGitRepository(dir)).toBe(false)
+
+		expect(initGitRepository(dir)).toBe(true)
+
+		expect(isGitRepository(dir)).toBe(true)
+		expect(fs.existsSync(path.join(dir, ".git"))).toBe(true)
+	})
+
+	test("stages the working tree and commits when an identity is available", () => {
+		fs.writeFileSync(path.join(dir, "file.txt"), "hi\n")
+		initGitRepository(dir)
+
+		// The commit needs a configured user.name/email; where one exists (as here) the file lands in an
+		// "Initial commit". On a machine without an identity the commit is skipped, so only assert when it
+		// actually produced a log — the repo is still initialized either way.
+		const log = spawnSync("git", ["log", "--oneline"], { cwd: dir, encoding: "utf8" })
+		if (log.status === 0) expect(log.stdout).toContain("Initial commit")
 	})
 })

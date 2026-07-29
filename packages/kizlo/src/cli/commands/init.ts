@@ -26,12 +26,17 @@ import {
 } from "../presets/template"
 import {
 	addDependencyArgs,
+	aliasWithSlash,
 	detectImportAlias,
+	detectInvokingPackageManager,
 	detectPackageManager,
 	type EnvKeys,
 	ensureGitignored,
 	getVersion,
 	loadEnvFiles,
+	type PackageManager,
+	persistPackageManagerField,
+	readPersistedAlias,
 	runCommandAsync,
 } from "../utils"
 import {
@@ -43,6 +48,7 @@ import {
 	orCancel,
 	readEnvExample,
 	resolveEnvKeys,
+	selectPackageManager,
 	setupLocalWordPress,
 	syncRemote,
 	validate,
@@ -53,6 +59,7 @@ import {
 	applyProjectPatches,
 	buildScaffoldContext,
 	kizloConfigTemplate,
+	printManualStep,
 	reportScaffold,
 	type ScaffoldResult,
 	scaffoldFile,
@@ -69,11 +76,6 @@ type Setup = Connection & {
 
 function defaultDir(hasSrcDir: boolean): string {
 	return hasSrcDir ? "src/lib/kizlo" : "lib/kizlo"
-}
-
-/** Normalizes an alias prefix to the familiar `@/` form (or empty for relative). */
-function aliasWithSlash(alias: string | undefined): string {
-	return alias ? `${alias.replace(/\/+$/, "")}/` : ""
 }
 
 /** Whether two URLs share an origin (scheme + host + port); false when either can't be parsed. */
@@ -104,21 +106,40 @@ function detectAppDir(cwd: string, hasSrcDir: boolean, templateAppDir?: string):
 	return hasSrcDir ? "src/app" : "app"
 }
 
-async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; apiPath?: string }): Promise<Setup> {
+/**
+ * The import alias settled without asking — the explicit `--alias` flag, else the alias a previous init
+ * persisted in kizlo.config. `undefined` when neither is set: the choice hasn't been made, so it must be
+ * prompted for (interactive) or defaulted to relative imports (`--yes`). Detection never enters here — a
+ * tsconfig alias is only ever a prompt *hint*, since relative imports always work and a detected alias
+ * isn't a guarantee (a project may have several, or map one Kizlo's dir isn't under).
+ */
+function decidedAlias(flagAlias: string | undefined, persistedAlias: string | undefined): string | undefined {
+	return flagAlias ?? persistedAlias
+}
+
+type AliasCtx = { cwd: string; hasSrcDir: boolean; apiPath?: string; persistedAlias?: string; flagAlias?: string }
+
+async function collectInteractively(ctx: AliasCtx): Promise<Setup> {
 	const dir = orCancel(await p.text({ message: "Kizlo directory", initialValue: defaultDir(ctx.hasSrcDir), validate: validate(dirPath) }))
 
-	let alias = ""
-	if (ctx.apiPath) {
-		const serverDir = path.join(dir.replace(/^\.\//, "").replace(/\/+$/, ""), "server")
-		const detected = detectImportAlias(ctx.cwd, serverDir)?.prefix
-		const answer = orCancel(
-			await p.text({
-				message: "Import alias (blank for relative imports)",
-				placeholder: "@/",
-				initialValue: detected ? `${detected}/` : "",
-			}),
-		)
-		alias = answer.trim()
+	let alias = decidedAlias(ctx.flagAlias, ctx.persistedAlias)
+	if (alias === undefined) {
+		// No flag and nothing persisted — the choice hasn't been made yet. Ask once (only for templates
+		// whose files carry alias imports), offering any tsconfig alias as a hint. A blank answer means
+		// relative imports; either way the answer is persisted below, so later runs skip this prompt.
+		if (ctx.apiPath) {
+			const serverDir = path.join(dir.replace(/^\.\//, "").replace(/\/+$/, ""), "server")
+			const detected = detectImportAlias(ctx.cwd, serverDir)?.prefix
+			alias = orCancel(
+				await p.text({
+					message: "Import alias (blank for relative imports)",
+					placeholder: "@/",
+					initialValue: detected ? `${detected}/` : "",
+				}),
+			).trim()
+		} else {
+			alias = ""
+		}
 	}
 
 	const conn = await collectConnectionInteractively(ctx.apiPath)
@@ -127,18 +148,16 @@ async function collectInteractively(ctx: { cwd: string; hasSrcDir: boolean; apiP
 }
 
 /**
- * Non-interactive setup: skip prompts and use defaults. Values present in the
- * environment are used; missing ones are left empty for the user to fill in
- * later. Never fails — `--yes` always scaffolds a fillable project.
+ * Non-interactive setup: skip prompts and use defaults. Values present in the environment are used;
+ * missing ones are left empty for the user to fill in later. The alias is the `--alias` flag, else the
+ * one persisted from a prior run, else relative imports — never silent tsconfig detection, since `--yes`
+ * can't confirm it and relative imports always work. Never fails — `--yes` always scaffolds a fillable
+ * project.
  */
-function collectFromEnv(ctx: { cwd: string; hasSrcDir: boolean; apiPath?: string; envKeys: EnvKeys }): Setup {
+function collectFromEnv(ctx: AliasCtx & { envKeys: EnvKeys }): Setup {
 	const conn = collectConnectionFromEnv(ctx.envKeys)
 	const dir = defaultDir(ctx.hasSrcDir)
-	return {
-		...conn,
-		dir,
-		alias: ctx.apiPath ? aliasWithSlash(detectImportAlias(ctx.cwd, path.join(dir, "server"))?.prefix) : "",
-	}
+	return { ...conn, dir, alias: decidedAlias(ctx.flagAlias, ctx.persistedAlias) ?? "" }
 }
 
 function readPkg(pkgPath: string): Record<string, unknown> {
@@ -148,26 +167,37 @@ function readPkg(pkgPath: string): Record<string, unknown> {
 type Deps = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
 
 /**
- * The template is authoritative for the pinned versions: it declares `dependencies`/`devDependencies`
- * in its manifest (stamped at release), falling back to the running CLI's version for `kizlo` in-repo
- * before the first stamp. For each declared package the project already has at an older release, upgrade
- * it up to the template's pin and say so — a deliberate pin is never changed silently. Never downgrades,
- * and never adds a package the project doesn't already have (a missing `kizlo` is installed separately).
+ * Bring the project's dependencies in line with the template's pins. The template is authoritative for
+ * the versions: it declares `dependencies`/`devDependencies` in its manifest (stamped at release),
+ * falling back to the running CLI's version for `kizlo` in-repo before the first stamp. For each declared
+ * package:
+ *
+ * - missing from the project — install it at the template's pin, as a dev dependency when the template
+ *   declares it there. `create` records the template's whole dependency set into the fresh app before
+ *   installing; `init` layers onto an existing project, so packages the template needs but the project
+ *   lacks (e.g. Astro's `@astrojs/node` adapter) must be added here or the app won't run.
+ * - present at an older release — upgrade it up to the pin and say so; a deliberate newer pin is never
+ *   changed silently, and nothing is ever downgraded.
+ *
+ * A *missing* `kizlo` is installed on its own earlier (with its own messaging), so it's skipped here;
+ * an existing older `kizlo` still gets the upgrade path.
  */
-async function alignDependencies(
-	cwd: string,
-	pm: ReturnType<typeof detectPackageManager>,
-	pkg: Deps,
-	manifest: TemplateManifest,
-): Promise<void> {
+async function alignDependencies(cwd: string, pm: PackageManager, pkg: Deps, manifest: TemplateManifest): Promise<void> {
 	const { dependencies, devDependencies } = resolveDependencies(manifest)
-	for (const [name, want] of [...Object.entries(dependencies), ...Object.entries(devDependencies)]) {
+	const declared = [
+		...Object.entries(dependencies).map(([name, want]) => ({ name, want, dev: false })),
+		...Object.entries(devDependencies).map(([name, want]) => ({ name, want, dev: true })),
+	]
+	for (const { name, want, dev } of declared) {
 		const have = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name]
-		if (!have || !isOlderVersion(have, want)) continue
+		if (name === "kizlo" && !have) continue
+		if (have && !isOlderVersion(have, want)) continue
+		const args = addDependencyArgs(pm, `${name}@${want}`, { dev })
 		const s = p.spinner()
-		s.start(`Upgrading ${name} from ${have} to ${want}`)
-		const ok = await runCommandAsync(addDependencyArgs(pm, `${name}@${want}`), cwd, "ignore")
-		s.stop(ok ? `Upgraded ${name} to ${want}` : `Could not upgrade ${name} automatically — install ${name}@${want} yourself`)
+		s.start(have ? `Upgrading ${name} from ${have} to ${want}` : `Installing ${name}@${want}`)
+		const ok = await runCommandAsync(args, cwd, "ignore")
+		if (have) s.stop(ok ? `Upgraded ${name} to ${want}` : `Could not upgrade ${name} automatically — install ${name}@${want} yourself`)
+		else s.stop(ok ? `Installed ${name}@${want}` : `Could not install ${name} automatically — run \`${args.join(" ")}\` yourself`)
 	}
 }
 
@@ -228,7 +258,19 @@ export const init = defineCommand({
 			devDependencies?: Record<string, string>
 		}
 
-		const pm = detectPackageManager(cwd)
+		// A lockfile or corepack field settles the manager outright; otherwise we don't guess (the invoking
+		// manager lies under `npx`) — interactively we ask, and `--yes` opts out of prompts so it takes the
+		// invoking manager as its best non-interactive guess, falling back to npm.
+		const detectedPm = detectPackageManager(cwd)
+		const pm =
+			detectedPm ??
+			(yes
+				? (detectInvokingPackageManager() ?? "npm")
+				: await selectPackageManager("Couldn't detect this project's package manager — which should Kizlo use?"))
+
+		// When the project gave no signal and we had to ask, stamp the choice into package.json so a later run
+		// detects it instead of prompting again. Skipped under `--yes`: that path only guessed, never confirmed.
+		if (!detectedPm && !yes) persistPackageManagerField(cwd, pm)
 		const hasKizlo = Boolean(pkg.dependencies?.kizlo) || Boolean(pkg.devDependencies?.kizlo)
 		const hasSrcDir = fs.existsSync(path.join(cwd, "src"))
 
@@ -310,8 +352,13 @@ export const init = defineCommand({
 			const apiPath = manifest.apiPath
 			const envKeys = resolveEnvKeys(manifest)
 
-			const setup = yes ? collectFromEnv({ cwd, hasSrcDir, apiPath, envKeys }) : await collectInteractively({ cwd, hasSrcDir, apiPath })
-			if (args.alias !== undefined) setup.alias = String(args.alias).trim()
+			// Alias precedence: the explicit `--alias` flag, then the alias persisted in kizlo.config by a
+			// prior run, then a one-time prompt (interactive) or relative imports (`--yes`). The chosen value
+			// is persisted into kizlo.config below, so a later `init` reads it back instead of re-asking.
+			const flagAlias = args.alias !== undefined ? String(args.alias).trim() : undefined
+			const persistedAlias = readPersistedAlias(cwd)
+			const aliasCtx = { cwd, hasSrcDir, apiPath, persistedAlias, flagAlias }
+			const setup = yes ? collectFromEnv({ ...aliasCtx, envKeys }) : await collectInteractively(aliasCtx)
 			setup.alias = aliasWithSlash(setup.alias)
 
 			const includeExamples = yes ? true : orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
@@ -361,7 +408,7 @@ export const init = defineCommand({
 
 			for (const note of manifest.notes ?? []) {
 				const rendered = renderNote(note, setup.alias)
-				p.note(rendered.body, rendered.title)
+				printManualStep(rendered.title, rendered.body)
 			}
 
 			if (gitignore !== "present") p.log.success(`${gitignore === "created" ? "Created" : "Updated"} .gitignore (ignoring .env)`)

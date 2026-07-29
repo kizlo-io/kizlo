@@ -17,6 +17,9 @@ function ctx(): ScaffoldContext {
 		appDir: "app",
 		// A fixed specifier so the assertion is stable regardless of the file's depth.
 		serverImport: () => "@/lib/kizlo/server",
+		// Re-emit any project path under the project's `@` alias (src root stripped), the shape the real
+		// resolver produces for an aliased project.
+		importFrom: (targetRel: string) => `@/${targetRel.replace(/^src\//, "")}`,
 	}
 }
 
@@ -69,6 +72,31 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 		// The template's `@/lib/kizlo/server` specifier is swapped for the resolved import.
 		expect(file.contents).toContain('from "@/lib/kizlo/server"')
 		expect(file.contents).not.toContain('"@/lib/kizlo/server/')
+	})
+
+	it("retargets every template-alias import — not just the server — to the chosen alias", () => {
+		// Astro's blog page imports both its layout (`@/layouts/Layout.astro`) and the server
+		// (`@/lib/kizlo/server`) through the template's `@` alias. A project that chose a `~` alias must
+		// get every one rewritten, or the non-server imports keep pointing at a `@` the project lacks.
+		const astroDir = path.resolve(here, "../../../../../templates/astro")
+		const astro = readManifest(astroDir)
+		const blog = fileEntries(changesFor(astro, "init", { includeExamples: true })).find((e) => e.role === "blog-post")
+		if (!blog) throw new Error("astro blog-post entry missing")
+
+		const tildeCtx: ScaffoldContext = {
+			kizloDir: "src/lib/kizlo",
+			serverDirName: "server",
+			serverEntryPath: "src/lib/kizlo/server/index.ts",
+			clientPath: "src/lib/kizlo/client.ts",
+			appDir: "src/pages",
+			serverImport: () => "~/lib/kizlo/server",
+			importFrom: (targetRel: string) => `~/${targetRel.replace(/^src\//, "")}`,
+		}
+		const file = adaptFile(astroDir, blog, astro.conventions, tildeCtx)
+
+		expect(file.contents).toContain('from "~/lib/kizlo/server"')
+		expect(file.contents).toContain('from "~/layouts/Layout.astro"')
+		expect(file.contents).not.toContain('"@/')
 	})
 
 	it("resolves a patch's import token against the project's server import", () => {

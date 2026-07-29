@@ -18,6 +18,12 @@ export interface ScaffoldContext {
 	/** Import specifier for the server entry from `fromDir` (tsconfig alias or relative). */
 	serverImport(fromDir: string): string
 	/**
+	 * Import specifier for an arbitrary project-relative target from `fromDir`, resolved through the
+	 * project's chosen alias (or a relative import when none). Used to retarget every template-alias
+	 * import a scaffolded file carries, not just the server entry.
+	 */
+	importFrom(targetRel: string, fromDir: string): string
+	/**
 	 * Backend URL to inline into the browser client, set only when it differs from the site origin
 	 * (base preset, split deployment). Undefined when the client can default to the page origin or
 	 * resolves the URL from a framework env var.

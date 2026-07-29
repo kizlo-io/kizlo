@@ -21,6 +21,7 @@
 			"--no-eslint",
 			"--no-turbopack",
 			"--skip-install",
+			"--disable-git",
 			"--use-{{pm}}",
 			"--yes"
 		]

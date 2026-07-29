@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { applyPatchToSource, patchChanged, type ResolvedPatch, resolvePatchTargetPath } from "./patch"
+import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode, resolvePatchTargetPath } from "./patch"
 
 const patch: Pick<ResolvedPatch, "imports" | "exports"> = {
 	imports: [
@@ -226,6 +226,25 @@ export default function RootLayout() {
 }
 `
 		expect(() => apply(src)).toThrow()
+	})
+})
+
+describe("renderPatchCode", () => {
+	it("renders imports and exports for an apply-mode patch", () => {
+		const code = renderPatchCode(patch)
+		expect(has(code, 'import { createRootMetadata, createRootViewport } from "kizlo/nextjs/server"')).toBe(true)
+		expect(has(code, "export const generateMetadata = createRootMetadata(client)")).toBe(true)
+	})
+
+	it("prints a note-mode patch's body verbatim, ignoring imports/exports", () => {
+		const body = 'export default defineConfig({\n\toutput: "server",\n})'
+		const code = renderPatchCode({ imports: patch.imports, exports: patch.exports, note: body })
+		expect(code).toBe(`${body}\n`)
+		expect(code).not.toContain("createRootMetadata")
+	})
+
+	it("does not double a trailing newline on a note body", () => {
+		expect(renderPatchCode({ imports: [], exports: [], note: "line\n" })).toBe("line\n")
 	})
 })
 

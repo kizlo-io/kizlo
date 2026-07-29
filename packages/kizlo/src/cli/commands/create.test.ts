@@ -134,6 +134,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		// written when local WordPress is chosen.
 		const config = fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")
 		expect(config).toContain('dir: "src/lib/kizlo"')
+		// The alias is persisted in its canonical `@/` form (how it's written and declared in tsconfig),
+		// not a bare `@`, so create and init record it the same way.
+		expect(config).toContain('alias: "@/"')
 		expect(config).not.toContain("dev:")
 		expect(config).not.toContain("test:")
 

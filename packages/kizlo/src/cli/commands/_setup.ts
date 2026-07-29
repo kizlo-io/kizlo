@@ -8,12 +8,15 @@ import z from "zod/v4"
 import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName, stackProject } from "../daemon/config"
 import type { TemplateManifest } from "../presets/template"
 import {
+	availablePackageManagers,
 	DEFAULT_ENV_KEYS,
+	detectInvokingPackageManager,
 	type EnvKeys,
 	ensureGitignored,
 	envGroups,
 	envKeysPresent,
 	mergeEnv,
+	type PackageManager,
 	pickStackPort,
 	writeFileIfAbsent,
 } from "../utils"
@@ -134,6 +137,28 @@ export function orCancel<T>(value: T | symbol): T {
 	return value as T
 }
 
+/** Package managers the CLI can wire getting-started steps for, in display order. */
+export const PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn", "bun"]
+
+/**
+ * Ask which package manager to use, offering only those installed on the host. The pre-selected default
+ * is the manager that invoked this CLI when it's available (a hint, not a decision — `npx` reports
+ * `npm`, so it can be wrong, which is exactly why we ask rather than commit to it), else the first
+ * installed. `create` asks up front; `init` asks only when it couldn't detect one from the project.
+ */
+export async function selectPackageManager(message: string): Promise<PackageManager> {
+	const installed = availablePackageManagers(PACKAGE_MANAGERS)
+	const invoking = detectInvokingPackageManager()
+	const initialValue = invoking && installed.includes(invoking) ? invoking : installed[0]
+	return orCancel(
+		await p.select<PackageManager>({
+			message,
+			options: installed.map((id) => ({ value: id, label: id })),
+			initialValue,
+		}),
+	)
+}
+
 /** Appends the API path to the base URL so the client and route handler agree. */
 export function withApiPath(baseUrl: string, apiPath: string): string {
 	try {
@@ -213,6 +238,7 @@ export async function collectConnectionInteractively(apiPath: string | undefined
 			options: [
 				{ value: "local" as const, label: "Set up local WordPress", hint: "runs in Docker, for dev and test" },
 				{ value: "remote" as const, label: "Use my own WordPress", hint: "connect to your existing WordPress" },
+				{ value: "skip" as const, label: "Skip for now", hint: "fill in the connection in .env later" },
 			],
 		}),
 	)
@@ -236,8 +262,13 @@ export async function collectConnectionInteractively(apiPath: string | undefined
 		wpPassword = orCancel(await p.password({ message: "WordPress application password", validate: validate(requiredString) }))
 	}
 	// Local mode needs nothing more — the install folder is fixed (`.kizlo/local`) and provisioned on setup.
+	if (mode === "skip") {
+		p.log.info("Skipping WordPress setup — the connection keys are written to .env empty for you to fill in later.")
+	}
 
-	return { mode, baseUrl, siteUrl, siteSecret, wpUrl, wpUsername, wpPassword }
+	// `skip` leaves the credentials blank and behaves like a remote connection downstream: nothing to
+	// provision, and `syncRemote` no-ops on the empty credentials until the user fills them in.
+	return { mode: mode === "local" ? "local" : "remote", baseUrl, siteUrl, siteSecret, wpUrl, wpUsername, wpPassword }
 }
 
 /**

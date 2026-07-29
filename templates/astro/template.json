@@ -92,7 +92,16 @@
 			"example": true
 		}
 	],
-	"init": [],
+	"init": [
+		{
+			"kind": "patch",
+			"mode": "note",
+			"role": "framework-config",
+			"label": "Astro config",
+			"path": "astro.config.mjs",
+			"note": "Kizlo renders on demand, so Astro needs server output and a runtime adapter. In astro.config.mjs, set `output: \"server\"` and add an adapter (Node shown; swap for your host's adapter if you deploy elsewhere):\n\nimport node from \"@astrojs/node\"\nimport { defineConfig } from \"astro/config\"\n\nexport default defineConfig({\n\toutput: \"server\",\n\tadapter: node({ mode: \"standalone\" }),\n})"
+		}
+	],
 	"env": {
 		"baseUrl": "PUBLIC_KIZLO_API_URL",
 		"remote": {
