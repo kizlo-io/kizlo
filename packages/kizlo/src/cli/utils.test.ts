@@ -239,6 +239,14 @@ describe("detectPackageManager", () => {
 		expect(await detectPackageManager(dir)).toBe("pnpm")
 	})
 
+	test("resolves a monorepo package to the workspace root's lockfile", async () => {
+		fs.writeFileSync(path.join(dir, "pnpm-lock.yaml"), "")
+		const pkgDir = path.join(dir, "packages", "app")
+		fs.mkdirSync(pkgDir, { recursive: true })
+		fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({ name: "app" }))
+		expect(await detectPackageManager(pkgDir)).toBe("pnpm")
+	})
+
 	test("ignores an unsupported packageManager field", async () => {
 		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ packageManager: "cnpm@1.0.0" }))
 		expect(await detectPackageManager(dir)).toBeUndefined()

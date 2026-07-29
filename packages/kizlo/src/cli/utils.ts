@@ -150,18 +150,19 @@ export function getVersion(): string {
 }
 
 /**
- * The package manager a project uses, from evidence in the project itself — a lockfile (the strongest
- * signal, it reflects an actual install), else package.json's corepack `packageManager` /
+ * The package manager a project uses, from evidence in the project or an enclosing workspace — a lockfile
+ * (the strongest signal, it reflects an actual install), else package.json's corepack `packageManager` /
  * `devEngines.packageManager` field (declared intent, present before the first install). Delegates to
- * `package-manager-detector` so every lockfile variant is recognised (npm's `package-lock.json` and
- * `npm-shrinkwrap.json` included). `stopDir` pins the search to `cwd` so a subfolder never inherits a
- * monorepo parent's manager. Returns `undefined` when neither signal is present, or the manager isn't one
- * Kizlo supports, rather than guessing: the invoking manager is unreliable (`npx` reports `npm` whatever
- * the user really uses), and a missing lockfile can just mean a freshly bootstrapped project. Callers that
- * can't proceed without one should ask the user (see `selectPackageManager`) instead of defaulting.
+ * `package-manager-detector`, which recognises every lockfile variant (npm's `package-lock.json` and
+ * `npm-shrinkwrap.json` included) and walks up from `cwd` to the filesystem root — so a package in a
+ * monorepo resolves to the manager pinned by the workspace root, where the single lockfile lives. Returns
+ * `undefined` when no signal is found anywhere up the tree, or the manager isn't one Kizlo supports, rather
+ * than guessing: the invoking manager is unreliable (`npx` reports `npm` whatever the user really uses).
+ * Callers that can't proceed without one should ask the user (see `selectPackageManager`) instead of
+ * defaulting.
  */
 export async function detectPackageManager(cwd: string): Promise<PackageManager | undefined> {
-	const name = (await detect({ cwd, stopDir: cwd }))?.name
+	const name = (await detect({ cwd }))?.name
 	return name === "pnpm" || name === "yarn" || name === "bun" || name === "npm" ? name : undefined
 }
 
