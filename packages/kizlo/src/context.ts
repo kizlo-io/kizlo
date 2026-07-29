@@ -7,7 +7,7 @@ import {
 	pluginUpdateMessage,
 	tryCatchSync,
 } from "@kizlo/shared"
-import { serialize } from "cookie"
+import { stringifySetCookie } from "cookie"
 import type { AuthUser } from "./adapters/auth"
 import type { ConnInfo } from "./adapters/geo"
 import { type Logger, type LogLevel, noopAdapter } from "./adapters/logger"
@@ -155,12 +155,15 @@ export class Context {
 			},
 			setAll: async (cookies) => {
 				cookies.forEach((cookie) => {
-					headers.append("Set-Cookie", serialize(cookie.name, cookie.value, cookie.options))
+					headers.append("Set-Cookie", stringifySetCookie({ ...cookie.options, name: cookie.name, value: cookie.value }))
 				})
 			},
 			deleteAll: async (cookies: { name: string; options?: CookieOptions }[]) => {
 				cookies.forEach((cookie) => {
-					headers.append("Set-Cookie", serialize(cookie.name, "", { ...cookie.options, maxAge: 0, expires: new Date(0) }))
+					headers.append(
+						"Set-Cookie",
+						stringifySetCookie({ ...cookie.options, name: cookie.name, value: "", maxAge: 0, expires: new Date(0) }),
+					)
 				})
 			},
 		})
