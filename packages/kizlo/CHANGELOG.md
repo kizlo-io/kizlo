@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.12.1
+
+### Patch Changes
+
+- [#91](https://github.com/kizlo-io/kizlo/pull/91) [`a1c4110`](https://github.com/kizlo-io/kizlo/commit/a1c41101ee3d23b06ae060d99791d32bc5f3a9d6) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix a runtime crash when kizlo is bundled alongside `cookie` v2 by switching to its `stringifySetCookie` export.
+
 ## 0.12.0
 
 ### Minor Changes
