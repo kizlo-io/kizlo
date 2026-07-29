@@ -298,7 +298,11 @@ export const create = defineCommand({
 		// The framework bootstrap runs with git disabled, so Kizlo owns the first commit — offered last so
 		// it captures the whole wired project (`.env` and `.kizlo/` are already gitignored). Skipped when
 		// git isn't installed, or when scaffolding into an existing repo (a monorepo) so we never nest one.
-		if (isCommandAvailable("git") && !isGitRepository(dir) && orCancel(await p.confirm({ message: "Initialize a git repository?", initialValue: true }))) {
+		if (
+			isCommandAvailable("git") &&
+			!isGitRepository(dir) &&
+			orCancel(await p.confirm({ message: "Initialize a git repository?", initialValue: true }))
+		) {
 			const gs = p.spinner()
 			gs.start("Initializing git repository")
 			const ok = initGitRepository(dir)
@@ -306,9 +310,13 @@ export const create = defineCommand({
 		}
 
 		p.note(
-			[`cd ${name}`, ...(depsInstalled ? [] : [`${pm} install`]), ...(approveBuilds ? [approveBuilds] : []), ``, ...nextStepsLines(conn)].join(
-				"\n",
-			),
+			[
+				`cd ${name}`,
+				...(depsInstalled ? [] : [`${pm} install`]),
+				...(approveBuilds ? [approveBuilds] : []),
+				``,
+				...nextStepsLines(conn),
+			].join("\n"),
 			"Next steps",
 		)
 

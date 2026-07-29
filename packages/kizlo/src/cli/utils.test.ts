@@ -351,7 +351,8 @@ describe("addDependencyArgs", () => {
 })
 
 describe("approveBuildsCommand", () => {
-	const pnpmWarning = 'Ignored build scripts: better-sqlite3, esbuild.\nRun "pnpm approve-builds" to pick which dependencies should run scripts.'
+	const pnpmWarning =
+		'Ignored build scripts: better-sqlite3, esbuild.\nRun "pnpm approve-builds" to pick which dependencies should run scripts.'
 	const bunWarning = "1 package installed [468.00ms]\n\nBlocked 3 postinstalls. Run `bun pm untrusted` for details."
 
 	test("returns the pnpm approval command when pnpm blocked build scripts", () => {
