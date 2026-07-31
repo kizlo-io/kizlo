@@ -16,6 +16,7 @@
 		"/docs/php/functions/register-route-interceptor",
 		"/docs/quickstarts/astro",
 		"/docs/quickstarts/nextjs",
+		"/docs/quickstarts/tanstack-start",
 		"/docs/reference/functions/create-auth-adapter",
 		"/docs/reference/functions/create-captcha-adapter",
 		"/docs/reference/functions/create-cookies-adapter",

@@ -37,7 +37,7 @@ export interface PatchExport {
 
 export interface ResolvedPatch {
 	label: string
-	/** Hint target file relative to cwd, with `{{kizloDir}}` / `{{appDir}}` substituted. */
+	/** Target file relative to cwd, with the template's Kizlo dir remapped and the leading `src/` matched to the project. */
 	relPath: string
 	/** `apply` merges into the file (default); `note` always prints {@link ResolvedPatch.note} instead. */
 	mode: "apply" | "note"

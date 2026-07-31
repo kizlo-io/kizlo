@@ -5,16 +5,16 @@ export interface PackageJson {
 }
 
 export interface ScaffoldContext {
-	/** Kizlo home directory relative to cwd (`src/lib/kizlo`); the `{{kizloDir}}` token in template paths. */
-	kizloDir: string
+	/** Kizlo home directory in the project, relative to cwd (`src/lib/kizlo`); the template's `kizloPath` prefix remaps here. */
+	kizloPath: string
 	/** Last segment of the server directory, e.g. `server`. */
 	serverDirName: string
 	/** Server entry path relative to cwd (`<dir>/server/index.ts`); where the server file is written. */
 	serverEntryPath: string
 	/** Browser client path relative to cwd (`<dir>/client.ts`); where the client file is written. */
 	clientPath: string
-	/** App Router directory, `app` or `src/app`. */
-	appDir: string
+	/** Whether the project keeps its source under a `src/` directory. When false, the leading `src/` is stripped from every template path (config files at the root are untouched). */
+	hasSrcDir: boolean
 	/** Import specifier for the server entry from `fromDir` (tsconfig alias or relative). */
 	serverImport(fromDir: string): string
 	/**

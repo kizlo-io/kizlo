@@ -13,7 +13,7 @@ const templateDir = path.resolve(here, "../../../../../templates/nextjs")
 /**
  * The `init` layout patch against a project that has no `src` directory — its App Router lives at the
  * repo root (`app/`, not `src/app/`). The template authors the patch target as `src/app/layout.tsx`;
- * this asserts it resolves to the project's real `app/layout.tsx` via the `appDir` token swap and lands
+ * this asserts it resolves to the project's real `app/layout.tsx` via the `src/` strip (no-src project) and lands
  * there, never creating a stray `src/` path.
  */
 describe("applyProjectPatches on a no-src project", () => {
@@ -28,11 +28,11 @@ describe("applyProjectPatches on a no-src project", () => {
 	/** A no-src project context: App Router at `app`, Kizlo home at `lib/kizlo`. */
 	function scaffold(): ScaffoldContext {
 		return {
-			kizloDir: "lib/kizlo",
+			kizloPath: "lib/kizlo",
 			serverDirName: "server",
 			serverEntryPath: "lib/kizlo/server/index.ts",
 			clientPath: "lib/kizlo/client.ts",
-			appDir: "app",
+			hasSrcDir: false,
 			// Fixed so the assertion is stable regardless of tsconfig resolution.
 			serverImport: () => "@/lib/kizlo/server",
 			importFrom: (targetRel: string) => `@/${targetRel.replace(/^src\//, "")}`,
@@ -58,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 `,
 		)
 
-		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold())
+		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.config, scaffold())
 
 		// No stray src/ path is created — the patch resolves to the project's real app dir.
 		expect(fs.existsSync(path.join(dir, "src/app/layout.tsx"))).toBe(false)
@@ -82,7 +82,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 `,
 		)
 
-		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold())
+		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.config, scaffold())
 
 		const home = fs.readFileSync(path.join(dir, "app/page.tsx"), "utf8")
 		expect(home).toContain("createHomeMetadata")
@@ -105,7 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 `,
 		)
 
-		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold())
+		applyProjectPatches(dir, patchEntries(changesFor(manifest, "init")), manifest.config, scaffold())
 
 		// No stray page.tsx is created, and the layout is never used as a stand-in for the home page.
 		expect(fs.existsSync(path.join(dir, "app/page.tsx"))).toBe(false)
@@ -130,11 +130,11 @@ describe("applyProjectPatches with a note-mode patch", () => {
 
 	function scaffold(): ScaffoldContext {
 		return {
-			kizloDir: "src/lib/kizlo",
+			kizloPath: "src/lib/kizlo",
 			serverDirName: "server",
 			serverEntryPath: "src/lib/kizlo/server/index.ts",
 			clientPath: "src/lib/kizlo/client.ts",
-			appDir: "src/pages",
+			hasSrcDir: true,
 			serverImport: () => "@/lib/kizlo/server",
 			importFrom: (targetRel: string) => `@/${targetRel.replace(/^src\//, "")}`,
 		}
@@ -149,7 +149,7 @@ describe("applyProjectPatches with a note-mode patch", () => {
 		expect(notePatches).toHaveLength(1)
 		expect(notePatches[0]?.mode).toBe("note")
 
-		applyProjectPatches(dir, notePatches, manifest.conventions, scaffold())
+		applyProjectPatches(dir, notePatches, manifest.config, scaffold())
 
 		expect(fs.readFileSync(path.join(dir, "astro.config.mjs"), "utf8")).toBe(original)
 	})

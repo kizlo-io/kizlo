@@ -59,19 +59,19 @@ export async function fetchRegistry(registry: Registry): Promise<FetchedRegistry
 export interface TemplateEntry {
 	/** Template id — its subdirectory name in the registry, and the value `create` accepts as an argument. */
 	id: string
-	/** Human label for prompts and logs — the manifest's `name`, falling back to its `framework`, then the id. */
+	/** Human label for prompts and logs — the manifest's `name`, falling back to its `id`, then the directory id. */
 	label: string
 	/** Absolute path to the template's directory inside the fetched registry. */
 	dir: string
 }
 
 /** The display fields from a raw `template.json`, read leniently so one bad manifest can't break discovery. */
-function readMeta(manifestPath: string): { name?: string; framework?: string } {
+function readMeta(manifestPath: string): { name?: string; id?: string } {
 	try {
-		const raw = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { name?: unknown; framework?: unknown }
+		const raw = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { name?: unknown; id?: unknown }
 		return {
 			name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : undefined,
-			framework: typeof raw.framework === "string" && raw.framework.trim() ? raw.framework.trim() : undefined,
+			id: typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : undefined,
 		}
 	} catch {
 		// Full schema validation happens when the template is actually applied (`readManifest`).
@@ -88,7 +88,7 @@ function readMeta(manifestPath: string): { name?: string; framework?: string } {
  *   break the listing.
  * - A single template: a directory that is itself a template (`template.json` at its root) — the escape
  *   hatch for a community template shipped on its own, e.g. `--source github:acme/kizlo-astro-template`.
- *   Its id comes from the manifest's `framework` (a stable name that also matches what `init`'s detected
+ *   Its id comes from the manifest's `id` (a stable name that also matches what `init`'s detected
  *   preset asks for), not the directory name, which for a downloaded repo is a random temp folder.
  *
  * Discovery is by scanning, not a hardcoded list, and the manifest is read only for its display fields
@@ -110,8 +110,8 @@ export function listTemplates(registryDir: string): TemplateEntry[] {
 	if (isSingleTemplate(registryDir)) {
 		const rootManifest = path.join(registryDir, "template.json")
 		const meta = readMeta(rootManifest)
-		const id = meta.framework ?? path.basename(registryDir)
-		return [{ id, label: meta.name ?? meta.framework ?? id, dir: registryDir }]
+		const id = meta.id ?? path.basename(registryDir)
+		return [{ id, label: meta.name ?? meta.id ?? id, dir: registryDir }]
 	}
 
 	const entries: TemplateEntry[] = []
@@ -121,19 +121,28 @@ export function listTemplates(registryDir: string): TemplateEntry[] {
 		const manifestPath = path.join(dir, "template.json")
 		if (!fs.existsSync(manifestPath)) continue
 		const meta = readMeta(manifestPath)
-		entries.push({ id: dirent.name, label: meta.name ?? meta.framework ?? dirent.name, dir })
+		entries.push({ id: dirent.name, label: meta.name ?? meta.id ?? dirent.name, dir })
 	}
 	return entries.sort((a, b) => a.id.localeCompare(b.id))
 }
 
-/** A template's detection dependency list, read leniently so one bad manifest can't break detection. */
+/**
+ * A template's detection package list — the `values` of every `dep` requirement under `init.requires`,
+ * read leniently (raw JSON, no schema) so one malformed manifest can't break detection for the rest of a
+ * registry. Full schema validation happens when the template is actually applied (`readManifest`).
+ */
 function readDetectDeps(templateDir: string): string[] {
 	try {
-		const raw = JSON.parse(fs.readFileSync(path.join(templateDir, "template.json"), "utf8")) as { detect?: { dependencies?: unknown } }
-		const deps = raw.detect?.dependencies
-		return Array.isArray(deps) ? deps.filter((name): name is string => typeof name === "string") : []
+		const raw = JSON.parse(fs.readFileSync(path.join(templateDir, "template.json"), "utf8")) as {
+			init?: { requires?: Array<{ kind?: unknown; values?: unknown }> }
+		}
+		const requires = raw.init?.requires
+		if (!Array.isArray(requires)) return []
+		return requires
+			.filter((req) => req?.kind === "dep" && Array.isArray(req.values))
+			.flatMap((req) => req.values as unknown[])
+			.filter((name): name is string => typeof name === "string")
 	} catch {
-		// Full schema validation happens when the template is actually applied (`readManifest`).
 		return []
 	}
 }

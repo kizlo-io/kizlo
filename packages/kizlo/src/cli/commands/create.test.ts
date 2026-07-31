@@ -3,32 +3,68 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { readManifest } from "../presets/template"
-import { getVersion } from "../utils"
-import { applyManifestWiring, bootstrapArgs, normalizeProjectName, projectName } from "./create"
+import { promptFragment, readManifest, resolvePromptDefault, type TemplatePrompt } from "../presets/template"
+import { getVersion, tokenizeCommand } from "../utils"
+import { applyManifestWiring, bootstrapArgs, isDirScaffoldable, normalizeProjectName, projectName } from "./create"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const templateDir = path.resolve(here, "../../../../../templates/nextjs")
 const astroTemplateDir = path.resolve(here, "../../../../../templates/astro")
+const tanstackTemplateDir = path.resolve(here, "../../../../../templates/tanstack-start-react")
 
 describe("bootstrapArgs", () => {
 	const manifest = readManifest(templateDir)
 
-	it("builds the framework create argv from the manifest, substituting {{pm}}", () => {
-		const argv = bootstrapArgs(manifest, "pnpm", "my-app")
+	it("tokenizes the manifest command, substituting {{pm}} and {{name}}", () => {
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--no-eslint" })
 		expect(argv?.slice(0, 4)).toEqual(["pnpm", "create", "next-app@latest", "my-app"])
-		// The {{pm}} token is resolved to the chosen manager, and no unresolved tokens remain.
+		// `--import-alias @/*` stays two separate tokens, and the alias survives tokenizing intact.
+		const aliasFlag = argv?.indexOf("--import-alias")
+		expect(argv?.[(aliasFlag as number) + 1]).toBe("@/*")
+		// Both tokens are resolved to the chosen manager / project name, and none remain unsubstituted.
 		expect(argv).toContain("--use-pnpm")
-		expect(argv?.some((arg) => arg.includes("{{pm}}"))).toBe(false)
+		expect(argv?.some((arg) => arg.includes("{{pm}}") || arg.includes("{{name}}") || arg.includes("{{linter}}"))).toBe(false)
 	})
 
-	it("routes npm flags through a -- separator", () => {
-		const argv = bootstrapArgs(manifest, "npm", "my-app")
-		expect(argv?.slice(0, 5)).toEqual(["npm", "create", "next-app@latest", "my-app", "--"])
+	it("substitutes {{name}} into whichever position the template places it", () => {
+		const argv = bootstrapArgs(manifest, "npm", "cool-app", { linter: "--no-eslint" })
+		expect(argv?.slice(0, 4)).toEqual(["npm", "create", "next-app@latest", "cool-app"])
 		expect(argv).toContain("--use-npm")
 	})
 
-	it("builds the create-astro argv from the astro manifest (no {{pm}} token)", () => {
+	it("expands {{dlx}} to the manager's exec command for a non-create-* CLI", () => {
+		const tanstackManifest = readManifest(tanstackTemplateDir)
+		// pnpm/yarn spell it `<pm> dlx` (two tokens); npm uses `npx`, bun uses `bunx` (one token).
+		expect(bootstrapArgs(tanstackManifest, "pnpm", "my-app")?.slice(0, 3)).toEqual(["pnpm", "dlx", "@tanstack/cli@latest"])
+		expect(bootstrapArgs(tanstackManifest, "npm", "my-app")?.slice(0, 2)).toEqual(["npx", "@tanstack/cli@latest"])
+		expect(bootstrapArgs(tanstackManifest, "bun", "my-app")?.slice(0, 2)).toEqual(["bunx", "@tanstack/cli@latest"])
+		// The `create` subcommand and remaining flags follow the exec command, and no token remains.
+		const argv = bootstrapArgs(tanstackManifest, "pnpm", "my-app")
+		expect(argv).toEqual([
+			"pnpm",
+			"dlx",
+			"@tanstack/cli@latest",
+			"create",
+			"--target-dir",
+			"my-app",
+			"--blank",
+			"-y",
+			"--package-manager",
+			"pnpm",
+			"--no-install",
+			"--no-git",
+		])
+	})
+
+	it("passes a path-style name through TanStack's --target-dir, not the URL-friendly slug positional", () => {
+		// kizlo permits a path name (`apps/my-app`); TanStack's positional rejects the `/`, so the template
+		// routes it through `--target-dir`, which derives the slug from the basename.
+		const argv = bootstrapArgs(readManifest(tanstackTemplateDir), "pnpm", "apps/my-app")
+		const targetDir = argv?.indexOf("--target-dir")
+		expect(argv?.[(targetDir as number) + 1]).toBe("apps/my-app")
+	})
+
+	it("tokenizes the astro manifest command (no {{pm}} token in the initializer)", () => {
 		const astroManifest = readManifest(astroTemplateDir)
 		const argv = bootstrapArgs(astroManifest, "pnpm", "my-app")
 		expect(argv?.slice(0, 4)).toEqual(["pnpm", "create", "astro@latest", "my-app"])
@@ -36,6 +72,109 @@ describe("bootstrapArgs", () => {
 		expect(argv).toContain("minimal")
 		// create-astro infers the package manager from the invoker, so there is no {{pm}} substitution.
 		expect(argv?.some((arg) => arg.includes("{{pm}}"))).toBe(false)
+	})
+
+	it("splices a prompt fragment into the bootstrap via its {{token}}", () => {
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--eslint" })
+		expect(argv).toContain("--eslint")
+		expect(argv).not.toContain("--no-eslint")
+		expect(argv?.some((arg) => arg.includes("{{linter}}"))).toBe(false)
+	})
+
+	it("drops a prompt token whose fragment is empty, leaving the surrounding flags intact", () => {
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "" })
+		// No stray empty token and no leftover placeholder.
+		expect(argv?.some((arg) => arg === "" || arg.includes("{{linter}}"))).toBe(false)
+		// The flags that flanked {{linter}} still line up.
+		const aliasFlag = argv?.indexOf("--import-alias")
+		expect(argv?.[(aliasFlag as number) + 1]).toBe("@/*")
+		expect(argv).toContain("--no-turbopack")
+	})
+
+	it("expands a multi-flag prompt fragment into separate argv tokens", () => {
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--eslint --strict" })
+		expect(argv).toContain("--eslint")
+		expect(argv).toContain("--strict")
+	})
+})
+
+describe("template prompts", () => {
+	const select: TemplatePrompt = {
+		kind: "select",
+		token: "linter",
+		message: "Which linter?",
+		default: "none",
+		options: [
+			{ label: "ESLint", value: "eslint", arg: "--eslint" },
+			{ label: "None", value: "none", arg: "--no-eslint" },
+		],
+	}
+	const confirm: TemplatePrompt = {
+		kind: "confirm",
+		token: "tp",
+		message: "Turbopack?",
+		default: true,
+		arg: "--turbopack",
+		argFalse: "--no-turbopack",
+	}
+	const text: TemplatePrompt = { kind: "text", token: "alias", message: "Import alias?", arg: "--import-alias {{value}}" }
+
+	it("resolvePromptDefault picks a select's default option, else the first", () => {
+		expect(resolvePromptDefault(select)).toEqual({ answer: "none", arg: "--no-eslint" })
+		expect(resolvePromptDefault({ ...select, default: undefined })).toEqual({ answer: "eslint", arg: "--eslint" })
+	})
+
+	it("resolvePromptDefault maps a confirm default to arg / argFalse", () => {
+		expect(resolvePromptDefault(confirm)).toEqual({ answer: true, arg: "--turbopack" })
+		expect(resolvePromptDefault({ ...confirm, default: false })).toEqual({ answer: false, arg: "--no-turbopack" })
+	})
+
+	it("promptFragment falls back to the first option for a stale select answer", () => {
+		expect(promptFragment(select, "gone")).toBe("--eslint")
+	})
+
+	it("promptFragment shell-quotes a text value so spaces survive tokenizing", () => {
+		const fragment = promptFragment(text, "my alias")
+		expect(fragment).toBe('--import-alias "my alias"')
+		// Spliced into a command, the quoted value stays exactly one argv token.
+		expect(tokenizeCommand(`create ${fragment}`)).toEqual(["create", "--import-alias", "my alias"])
+	})
+
+	it("promptFragment contributes nothing for an empty text value with the default arg", () => {
+		const bare: TemplatePrompt = { kind: "text", token: "x", message: "?", arg: "{{value}}" }
+		expect(promptFragment(bare, "")).toBe("")
+	})
+})
+
+describe("manifest prompt guard", () => {
+	let dir: string
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-manifest-"))
+	})
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
+	const writeManifest = (prompts: unknown[]): void => {
+		const manifest = {
+			id: "x",
+			config: { alias: "@", kizloPath: "src/lib/kizlo" },
+			create: { command: "{{pm}} create x {{name}}", prompts },
+		}
+		fs.writeFileSync(path.join(dir, "template.json"), JSON.stringify(manifest))
+	}
+
+	it("rejects a prompt token that shadows a core token", () => {
+		writeManifest([{ kind: "select", token: "name", message: "?", options: [{ label: "A", value: "a", arg: "--a" }] }])
+		expect(() => readManifest(dir)).toThrow()
+	})
+
+	it("rejects duplicate prompt tokens", () => {
+		writeManifest([
+			{ kind: "confirm", token: "dup", message: "?" },
+			{ kind: "confirm", token: "dup", message: "?" },
+		])
+		expect(() => readManifest(dir)).toThrow()
 	})
 })
 
@@ -54,11 +193,40 @@ describe("projectName", () => {
 		expect(projectName("apps/my-app/")).toBeUndefined()
 	})
 
+	it("accepts a lone `.` — the opt-in to scaffold into the current directory", () => {
+		expect(projectName(".")).toBeUndefined()
+	})
+
 	it("rejects an empty name or one whose final segment isn't a folder", () => {
 		expect(projectName("")).toBeDefined()
 		expect(projectName("apps/..")).toBeDefined()
+		// `.` is only the current-dir opt-in on its own — not as a path segment.
 		expect(projectName("apps/.")).toBeDefined()
 		expect(projectName("apps/my app")).toBeDefined()
+	})
+})
+
+describe("isDirScaffoldable", () => {
+	let dir: string
+
+	beforeEach(() => {
+		dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-scaffoldable-"))
+	})
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
+	it("treats an empty directory (or one with only .git/.DS_Store) as scaffoldable", () => {
+		expect(isDirScaffoldable(dir)).toBe(true)
+		fs.mkdirSync(path.join(dir, ".git"))
+		fs.writeFileSync(path.join(dir, ".DS_Store"), "")
+		expect(isDirScaffoldable(dir)).toBe(true)
+	})
+
+	it("rejects a directory that holds real files", () => {
+		fs.writeFileSync(path.join(dir, "README.md"), "hi")
+		expect(isDirScaffoldable(dir)).toBe(false)
 	})
 })
 

@@ -4,7 +4,7 @@ import * as p from "@clack/prompts"
 import { CONTRACT_BARREL } from "../daemon/generate"
 import type { ScaffoldContext, ScaffoldFile } from "../presets"
 import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode, resolvePatchTargetPath } from "../presets/patch"
-import { type PatchEntry, resolvePatch, type TemplateConventions } from "../presets/template"
+import { type PatchEntry, resolvePatch, type TemplateConfig } from "../presets/template"
 import { aliasWithSlash, resolveModuleImport, writeFileIfAbsent } from "../utils"
 import { orCancel } from "./_setup"
 
@@ -25,24 +25,25 @@ export default defineConfig({
 }
 
 /**
- * Build the {@link ScaffoldContext} that adapts a template's conventions (paths and imports) to a real
- * project. `dirRel` is the Kizlo home directory, `appDir` the App Router directory, and `alias` the
- * import-alias prefix (empty for relative imports). Imports are resolved per calling file so each
- * scaffolded file references its targets through the right specifier — `importFrom` for any project
- * path (used to retarget every template-alias import), `serverImport` the server-entry shorthand.
+ * Build the {@link ScaffoldContext} that adapts a template's config (paths and imports) to a real
+ * project. `dirRel` is the Kizlo home directory, `hasSrcDir` whether the project keeps source under
+ * `src/` (decides the `src/` normalization of template paths), and `alias` the import-alias prefix (empty
+ * for relative imports). Imports are resolved per calling file so each scaffolded file references its
+ * targets through the right specifier — `importFrom` for any project path (used to retarget every
+ * template-alias import), `serverImport` the server-entry shorthand.
  */
 export function buildScaffoldContext(
 	cwd: string,
-	{ dirRel, appDir, alias, clientUrl }: { dirRel: string; appDir: string; alias: string; clientUrl?: string },
+	{ dirRel, hasSrcDir, alias, clientUrl }: { dirRel: string; hasSrcDir: boolean; alias: string; clientUrl?: string },
 ): ScaffoldContext {
 	const serverDirRel = path.join(dirRel, "server")
 	const importFrom = (targetRel: string, fromDir: string) => resolveModuleImport(cwd, targetRel, fromDir, alias)
 	return {
-		kizloDir: dirRel,
+		kizloPath: dirRel,
 		serverDirName: path.basename(serverDirRel),
 		serverEntryPath: path.join(serverDirRel, "index.ts"),
 		clientPath: path.join(dirRel, "client.ts"),
-		appDir,
+		hasSrcDir,
 		serverImport: (fromDir) => importFrom(serverDirRel, fromDir),
 		importFrom,
 		clientUrl,
@@ -98,15 +99,10 @@ export function writeGeneratedContract(cwd: string, serverDirRel: string): void 
  * written to a guessed-at file. We never scan the tree to find a stand-in. A confident apply is an
  * idempotent upsert: it replaces our exports if present, adds them if not.
  */
-export function applyProjectPatches(
-	cwd: string,
-	patches: readonly PatchEntry[],
-	conventions: TemplateConventions,
-	scaffold: ScaffoldContext,
-): void {
+export function applyProjectPatches(cwd: string, patches: readonly PatchEntry[], config: TemplateConfig, scaffold: ScaffoldContext): void {
 	const manualSteps: ResolvedPatch[] = []
 	for (const entry of patches) {
-		const resolved = resolvePatch(entry, conventions, scaffold)
+		const resolved = resolvePatch(entry, config, scaffold)
 		// A `note`-mode patch is a change Kizlo can't safely auto-merge (e.g. Astro's defineConfig
 		// output/adapter): never read or write the file — always print the instruction at the end.
 		if (resolved.mode === "note") {

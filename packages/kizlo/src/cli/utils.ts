@@ -209,6 +209,130 @@ export function detectInvokingPackageManager(): PackageManager | undefined {
 	return name === "pnpm" || name === "yarn" || name === "bun" || name === "npm" ? name : undefined
 }
 
+/** An enclosing workspace found above a target directory. */
+export interface WorkspaceInfo {
+	/** The workspace root — the dir a member install runs from, where the single lockfile lives. */
+	root: string
+	/** Which config declares the workspace: pnpm's `pnpm-workspace.yaml`, or a `package.json` `workspaces` field (npm/yarn/bun). */
+	kind: "pnpm" | "npm"
+}
+
+/**
+ * Walk up from `fromDir` for the nearest enclosing workspace root: a directory holding a
+ * `pnpm-workspace.yaml` (pnpm), or a `package.json` with a non-empty `workspaces` field (npm/yarn/bun).
+ * Returns the root and which config declares it, or `undefined` when the target is standalone (no
+ * monorepo above it). Only those two markers count — a plain parent `package.json` without `workspaces`
+ * does not make a workspace. Start this from the app's *parent*: a scaffolded app may carry its own
+ * (framework-created) workspace file, and we only care about an *enclosing* one.
+ */
+export function findWorkspaceRoot(fromDir: string): WorkspaceInfo | undefined {
+	let dir = path.resolve(fromDir)
+	while (true) {
+		if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) return { root: dir, kind: "pnpm" }
+		if (workspaceGlobs(dir).length > 0) return { root: dir, kind: "npm" }
+		const parent = path.dirname(dir)
+		if (parent === dir) return undefined // reached the filesystem root
+		dir = parent
+	}
+}
+
+/** The `workspaces` globs declared in `dir`'s `package.json` (array, or the `{ packages: [] }` form); empty when absent or unreadable. */
+function workspaceGlobs(dir: string): string[] {
+	const pkgPath = path.join(dir, "package.json")
+	if (!fs.existsSync(pkgPath)) return []
+	try {
+		const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as { workspaces?: string[] | { packages?: string[] } }
+		return (Array.isArray(pkg.workspaces) ? pkg.workspaces : pkg.workspaces?.packages) ?? []
+	} catch {
+		return []
+	}
+}
+
+/**
+ * Match a workspace-relative POSIX path against a set of `workspaces`-style globs: `*` matches a single
+ * path segment, `**` any depth, and a leading `!` excludes (later patterns win, so an exclude can undo an
+ * earlier match). Deliberately small — workspace globs are simple directory patterns, not full gitignore
+ * semantics — and only used as the npm/yarn/bun membership fallback (pnpm membership asks pnpm directly).
+ */
+export function matchesWorkspaceGlobs(relPath: string, globs: readonly string[]): boolean {
+	let matched = false
+	for (const raw of globs) {
+		const negated = raw.startsWith("!")
+		if (globToRegExp(negated ? raw.slice(1) : raw).test(relPath)) matched = !negated
+	}
+	return matched
+}
+
+function globToRegExp(glob: string): RegExp {
+	const pattern = glob.replace(/\/+$/, "")
+	let re = ""
+	for (let i = 0; i < pattern.length; i++) {
+		const char = pattern[i]
+		if (char === "*") {
+			if (pattern[i + 1] === "*") {
+				re += ".*"
+				i++
+				if (pattern[i + 1] === "/") i++ // swallow the slash after `**` so `a/**` matches `a` too
+			} else {
+				re += "[^/]+"
+			}
+		} else if ("\\^$.|?+()[]{}".includes(char as string)) {
+			re += `\\${char}`
+		} else {
+			re += char
+		}
+	}
+	return new RegExp(`^${re}$`)
+}
+
+/**
+ * Whether `appDir` is a member of `workspace` — i.e. whether an install run from the workspace root would
+ * install it. For pnpm this asks pnpm itself (`pnpm -r ls`), matching pnpm's own resolution exactly rather
+ * than reimplementing its glob rules; for npm/yarn/bun (which offer no equivalent pre-install enumeration)
+ * it glob-matches the app's path against the root's `workspaces` globs. The app must already exist on disk
+ * for either check to see it. A failed or unparseable pnpm probe reads as "not a member" — the safe
+ * default, since it falls back to a standalone install rather than a root install that might do nothing.
+ */
+export function isWorkspaceMember(workspace: WorkspaceInfo, appDir: string): boolean {
+	const target = path.resolve(appDir)
+	if (workspace.kind === "pnpm") {
+		const result = spawnSync("pnpm", ["-r", "ls", "--depth", "-1", "--json"], {
+			cwd: workspace.root,
+			encoding: "utf8",
+			shell: process.platform === "win32",
+		})
+		if (result.error || result.status !== 0 || !result.stdout) return false
+		try {
+			const projects = JSON.parse(result.stdout) as { path: string }[]
+			return projects.some((project) => path.resolve(project.path) === target)
+		} catch {
+			return false
+		}
+	}
+	const rel = path.relative(workspace.root, target).split(path.sep).join("/")
+	return matchesWorkspaceGlobs(rel, workspaceGlobs(workspace.root))
+}
+
+/**
+ * The app-local package-manager files a framework's `create` CLI may leave behind that detach a scaffolded
+ * app from an enclosing monorepo: a nested `pnpm-workspace.yaml` makes the app its own workspace root, and
+ * a stray lockfile shadows the monorepo's single one. Removed only when the app is a workspace *member*, so
+ * an install from the root treats it as one (fixing `workspace:` resolution); a standalone app keeps its
+ * files, where they're correct. Returns the names removed.
+ */
+export function cleanupWorkspaceArtifacts(dir: string): string[] {
+	const artifacts = ["pnpm-workspace.yaml", "pnpm-lock.yaml", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "bun.lockb"]
+	const removed: string[] = []
+	for (const name of artifacts) {
+		const file = path.join(dir, name)
+		if (fs.existsSync(file)) {
+			fs.rmSync(file)
+			removed.push(name)
+		}
+	}
+	return removed
+}
+
 /**
  * Whether `command` resolves to a runnable executable, probed with `--version`. Used to hide or
  * disable package-manager choices the user can't actually run. A non-zero exit or a spawn error
@@ -257,20 +381,15 @@ export function approveBuildsCommand(pm: PackageManager, output: string): string
 }
 
 /**
- * The argv to run a framework's `create-*` initializer through a package manager, e.g.
- * `pnpm create next-app@latest my-app --ts …`. The mechanics differ per manager: npm forwards
- * flags to the initializer only after a `--` separator, and `yarn create` resolves the latest
- * version itself so the `@latest` tag is dropped. `flags` are the initializer's own options.
+ * Split a command string into an argv array the way a shell would for the simple cases a bootstrap
+ * command needs: runs of whitespace separate tokens, and a single- or double-quoted span groups a token
+ * that contains spaces (the surrounding quotes are stripped). There is no variable, glob, or escape
+ * expansion — a bootstrap command is a plain `<pm> create … {{name}}` template, so this stays a small
+ * tokenizer rather than a full shell parser. Empty and whitespace-only strings yield an empty argv.
  */
-export function frameworkCreateArgs(pm: PackageManager, initializer: string, name: string, flags: string[]): string[] {
-	switch (pm) {
-		case "npm":
-			return ["npm", "create", initializer, name, "--", ...flags]
-		case "yarn":
-			return ["yarn", "create", initializer.replace(/@latest$/, ""), name, ...flags]
-		default:
-			return [pm, "create", initializer, name, ...flags]
-	}
+export function tokenizeCommand(command: string): string[] {
+	const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g
+	return Array.from(command.matchAll(pattern), (match) => match[1] ?? match[2] ?? match[3] ?? "")
 }
 
 export function runCommand(args: string[], cwd: string, stdio: "inherit" | "ignore" = "inherit"): boolean {
@@ -300,26 +419,12 @@ export function runCommandAsync(args: string[], cwd: string, stdio: "inherit" | 
 }
 
 /**
- * Run a command capturing its combined output instead of streaming it, for a step that should stay
- * quiet on success but whose logs are worth surfacing when it fails (e.g. the framework's scaffolder
- * behind a spinner). Returns whether it succeeded and the trimmed stdout+stderr.
- */
-export function runCommandCaptured(args: string[], cwd: string): { ok: boolean; output: string } {
-	const [command, ...rest] = args
-	if (!command) return { ok: false, output: "" }
-	const result = spawnSync(command, rest, {
-		cwd,
-		encoding: "utf8",
-		shell: process.platform === "win32",
-	})
-	return { ok: result.status === 0, output: `${result.stdout ?? ""}${result.stderr ?? ""}`.trim() }
-}
-
-/**
- * Async sibling of {@link runCommandCaptured}: captures a command's combined output without blocking the
- * event loop, so a clack spinner keeps animating while it runs (the synchronous `runCommandCaptured` would
- * freeze it on the first frame). Resolves whether it exited cleanly plus the trimmed stdout+stderr; a
- * spawn error (binary off PATH) resolves `{ ok: false, output: "" }`.
+ * Run a command capturing its combined output instead of streaming it, for a step that should stay quiet
+ * on success but whose logs are worth surfacing when it fails (e.g. the framework's scaffolder behind a
+ * spinner). Runs without blocking the event loop, so a clack spinner keeps animating while it works — a
+ * synchronous `spawnSync` would freeze the spinner on its first frame and look stuck. Resolves whether it
+ * exited cleanly plus the trimmed stdout+stderr; a spawn error (binary off PATH) resolves
+ * `{ ok: false, output: "" }`.
  */
 export function runCommandCapturedAsync(args: string[], cwd: string): Promise<{ ok: boolean; output: string }> {
 	const [command, ...rest] = args

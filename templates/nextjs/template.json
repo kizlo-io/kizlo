@@ -1,142 +1,156 @@
 {
-	"framework": "nextjs",
+	"id": "nextjs",
 	"name": "Next.js",
-	"minCli": "0.11.0",
-	"apiPath": "/api/kizlo",
-	"detect": {
-		"dependencies": ["next"]
+	"minCli": "0.13.1",
+	"config": {
+		"alias": "@",
+		"apiPath": "/api/kizlo",
+		"kizloPath": "src/lib/kizlo"
 	},
-	"requires": {
-		"anyDir": ["app", "src/app"],
-		"message": "Kizlo needs the Next.js App Router — no `app` or `src/app` directory found. The Pages Router isn't supported."
-	},
-	"bootstrap": {
-		"initializer": "next-app@latest",
-		"flags": [
-			"--ts",
-			"--app",
-			"--src-dir",
-			"--import-alias",
-			"@/*",
-			"--no-eslint",
-			"--no-turbopack",
-			"--skip-install",
-			"--disable-git",
-			"--use-{{pm}}",
-			"--yes"
+	"init": {
+		"requires": [
+			{
+				"kind": "dep",
+				"values": ["next"]
+			},
+			{
+				"kind": "dir",
+				"values": ["app", "src/app"],
+				"message": "Kizlo needs the Next.js App Router — no `app` or `src/app` directory found. The Pages Router isn't supported."
+			}
 		]
 	},
-	"conventions": {
-		"kizloDir": "src/lib/kizlo",
-		"appDir": "src/app",
-		"alias": "@"
+	"create": {
+		"command": "{{pm}} create next-app@latest {{name}} --ts --app --src-dir --import-alias @/* {{linter}} --no-turbopack --skip-install --disable-git --use-{{pm}} --yes",
+		"prompts": [
+			{
+				"kind": "select",
+				"token": "linter",
+				"message": "Which linter would you like to use?",
+				"default": "none",
+				"options": [
+					{
+						"label": "ESLint",
+						"value": "eslint",
+						"arg": "--eslint"
+					},
+					{
+						"label": "None",
+						"value": "none",
+						"arg": "--no-eslint"
+					}
+				]
+			}
+		]
 	},
-	"base": [
-		{
-			"kind": "file",
-			"role": "server-entry",
-			"path": "src/lib/kizlo/server/index.ts"
-		},
-		{
-			"kind": "file",
-			"role": "client",
-			"path": "src/lib/kizlo/client.ts"
-		},
-		{
-			"kind": "file",
-			"role": "api-route",
-			"path": "src/app/api/kizlo/[[...rest]]/route.ts"
-		},
-		{
-			"kind": "file",
-			"role": "robots",
-			"path": "src/app/robots.txt/route.ts"
-		},
-		{
-			"kind": "file",
-			"role": "sitemap",
-			"path": "src/app/sitemaps/[sitemap]/route.ts"
-		},
-		{
-			"kind": "file",
-			"role": "sitemap-redirect",
-			"path": "src/app/sitemap.xml/route.ts"
-		},
-		{
-			"kind": "file",
-			"role": "manifest",
-			"path": "src/app/site.webmanifest/route.ts"
-		},
-		{
-			"kind": "file",
-			"role": "blog-post",
-			"path": "src/app/blog/[slug]/page.tsx",
-			"example": true
-		}
-	],
-	"create": [
-		{
-			"kind": "file",
-			"role": "root-layout",
-			"path": "src/app/layout.tsx"
-		},
-		{
-			"kind": "file",
-			"role": "home-page",
-			"path": "src/app/page.tsx",
-			"example": true
-		}
-	],
-	"init": [
-		{
-			"kind": "patch",
-			"role": "root-layout",
-			"label": "root layout",
-			"path": "src/app/layout.tsx",
-			"imports": [
-				{
-					"module": "kizlo/nextjs/server",
-					"names": ["createRootMetadata", "createRootViewport"]
-				},
-				{
-					"module": "{{serverImport}}",
-					"names": ["client"]
-				}
-			],
-			"exports": [
-				{
-					"name": "generateMetadata",
-					"value": "createRootMetadata(client)"
-				},
-				{
-					"name": "generateViewport",
-					"value": "createRootViewport(client)"
-				}
-			]
-		},
-		{
-			"kind": "patch",
-			"role": "home-page",
-			"label": "home page",
-			"path": "src/app/page.tsx",
-			"imports": [
-				{
-					"module": "kizlo/nextjs/server",
-					"names": ["createHomeMetadata"]
-				},
-				{
-					"module": "{{serverImport}}",
-					"names": ["client"]
-				}
-			],
-			"exports": [
-				{
-					"name": "generateMetadata",
-					"value": "createHomeMetadata(client)"
-				}
-			]
-		}
-	],
+	"changes": {
+		"base": [
+			{
+				"kind": "file",
+				"role": "server-entry",
+				"path": "src/lib/kizlo/server/index.ts"
+			},
+			{
+				"kind": "file",
+				"role": "client",
+				"path": "src/lib/kizlo/client.ts"
+			},
+			{
+				"kind": "file",
+				"role": "api-route",
+				"path": "src/app/api/kizlo/[[...rest]]/route.ts"
+			},
+			{
+				"kind": "file",
+				"role": "robots",
+				"path": "src/app/robots.txt/route.ts"
+			},
+			{
+				"kind": "file",
+				"role": "sitemap",
+				"path": "src/app/sitemaps/[sitemap]/route.ts"
+			},
+			{
+				"kind": "file",
+				"role": "sitemap-redirect",
+				"path": "src/app/sitemap.xml/route.ts"
+			},
+			{
+				"kind": "file",
+				"role": "manifest",
+				"path": "src/app/site.webmanifest/route.ts"
+			},
+			{
+				"kind": "file",
+				"role": "blog-post",
+				"path": "src/app/blog/[slug]/page.tsx",
+				"example": true
+			}
+		],
+		"create": [
+			{
+				"kind": "file",
+				"role": "root-layout",
+				"path": "src/app/layout.tsx"
+			},
+			{
+				"kind": "file",
+				"role": "home-page",
+				"path": "src/app/page.tsx",
+				"example": true
+			}
+		],
+		"init": [
+			{
+				"kind": "patch",
+				"role": "root-layout",
+				"label": "root layout",
+				"path": "src/app/layout.tsx",
+				"imports": [
+					{
+						"module": "kizlo/nextjs/server",
+						"names": ["createRootMetadata", "createRootViewport"]
+					},
+					{
+						"module": "{{serverImport}}",
+						"names": ["client"]
+					}
+				],
+				"exports": [
+					{
+						"name": "generateMetadata",
+						"value": "createRootMetadata(client)"
+					},
+					{
+						"name": "generateViewport",
+						"value": "createRootViewport(client)"
+					}
+				]
+			},
+			{
+				"kind": "patch",
+				"role": "home-page",
+				"label": "home page",
+				"path": "src/app/page.tsx",
+				"imports": [
+					{
+						"module": "kizlo/nextjs/server",
+						"names": ["createHomeMetadata"]
+					},
+					{
+						"module": "{{serverImport}}",
+						"names": ["client"]
+					}
+				],
+				"exports": [
+					{
+						"name": "generateMetadata",
+						"value": "createHomeMetadata(client)"
+					}
+				]
+			}
+		]
+	},
 	"env": {
 		"baseUrl": "NEXT_PUBLIC_KIZLO_API_URL",
 		"remote": {

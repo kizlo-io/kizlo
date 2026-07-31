@@ -39,13 +39,25 @@ import type { ScaffoldContext, ScaffoldFile } from "./types"
  *   patch may instead set `mode: "note"` to always print its instructions rather than edit the file —
  *   for a change too shaped-unlike an import/export to auto-merge (Astro's `defineConfig` output/adapter).
  */
-const conventionsSchema = z.object({
-	/** Kizlo home directory in the template, e.g. `src/lib/kizlo`. */
-	kizloDir: z.string(),
-	/** App Router directory in the template, e.g. `src/app`. */
-	appDir: z.string(),
-	/** Import alias prefix the template's files use, e.g. `@`. */
+/**
+ * The template's wiring config — how Kizlo addresses the files it lays down, rewritten to the project's
+ * own layout on apply (used by both `create` and `init`, unlike the init-only preconditions). The
+ * template writes its files against its own {@link configSchema.shape.kizloPath} and
+ * {@link configSchema.shape.alias}; on apply the Kizlo dir is retargeted to the project's chosen location,
+ * every alias import to the project's import style, and every other `src/`-rooted path to the project's
+ * `src/` convention (kept when the project uses `src/`, stripped when it doesn't).
+ */
+const configSchema = z.object({
+	/**
+	 * The path the API handler mounts at (e.g. `/api/kizlo`), appended to the base URL so the client and
+	 * route handler agree. Read generically by `create`/`init` — the CLI hardcodes no framework path.
+	 * Absent on templates whose client resolves the backend URL itself. See {@link withApiPath}.
+	 */
+	apiPath: z.string().optional(),
+	/** Import alias prefix the template's files use, e.g. `@` (empty rewrites cross-file imports to relative). */
 	alias: z.string(),
+	/** Kizlo home directory in the template, e.g. `src/lib/kizlo`; retargeted to the user's chosen Kizlo dir on apply. */
+	kizloPath: z.string(),
 })
 
 const fileSchema = z.object({
@@ -85,22 +97,138 @@ const patchSchema = z.object({
 	note: z.string().optional(),
 })
 
-const bootstrapSchema = z.object({
-	/**
-	 * The framework's official `create-*` initializer, e.g. `next-app@latest`. `create` runs it through
-	 * the chosen package manager (`<pm> create <initializer> <name> …`); the CLI owns only the argv
-	 * mechanics (the `create` verb, npm's `--` separator), so the template stays framework-authoritative.
-	 */
-	initializer: z.string(),
-	/**
-	 * Flags passed to the initializer. Must produce a project whose shape matches {@link conventionsSchema}
-	 * (directory layout, import alias) so the wiring lands where the manifest expects. `{{pm}}` is
-	 * substituted with the chosen package manager (e.g. `--use-{{pm}}`).
-	 */
-	flags: z.array(z.string()).default([]),
+/**
+ * The `command` half of {@link createSchema}: the full invocation that scaffolds the base app with the
+ * framework's own CLI, written exactly as it would be typed — e.g. `{{pm}} create next-app@latest {{name}}
+ * --ts …`. The CLI imposes no shape: it tokenizes the string, substitutes the tokens below, and runs the
+ * argv verbatim, so a template can use any invocation (a `create-*` initializer, `{{pm}} dlx <cli> create`,
+ * a subcommand after the package spec) without the CLI knowing anything framework-specific. The template is
+ * fully authoritative, which means it also owns any package-manager quirks (npm's `--` separator, yarn's
+ * `@latest` handling).
+ *
+ * The core tokens substituted before the command runs:
+ * - `{{pm}}` — the chosen package manager (`pnpm`/`npm`/`yarn`/`bun`).
+ * - `{{name}}` — the project name (or path) the user gave.
+ * - `{{dlx}}` — the manager's run-a-package command (`pnpm dlx`/`npx`/`yarn dlx`/`bunx`), for a CLI that
+ *   isn't a `create-*` package (e.g. `{{dlx}} @tanstack/cli@latest create {{name}}`); a `create-*`
+ *   package invokes more simply as `{{pm}} create <initializer> {{name}}`.
+ *
+ * Beyond those, a `{{<token>}}` for every prompt in the same `create` block (see {@link promptSchema}) is
+ * substituted with the CLI fragment the user's answer maps to — the mechanism that lets a template
+ * surface a real framework choice (which linter, turbopack on/off) instead of hard-coding the flag.
+ * A fragment may be empty (contributes nothing) or several flags; each is spliced in as plain text and
+ * re-tokenized, so the CLI still learns nothing framework-specific.
+ *
+ * The command must produce a project whose shape matches {@link configSchema} (directory layout,
+ * import alias) so the wiring lands where the manifest expects. Simple single/double quotes group a
+ * token that contains spaces; there is no shell expansion.
+ */
+const commandSchema = z.string()
+
+/**
+ * A prompt the template asks during `create`, its answer mapped to a fragment of the {@link commandSchema}
+ * command via the prompt's `{{token}}`. This is how a template exposes a framework CLI choice it would
+ * otherwise have to hard-code (which linter, turbopack on/off, a custom import alias) without the Kizlo
+ * CLI knowing anything framework-specific: the manifest owns both the question and the flag it produces.
+ *
+ * Three shapes, discriminated on `kind`:
+ * - `select` — a single choice from {@link promptOptionSchema} options; the chosen option's `arg` is the
+ *   fragment. `default` names the option value pre-selected (and used non-interactively); absent → the
+ *   first option.
+ * - `confirm` — a yes/no; `arg` is the fragment when yes, `argFalse` when no. `default` is the answer used
+ *   non-interactively.
+ * - `text` — free input spliced into `arg` at its `{{value}}` placeholder; the value is shell-quoted so it
+ *   stays a single argv token. Empty input quotes to nothing, so with the default `{{value}}` arg it
+ *   contributes nothing (a wrapping arg like `--flag {{value}}` still emits the flag). `default` is the
+ *   value used non-interactively.
+ *
+ * Every prompt owns a unique `token` that must not shadow a core token (`pm`/`name`/`dlx`); the bootstrap
+ * schema rejects collisions and duplicates.
+ */
+const promptOptionSchema = z.object({
+	/** The label shown in the picker and echoed in the choices summary. */
+	label: z.string(),
+	/** Stable id for this option — names the `default` and is the value carried into resolution. */
+	value: z.string(),
+	/** The CLI fragment this choice contributes to the bootstrap command; empty contributes nothing. */
+	arg: z.string().default(""),
 })
 
+const selectPromptSchema = z.object({
+	kind: z.literal("select"),
+	token: z.string(),
+	message: z.string(),
+	/** The pre-selected option `value`; falls back to the first option when absent. */
+	default: z.string().optional(),
+	options: z.array(promptOptionSchema).min(1),
+})
+
+const confirmPromptSchema = z.object({
+	kind: z.literal("confirm"),
+	token: z.string(),
+	message: z.string(),
+	default: z.boolean().default(true),
+	/** Fragment when the answer is yes. */
+	arg: z.string().default(""),
+	/** Fragment when the answer is no. */
+	argFalse: z.string().default(""),
+})
+
+const textPromptSchema = z.object({
+	kind: z.literal("text"),
+	token: z.string(),
+	message: z.string(),
+	placeholder: z.string().optional(),
+	default: z.string().optional(),
+	/** Fragment template; `{{value}}` is replaced by the shell-quoted input. */
+	arg: z.string().default("{{value}}"),
+})
+
+const promptSchema = z.discriminatedUnion("kind", [selectPromptSchema, confirmPromptSchema, textPromptSchema])
+
+/** The core bootstrap tokens a prompt token must never shadow. */
+const RESERVED_TOKENS = new Set(["pm", "name", "dlx"])
+
+/**
+ * How `create` scaffolds the base app: the framework CLI `command` to run, plus the `prompts` whose answers
+ * fill its `{{token}}` placeholders — kept together because a prompt is meaningless without the command it
+ * customizes. Absent on templates that only `init` supports; `create` refuses a template whose manifest
+ * declares no `create` block. A `superRefine` rejects a prompt `token` that shadows a core token
+ * (`pm`/`name`/`dlx`) or repeats another prompt's, so a mis-authored manifest fails loudly at parse time.
+ */
+const createSchema = z
+	.object({
+		/** The framework CLI invocation, with `{{pm}}`/`{{name}}`/`{{dlx}}` and per-prompt tokens. See {@link commandSchema}. */
+		command: commandSchema,
+		/** Prompts asked before the command runs, each answer spliced into `command` via its `{{token}}`. See {@link promptSchema}. */
+		prompts: z.array(promptSchema).default([]),
+	})
+	.superRefine((create, ctx) => {
+		const seen = new Set<string>()
+		for (const prompt of create.prompts) {
+			if (RESERVED_TOKENS.has(prompt.token))
+				ctx.addIssue({ code: "custom", message: `Prompt token "${prompt.token}" is reserved (pm/name/dlx).`, path: ["prompts"] })
+			if (seen.has(prompt.token)) ctx.addIssue({ code: "custom", message: `Duplicate prompt token "${prompt.token}".`, path: ["prompts"] })
+			seen.add(prompt.token)
+		}
+	})
+
 const changeSchema = z.discriminatedUnion("kind", [fileSchema, patchSchema])
+
+/**
+ * The changes a template lays down, split by the one question that decides whether a command may safely
+ * apply them — *where is this safe to land?* No command reads another's section: `base` is additive and
+ * safe on any project (both commands apply it), `create` overwrites framework-scaffolded files (only
+ * `create`), `init` patches files the user owns (only `init`). See the section doc above and {@link changesFor}.
+ */
+const changesSchema = z.object({
+	/** Changes safe on any project — additive Kizlo-owned files, applied by both commands. */
+	base: z.array(changeSchema).default([]),
+	/** Changes safe only on a fresh app — overwrites of framework-scaffolded files (the whole layout). */
+	create: z.array(changeSchema).default([]),
+	/** Changes only `init` applies onto the user's project (the root-layout patch). */
+	init: z.array(changeSchema).default([]),
+})
 
 /**
  * The `.env` key names the scaffold writes and the pinned runtime later reads — the one part of the
@@ -119,20 +247,6 @@ const envSchema = z.object({
 const depsSchema = z.record(z.string(), z.string())
 
 /**
- * The package names whose presence in a project's dependencies identify this framework — how `init`
- * recognizes which template to apply to an existing project (e.g. `["next"]`, `["astro"]`). Detection is
- * data, so a community template declares its own signal and needs no CLI change. See {@link detectTemplate}.
- */
-const detectSchema = z.object({ dependencies: z.array(z.string()).default([]) })
-
-/**
- * An `init` precondition on the project's shape: at least one of `anyDir` must exist in the project,
- * else `init` stops with `message`. Replaces framework-specific `if` branches — e.g. Next.js needs an
- * `app` or `src/app` directory (the App Router), which the Pages Router lacks. Dormant when absent.
- */
-const requiresSchema = z.object({ anyDir: z.array(z.string()), message: z.string() })
-
-/**
  * A post-setup manual step `init` prints after wiring — the piece Kizlo can't auto-wire into a file the
  * user owns (e.g. Astro's SEO tags render through a `.astro` component, not a patchable export). `create`
  * owns files whole, so it never prints these. `body` may carry one token, `{{importPrefix}}`, substituted
@@ -140,14 +254,53 @@ const requiresSchema = z.object({ anyDir: z.array(z.string()), message: z.string
  */
 const noteSchema = z.object({ title: z.string(), body: z.string() })
 
+/**
+ * A single precondition `init` checks against the project before applying — data in place of the old
+ * framework-specific `if` branches, so a community template declares its own without a CLI change.
+ * Discriminated on `kind`:
+ *
+ * - `dep` — package(s) in the project's dependencies. Doubles as the framework *detection* signal (see
+ *   {@link detectTemplates}): a template's match score is how many of its `dep` `values` the project has,
+ *   read across every candidate template before one is chosen.
+ * - `dir` — director(ies) in the project tree, e.g. Next's `app`/`src/app` App Router (the Pages Router
+ *   lacks it).
+ *
+ * `match` decides whether `any` (default) or `all` of `values` must be present; `message` is the abort
+ * text shown when the requirement is unmet, defaulting to `""` → a generated fallback. See {@link unmetRequirement}.
+ */
+const requiresFields = {
+	/** The packages (`dep`) or directories (`dir`) this requirement is about; at least one. */
+	values: z.array(z.string()).min(1),
+	/** Whether `any` (default) or `all` of `values` must be present for the requirement to be satisfied. */
+	match: z.enum(["any", "all"]).default("any"),
+	/** Abort message when unmet; `""` (default) yields a generated fallback. */
+	message: z.string().default(""),
+}
+const requiresDepSchema = z.object({ kind: z.literal("dep"), ...requiresFields })
+const requiresDirSchema = z.object({ kind: z.literal("dir"), ...requiresFields })
+const requirementSchema = z.discriminatedUnion("kind", [requiresDepSchema, requiresDirSchema])
+
+/** Everything the `init` command needs of the project: the preconditions it checks and the steps it prints. */
+const initSchema = z.object({
+	/** Preconditions `init` checks before applying; `dep` entries also drive detection. See {@link requirementSchema}. */
+	requires: z.array(requirementSchema).default([]),
+	/** Manual steps `init` prints after wiring — what Kizlo can't auto-wire. See {@link noteSchema}. */
+	notes: z.array(noteSchema).default([]),
+})
+
 /** The command a set of changes is being applied for: the shared `base` plus this section. */
 export type Command = "create" | "init"
 
 const manifestSchema = z.object({
-	framework: z.string(),
+	/**
+	 * The template's stable id — a name like `nextjs` that also matches what `init`'s detected preset asks
+	 * for. Used as the addressable id when the source is a single template, and as the label fallback. For
+	 * a registry of many, the subdirectory name is the addressable id and this is display-only.
+	 */
+	id: z.string(),
 	/**
 	 * Display label for template pickers and logs (e.g. `Next.js`). Optional — registry listing falls
-	 * back to {@link manifestSchema.shape.framework} and then the template's directory name — so a
+	 * back to {@link manifestSchema.shape.id} and then the template's directory name — so a
 	 * community template that omits it still shows up, just under its folder id. See `listTemplates`.
 	 */
 	name: z.string().optional(),
@@ -173,42 +326,75 @@ const manifestSchema = z.object({
 	 * "satisfied", so it enforces nothing until a manifest change bumps it. See {@link minCliError}.
 	 */
 	minCli: z.string().optional(),
+	/** The template's wiring config — API mount path, import alias, and directory layout. See {@link configSchema}. */
+	config: configSchema,
+	/** Everything the `init` command needs of the project — preconditions and manual steps. See {@link initSchema}. */
+	init: initSchema.default({ requires: [], notes: [] }),
 	/**
-	 * The path the API handler mounts at (e.g. `/api/kizlo`), appended to the base URL so the client and
-	 * route handler agree. Read generically by `create`/`init` — the CLI hardcodes no framework path.
-	 * Absent on templates whose client resolves the backend URL itself. See {@link withApiPath}.
+	 * How `create` bootstraps the base app — the framework CLI command plus its prompts. Absent on templates
+	 * that only `init` supports; `create` refuses a template whose manifest declares no `create` block. See
+	 * {@link createSchema}.
 	 */
-	apiPath: z.string().optional(),
-	/** The dependency signal that identifies this framework for `init`'s detection. See {@link detectSchema}. */
-	detect: detectSchema.optional(),
-	/** An `init` precondition on the project's directory layout. See {@link requiresSchema}. */
-	requires: requiresSchema.optional(),
-	/** Manual steps `init` prints after wiring — what Kizlo can't auto-wire. See {@link noteSchema}. */
-	notes: z.array(noteSchema).default([]),
-	/**
-	 * How `create` bootstraps the base app with the framework's own CLI. Absent on templates that only
-	 * `init` supports; `create` refuses a template whose manifest declares no bootstrap.
-	 */
-	bootstrap: bootstrapSchema.optional(),
-	/** The template's own directory layout and import alias, rewritten to the project's on apply. */
-	conventions: conventionsSchema,
-	/** Changes safe on any project — additive Kizlo-owned files, applied by both commands. */
-	base: z.array(changeSchema).default([]),
-	/** Changes safe only on a fresh app — overwrites of framework-scaffolded files (the whole layout). */
-	create: z.array(changeSchema).default([]),
-	/** Changes only `init` applies onto the user's project (the root-layout patch). */
-	init: z.array(changeSchema).default([]),
+	create: createSchema.optional(),
+	/** The files Kizlo lays down, split by where each is safe to land. See {@link changesSchema}. */
+	changes: changesSchema.default({ base: [], create: [], init: [] }),
 })
 
 export type TemplateManifest = z.infer<typeof manifestSchema>
-export type TemplateConventions = z.infer<typeof conventionsSchema>
-export type TemplateBootstrap = z.infer<typeof bootstrapSchema>
-export type TemplateDetect = z.infer<typeof detectSchema>
-export type TemplateRequires = z.infer<typeof requiresSchema>
+export type TemplateConfig = z.infer<typeof configSchema>
+export type TemplateCreate = z.infer<typeof createSchema>
+export type TemplateRequirement = z.infer<typeof requirementSchema>
 export type TemplateNote = z.infer<typeof noteSchema>
+export type TemplatePrompt = z.infer<typeof promptSchema>
 export type FileEntry = z.infer<typeof fileSchema>
 export type PatchEntry = z.infer<typeof patchSchema>
 export type Change = z.infer<typeof changeSchema>
+
+/**
+ * Wrap a text prompt's answer so it survives {@link tokenizeCommand} as exactly one argv token: an empty
+ * value stays empty (contributes nothing), otherwise it's double-quoted with any inner `"` escaped. This is
+ * what lets a free-text value with spaces (`--import-alias "my alias"`) splice cleanly into the bootstrap
+ * command without the tokenizer splitting it.
+ */
+function quoteValue(value: string): string {
+	if (value === "") return ""
+	return `"${value.replaceAll('"', '\\"')}"`
+}
+
+/**
+ * The CLI fragment a prompt answer maps to — the single place answer→flag translation lives, shared by the
+ * interactive collector and the non-interactive default path. `answer` is the chosen option `value`
+ * (select), the boolean (confirm), or the raw input (text). Returns the fragment spliced into the bootstrap
+ * command for this prompt's `{{token}}`; a select answer with no matching option (a stale `default`) yields
+ * the first option's fragment.
+ */
+export function promptFragment(prompt: TemplatePrompt, answer: string | boolean): string {
+	switch (prompt.kind) {
+		case "select": {
+			const option = prompt.options.find((opt) => opt.value === answer) ?? prompt.options[0]
+			return option?.arg ?? ""
+		}
+		case "confirm":
+			return answer ? prompt.arg : prompt.argFalse
+		case "text":
+			return prompt.arg.replaceAll("{{value}}", quoteValue(String(answer)))
+	}
+}
+
+/**
+ * The answer used non-interactively (`--yes`, non-TTY) — the prompt's declared default, or the first
+ * option / empty string when none is set. Returns both the answer (for the choices summary) and the
+ * {@link promptFragment} it maps to, so the caller shows a value and splices a flag from one call.
+ */
+export function resolvePromptDefault(prompt: TemplatePrompt): { answer: string | boolean; arg: string } {
+	const answer: string | boolean =
+		prompt.kind === "confirm"
+			? prompt.default
+			: prompt.kind === "select"
+				? (prompt.default ?? prompt.options[0]?.value ?? "")
+				: (prompt.default ?? "")
+	return { answer, arg: promptFragment(prompt, answer) }
+}
 
 /**
  * Render a manual-step note for display, substituting the `{{importPrefix}}` token with the project's
@@ -301,8 +487,32 @@ export function minCliError(manifest: TemplateManifest): string | undefined {
  * section: init's opt-in examples are the additive ones in `base`, never create's homepage overwrite.
  */
 export function changesFor(manifest: TemplateManifest, command: Command, opts: { includeExamples?: boolean } = {}): Change[] {
-	const changes = [...manifest.base, ...manifest[command]]
+	const changes = [...manifest.changes.base, ...manifest.changes[command]]
 	return opts.includeExamples ? changes : changes.filter((change) => !isExample(change))
+}
+
+/**
+ * The first `init` precondition the project fails, as a ready-to-print abort message, or `undefined` when
+ * every requirement passes. `deps` is the project's merged dependencies; `dirExists` tests a
+ * project-relative directory. A `dep` requirement checks membership in `deps`, a `dir` requirement checks
+ * the tree, each honoring its `match` (`any`/`all`). An unmet requirement yields its own `message`, or a
+ * generated fallback when it declares none (the common case for `dep` entries, which detection filters
+ * out first). See {@link requirementSchema}.
+ */
+export function unmetRequirement(
+	requires: readonly TemplateRequirement[],
+	deps: Record<string, string>,
+	dirExists: (rel: string) => boolean,
+): string | undefined {
+	for (const req of requires) {
+		const has = req.kind === "dep" ? (value: string) => value in deps : dirExists
+		const satisfied = req.match === "all" ? req.values.every(has) : req.values.some(has)
+		if (satisfied) continue
+		if (req.message) return req.message
+		const noun = req.kind === "dep" ? "package" : "directory"
+		return `Kizlo needs ${req.match === "all" ? "all of" : "one of"} these ${noun}s: ${req.values.join(", ")}.`
+	}
+	return undefined
 }
 
 /** The whole-file changes in a resolved change list. */
@@ -332,11 +542,11 @@ function escapeRegExp(value: string): string {
  * `src`/root heuristic when the template declares no matching alias, staying consistent with the rest of
  * the alias handling.
  */
-function templateAliasBase(templateDir: string, conventions: TemplateConventions): string {
-	const alias = conventions.alias.replace(/\/+$/, "")
+function templateAliasBase(templateDir: string, config: TemplateConfig): string {
+	const alias = config.alias.replace(/\/+$/, "")
 	const mapping = readTsconfigPaths(templateDir)?.[`${alias}/*`]?.[0]
 	if (mapping) return mapping.replace(/^\.\//, "").replace(/\/\*$/, "").replace(/\/+$/, "")
-	return conventions.kizloDir.startsWith("src/") ? "src" : ""
+	return config.kizloPath.startsWith("src/") ? "src" : ""
 }
 
 /**
@@ -349,26 +559,29 @@ function templateAliasBase(templateDir: string, conventions: TemplateConventions
  * Only quoted specifiers that begin with the template alias are touched, so an unrelated string can't be
  * corrupted. Subsumes the server-entry import: it is simply the alias import that lands in the Kizlo dir.
  */
-function rewriteAliasImports(body: string, fromDir: string, base: string, conventions: TemplateConventions, ctx: ScaffoldContext): string {
-	const alias = conventions.alias.replace(/\/+$/, "")
+function rewriteAliasImports(body: string, fromDir: string, base: string, config: TemplateConfig, ctx: ScaffoldContext): string {
+	const alias = config.alias.replace(/\/+$/, "")
 	if (!alias) return body
 	const pattern = new RegExp(`(["'])${escapeRegExp(alias)}/([^"']+)\\1`, "g")
 	return body.replace(pattern, (_match, quote: string, rest: string) => {
-		const targetRel = adaptTemplatePath(base ? `${base}/${rest}` : rest, conventions, ctx)
+		const targetRel = adaptTemplatePath(base ? `${base}/${rest}` : rest, config, ctx)
 		return `${quote}${ctx.importFrom(targetRel, fromDir)}${quote}`
 	})
 }
 
 /**
- * Adapt a template path prefix (`src/app/...`, `src/lib/kizlo/...`) to the project's real directories.
- * Only the leading convention dir is swapped; the rest of the path is preserved verbatim.
+ * Adapt a template path to the project's real layout. The Kizlo home dir is retargeted to wherever the
+ * user put it (`config.kizloPath` → `ctx.kizloPath`). Every other path is `src/`-rooted as authored, so it
+ * only needs to match the project's `src/` convention: a project that keeps source under `src/` gets it
+ * verbatim, one that doesn't gets the leading `src/` stripped (so `src/app/...` lands at `app/...`, config
+ * files at the root are untouched). This makes the one project-wide decision — `src/` or not — instead of
+ * tracking a per-framework route directory.
  */
-function adaptTemplatePath(relPath: string, conventions: TemplateConventions, ctx: ScaffoldContext): string {
+function adaptTemplatePath(relPath: string, config: TemplateConfig, ctx: ScaffoldContext): string {
 	const normalized = relPath.split(path.sep).join("/")
-	if (normalized === conventions.appDir || normalized.startsWith(`${conventions.appDir}/`))
-		return `${ctx.appDir}${normalized.slice(conventions.appDir.length)}`
-	if (normalized === conventions.kizloDir || normalized.startsWith(`${conventions.kizloDir}/`))
-		return `${ctx.kizloDir}${normalized.slice(conventions.kizloDir.length)}`
+	const { kizloPath } = config
+	if (normalized === kizloPath || normalized.startsWith(`${kizloPath}/`)) return `${ctx.kizloPath}${normalized.slice(kizloPath.length)}`
+	if (!ctx.hasSrcDir && normalized.startsWith("src/")) return normalized.slice("src/".length)
 	return normalized
 }
 
@@ -380,21 +593,21 @@ function adaptTemplatePath(relPath: string, conventions: TemplateConventions, ct
  * the template uses are rewritten, not a loose directory substring, so an unrelated occurrence can't be
  * corrupted. This is the job the old build-time extractor did; it moves to runtime and stays as precise.
  */
-export function adaptFile(templateDir: string, entry: FileEntry, conventions: TemplateConventions, ctx: ScaffoldContext): ScaffoldFile {
+export function adaptFile(templateDir: string, entry: FileEntry, config: TemplateConfig, ctx: ScaffoldContext): ScaffoldFile {
 	const abs = path.join(templateDir, entry.path)
 	if (!fs.existsSync(abs)) {
 		throw new Error(`Template file "${entry.path}" is listed in the manifest but does not exist in the template.`)
 	}
 	const body = fs.readFileSync(abs, "utf8")
-	const relPath = adaptTemplatePath(entry.path, conventions, ctx)
+	const relPath = adaptTemplatePath(entry.path, config, ctx)
 	const fromDir = path.posix.dirname(relPath)
-	const contents = rewriteAliasImports(body, fromDir, templateAliasBase(templateDir, conventions), conventions, ctx)
+	const contents = rewriteAliasImports(body, fromDir, templateAliasBase(templateDir, config), config, ctx)
 	return { label: ROLE_LABELS[entry.role] ?? entry.role, relPath, contents }
 }
 
 /** Adapt a patch's path prefix and server-import specifier to the project's real directories. */
-export function resolvePatch(entry: PatchEntry, conventions: TemplateConventions, ctx: ScaffoldContext): ResolvedPatch {
-	const relPath = adaptTemplatePath(entry.path, conventions, ctx)
+export function resolvePatch(entry: PatchEntry, config: TemplateConfig, ctx: ScaffoldContext): ResolvedPatch {
+	const relPath = adaptTemplatePath(entry.path, config, ctx)
 	const fromDir = path.posix.dirname(relPath)
 	const imports = entry.imports.map((imp) => ({
 		module: imp.module.replaceAll("{{serverImport}}", ctx.serverImport(fromDir)),
