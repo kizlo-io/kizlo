@@ -8,7 +8,12 @@
 		"kizloPath": "src/lib/kizlo"
 	},
 	"init": {
-		"requires": [{ "kind": "dep", "values": ["astro"] }],
+		"requires": [
+			{
+				"kind": "dep",
+				"values": ["astro"]
+			}
+		],
 		"notes": [
 			{
 				"title": "Add Kizlo's SEO tags to your root layout's <head>",
@@ -119,7 +124,7 @@
 		}
 	},
 	"dependencies": {
-		"kizlo": "^0.13.1",
+		"kizlo": "^0.14.0",
 		"@astrojs/node": "^11.0.2"
 	}
 }
