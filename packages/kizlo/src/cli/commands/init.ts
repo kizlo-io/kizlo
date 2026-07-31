@@ -23,6 +23,7 @@ import {
 	renderNote,
 	resolveDependencies,
 	type TemplateManifest,
+	unmetRequirement,
 } from "../presets/template"
 import {
 	addDependencyArgs,
@@ -44,17 +45,19 @@ import {
 	collectConnectionFromEnv,
 	collectConnectionInteractively,
 	dirPath,
+	envConflicts,
 	nextStepsNote,
 	orCancel,
+	provisionLocalWordPress,
 	readEnvExample,
 	resolveEnvKeys,
 	selectPackageManager,
-	setupLocalWordPress,
 	syncRemote,
 	validate,
 	withApiPath,
 	writeEnv,
 } from "./_setup"
+import { confirmProceed, FINAL_CONFIRMATION_TEXT, runChecklist, StepError, summaryNote } from "./_tasks"
 import {
 	applyProjectPatches,
 	buildScaffoldContext,
@@ -85,25 +88,6 @@ function sameOrigin(a: string, b: string): boolean {
 	} catch {
 		return false
 	}
-}
-
-/**
- * The framework's route directory in the user's project. When a template is present its
- * `conventions.appDir` (e.g. `src/app` for Next, `src/pages` for Astro) is the expected layout; we
- * probe that path and its no-`src` variant so a project that keeps routes at the top level is still
- * found, falling back to whether the project has a `src` dir. With no known template appDir we keep the
- * App Router default.
- */
-function detectAppDir(cwd: string, hasSrcDir: boolean, templateAppDir?: string): string {
-	if (templateAppDir) {
-		const withoutSrc = templateAppDir.replace(/^src\//, "")
-		if (fs.existsSync(path.join(cwd, templateAppDir))) return templateAppDir
-		if (fs.existsSync(path.join(cwd, withoutSrc))) return withoutSrc
-		return hasSrcDir ? templateAppDir : withoutSrc
-	}
-	if (fs.existsSync(path.join(cwd, "src", "app"))) return "src/app"
-	if (fs.existsSync(path.join(cwd, "app"))) return "app"
-	return hasSrcDir ? "src/app" : "app"
 }
 
 /**
@@ -182,23 +166,41 @@ type Deps = { dependencies?: Record<string, string>; devDependencies?: Record<st
  * A *missing* `kizlo` is installed on its own earlier (with its own messaging), so it's skipped here;
  * an existing older `kizlo` still gets the upgrade path.
  */
-async function alignDependencies(cwd: string, pm: PackageManager, pkg: Deps, manifest: TemplateManifest): Promise<void> {
+async function alignDependencies(
+	cwd: string,
+	pm: PackageManager,
+	pkg: Deps,
+	manifest: TemplateManifest,
+	message: (text: string) => void,
+	warnings: string[],
+): Promise<string> {
 	const { dependencies, devDependencies } = resolveDependencies(manifest)
 	const declared = [
 		...Object.entries(dependencies).map(([name, want]) => ({ name, want, dev: false })),
 		...Object.entries(devDependencies).map(([name, want]) => ({ name, want, dev: true })),
 	]
+	let installed = 0
+	let upgraded = 0
 	for (const { name, want, dev } of declared) {
 		const have = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name]
 		if (name === "kizlo" && !have) continue
 		if (have && !isOlderVersion(have, want)) continue
 		const args = addDependencyArgs(pm, `${name}@${want}`, { dev })
-		const s = p.spinner()
-		s.start(have ? `Upgrading ${name} from ${have} to ${want}` : `Installing ${name}@${want}`)
+		message(have ? `Upgrading ${name} from ${have} to ${want}` : `Installing ${name}@${want}`)
 		const ok = await runCommandAsync(args, cwd, "ignore")
-		if (have) s.stop(ok ? `Upgraded ${name} to ${want}` : `Could not upgrade ${name} automatically — install ${name}@${want} yourself`)
-		else s.stop(ok ? `Installed ${name}@${want}` : `Could not install ${name} automatically — run \`${args.join(" ")}\` yourself`)
+		if (!ok) {
+			warnings.push(
+				have
+					? `Could not upgrade ${name} automatically — install ${name}@${want} yourself`
+					: `Could not install ${name} — run \`${args.join(" ")}\` yourself`,
+			)
+			continue
+		}
+		if (have) upgraded++
+		else installed++
 	}
+	const parts = [installed ? `installed ${installed}` : "", upgraded ? `upgraded ${upgraded}` : ""].filter(Boolean)
+	return parts.length ? `Aligned dependencies (${parts.join(", ")})` : "Dependencies already aligned"
 }
 
 export const init = defineCommand({
@@ -268,9 +270,10 @@ export const init = defineCommand({
 				? (detectInvokingPackageManager() ?? "npm")
 				: await selectPackageManager("Couldn't detect this project's package manager — which should Kizlo use?"))
 
-		// When the project gave no signal and we had to ask, stamp the choice into package.json so a later run
-		// detects it instead of prompting again. Skipped under `--yes`: that path only guessed, never confirmed.
-		if (!detectedPm && !yes) persistPackageManagerField(cwd, pm)
+		// When the project gave no signal and we had to ask, we stamp the choice into package.json so a later
+		// run detects it instead of prompting again — deferred to the execute phase so nothing is written
+		// before the user confirms. Skipped under `--yes`: that path only guessed, never confirmed.
+		const shouldPersistPm = !detectedPm && !yes
 		const hasKizlo = Boolean(pkg.dependencies?.kizlo) || Boolean(pkg.devDependencies?.kizlo)
 		const hasSrcDir = fs.existsSync(path.join(cwd, "src"))
 
@@ -345,11 +348,10 @@ export const init = defineCommand({
 			const manifest = readManifest(entry.dir)
 			const minErr = minCliError(manifest)
 			if (minErr) cancelFrom(minErr)
-			if (manifest.requires && !manifest.requires.anyDir.some((rel) => fs.existsSync(path.join(cwd, rel)))) {
-				cancelFrom(manifest.requires.message)
-			}
+			const unmet = unmetRequirement(manifest.init.requires, projectDeps, (rel) => fs.existsSync(path.join(cwd, rel)))
+			if (unmet) cancelFrom(unmet)
 
-			const apiPath = manifest.apiPath
+			const apiPath = manifest.config.apiPath
 			const envKeys = resolveEnvKeys(manifest)
 
 			// Alias precedence: the explicit `--alias` flag, then the alias persisted in kizlo.config by a
@@ -360,53 +362,136 @@ export const init = defineCommand({
 			const aliasCtx = { cwd, hasSrcDir, apiPath, persistedAlias, flagAlias }
 			const setup = yes ? collectFromEnv({ ...aliasCtx, envKeys }) : await collectInteractively(aliasCtx)
 			setup.alias = aliasWithSlash(setup.alias)
+			if (apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, apiPath)
 
 			const includeExamples = yes ? true : orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
 
-			if (!hasKizlo) {
-				const spec = `kizlo@${manifest.dependencies?.kizlo ?? `^${getVersion()}`}`
-				const s = p.spinner()
-				s.start(`Installing kizlo with ${pm}`)
-				const ok = await runCommandAsync(addDependencyArgs(pm, spec), cwd, "ignore")
-				s.stop(ok ? "Installed kizlo" : "Could not install kizlo automatically")
-				if (!ok) p.log.warn(`Install it yourself: ${addDependencyArgs(pm, spec).join(" ")}`)
-			}
-
-			if (apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, apiPath)
-
-			await setupLocalWordPress(cwd, setup)
-
-			await writeEnv(cwd, envKeys, setup, { force, yes, exampleTemplate: readEnvExample(entry.dir) })
-			await syncRemote(setup)
-
+			// Build the file plan in memory (no writes yet) so existing files can be surfaced before anything
+			// runs — the overwrite decision is made here, during collection, not asked mid-checklist.
 			const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
 			const serverDirRel = path.join(dirRel, "server")
 			const clientUrl = setup.siteUrl && !sameOrigin(setup.siteUrl, setup.baseUrl) ? setup.baseUrl : undefined
-
-			const appDir = detectAppDir(cwd, hasSrcDir, manifest.conventions.appDir)
-			const scaffold = buildScaffoldContext(cwd, { dirRel, appDir, alias: setup.alias, clientUrl })
+			const scaffold = buildScaffoldContext(cwd, { dirRel, hasSrcDir, alias: setup.alias, clientUrl })
 
 			const files: ScaffoldFile[] = [
 				{ label: "Kizlo config", relPath: "kizlo.config.ts", contents: kizloConfigTemplate(dirRel, setup.alias, setup.mode === "local") },
 			]
-
-			await alignDependencies(cwd, pm, pkg, manifest)
 			for (const fileEntry of fileEntries(changesFor(manifest, "init", { includeExamples })))
-				files.push(adaptFile(entry.dir, fileEntry, manifest.conventions, scaffold))
+				files.push(adaptFile(entry.dir, fileEntry, manifest.config, scaffold))
 
+			// Resolve both overwrite decisions up front: `--force` overwrites, `--yes` keeps, and interactively
+			// we only ask when something actually collides. Files are chosen individually via a multiselect
+			// (all pre-selected, so Enter overwrites everything) — deselect a file to keep it as-is.
+			const existingFiles = files.filter((file) => fs.existsSync(path.join(cwd, file.relPath)))
+			const overwritePaths: ReadonlySet<string> =
+				force || existingFiles.length === 0 || yes
+					? new Set(force ? existingFiles.map((f) => f.relPath) : [])
+					: new Set(
+							orCancel(
+								await p.multiselect({
+									message: `${existingFiles.length} file(s) already exist. Select which to overwrite (space to toggle, enter to confirm).`,
+									options: existingFiles.map((f) => ({ value: f.relPath, label: f.relPath })),
+									initialValues: existingFiles.map((f) => f.relPath),
+									required: false,
+								}),
+							),
+						)
+			const envKeyConflicts = envConflicts(cwd, envKeys, setup)
+			const overwriteEnv =
+				force ||
+				(envKeyConflicts.length > 0 &&
+					!yes &&
+					orCancel(await p.confirm({ message: `Overwrite existing .env values (${envKeyConflicts.join(", ")})?`, initialValue: true })))
+
+			// ── Review, then confirm ──────────────────────────────────────────────────────────────────
+			summaryNote([
+				["Template", entry.label],
+				["Package manager", pm],
+				["Kizlo directory", setup.dir],
+				["Import alias", setup.alias || "relative imports"],
+				["API URL", setup.baseUrl || "fill in .env later"],
+				["WordPress", setup.mode === "local" ? "Local" : "Remote"],
+				["Examples", includeExamples ? "Yes" : "No"],
+			])
+			if (!yes && !(await confirmProceed(FINAL_CONFIRMATION_TEXT))) {
+				fetchedRegistry.cleanup()
+				p.cancel("Setup cancelled.")
+				process.exit(0)
+			}
+
+			// ── Execute as a checklist ──────────────────────────────────────────────────────────────────
+			if (shouldPersistPm) persistPackageManagerField(cwd, pm)
+			const warnings: string[] = []
 			const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
-			for (const file of files) scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force, yes }) })
+			let gitignore: ReturnType<typeof ensureGitignored> = "present"
+			const kizloSpec = `kizlo@${manifest.dependencies?.kizlo ?? `^${getVersion()}`}`
 
-			writeGeneratedContract(cwd, serverDirRel)
+			const aborted = await runChecklist([
+				{
+					title: `Installing kizlo with ${pm}`,
+					enabled: !hasKizlo,
+					run: async () => {
+						if (await runCommandAsync(addDependencyArgs(pm, kizloSpec), cwd, "ignore")) return "Installed kizlo"
+						// Non-fatal: the rest of the wiring still runs; the user finishes by installing it themselves.
+						warnings.push(`Install it yourself: ${addDependencyArgs(pm, kizloSpec).join(" ")}`)
+						throw new StepError("Could not install kizlo automatically", { fatal: false })
+					},
+				},
+				{
+					title: "Aligning dependencies",
+					run: (message) => alignDependencies(cwd, pm, pkg, manifest, message, warnings),
+				},
+				{
+					title: "Setting up local WordPress (first run downloads images, this can take a while)",
+					enabled: setup.mode === "local",
+					run: async () => {
+						try {
+							const warning = await provisionLocalWordPress(cwd, setup)
+							if (warning) warnings.push(warning)
+							return "Local WordPress ready"
+						} catch (error) {
+							throw new StepError("Local WordPress setup failed", { detail: error instanceof Error ? error.message : String(error) })
+						}
+					},
+				},
+				{
+					title: "Writing environment files",
+					run: () => writeEnv(cwd, envKeys, setup, { overwrite: overwriteEnv, exampleTemplate: readEnvExample(entry.dir) }),
+				},
+				{
+					title: "Syncing settings to WordPress",
+					enabled: setup.mode === "remote" && Boolean(setup.wpUrl && setup.wpUsername && setup.wpPassword),
+					run: async () => {
+						warnings.push(...(await syncRemote(setup)))
+						return "Synced settings to WordPress"
+					},
+				},
+				{
+					title: "Scaffolding Kizlo files",
+					run: async () => {
+						for (const file of files)
+							scaffolded.push({ file, result: await scaffoldFile(cwd, file, { force: overwritePaths.has(file.relPath), yes: true }) })
+						writeGeneratedContract(cwd, serverDirRel)
+						gitignore = ensureGitignored(cwd, ".env")
+						ensureGitignored(cwd, ".kizlo/")
+						const written = scaffolded.filter(({ result }) => result !== "kept").length
+						return `Scaffolded ${written} file${written === 1 ? "" : "s"}`
+					},
+				},
+			])
 
-			const gitignore = ensureGitignored(cwd, ".env")
-			ensureGitignored(cwd, ".kizlo/")
+			if (aborted) {
+				p.cancel("Setup failed — see the errors above.")
+				process.exit(1)
+			}
 
+			// ── Report the details the checklist elided, plus manual steps a spinner couldn't render ────
+			for (const warning of warnings) p.log.warn(warning)
 			for (const { file, result } of scaffolded) reportScaffold(file, result, yes)
 
-			applyProjectPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.conventions, scaffold)
+			applyProjectPatches(cwd, patchEntries(changesFor(manifest, "init")), manifest.config, scaffold)
 
-			for (const note of manifest.notes ?? []) {
+			for (const note of manifest.init.notes) {
 				const rendered = renderNote(note, setup.alias)
 				printManualStep(rendered.title, rendered.body)
 			}

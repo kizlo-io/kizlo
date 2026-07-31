@@ -1,3 +1,12 @@
-- [x] Package manager detection still failing even if package lock file exist.
-- [] Add React + Vite template.
-- [] Add Tanstack start template.
+# Today
+- [x] Add Tanstack start template.
+- [x] Template bootstrap object could be a single string where we can define a command with args and flags. the need of array for adding args and flags is redundant, It is also limiting to certain cli commands shape like i couldn't use @tanstack/create-cli@latest create, the logic that parses the bootstrap object requires it to be a certain shape which we shouldn't have, I dont understand whats the reasoning behind of this limitation and shape of the bootstrap object.
+- [x] Fix tanstack start template using deprecated cli @tanstack/create-start, use @tanstack/cli instead.
+- [x] Make the cli prompts lazy meaning collect all user inputs and selections then show a summery of what they have chosen the ask for continue with yes or no, This is very good structure to have because it does nothing until every piece of information is collected and agreed, finally when user agrees then we can show a the process in checklist format with loader in-progress and checkmark on complete individually. 
+- [x] Try to detect the package manager in kizlo create also because if user is trying to create a project in monorepo and executing the kizlo create from root we can detect the package manager there since that would be obvious for user to use the same package manager the monorepo uses, we couldn't detect that means user is not in monorepo or something else is wrong then fallback will be to ask for it.
+- [x] Make the project name optional by choosing the cwd name as project name and also showing that as placeholder instead of static my-app.
+- [x] Add a ability to add template specific prompts, because currently we hard code the flags and args to bootstrap so if user want something that framework provides the support for, like what linter they want to choose so we dont hard code the choice of them. Each choice will be mapped to a framework's cli arg or flag so we can construct a more dynamic bootstrap command.
+
+# Backlog
+- [] Rename the existing tanstack start template with react (Tanstack Start React) and add a separate Tanstack Start Solid. so we can provide support for both frameworks separately.
+- [] Add React + Vite template like nextjs or astro with server capability because kizlo needs a server not a client application like pure react thats why i chose vite since vite provides server.

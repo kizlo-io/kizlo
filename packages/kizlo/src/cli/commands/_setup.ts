@@ -6,7 +6,7 @@ import { isPluginVersionSupported, pluginUpdateMessage } from "@kizlo/shared"
 import getPort, { portNumbers } from "get-port"
 import z from "zod/v4"
 import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName, stackProject } from "../daemon/config"
-import type { TemplateManifest } from "../presets/template"
+import { promptFragment, resolvePromptDefault, type TemplateManifest, type TemplatePrompt } from "../presets/template"
 import {
 	availablePackageManagers,
 	DEFAULT_ENV_KEYS,
@@ -157,6 +157,54 @@ export async function selectPackageManager(message: string): Promise<PackageMana
 			initialValue,
 		}),
 	)
+}
+
+/** The choices summary shows a prompt under a short label — the title-cased token (`linter` → `Linter`). */
+function promptLabel(token: string): string {
+	return token.charAt(0).toUpperCase() + token.slice(1)
+}
+
+/** What a resolved prompt answer reads as in the choices summary: the option label, `Yes`/`No`, or the text. */
+function promptDisplay(prompt: TemplatePrompt, answer: string | boolean): string {
+	if (prompt.kind === "confirm") return answer ? "Yes" : "No"
+	if (prompt.kind === "select") return prompt.options.find((opt) => opt.value === answer)?.label ?? String(answer)
+	return answer === "" ? "(default)" : String(answer)
+}
+
+/**
+ * Ask the template's own prompts and turn the answers into `bootstrap` substitutions. Each prompt maps its
+ * answer to a CLI fragment (via {@link promptFragment}) keyed by the prompt's `{{token}}`, which
+ * `bootstrapArgs` splices into the framework command — so a template surfaces a real framework choice
+ * without the CLI knowing anything framework-specific. Non-interactive (`--yes`) resolves every prompt to
+ * its {@link resolvePromptDefault} with no I/O. Returns the token→fragment map plus the choices-summary rows.
+ */
+export async function collectTemplatePrompts(
+	manifest: TemplateManifest,
+	opts: { yes: boolean },
+): Promise<{ args: Record<string, string>; rows: [string, string][] }> {
+	const args: Record<string, string> = {}
+	const rows: [string, string][] = []
+	for (const prompt of manifest.create?.prompts ?? []) {
+		let answer: string | boolean
+		if (opts.yes) {
+			answer = resolvePromptDefault(prompt).answer
+		} else if (prompt.kind === "select") {
+			answer = orCancel(
+				await p.select({
+					message: prompt.message,
+					options: prompt.options.map((opt) => ({ value: opt.value, label: opt.label })),
+					initialValue: prompt.default ?? prompt.options[0]?.value,
+				}),
+			)
+		} else if (prompt.kind === "confirm") {
+			answer = orCancel(await p.confirm({ message: prompt.message, initialValue: prompt.default }))
+		} else {
+			answer = orCancel(await p.text({ message: prompt.message, placeholder: prompt.placeholder, defaultValue: prompt.default ?? "" }))
+		}
+		args[prompt.token] = promptFragment(prompt, answer)
+		rows.push([promptLabel(prompt.token), promptDisplay(prompt, answer)])
+	}
+	return { args, rows }
 }
 
 /** Appends the API path to the base URL so the client and route handler agree. */
@@ -346,29 +394,21 @@ async function provisionLocalStack(cfg: ResolvedDevConfig, siteSecret: string, b
 }
 
 /**
- * Provision local WordPress and fill the connection's WP credentials from it, then report the
- * outcome. Mutates `conn` in place (wpUrl / wpUsername / wpPassword). Writing the `local` flags into
- * `kizlo.config.ts` is the caller's job (the generated config for `create`/`init`). Exits on failure.
- * No-op for a remote connection.
+ * Provision local WordPress and fill the connection's WP credentials from it. Mutates `conn` in place
+ * (wpUrl / wpUsername / wpPassword / adminPassword). Owns no spinner and never exits — it runs as one
+ * step of the execute checklist, so it throws on failure for the runner to render, and returns a
+ * non-fatal warning string (or `undefined`) the caller surfaces after the run. Writing the `local` flags
+ * into `kizlo.config.ts` is the caller's job. No-op for a remote connection.
  */
-export async function setupLocalWordPress(cwd: string, conn: Connection): Promise<void> {
-	if (conn.mode !== "local") return
+export async function provisionLocalWordPress(cwd: string, conn: Connection): Promise<string | undefined> {
+	if (conn.mode !== "local") return undefined
 	ensureGitignored(cwd, ".kizlo/")
-	const s = p.spinner()
-	s.start("Setting up local WordPress (first run downloads images, this can take a while)")
-	try {
-		const local = await provisionLocalStack(devConfigFor(cwd), conn.siteSecret, conn.baseUrl)
-		conn.wpUrl = local.url
-		conn.wpUsername = local.username
-		conn.wpPassword = local.appPassword
-		conn.adminPassword = local.adminPassword
-		s.stop("Local WordPress ready")
-		if (local.secretSyncError) p.log.warn(`Could not sync KIZLO_LOCAL_WP_SECRET to the local plugin (${local.secretSyncError})`)
-	} catch (error) {
-		s.stop("Local WordPress setup failed")
-		p.cancel(error instanceof Error ? error.message : String(error))
-		process.exit(1)
-	}
+	const local = await provisionLocalStack(devConfigFor(cwd), conn.siteSecret, conn.baseUrl)
+	conn.wpUrl = local.url
+	conn.wpUsername = local.username
+	conn.wpPassword = local.appPassword
+	conn.adminPassword = local.adminPassword
+	return local.secretSyncError ? `Could not sync KIZLO_LOCAL_WP_SECRET to the local plugin (${local.secretSyncError})` : undefined
 }
 
 /**
@@ -395,36 +435,32 @@ function generatedEnvExample(envKeys: EnvKeys): string {
 }
 
 /**
- * Write (or update) `.env` and `.env.example` for the managed keys and report the outcome.
- * Existing conflicting `.env` values are preserved unless `force`; interactively the user is asked,
- * and under `--yes` they are kept. `.env.example` is only written when absent, and is sourced from the
- * template's own file (`opts.exampleTemplate`) so it matches the `.env` structure, falling back to a
- * generated block for the base preset.
+ * The managed keys already present in an existing `.env` — the values a write would overwrite. Collected
+ * up front (before anything runs) so the overwrite decision is made during the lazy prompt phase and
+ * passed to {@link writeEnv} as a resolved `overwrite` flag, rather than {@link writeEnv} stopping to ask
+ * mid-checklist. Empty when there's no `.env` or nothing collides.
  */
-export async function writeEnv(
-	cwd: string,
-	envKeys: EnvKeys,
-	conn: Connection,
-	opts: { force: boolean; yes: boolean; exampleTemplate?: string },
-): Promise<void> {
+export function envConflicts(cwd: string, envKeys: EnvKeys, conn: Connection): string[] {
+	const { keys } = managedEnv(envKeys, conn)
+	const envPath = path.join(cwd, ".env")
+	if (!fs.existsSync(envPath)) return []
+	return envKeysPresent(fs.readFileSync(envPath, "utf8"), keys)
+}
+
+/**
+ * Write (or update) `.env` and `.env.example` for the managed keys and return a one-line summary for the
+ * checklist. Runs as a step of the execute phase, so it neither prompts nor logs: `overwrite` (whether to
+ * replace conflicting values) is decided during collection — see {@link envConflicts} — and passed in.
+ * `.env.example` is only written when absent, sourced from the template's own file (`opts.exampleTemplate`)
+ * so it matches the `.env` structure, falling back to a generated block for the base preset.
+ */
+export function writeEnv(cwd: string, envKeys: EnvKeys, conn: Connection, opts: { overwrite: boolean; exampleTemplate?: string }): string {
 	const { keys, values: envValues } = managedEnv(envKeys, conn)
 
 	const envPath = path.join(cwd, ".env")
 	const envExisted = fs.existsSync(envPath)
 	const existingEnv = envExisted ? fs.readFileSync(envPath, "utf8") : ""
-	const conflicts = envKeysPresent(existingEnv, keys)
-
-	let overwriteKeys = new Set<string>(keys)
-	if (conflicts.length && !opts.force) {
-		if (opts.yes) {
-			overwriteKeys = new Set()
-			p.log.info("Keeping existing .env values (pass --force to overwrite)")
-		} else {
-			p.log.warn("Some environment variables already exist in .env")
-			const overwrite = orCancel(await p.confirm({ message: "Overwrite their existing values?", initialValue: true }))
-			if (!overwrite) overwriteKeys = new Set()
-		}
-	}
+	const overwriteKeys = opts.overwrite ? new Set<string>(keys) : new Set<string>()
 
 	const merge = mergeEnv(existingEnv, envValues, overwriteKeys, envGroups(envKeys))
 	fs.writeFileSync(envPath, merge.content)
@@ -432,34 +468,28 @@ export async function writeEnv(
 	const exampleBody = opts.exampleTemplate ?? generatedEnvExample(envKeys)
 	const exampleCreated = writeFileIfAbsent(path.join(cwd, ".env.example"), exampleBody)
 
-	if (!envExisted) {
-		p.log.success("Created .env")
-	} else if (merge.updated.length || merge.added.length) {
-		p.log.success("Updated .env")
-	} else {
-		p.log.info("Left .env unchanged")
-	}
-	p.log.success(exampleCreated ? "Created .env.example" : "Skipped .env.example (exists)")
+	const envMsg = !envExisted ? "Created .env" : merge.updated.length || merge.added.length ? "Updated .env" : "Left .env unchanged"
+	return exampleCreated ? `${envMsg}, created .env.example` : envMsg
 }
 
 /**
- * Push the site settings (secret, canonical site URL, backend URL) to a remote WordPress so
- * webhook signing and event delivery work. No-op for local (handled during provisioning) or when
- * credentials are incomplete. Warns and continues on failure.
+ * Push the site settings (secret, canonical site URL, backend URL) to a remote WordPress so webhook
+ * signing and event delivery work. No-op for local (handled during provisioning) or when credentials are
+ * incomplete. Runs as a checklist step, so instead of logging it returns any non-fatal warnings (a failed
+ * sync, an outdated plugin) for the caller to surface after the run; success returns an empty array.
  */
-export async function syncRemote(conn: Connection): Promise<void> {
-	if (conn.mode !== "remote" || !conn.wpUrl || !conn.wpUsername || !conn.wpPassword) return
+export async function syncRemote(conn: Connection): Promise<string[]> {
+	if (conn.mode !== "remote" || !conn.wpUrl || !conn.wpUsername || !conn.wpPassword) return []
 	const sync = await syncSiteSettings(
 		{ url: conn.wpUrl, username: conn.wpUsername, password: conn.wpPassword },
 		{ secret: conn.siteSecret, siteUrl: conn.siteUrl, backendUrl: conn.baseUrl },
 	)
 	if (!sync.ok) {
-		p.log.warn(
+		return [
 			`Could not sync the site settings to WordPress (${sync.error}) — make sure the kizlo plugin is active, then set them from the Kizlo settings.`,
-		)
-		return
+		]
 	}
-	if (!isPluginVersionSupported(sync.pluginVersion)) p.log.warn(pluginUpdateMessage(sync.pluginVersion))
+	return isPluginVersionSupported(sync.pluginVersion) ? [] : [pluginUpdateMessage(sync.pluginVersion)]
 }
 
 /** The "Next steps" lines. `kizlo dev` is the single entry point for development. */

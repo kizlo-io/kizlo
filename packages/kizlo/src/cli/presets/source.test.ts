@@ -17,13 +17,13 @@ describe("listTemplates", () => {
 		expect(ids).not.toContain("astro-sample")
 	})
 
-	it("labels a template from its manifest name, falling back to framework then the id", () => {
+	it("labels a template from its manifest name, falling back to its id then the directory id", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-registry-test-"))
 		try {
 			fs.mkdirSync(path.join(dir, "named"))
-			fs.writeFileSync(path.join(dir, "named", "template.json"), JSON.stringify({ framework: "x", name: "Fancy Name" }))
+			fs.writeFileSync(path.join(dir, "named", "template.json"), JSON.stringify({ id: "x", name: "Fancy Name" }))
 			fs.mkdirSync(path.join(dir, "unnamed"))
-			fs.writeFileSync(path.join(dir, "unnamed", "template.json"), JSON.stringify({ framework: "Solid" }))
+			fs.writeFileSync(path.join(dir, "unnamed", "template.json"), JSON.stringify({ id: "Solid" }))
 			fs.mkdirSync(path.join(dir, "bare"))
 			fs.writeFileSync(path.join(dir, "bare", "template.json"), JSON.stringify({}))
 
@@ -43,10 +43,10 @@ describe("listTemplates", () => {
 	it("treats a directory that is itself a template (template.json at its root) as a single template", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-single-template-"))
 		try {
-			fs.writeFileSync(path.join(dir, "template.json"), JSON.stringify({ framework: "astro", name: "Community Astro" }))
+			fs.writeFileSync(path.join(dir, "template.json"), JSON.stringify({ id: "astro", name: "Community Astro" }))
 
 			const entries = listTemplates(dir)
-			// One template, its id from the manifest framework (not the random temp dir name) so `init`'s
+			// One template, its id from the manifest id (not the random temp dir name) so `init`'s
 			// detected preset can still locate it, and the whole dir is the template.
 			expect(entries).toHaveLength(1)
 			expect(entries[0]).toEqual({ id: "astro", label: "Community Astro", dir })
@@ -61,7 +61,7 @@ describe("isSingleTemplate", () => {
 	it("is true for a source that is itself a template (template.json at its root)", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-single-"))
 		try {
-			fs.writeFileSync(path.join(dir, "template.json"), JSON.stringify({ framework: "astro" }))
+			fs.writeFileSync(path.join(dir, "template.json"), JSON.stringify({ id: "astro" }))
 			expect(isSingleTemplate(dir)).toBe(true)
 		} finally {
 			fs.rmSync(dir, { recursive: true, force: true })
@@ -86,7 +86,7 @@ describe("locateTemplate", () => {
 describe("detectTemplates", () => {
 	const entries = listTemplates(templatesDir)
 
-	it("picks the template whose detect.dependencies the project has", () => {
+	it("picks the template whose init.requires dep values the project has", () => {
 		expect(detectTemplates(entries, { next: "^16.0.0", react: "^19.0.0" }).map((e) => e.id)).toEqual(["nextjs"])
 		expect(detectTemplates(entries, { astro: "^5.0.0" }).map((e) => e.id)).toEqual(["astro"])
 	})
@@ -102,12 +102,12 @@ describe("detectTemplates", () => {
 			fs.mkdirSync(path.join(dir, "astro-blog"))
 			fs.writeFileSync(
 				path.join(dir, "astro-blog", "template.json"),
-				JSON.stringify({ framework: "astro", detect: { dependencies: ["astro"] } }),
+				JSON.stringify({ id: "astro", init: { requires: [{ kind: "dep", values: ["astro"] }] } }),
 			)
 			fs.mkdirSync(path.join(dir, "astro-shop"))
 			fs.writeFileSync(
 				path.join(dir, "astro-shop", "template.json"),
-				JSON.stringify({ framework: "astro", detect: { dependencies: ["astro"] } }),
+				JSON.stringify({ id: "astro", init: { requires: [{ kind: "dep", values: ["astro"] }] } }),
 			)
 
 			// Both match the single `astro` dep, so both come back, id-sorted, for the caller to pick from.
@@ -121,11 +121,14 @@ describe("detectTemplates", () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-detect-score-"))
 		try {
 			fs.mkdirSync(path.join(dir, "broad"))
-			fs.writeFileSync(path.join(dir, "broad", "template.json"), JSON.stringify({ framework: "a", detect: { dependencies: ["react"] } }))
+			fs.writeFileSync(
+				path.join(dir, "broad", "template.json"),
+				JSON.stringify({ id: "a", init: { requires: [{ kind: "dep", values: ["react"] }] } }),
+			)
 			fs.mkdirSync(path.join(dir, "specific"))
 			fs.writeFileSync(
 				path.join(dir, "specific", "template.json"),
-				JSON.stringify({ framework: "b", detect: { dependencies: ["react", "next"] } }),
+				JSON.stringify({ id: "b", init: { requires: [{ kind: "dep", values: ["react", "next"] }] } }),
 			)
 
 			expect(detectTemplates(listTemplates(dir), { react: "^19.0.0", next: "^16.0.0" }).map((e) => e.id)).toEqual(["specific"])
@@ -140,7 +143,7 @@ describe("detectTemplates", () => {
 			fs.mkdirSync(path.join(dir, "good"))
 			fs.writeFileSync(
 				path.join(dir, "good", "template.json"),
-				JSON.stringify({ framework: "svelte", detect: { dependencies: ["svelte"] } }),
+				JSON.stringify({ id: "svelte", init: { requires: [{ kind: "dep", values: ["svelte"] }] } }),
 			)
 			fs.mkdirSync(path.join(dir, "broken"))
 			fs.writeFileSync(path.join(dir, "broken", "template.json"), "{ not valid json")

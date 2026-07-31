@@ -1,107 +1,107 @@
 {
-	"framework": "astro",
+	"id": "astro",
 	"name": "Astro",
-	"minCli": "0.11.0",
-	"apiPath": "/api/kizlo",
-	"detect": {
-		"dependencies": ["astro"]
+	"minCli": "0.13.1",
+	"config": {
+		"apiPath": "/api/kizlo",
+		"alias": "@",
+		"kizloPath": "src/lib/kizlo"
 	},
-	"notes": [
-		{
-			"title": "Add Kizlo's SEO tags to your root layout's <head>",
-			"body": "---\nimport BaseHead from \"{{importPrefix}}components/BaseHead.astro\"\n---\n<head>\n\t<BaseHead />\n</head>"
-		}
-	],
-	"bootstrap": {
-		"initializer": "astro@latest",
-		"flags": ["--template", "minimal", "--no-install", "--no-git", "--no-ai", "--skip-houston", "--yes"]
+	"init": {
+		"requires": [{ "kind": "dep", "values": ["astro"] }],
+		"notes": [
+			{
+				"title": "Add Kizlo's SEO tags to your root layout's <head>",
+				"body": "---\nimport BaseHead from \"{{importPrefix}}components/BaseHead.astro\"\n---\n<head>\n\t<BaseHead />\n</head>"
+			}
+		]
 	},
-	"conventions": {
-		"kizloDir": "src/lib/kizlo",
-		"appDir": "src/pages",
-		"alias": "@"
+	"create": {
+		"command": "{{pm}} create astro@latest {{name}} --template minimal --no-install --no-git --no-ai --skip-houston --yes"
 	},
-	"base": [
-		{
-			"kind": "file",
-			"role": "server-entry",
-			"path": "src/lib/kizlo/server/index.ts"
-		},
-		{
-			"kind": "file",
-			"role": "client",
-			"path": "src/lib/kizlo/client.ts"
-		},
-		{
-			"kind": "file",
-			"role": "api-route",
-			"path": "src/pages/api/kizlo/[...rest].ts"
-		},
-		{
-			"kind": "file",
-			"role": "robots",
-			"path": "src/pages/robots.txt.ts"
-		},
-		{
-			"kind": "file",
-			"role": "sitemap",
-			"path": "src/pages/sitemaps/[sitemap].xml.ts"
-		},
-		{
-			"kind": "file",
-			"role": "sitemap-redirect",
-			"path": "src/pages/sitemap.xml.ts"
-		},
-		{
-			"kind": "file",
-			"role": "manifest",
-			"path": "src/pages/site.webmanifest.ts"
-		},
-		{
-			"kind": "file",
-			"role": "head-component",
-			"path": "src/components/BaseHead.astro"
-		},
-		{
-			"kind": "file",
-			"role": "blog-post",
-			"path": "src/pages/blog/[slug].astro",
-			"example": true
-		}
-	],
-	"create": [
-		{
-			"kind": "file",
-			"role": "framework-config",
-			"path": "astro.config.mjs"
-		},
-		{
-			"kind": "file",
-			"role": "tsconfig",
-			"path": "tsconfig.json"
-		},
-		{
-			"kind": "file",
-			"role": "root-layout",
-			"path": "src/layouts/Layout.astro"
-		},
-		{
-			"kind": "file",
-			"role": "home-page",
-			"path": "src/pages/index.astro",
-			"example": true
-		}
-	],
-	"init": [
-		{
-			"kind": "patch",
-			"mode": "note",
-			"role": "framework-config",
-			"label": "Astro config",
-			"path": "astro.config.mjs",
-			"note": "Kizlo renders on demand, so Astro needs server output and a runtime adapter. In astro.config.mjs, set `output: \"server\"` and add an adapter (Node shown; swap for your host's adapter if you deploy elsewhere):\n\nimport node from \"@astrojs/node\"\nimport { defineConfig } from \"astro/config\"\n\nexport default defineConfig({\n\toutput: \"server\",\n\tadapter: node({ mode: \"standalone\" }),\n})"
-		}
-	],
+	"changes": {
+		"base": [
+			{
+				"kind": "file",
+				"role": "server-entry",
+				"path": "src/lib/kizlo/server/index.ts"
+			},
+			{
+				"kind": "file",
+				"role": "client",
+				"path": "src/lib/kizlo/client.ts"
+			},
+			{
+				"kind": "file",
+				"role": "api-route",
+				"path": "src/pages/api/kizlo/[...rest].ts"
+			},
+			{
+				"kind": "file",
+				"role": "robots",
+				"path": "src/pages/robots.txt.ts"
+			},
+			{
+				"kind": "file",
+				"role": "sitemap",
+				"path": "src/pages/sitemaps/[sitemap].xml.ts"
+			},
+			{
+				"kind": "file",
+				"role": "sitemap-redirect",
+				"path": "src/pages/sitemap.xml.ts"
+			},
+			{
+				"kind": "file",
+				"role": "manifest",
+				"path": "src/pages/site.webmanifest.ts"
+			},
+			{
+				"kind": "file",
+				"role": "head-component",
+				"path": "src/components/BaseHead.astro"
+			},
+			{
+				"kind": "file",
+				"role": "blog-post",
+				"path": "src/pages/blog/[slug].astro",
+				"example": true
+			}
+		],
+		"create": [
+			{
+				"kind": "file",
+				"role": "framework-config",
+				"path": "astro.config.mjs"
+			},
+			{
+				"kind": "file",
+				"role": "tsconfig",
+				"path": "tsconfig.json"
+			},
+			{
+				"kind": "file",
+				"role": "root-layout",
+				"path": "src/layouts/Layout.astro"
+			},
+			{
+				"kind": "file",
+				"role": "home-page",
+				"path": "src/pages/index.astro",
+				"example": true
+			}
+		],
+		"init": [
+			{
+				"kind": "patch",
+				"mode": "note",
+				"role": "framework-config",
+				"label": "Astro config",
+				"path": "astro.config.mjs",
+				"note": "Kizlo renders on demand, so Astro needs server output and a runtime adapter. In astro.config.mjs, set `output: \"server\"` and add an adapter (Node shown; swap for your host's adapter if you deploy elsewhere):\n\nimport node from \"@astrojs/node\"\nimport { defineConfig } from \"astro/config\"\n\nexport default defineConfig({\n\toutput: \"server\",\n\tadapter: node({ mode: \"standalone\" }),\n})"
+			}
+		]
+	},
 	"env": {
 		"baseUrl": "PUBLIC_KIZLO_API_URL",
 		"remote": {

@@ -7,21 +7,25 @@ import {
 	addDependencyArgs,
 	approveBuildsCommand,
 	availablePackageManagers,
+	cleanupWorkspaceArtifacts,
 	detectImportAlias,
 	detectInvokingPackageManager,
 	detectPackageManager,
 	ensureGitignored,
 	envKeysPresent,
-	frameworkCreateArgs,
+	findWorkspaceRoot,
 	initGitRepository,
 	isCommandAvailable,
 	isGitRepository,
+	isWorkspaceMember,
+	matchesWorkspaceGlobs,
 	mergeEnv,
 	persistPackageManagerField,
 	readPersistedAlias,
 	readTsconfigPaths,
 	resolveModuleImport,
 	stripJsonComments,
+	tokenizeCommand,
 	writeFileIfAbsent,
 } from "./utils"
 
@@ -39,6 +43,94 @@ afterEach(() => {
 function writeTsconfig(paths: Record<string, string[]>): void {
 	fs.writeFileSync(path.join(dir, "tsconfig.json"), JSON.stringify({ compilerOptions: { paths } }))
 }
+
+describe("findWorkspaceRoot", () => {
+	test("finds a pnpm workspace root above the target", () => {
+		fs.writeFileSync(path.join(dir, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n")
+		const appDir = path.join(dir, "apps", "my-app")
+		fs.mkdirSync(appDir, { recursive: true })
+		expect(findWorkspaceRoot(appDir)).toEqual({ root: dir, kind: "pnpm" })
+	})
+
+	test("finds an npm/yarn workspace root from a package.json workspaces field", () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "root", workspaces: ["apps/*"] }))
+		const appDir = path.join(dir, "apps", "web")
+		fs.mkdirSync(appDir, { recursive: true })
+		expect(findWorkspaceRoot(appDir)).toEqual({ root: dir, kind: "npm" })
+	})
+
+	test("supports the { packages: [...] } workspaces form", () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "root", workspaces: { packages: ["pkgs/*"] } }))
+		const appDir = path.join(dir, "pkgs", "a")
+		fs.mkdirSync(appDir, { recursive: true })
+		expect(findWorkspaceRoot(appDir)?.kind).toBe("npm")
+	})
+
+	test("returns undefined when there is no enclosing workspace", () => {
+		const appDir = path.join(dir, "standalone")
+		fs.mkdirSync(appDir, { recursive: true })
+		fs.writeFileSync(path.join(appDir, "package.json"), JSON.stringify({ name: "standalone" }))
+		expect(findWorkspaceRoot(appDir)).toBeUndefined()
+	})
+
+	test("a plain parent package.json without workspaces is not a workspace", () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "just-an-app" }))
+		const appDir = path.join(dir, "sub")
+		fs.mkdirSync(appDir, { recursive: true })
+		expect(findWorkspaceRoot(appDir)).toBeUndefined()
+	})
+})
+
+describe("matchesWorkspaceGlobs", () => {
+	test("matches a single-segment star glob against a direct child", () => {
+		expect(matchesWorkspaceGlobs("apps/my-app", ["apps/*"])).toBe(true)
+		expect(matchesWorkspaceGlobs("apps/my-app/nested", ["apps/*"])).toBe(false)
+	})
+
+	test("matches deeper paths with a double star", () => {
+		expect(matchesWorkspaceGlobs("apps/my-app", ["apps/**"])).toBe(true)
+		expect(matchesWorkspaceGlobs("apps/group/my-app", ["apps/**"])).toBe(true)
+	})
+
+	test("does not match a path outside the globs", () => {
+		expect(matchesWorkspaceGlobs("apps/my-app", ["packages/*"])).toBe(false)
+	})
+
+	test("a later negation excludes an earlier match", () => {
+		expect(matchesWorkspaceGlobs("packages/private", ["packages/*", "!packages/private"])).toBe(false)
+		expect(matchesWorkspaceGlobs("packages/public", ["packages/*", "!packages/private"])).toBe(true)
+	})
+})
+
+describe("isWorkspaceMember (npm/yarn glob branch)", () => {
+	test("an app under the workspace globs is a member; one outside is not", () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "root", workspaces: ["apps/*", "packages/*"] }))
+		const member = path.join(dir, "apps", "web")
+		const outsider = path.join(dir, "tools", "cli")
+		fs.mkdirSync(member, { recursive: true })
+		fs.mkdirSync(outsider, { recursive: true })
+		expect(isWorkspaceMember({ root: dir, kind: "npm" }, member)).toBe(true)
+		expect(isWorkspaceMember({ root: dir, kind: "npm" }, outsider)).toBe(false)
+	})
+})
+
+describe("cleanupWorkspaceArtifacts", () => {
+	test("removes app-local workspace and lockfiles, reporting what it removed", () => {
+		fs.writeFileSync(path.join(dir, "pnpm-workspace.yaml"), "onlyBuiltDependencies:\n  - esbuild\n")
+		fs.writeFileSync(path.join(dir, "pnpm-lock.yaml"), "")
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "app" }))
+		const removed = cleanupWorkspaceArtifacts(dir)
+		expect(removed.sort()).toEqual(["pnpm-lock.yaml", "pnpm-workspace.yaml"])
+		expect(fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))).toBe(false)
+		expect(fs.existsSync(path.join(dir, "pnpm-lock.yaml"))).toBe(false)
+		// Leaves everything else (like package.json) untouched.
+		expect(fs.existsSync(path.join(dir, "package.json"))).toBe(true)
+	})
+
+	test("is a no-op when there are no artifacts", () => {
+		expect(cleanupWorkspaceArtifacts(dir)).toEqual([])
+	})
+})
 
 describe("mergeEnv", () => {
 	test("appends keys to an empty file", () => {
@@ -391,34 +483,9 @@ describe("approveBuildsCommand", () => {
 	})
 })
 
-describe("frameworkCreateArgs", () => {
-	const flags = ["--ts", "--app"]
-
-	test("npm forwards initializer flags after a -- separator", () => {
-		expect(frameworkCreateArgs("npm", "next-app@latest", "my-app", flags)).toEqual([
-			"npm",
-			"create",
-			"next-app@latest",
-			"my-app",
-			"--",
-			"--ts",
-			"--app",
-		])
-	})
-
-	test("yarn drops the @latest tag and passes flags directly", () => {
-		expect(frameworkCreateArgs("yarn", "next-app@latest", "my-app", flags)).toEqual([
-			"yarn",
-			"create",
-			"next-app",
-			"my-app",
-			"--ts",
-			"--app",
-		])
-	})
-
-	test("pnpm and bun pass the tagged initializer and flags directly", () => {
-		expect(frameworkCreateArgs("pnpm", "next-app@latest", "my-app", flags)).toEqual([
+describe("tokenizeCommand", () => {
+	test("splits a plain command on whitespace", () => {
+		expect(tokenizeCommand("pnpm create next-app@latest my-app --ts --app")).toEqual([
 			"pnpm",
 			"create",
 			"next-app@latest",
@@ -426,14 +493,31 @@ describe("frameworkCreateArgs", () => {
 			"--ts",
 			"--app",
 		])
-		expect(frameworkCreateArgs("bun", "next-app@latest", "my-app", flags)).toEqual([
-			"bun",
+	})
+
+	test("collapses runs of whitespace and ignores leading/trailing space", () => {
+		expect(tokenizeCommand("  npm   create   next-app  ")).toEqual(["npm", "create", "next-app"])
+	})
+
+	test("keeps a scoped package and its subcommand as separate tokens", () => {
+		expect(tokenizeCommand("pnpm create @tanstack/cli@latest create my-app --blank")).toEqual([
+			"pnpm",
 			"create",
-			"next-app@latest",
+			"@tanstack/cli@latest",
+			"create",
 			"my-app",
-			"--ts",
-			"--app",
+			"--blank",
 		])
+	})
+
+	test("groups a quoted span into one token, stripping the quotes", () => {
+		expect(tokenizeCommand('astro create my-app --title "My Cool App"')).toEqual(["astro", "create", "my-app", "--title", "My Cool App"])
+		expect(tokenizeCommand("git commit -m 'first commit'")).toEqual(["git", "commit", "-m", "first commit"])
+	})
+
+	test("returns an empty argv for an empty or whitespace-only string", () => {
+		expect(tokenizeCommand("")).toEqual([])
+		expect(tokenizeCommand("   ")).toEqual([])
 	})
 })
 

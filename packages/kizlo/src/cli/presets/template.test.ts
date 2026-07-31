@@ -10,11 +10,11 @@ const templateDir = path.resolve(here, "../../../../../templates/nextjs")
 /** A context standing in for a project whose App Router lives at `app` (not `src/app`). */
 function ctx(): ScaffoldContext {
 	return {
-		kizloDir: "lib/kizlo",
+		kizloPath: "lib/kizlo",
 		serverDirName: "server",
 		serverEntryPath: "lib/kizlo/server/index.ts",
 		clientPath: "lib/kizlo/client.ts",
-		appDir: "app",
+		hasSrcDir: false,
 		// A fixed specifier so the assertion is stable regardless of the file's depth.
 		serverImport: () => "@/lib/kizlo/server",
 		// Re-emit any project path under the project's `@` alias (src root stripped), the shape the real
@@ -65,7 +65,7 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 	it("rewrites a file's path prefix and server-import specifier to the project's", () => {
 		const apiRoute = fileEntries(changesFor(manifest, "init")).find((e) => e.role === "api-route")
 		if (!apiRoute) throw new Error("api-route entry missing")
-		const file = adaptFile(templateDir, apiRoute, manifest.conventions, ctx())
+		const file = adaptFile(templateDir, apiRoute, manifest.config, ctx())
 
 		// The template's `src/app/...` prefix becomes the project's `app/...`.
 		expect(file.relPath).toBe("app/api/kizlo/[[...rest]]/route.ts")
@@ -84,15 +84,15 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 		if (!blog) throw new Error("astro blog-post entry missing")
 
 		const tildeCtx: ScaffoldContext = {
-			kizloDir: "src/lib/kizlo",
+			kizloPath: "src/lib/kizlo",
 			serverDirName: "server",
 			serverEntryPath: "src/lib/kizlo/server/index.ts",
 			clientPath: "src/lib/kizlo/client.ts",
-			appDir: "src/pages",
+			hasSrcDir: true,
 			serverImport: () => "~/lib/kizlo/server",
 			importFrom: (targetRel: string) => `~/${targetRel.replace(/^src\//, "")}`,
 		}
-		const file = adaptFile(astroDir, blog, astro.conventions, tildeCtx)
+		const file = adaptFile(astroDir, blog, astro.config, tildeCtx)
 
 		expect(file.contents).toContain('from "~/lib/kizlo/server"')
 		expect(file.contents).toContain('from "~/layouts/Layout.astro"')
@@ -102,7 +102,7 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 	it("resolves a patch's import token against the project's server import", () => {
 		const patch = patchEntries(changesFor(manifest, "init"))[0]
 		if (!patch) throw new Error("patch entry missing")
-		const resolved = resolvePatch(patch, manifest.conventions, ctx())
+		const resolved = resolvePatch(patch, manifest.config, ctx())
 		expect(resolved.relPath).toBe("app/layout.tsx")
 		expect(resolved.imports.some((i) => i.module === "@/lib/kizlo/server" && i.names.includes("client"))).toBe(true)
 		expect(resolved.exports.map((e) => e.name)).toEqual(["generateMetadata", "generateViewport"])

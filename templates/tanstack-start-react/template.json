@@ -1,0 +1,110 @@
+{
+	"id": "tanstack-start",
+	"name": "TanStack Start (React)",
+	"minCli": "0.13.1",
+	"config": {
+		"alias": "@",
+		"apiPath": "/api/kizlo",
+		"kizloPath": "src/lib/kizlo"
+	},
+	"init": {
+		"requires": [
+			{
+				"kind": "dep",
+				"values": ["@tanstack/react-start"]
+			},
+			{
+				"kind": "dir",
+				"values": ["src/routes"],
+				"message": "Kizlo needs TanStack Start's file-based routing — no `src/routes` directory found."
+			}
+		],
+		"notes": [
+			{
+				"title": "Wire Kizlo's SEO defaults into your root route",
+				"body": "In src/routes/__root.tsx, load the brand head from WordPress and merge it into `head`:\n\nimport { createServerFn } from \"@tanstack/react-start\"\nimport { resolveRootHead } from \"kizlo/tanstack-start/server\"\nimport { client } from \"{{importPrefix}}lib/kizlo/server\"\n\nconst getRootHead = createServerFn().handler(() => resolveRootHead(client))\n\nexport const Route = createRootRoute({\n\tloader: () => getRootHead(),\n\thead: ({ loaderData }) => ({ meta: [...(loaderData?.meta ?? [])], links: loaderData?.links ?? [] }),\n})"
+			}
+		]
+	},
+	"create": {
+		"command": "{{dlx}} @tanstack/cli@latest create --target-dir {{name}} --blank -y --package-manager {{pm}} --no-install --no-git"
+	},
+	"changes": {
+		"base": [
+			{
+				"kind": "file",
+				"role": "server-entry",
+				"path": "src/lib/kizlo/server/index.ts"
+			},
+			{
+				"kind": "file",
+				"role": "client",
+				"path": "src/lib/kizlo/client.ts"
+			},
+			{
+				"kind": "file",
+				"role": "api-route",
+				"path": "src/routes/api/kizlo/$.ts"
+			},
+			{
+				"kind": "file",
+				"role": "robots",
+				"path": "src/routes/robots[.]txt.ts"
+			},
+			{
+				"kind": "file",
+				"role": "sitemap",
+				"path": "src/routes/sitemaps/$.ts"
+			},
+			{
+				"kind": "file",
+				"role": "sitemap-redirect",
+				"path": "src/routes/sitemap[.]xml.ts"
+			},
+			{
+				"kind": "file",
+				"role": "manifest",
+				"path": "src/routes/site[.]webmanifest.ts"
+			},
+			{
+				"kind": "file",
+				"role": "blog-post",
+				"path": "src/routes/blog/$slug.tsx",
+				"example": true
+			}
+		],
+		"create": [
+			{
+				"kind": "file",
+				"role": "root-layout",
+				"path": "src/routes/__root.tsx"
+			},
+			{
+				"kind": "file",
+				"role": "home-page",
+				"path": "src/routes/index.tsx",
+				"example": true
+			}
+		],
+		"init": []
+	},
+	"env": {
+		"baseUrl": "VITE_KIZLO_API_URL",
+		"remote": {
+			"siteSecret": "KIZLO_WP_SECRET",
+			"wpUrl": "KIZLO_WP_URL",
+			"wpUsername": "KIZLO_WP_USERNAME",
+			"wpPassword": "KIZLO_WP_APP_PASSWORD"
+		},
+		"local": {
+			"connect": "KIZLO_CONNECT",
+			"siteSecret": "KIZLO_LOCAL_WP_SECRET",
+			"wpUrl": "KIZLO_LOCAL_WP_URL",
+			"wpUsername": "KIZLO_LOCAL_WP_USERNAME",
+			"wpPassword": "KIZLO_LOCAL_WP_APP_PASSWORD"
+		}
+	},
+	"dependencies": {
+		"kizlo": "^0.13.1"
+	}
+}
