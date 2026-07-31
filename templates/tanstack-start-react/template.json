@@ -1,7 +1,7 @@
 {
 	"id": "tanstack-start",
 	"name": "TanStack Start (React)",
-	"minCli": "0.13.1",
+	"minCli": "0.14.0",
 	"config": {
 		"alias": "@",
 		"apiPath": "/api/kizlo",

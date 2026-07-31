@@ -1,7 +1,7 @@
 {
 	"id": "astro",
 	"name": "Astro",
-	"minCli": "0.13.1",
+	"minCli": "0.14.0",
 	"config": {
 		"apiPath": "/api/kizlo",
 		"alias": "@",
