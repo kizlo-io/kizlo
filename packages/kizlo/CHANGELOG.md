@@ -1,5 +1,23 @@
 # kizlo
 
+## 0.14.0
+
+### Minor Changes
+
+- [#97](https://github.com/kizlo-io/kizlo/pull/97) [`be5c5bc`](https://github.com/kizlo-io/kizlo/commit/be5c5bcf525aacd7e6f4dd43da73399ad286e11e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Make the `create` project name optional: press enter to accept a generated placeholder name, enter `.` to scaffold into the current directory, and show a bare folder as `./name` so it's clear where it lands
+
+- [#97](https://github.com/kizlo-io/kizlo/pull/97) [`be5c5bc`](https://github.com/kizlo-io/kizlo/commit/be5c5bcf525aacd7e6f4dd43da73399ad286e11e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Detect an enclosing monorepo when scaffolding: reuse its package manager (skipping the prompt), and install a workspace member from the root — cleaning up the stray workspace/lock files a framework CLI leaves — so the app joins the monorepo instead of detaching into its own workspace
+
+- [#97](https://github.com/kizlo-io/kizlo/pull/97) [`be5c5bc`](https://github.com/kizlo-io/kizlo/commit/be5c5bcf525aacd7e6f4dd43da73399ad286e11e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Collect every `create` and `init` prompt up front, show a summary to confirm, then run the setup as a live checklist, and add a non-interactive `kizlo create --yes`
+
+- [#97](https://github.com/kizlo-io/kizlo/pull/97) [`be5c5bc`](https://github.com/kizlo-io/kizlo/commit/be5c5bcf525aacd7e6f4dd43da73399ad286e11e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a TanStack Start template and `kizlo/tanstack-start` integration with SSR-wired SEO, server routes for the API, robots.txt, sitemaps, and web manifest
+
+- [#97](https://github.com/kizlo-io/kizlo/pull/97) [`be5c5bc`](https://github.com/kizlo-io/kizlo/commit/be5c5bcf525aacd7e6f4dd43da73399ad286e11e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Give a template's `bootstrap.command` a free-form command string with `{{pm}}`, `{{name}}`, and `{{dlx}}` tokens, letting templates use any scaffolding invocation instead of a fixed `<pm> create <initializer> <name>` shape
+
+- [#97](https://github.com/kizlo-io/kizlo/pull/97) [`be5c5bc`](https://github.com/kizlo-io/kizlo/commit/be5c5bcf525aacd7e6f4dd43da73399ad286e11e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Restructure the template manifest into `config` (apiPath, alias, kizloPath), `init` (requires, notes), `create` (bootstrap command/prompts), and `changes` (base/create/init), replace `detect`/`requires` with a single `init.requires` array of `{ kind: "dep" | "dir", values, match }` preconditions, and adapt template paths to the project's `src/` convention instead of a per-framework route directory
+
+- [#97](https://github.com/kizlo-io/kizlo/pull/97) [`be5c5bc`](https://github.com/kizlo-io/kizlo/commit/be5c5bcf525aacd7e6f4dd43da73399ad286e11e) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add template-defined prompts that map create-time choices to framework CLI flags, so a template can surface a real framework option (e.g. which linter) instead of hard-coding it in `bootstrap`
+
 ## 0.13.1
 
 ### Patch Changes
