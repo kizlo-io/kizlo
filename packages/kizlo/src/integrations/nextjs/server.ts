@@ -1,7 +1,6 @@
 export * from "./kizlo.server"
 export * from "./manifest"
 export * from "./metadata"
-export * from "./page-props"
 export * from "./revalidate"
 export * from "./robots"
 export * from "./sitemap"
