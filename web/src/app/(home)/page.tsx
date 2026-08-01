@@ -24,7 +24,7 @@ export default async function HomePage() {
 
 	return (
 		<main className="relative flex max-h-dvh flex-1 flex-col items-center justify-center overflow-hidden px-6 py-24 text-center">
-			{data && <JsonLd schema={data.schema} />}
+			<JsonLd schema={data?.schema} />
 			<ShaderBackdrop />
 
 			<div className="relative mb-8">

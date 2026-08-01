@@ -1,11 +1,9 @@
 # Today
-- [x] Add Tanstack start template.
-- [x] Template bootstrap object could be a single string where we can define a command with args and flags. the need of array for adding args and flags is redundant, It is also limiting to certain cli commands shape like i couldn't use @tanstack/create-cli@latest create, the logic that parses the bootstrap object requires it to be a certain shape which we shouldn't have, I dont understand whats the reasoning behind of this limitation and shape of the bootstrap object.
-- [x] Fix tanstack start template using deprecated cli @tanstack/create-start, use @tanstack/cli instead.
-- [x] Make the cli prompts lazy meaning collect all user inputs and selections then show a summery of what they have chosen the ask for continue with yes or no, This is very good structure to have because it does nothing until every piece of information is collected and agreed, finally when user agrees then we can show a the process in checklist format with loader in-progress and checkmark on complete individually. 
-- [x] Try to detect the package manager in kizlo create also because if user is trying to create a project in monorepo and executing the kizlo create from root we can detect the package manager there since that would be obvious for user to use the same package manager the monorepo uses, we couldn't detect that means user is not in monorepo or something else is wrong then fallback will be to ask for it.
-- [x] Make the project name optional by choosing the cwd name as project name and also showing that as placeholder instead of static my-app.
-- [x] Add a ability to add template specific prompts, because currently we hard code the flags and args to bootstrap so if user want something that framework provides the support for, like what linter they want to choose so we dont hard code the choice of them. Each choice will be mapped to a framework's cli arg or flag so we can construct a more dynamic bootstrap command.
+- [x] Fix page preview in kizlo plugin getting {"success":false,"data":"Failed to preview."}.
+- [x] Preview fails when a page is not build with dynamic segment meaning the page slug is not dynamic eg instead of [slug] its some-page. In this case the preview breaks since we create the preview link like this: http://localhost:3000/2-2?preview_token=eyJwYXlsb2FkIjp7ImlkIjo5LCJwYXJlbnQiOjIsImV4cGlyZXMiOjE3ODU1NDYxOTZ9LCJoYXNoIjoiZmE2ZThlN2Y1ZDU5ZmEzMTc2N2E3YWFlZTQ0Yjc1NmZiNTQ3NmZmYjQ1NDk4MTY0ZGRiNjRmZmY3OGY2YjE0OCJ9, the id does not match with the static slug and page becomes not found. Can we changed the id to slug? 
+- [x] Fix gutenberg preview in kizlo plugin, our existing preview solution not working in the gutenberg editor.
+- [] Rename tanstack start react id by suffixing the framework eg tanstack-start-react.
+- [] Custom fields are not getting into post and page meta.
 
 # Backlog
 - [] Rename the existing tanstack start template with react (Tanstack Start React) and add a separate Tanstack Start Solid. so we can provide support for both frameworks separately.

@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Fix preview for pages served from static (non-dynamic) front-end routes

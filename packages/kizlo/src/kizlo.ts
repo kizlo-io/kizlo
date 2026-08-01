@@ -75,7 +75,7 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 		})
 
 		const orpcRouter = createOrpcRouter(this.router)
-		this.client = createResultClient(createRouterClient(orpcRouter, { context: this.context } as never))
+		this.client = createResultClient(createRouterClient(orpcRouter, { context: () => this.context.createServerContext() } as never))
 
 		this.remoteHandler = new RPCHandler(orpcRouter, {
 			filter: (options) => {
