@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.14.1
+
+### Patch Changes
+
+- [#99](https://github.com/kizlo-io/kizlo/pull/99) [`fc3d4e4`](https://github.com/kizlo-io/kizlo/commit/fc3d4e455a83f152be894d23a5ad308ecf88d17c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix server client context values being inaccessible in procedures
+
 ## 0.14.0
 
 ### Minor Changes

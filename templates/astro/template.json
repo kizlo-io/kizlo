@@ -124,7 +124,7 @@
 		}
 	},
 	"dependencies": {
-		"kizlo": "^0.14.0",
+		"kizlo": "^0.14.1",
 		"@astrojs/node": "^11.0.2"
 	}
 }
