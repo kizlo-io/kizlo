@@ -11,11 +11,16 @@ class Asset
      * @param string $handle Script + style handle.
      * @param string $module FQCN of a Module class, e.g. Kizlo\Modules\Settings\SettingsModule.
      * @param array  $data   Optional data emitted before the script as `window.kizlo = {...}`.
+     * @param string $name   Optional build folder override for modules whose bundle
+     *                       name cannot be derived from the class namespace.
      */
-    public static function enqueue(string $handle, string $module, array $data = []): void
+    public static function enqueue(string $handle, string $module, array $data = [], ?string $name = null): void
     {
-        $parts = explode('\\', $module);
-        $name = strtolower($parts[2]);
+        if ($name === null) {
+            $parts = explode('\\', $module);
+            $name = strtolower($parts[2]);
+        }
+
         $base = "build/modules/{$name}/index";
 
         $asset_file = KIZLO_PATH . "{$base}.asset.php";

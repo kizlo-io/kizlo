@@ -9,12 +9,13 @@ function init(): void {
 	if (window.kizloPreviewData.isNewPost) {
 		btn.classList.add("disabled")
 
-		const slugCheck = setInterval(() => {
-			const postName = document.getElementById("post_name") as HTMLInputElement
-			if (postName?.value) {
+		const identityCheck = setInterval(() => {
+			const title = document.getElementById("title") as HTMLInputElement | null
+			const postName = document.getElementById("post_name") as HTMLInputElement | null
+			if (title?.value.trim() || postName?.value.trim()) {
 				btn.classList.remove("disabled")
 				btn.textContent = "Preview"
-				clearInterval(slugCheck)
+				clearInterval(identityCheck)
 			}
 		}, 300)
 	}

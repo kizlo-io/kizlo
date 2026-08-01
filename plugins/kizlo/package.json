@@ -32,7 +32,10 @@
 		"@types/react-dom": "^19.2.3",
 		"@wordpress/api-fetch": "^7.44.0",
 		"@wordpress/components": "^32.6.0",
+		"@wordpress/data": "^10.52.0",
+		"@wordpress/editor": "^14.52.0",
 		"@wordpress/element": "^6.44.0",
+		"@wordpress/plugins": "^7.52.0",
 		"@wordpress/scripts": "^32.0.0",
 		"glob": "^7.2.3",
 		"tailwindcss": "^4.2.3"

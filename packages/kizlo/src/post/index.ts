@@ -27,6 +27,7 @@ export const POST_ROUTER_MAP = {
 				if (!result) throw errors.POST_NOT_FOUND()
 
 				const response = await postType.get({ type: "id", value: result.id })
+
 				if (response.error) {
 					switch (response.error.code) {
 						case "invalid_post_type":

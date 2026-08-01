@@ -16,6 +16,7 @@ class PreviewModule
         $this->registerPostStatuses();
 
         add_action('admin_enqueue_scripts', [$this, 'enqueueScripts']);
+        add_action('enqueue_block_editor_assets', [$this, 'enqueueEditorAssets']);
         add_action('wp_ajax_kizlo_preview_token', [$this, 'ajaxHandler']);
         add_action('post_submitbox_misc_actions', [$this, 'ajaxCaller']);
     }
@@ -31,9 +32,50 @@ class PreviewModule
         ]);
     }
 
-    public function enqueueScripts()
+    /**
+     * Classic editor: hijack the native Preview button. The block editor has no
+     * such button, so its assets load separately via `enqueueEditorAssets`.
+     */
+    public function enqueueScripts(string $hook): void
     {
+        if (! in_array($hook, ['post.php', 'post-new.php'], true)) {
+            return;
+        }
+
+        $screen = get_current_screen();
+        if ($screen && $screen->is_block_editor()) {
+            return;
+        }
+
         Asset::enqueue('kizlo-preview', self::class);
+    }
+
+    /**
+     * Block editor: register the "Kizlo Preview" item in the native Preview
+     * dropdown. Data is localized here since `post_submitbox_misc_actions`
+     * (the classic path) never fires in Gutenberg.
+     */
+    public function enqueueEditorAssets(): void
+    {
+        $post = get_post();
+        if (! $post) {
+            return;
+        }
+
+        Asset::enqueue('kizlo-preview-editor', self::class, name: 'preview-editor');
+
+        wp_localize_script('kizlo-preview-editor', 'kizloPreviewData', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'postId'  => $post->ID,
+            'nonce'   => wp_create_nonce('kizlo_preview_' . $post->ID),
+        ]);
+
+        wp_register_style('kizlo-preview-editor', false);
+        wp_enqueue_style('kizlo-preview-editor');
+        wp_add_inline_style(
+            'kizlo-preview-editor',
+            '.components-menu-group:has(a[target^="wp-preview-"]){display:none !important;}'
+        );
     }
 
     /**
@@ -79,10 +121,10 @@ class PreviewModule
                 'post_excerpt' => sanitize_textarea_field($_POST['excerpt']),
             ]);
 
-            if ($post->post_type === 'post') {
-                $new_post_id = $this->handlePost($post, $preview_post);
-            } else {
-                $new_post_id = apply_filters('kizlo_preview_handle', null, $post, $preview_post);
+            $new_post_id = apply_filters('kizlo_preview_handle', null, $post, $preview_post);
+
+            if (empty($new_post_id)) {
+                $new_post_id = $this->handleDefault($post, $preview_post);
             }
 
             if (empty($new_post_id)) {
@@ -92,7 +134,7 @@ class PreviewModule
             do_action('kizlo_preview_save_meta', $new_post_id, $post->ID, $_POST);
 
             wp_send_json_success([
-                'preview_url' => $this->getPreviewUrl(get_post($new_post_id))
+                'preview_url' => $this->getPreviewUrl($post, get_post($new_post_id))
             ]);
         } catch (\Throwable $e) {
             kizlo_log($e->getMessage());
@@ -100,7 +142,11 @@ class PreviewModule
         }
     }
 
-    private function handlePost(WP_Post $post, ?WP_Post $preview_post = null): int
+    /**
+     * Default preview-save. Clones any standard post type (post, page, and
+     * custom types without a dedicated `kizlo_preview_handle` integration).
+     */
+    private function handleDefault(WP_Post $post, ?WP_Post $preview_post = null): int
     {
         if ($preview_post) {
             $new_post_id = $preview_post->ID;
@@ -123,21 +169,37 @@ class PreviewModule
 
         if (! $post) return;
 
+        $has_slug  = ! empty($post->post_name) && $post->post_name !== 'auto-draft';
+        $has_title = trim($post->post_title) !== '';
+
         wp_localize_script('kizlo-preview', 'kizloPreviewData', [
             'ajaxUrl'   => admin_url('admin-ajax.php'),
             'postId'    => $post->ID,
             'nonce'     => wp_create_nonce('kizlo_preview_' . $post->ID),
-            'isNewPost' => empty($post->post_name) || $post->post_name === 'auto-draft',
+            'isNewPost' => ! $has_slug && ! $has_title,
         ]);
     }
 
-    public function getPreviewUrl(WP_Post $preview_post): string
+    public function getPreviewUrl(WP_Post $post, WP_Post $preview_post): string
     {
         $expires = time() + 600;
 
+        // Resolve the URL from the original post so its path matches the front-end
+        // route (whether a dynamic `[slug]` segment or a static pathname). The
+        // preview clone's own permalink is keyed on a numeric slug and would not
+        // match a static route. The signed token carries the clone's id, which is
+        // what actually drives the fetched preview content.
         $settings           = Utils::getSettings();
-        $post_type_settings = $settings->postTypes->get($preview_post->post_type);
-        $url                = untrailingslashit($settings->resolvePostUrl($preview_post, $post_type_settings));
+        $post_type_settings = $settings->postTypes->get($post->post_type);
+
+        $post_for_url = clone $post;
+        if (empty($post_for_url->post_name)) {
+            $submitted_title = sanitize_text_field($_POST['post_title'] ?? $post->post_title);
+            $post_for_url->post_name = sanitize_title($submitted_title);
+        }
+        $post_for_url->post_status = 'publish';
+
+        $url = untrailingslashit($settings->resolvePostUrl($post_for_url, $post_type_settings));
 
         $payload = [
             'id'      => $preview_post->ID,
