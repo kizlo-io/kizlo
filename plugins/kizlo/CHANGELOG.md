@@ -4,6 +4,14 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-08-01
+### Added
+- Add block editor (Gutenberg) preview support via a Preview dropdown item
+
+### Fixed
+- Fix "Failed to preview" error when generating a preview
+- Fix preview for pages served from static (non-dynamic) front-end routes
+
 ## [0.9.0] - 2026-07-26
 ### Added
 - Add kizlo/v1/taxonomies/:taxonomy REST routes that resolve a term by id or slug server-side, so headless clients can fetch a single term by slug in one request instead of a list-then-get round trip.
@@ -97,6 +105,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.10.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.9.0...kizlo-v0.10.0
 [0.9.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.8.1...kizlo-v0.9.0
 [0.8.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.8.0...kizlo-v0.8.1
 [0.8.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.7.0...kizlo-v0.8.0
