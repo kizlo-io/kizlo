@@ -67,3 +67,5 @@ plugins/*/vendor/
 debug.txt
 
 .fallow
+
+.temp
