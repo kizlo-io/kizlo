@@ -14,6 +14,7 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettingsService;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettingsService;
 use Kizlo\Modules\Settings\Webhook\WebhookSettingsService;
 use Kizlo\Modules\Settings\Uploads\UploadsSettingsService;
+use Kizlo\Modules\Settings\Headless\HeadlessSettingsService;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\Support\Utils;
 
@@ -28,6 +29,7 @@ class SettingsModule
     private WebhookSettingsService $webhook;
     private CrawlingSettingsService $crawling;
     private UploadsSettingsService $uploads;
+    private HeadlessSettingsService $headless;
 
     public function __construct()
     {
@@ -40,6 +42,7 @@ class SettingsModule
         $this->webhook     = new WebhookSettingsService();
         $this->crawling    = new CrawlingSettingsService();
         $this->uploads     = new UploadsSettingsService();
+        $this->headless    = new HeadlessSettingsService();
     }
 
     /**
@@ -56,6 +59,7 @@ class SettingsModule
         $this->webhook->register();
         $this->crawling->register();
         $this->uploads->register();
+        $this->headless->register();
 
         $this->registerRestRoutes();
     }
@@ -93,6 +97,7 @@ class SettingsModule
             'crawling'         => $this->crawling->toResponse($settings->crawling),
             'webhook'          => $this->webhook->toResponse($settings->webhook),
             'uploads'          => $this->uploads->toResponse($settings->uploads),
+            'headless'         => $this->headless->toResponse($settings->headless),
             'plain_permalinks' => empty(get_option('permalink_structure')),
             'statuses'         => PostTypeSettings::getStatuses(),
         ];

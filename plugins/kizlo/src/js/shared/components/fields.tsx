@@ -268,17 +268,17 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 // SWITCH
 // ====================================================
 
-type SwitchFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues> = BaseFieldProps<
-	TFieldValues,
-	TContext,
-	TTransformedValues
->
+interface SwitchFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
+	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
+	disabled?: boolean
+}
 
 export function SwitchField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
 	control,
 	name,
 	label,
 	description,
+	disabled,
 }: SwitchFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
 		<Controller
@@ -286,7 +286,14 @@ export function SwitchField<TFieldValues extends FieldValues = FieldValues, TCon
 			control={control}
 			render={({ field, fieldState }) => (
 				<div>
-					<Toggle name={name} label={label} desc={description} checked={field.value ?? false} onChange={field.onChange} />
+					<Toggle
+						name={name}
+						label={label}
+						desc={description}
+						disabled={disabled}
+						checked={field.value ?? false}
+						onChange={field.onChange}
+					/>
 					<FieldError message={fieldState.error?.message} />
 				</div>
 			)}

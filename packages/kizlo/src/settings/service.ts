@@ -7,6 +7,8 @@ import type {
 	BrandSettingsInput,
 	CrawlingSettings,
 	CrawlingSettingsInput,
+	HeadlessSettings,
+	HeadlessSettingsInput,
 	IdentitySettings,
 	IdentitySettingsInput,
 	PostTypeSettings,
@@ -60,6 +62,10 @@ export class SettingsService {
 
 	public async updateUploads(input: UploadsSettingsInput) {
 		return this.update<UploadsSettings>("/settings/uploads", input)
+	}
+
+	public async updateHeadless(input: HeadlessSettingsInput) {
+		return this.update<HeadlessSettings>("/settings/headless", input)
 	}
 
 	public async updatePostType(key: string, input: PostTypeSettingsInput) {

@@ -26,6 +26,7 @@ import { CrawlingSettingsPage } from "./general/crawling"
 import { IdentitySettingsPage } from "./general/identity"
 import { SiteSettingsPage } from "./general/site"
 import { PostTypeSettingsPage } from "./post-type"
+import { HeadlessSettingsPage } from "./system/headless"
 import { UploadsSettingsPage } from "./system/uploads"
 import { WebhookSettingsPage } from "./system/webhook"
 import { TaxonomySettingsPage } from "./taxonomy"
@@ -50,6 +51,7 @@ export default function App() {
 				<Route path="/taxonomies/:slug" element={<TaxonomySettingsPage />} />
 				<Route path="/system/webhooks" element={<WebhookSettingsPage />} />
 				<Route path="/system/uploads" element={<UploadsSettingsPage />} />
+				<Route path="/system/headless" element={<HeadlessSettingsPage />} />
 
 				<Route path="/preview" element={<ComponentGallery />} />
 

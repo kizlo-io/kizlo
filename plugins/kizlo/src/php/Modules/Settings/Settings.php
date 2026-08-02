@@ -17,6 +17,7 @@ use Kizlo\Modules\Settings\Taxonomy\TaxonomySettings;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettingsCollection;
 use Kizlo\Modules\Settings\Webhook\WebhookSettings;
 use Kizlo\Modules\Settings\Uploads\UploadsSettings;
+use Kizlo\Modules\Settings\Headless\HeadlessSettings;
 
 class Settings
 {
@@ -29,6 +30,7 @@ class Settings
     public readonly WebhookSettings            $webhook;
     public readonly CrawlingSettings           $crawling;
     public readonly UploadsSettings            $uploads;
+    public readonly HeadlessSettings           $headless;
 
     private function __construct(
         SiteSettings               $site,
@@ -40,6 +42,7 @@ class Settings
         CrawlingSettings           $crawling,
         WebhookSettings            $webhook,
         UploadsSettings            $uploads,
+        HeadlessSettings           $headless,
     ) {
         $this->site       = $site;
         $this->brand      = $brand;
@@ -50,6 +53,7 @@ class Settings
         $this->crawling   = $crawling;
         $this->webhook    = $webhook;
         $this->uploads    = $uploads;
+        $this->headless   = $headless;
     }
 
     /**
@@ -78,6 +82,7 @@ class Settings
             crawling: CrawlingSettings::load(),
             webhook: WebhookSettings::load(),
             uploads: UploadsSettings::load(),
+            headless: HeadlessSettings::load(),
         );
     }
 
@@ -104,6 +109,7 @@ class Settings
                 crawling: new CrawlingSettings($cache['crawling']),
                 webhook: new WebhookSettings($cache['webhook']),
                 uploads: new UploadsSettings($cache['uploads'] ?? []),
+                headless: new HeadlessSettings($cache['headless'] ?? []),
             );
         }
 
@@ -132,6 +138,7 @@ class Settings
             'crawling'   => $this->crawling->getData(),
             'webhook'    => $this->webhook->getData(),
             'uploads'    => $this->uploads->getData(),
+            'headless'   => $this->headless->getData(),
         ]);
     }
 

@@ -15,9 +15,17 @@ class PreviewModule
         $this->registerIntegrations();
         $this->registerPostStatuses();
 
+        add_action('wp_ajax_kizlo_preview_token', [$this, 'ajaxHandler']);
+
+        // Headless preview off means the native WordPress Preview button (classic
+        // and Gutenberg) is left untouched. The ajax handler above stays wired but
+        // is never reached without the editor scripts that call it.
+        if (! Utils::getSettings()->headless->isEnabled('preview')) {
+            return;
+        }
+
         add_action('admin_enqueue_scripts', [$this, 'enqueueScripts']);
         add_action('enqueue_block_editor_assets', [$this, 'enqueueEditorAssets']);
-        add_action('wp_ajax_kizlo_preview_token', [$this, 'ajaxHandler']);
         add_action('post_submitbox_misc_actions', [$this, 'ajaxCaller']);
     }
 
