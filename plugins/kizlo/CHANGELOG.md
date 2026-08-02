@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-08-02
+### Added
+- Add Headless Mode: front-end lockout, security hardening, login protection, and headless view/preview links
+
 ## [0.10.0] - 2026-08-01
 ### Added
 - Add block editor (Gutenberg) preview support via a Preview dropdown item
@@ -105,6 +109,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.11.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.10.0...kizlo-v0.11.0
 [0.10.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.9.0...kizlo-v0.10.0
 [0.9.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.8.1...kizlo-v0.9.0
 [0.8.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.8.0...kizlo-v0.8.1
