@@ -309,6 +309,30 @@ export const UploadsSettingsSchema = z.object({
 export type UploadsSettingsInput = z.input<typeof UploadsSettingsSchema>
 export type UploadsSettingsOutput = z.output<typeof UploadsSettingsSchema>
 
+// ====================================================
+// HEADLESS SCHEMA
+// ====================================================
+
+export const HeadlessSettingsSchema = z.object({
+	enabled: z.boolean(),
+	preview: z.boolean(),
+	view_links: z.boolean(),
+	block_indexing: z.boolean(),
+	frontend_lockout: z.boolean(),
+	frontend_lockout_redirect: z.boolean(),
+	disable_feeds: z.boolean(),
+	disable_embeds: z.boolean(),
+	disable_xmlrpc: z.boolean(),
+	block_enumeration: z.boolean(),
+	clean_head: z.boolean(),
+	disable_file_editor: z.boolean(),
+	disable_pingbacks: z.boolean(),
+	rename_login: z.boolean(),
+	login_slug: NulledStringSchema,
+})
+export type HeadlessSettingsInput = z.input<typeof HeadlessSettingsSchema>
+export type HeadlessSettingsOutput = z.output<typeof HeadlessSettingsSchema>
+
 export interface SettingsMap {
 	site: SiteSettingsSchemaOutput
 	brand: BrandSettingsSchemaOutput
@@ -319,4 +343,5 @@ export interface SettingsMap {
 	webhook: WebhookSettingsOutput
 	crawling: CrawlingSettingsOutput
 	uploads: UploadsSettingsOutput
+	headless: HeadlessSettingsOutput
 }

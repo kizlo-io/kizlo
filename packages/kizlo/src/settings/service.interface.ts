@@ -2,6 +2,7 @@ import type {
 	AuthorsSettings,
 	BrandSettings,
 	CrawlingSettings,
+	HeadlessSettings,
 	IdentitySettings,
 	OrganizationSettings,
 	PersonSettings,
@@ -18,6 +19,7 @@ export type {
 	AuthorsSettings,
 	BrandSettings,
 	CrawlingSettings,
+	HeadlessSettings,
 	IdentitySettings,
 	OrganizationSettings,
 	PersonSettings,
@@ -49,6 +51,8 @@ export type AuthorsSettingsInput = Partial<AuthorsSettings>
 export type CrawlingSettingsInput = Partial<CrawlingSettings>
 
 export type UploadsSettingsInput = Partial<UploadsSettings>
+
+export type HeadlessSettingsInput = Partial<HeadlessSettings>
 
 export type PostTypeSettingsInput = Partial<
 	Pick<

@@ -27,4 +27,6 @@ require_once KIZLO_PATH . 'vendor/autoload.php';
 require_once KIZLO_PATH . 'src/php/Support/constants.php';
 require_once KIZLO_PATH . 'src/php/Support/functions.php';
 
+register_activation_hook(KIZLO_FILE, [Kizlo\Modules\Headless\Onboarding::class, 'activate']);
+
 Kizlo\Kernel\Plugin::instance()->boot();

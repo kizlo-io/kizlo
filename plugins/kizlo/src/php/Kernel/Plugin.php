@@ -6,6 +6,7 @@ use Kizlo\Modules\Admin\AdminModule;
 use Kizlo\Modules\Appearance\AppearanceModule;
 use Kizlo\Modules\Comment\CommentModule;
 use Kizlo\Modules\Email\EmailModule;
+use Kizlo\Modules\Headless\HeadlessModule;
 use Kizlo\Modules\Post\PostModule;
 use Kizlo\Modules\PostType\PostTypeModule;
 use Kizlo\Modules\Preview\PreviewModule;
@@ -33,6 +34,7 @@ class Plugin
     private array $modules = [
         AdminModule::class,
         SettingsModule::class,
+        HeadlessModule::class,
         PreviewModule::class,
         PostModule::class,
         PostTypeModule::class,

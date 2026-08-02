@@ -165,6 +165,24 @@ export interface UploadsSettings {
 	allowed_mimes: UploadMime[]
 }
 
+export interface HeadlessSettings {
+	enabled: boolean
+	preview: boolean
+	view_links: boolean
+	block_indexing: boolean
+	frontend_lockout: boolean
+	frontend_lockout_redirect: boolean
+	disable_feeds: boolean
+	disable_embeds: boolean
+	disable_xmlrpc: boolean
+	block_enumeration: boolean
+	clean_head: boolean
+	disable_file_editor: boolean
+	disable_pingbacks: boolean
+	rename_login: boolean
+	login_slug: string | null
+}
+
 export interface PostStatusDefinition {
 	label: string
 	slug: string
@@ -184,6 +202,7 @@ export interface Settings {
 	crawling: CrawlingSettings
 	webhook: WebhookSettings
 	uploads: UploadsSettings
+	headless: HeadlessSettings
 	statuses: PostStatusDefinition[]
 	plain_permalinks: boolean
 }

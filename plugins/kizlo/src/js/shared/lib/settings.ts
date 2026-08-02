@@ -11,6 +11,7 @@ import {
 	ImageIcon,
 	PaletteIcon,
 	RobotIcon,
+	ShieldIcon,
 	TagIcon,
 	UploadSimpleIcon,
 	UsersIcon,
@@ -175,6 +176,7 @@ export function useNav(): NavSection[] {
 				label: "System",
 				items: [
 					{ type: "link", name: "Uploads", path: "/system/uploads", icon: UploadSimpleIcon },
+					{ type: "link", name: "Headless", path: "/system/headless", icon: ShieldIcon },
 					{ type: "link", name: "Webhooks", path: "/system/webhooks", icon: WebhooksLogoIcon },
 				],
 			},
