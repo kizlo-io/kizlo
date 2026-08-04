@@ -5,7 +5,7 @@ const withMDX = createMDX()
 /** @type {import('next').NextConfig} */
 const config = {
 	reactStrictMode: true,
-	allowedDevOrigins: ["192.168.0.4", "192.168.0.3"],
+	allowedDevOrigins: ["192.168.0.4", "192.168.0.3", "192.168.0.5"],
 	async redirects() {
 		return [
 			// Bots and SEO tools probe the conventional /sitemap.xml; point them at our real

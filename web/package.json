@@ -22,6 +22,7 @@
 		"fumadocs-ui": "16.10.4",
 		"kizlo": "workspace:*",
 		"lucide-react": "^1.20.0",
+		"motion": "^12.43.0",
 		"next": "catalog:",
 		"radix-ui": "^1.6.0",
 		"react": "catalog:react19",

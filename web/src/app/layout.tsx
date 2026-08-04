@@ -1,5 +1,4 @@
 import "./global.css"
-import { RootProvider } from "fumadocs-ui/provider/next"
 import { createRootMetadata, createRootViewport } from "kizlo/nextjs/server"
 import { Geist } from "next/font/google"
 import { client } from "@/lib/kizlo/server"
@@ -14,7 +13,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
 	return (
 		<html lang="en" className={cn(geist.variable, "font-sans antialiased")} suppressHydrationWarning>
 			<body className="flex min-h-screen flex-col" suppressHydrationWarning>
-				<RootProvider>{children}</RootProvider>
+				{children}
 			</body>
 		</html>
 	)

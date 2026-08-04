@@ -1,24 +1,20 @@
 "use client"
 
-import { GodRays } from "@paper-design/shaders-react"
+import { GrainGradient } from "@paper-design/shaders-react"
+import { cn } from "@/lib/utils"
 
-export function ShaderBackdrop() {
+export function ShaderBackdrop({ className, ...props }: React.HTMLAttributes<HTMLElement>) {
 	return (
-		<div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-			<GodRays
-				className="absolute inset-0 size-full opacity-60"
-				colors={["#a600ff6e", "#6200fff0", "#ffffff", "#33fff5"]}
+		<div aria-hidden className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden", className)}>
+			<GrainGradient
+				className="absolute inset-0 size-full"
+				colors={["#0066ff"]}
 				colorBack="#000000"
-				colorBloom="#0000ff"
-				bloom={0.4}
-				intensity={0.8}
-				density={0.3}
-				spotty={0.3}
-				midSize={0.2}
-				midIntensity={0.4}
-				speed={0.75}
-				offsetX={-1}
-				offsetY={-0.55}
+				softness={0.5}
+				intensity={0.5}
+				noise={0.25}
+				shape="corners"
+				speed={1}
 			/>
 		</div>
 	)
