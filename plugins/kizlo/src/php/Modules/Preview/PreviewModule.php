@@ -34,8 +34,8 @@ class PreviewModule
         register_post_status('kizlo_preview', [
             'label'                     => 'Kizlo Preview',
             'public'                    => false,
-            'show_in_admin_all_list'    => true,
-            'show_in_admin_status_list' => true,
+            'show_in_admin_all_list'    => false,
+            'show_in_admin_status_list' => false,
             'exclude_from_search'       => true,
         ]);
     }

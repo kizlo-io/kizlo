@@ -8,6 +8,8 @@ export function deserializePage(data: WPK_Page, options?: { preview?: boolean })
 	const kizlo = data.kizlo
 	const title = data.title.rendered
 
+	console.log(data.meta)
+
 	return {
 		id: data.id,
 		url: kizlo.url ?? null,
