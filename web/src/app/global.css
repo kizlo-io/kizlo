@@ -11,6 +11,7 @@
 
 html {
 	scrollbar-gutter: stable;
+	/* overscroll-behavior: none; */
 }
 
 html > body[data-scroll-locked] {
@@ -140,4 +141,94 @@ html > body[data-scroll-locked] {
 	html {
 		@apply font-sans;
 	}
+}
+
+/* How-it-works section animations */
+@keyframes how-wipe {
+	from {
+		width: 100%;
+	}
+	to {
+		width: 0%;
+	}
+}
+
+@keyframes how-caret {
+	from {
+		left: 0%;
+		opacity: 1;
+	}
+	to {
+		left: 100%;
+		opacity: 1;
+	}
+}
+
+@keyframes how-caret-hide {
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes how-strike {
+	to {
+		opacity: 0.5;
+		text-decoration: line-through;
+	}
+}
+
+@keyframes how-progress {
+	from {
+		transform: scaleX(0);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+
+/* Per-container theming — CSS only, driven by <Container theme="dark|light">.
+   The section paints --container-bg/--container-fg full width; the bordered
+   column, its wrappers, and the ticks all read --container-border so the frame
+   stays legible on whichever background the theme sets. */
+[data-container-theme="dark"] {
+	--container-bg: var(--color-black);
+	--container-fg: var(--color-white);
+	--container-border: var(--color-neutral-800);
+}
+
+[data-container-theme="light"] {
+	--container-bg: var(--color-white);
+	--container-fg: var(--color-black);
+	--container-border: var(--color-neutral-200);
+}
+
+.wrapper--ticks {
+	--color-stroke: var(--container-border, var(--color-neutral-800));
+	position: relative;
+}
+
+.wrapper--ticks:before {
+	content: "";
+	border-top: 5px solid #0000;
+	border-bottom: 5px solid #0000;
+	border-right: 5px solid #0000;
+	border-left: 5px solid var(--color-stroke);
+	width: 0;
+	height: 0;
+	position: absolute;
+	top: -5.4px;
+	left: 0;
+}
+
+.wrapper--ticks:after {
+	content: "";
+	border-top: 5px solid #0000;
+	border-right: 5px solid var(--color-stroke);
+	border-bottom: 5px solid #0000;
+	border-left: 5px solid #0000;
+	width: 0;
+	height: 0;
+	position: absolute;
+	top: -5.4px;
+	right: 0;
 }
