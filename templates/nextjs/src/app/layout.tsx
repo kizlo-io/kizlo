@@ -1,3 +1,4 @@
+import "./globals.css"
 import { createRootMetadata, createRootViewport } from "kizlo/nextjs/server"
 import type { ReactNode } from "react"
 import { client } from "@/lib/kizlo/server"

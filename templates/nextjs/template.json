@@ -21,7 +21,7 @@
 		]
 	},
 	"create": {
-		"command": "{{pm}} create next-app@latest {{name}} --ts --app --src-dir --import-alias @/* {{linter}} --no-turbopack --skip-install --disable-git --use-{{pm}} --yes",
+		"command": "{{pm}} create next-app@latest {{name}} --ts --app --src-dir --import-alias @/* {{linter}} {{tailwind}} {{reactCompiler}} --skip-install --disable-git --use-{{pm}} --yes",
 		"prompts": [
 			{
 				"kind": "select",
@@ -35,11 +35,32 @@
 						"arg": "--eslint"
 					},
 					{
+						"label": "Biome",
+						"value": "biome",
+						"arg": "--biome"
+					},
+					{
 						"label": "None",
 						"value": "none",
 						"arg": "--no-eslint"
 					}
 				]
+			},
+			{
+				"kind": "confirm",
+				"token": "tailwind",
+				"message": "Add Tailwind CSS?",
+				"default": false,
+				"arg": "--tailwind",
+				"argFalse": "--no-tailwind"
+			},
+			{
+				"kind": "confirm",
+				"token": "reactCompiler",
+				"message": "Enable the React Compiler?",
+				"default": false,
+				"arg": "--react-compiler",
+				"argFalse": ""
 			}
 		]
 	},

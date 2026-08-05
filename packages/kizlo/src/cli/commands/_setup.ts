@@ -161,7 +161,8 @@ export async function selectPackageManager(message: string): Promise<PackageMana
 
 /** The choices summary shows a prompt under a short label — the title-cased token (`linter` → `Linter`). */
 function promptLabel(token: string): string {
-	return token.charAt(0).toUpperCase() + token.slice(1)
+	const spaced = token.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+	return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
 /** What a resolved prompt answer reads as in the choices summary: the option label, `Yes`/`No`, or the text. */

@@ -27,7 +27,65 @@
 		]
 	},
 	"create": {
-		"command": "{{dlx}} @tanstack/cli@latest create --target-dir {{name}} --blank --framework solid -y --package-manager {{pm}} --no-install --no-git"
+		"command": "{{dlx}} @tanstack/cli@latest create --target-dir {{name}} --blank --framework solid -y --package-manager {{pm}} --no-install --no-git {{toolchain}} {{deployment}}",
+		"prompts": [
+			{
+				"kind": "select",
+				"token": "toolchain",
+				"message": "Which linter/formatter would you like to use?",
+				"default": "none",
+				"options": [
+					{
+						"label": "Biome",
+						"value": "biome",
+						"arg": "--toolchain biome"
+					},
+					{
+						"label": "ESLint + Prettier",
+						"value": "eslint",
+						"arg": "--toolchain eslint"
+					},
+					{
+						"label": "None",
+						"value": "none",
+						"arg": "--no-toolchain"
+					}
+				]
+			},
+			{
+				"kind": "select",
+				"token": "deployment",
+				"message": "Which deployment adapter would you like to use?",
+				"default": "none",
+				"options": [
+					{
+						"label": "None",
+						"value": "none",
+						"arg": ""
+					},
+					{
+						"label": "Cloudflare",
+						"value": "cloudflare",
+						"arg": "--deployment cloudflare"
+					},
+					{
+						"label": "Railway",
+						"value": "railway",
+						"arg": "--deployment railway"
+					},
+					{
+						"label": "Netlify",
+						"value": "netlify",
+						"arg": "--deployment netlify"
+					},
+					{
+						"label": "Nitro (agnostic)",
+						"value": "nitro",
+						"arg": "--deployment nitro"
+					}
+				]
+			}
+		]
 	},
 	"changes": {
 		"base": [

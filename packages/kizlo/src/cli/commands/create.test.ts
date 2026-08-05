@@ -16,7 +16,7 @@ describe("bootstrapArgs", () => {
 	const manifest = readManifest(templateDir)
 
 	it("tokenizes the manifest command, substituting {{pm}} and {{name}}", () => {
-		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--no-eslint" })
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--no-eslint", tailwind: "", reactCompiler: "" })
 		expect(argv?.slice(0, 4)).toEqual(["pnpm", "create", "next-app@latest", "my-app"])
 		// `--import-alias @/*` stays two separate tokens, and the alias survives tokenizing intact.
 		const aliasFlag = argv?.indexOf("--import-alias")
@@ -27,7 +27,7 @@ describe("bootstrapArgs", () => {
 	})
 
 	it("substitutes {{name}} into whichever position the template places it", () => {
-		const argv = bootstrapArgs(manifest, "npm", "cool-app", { linter: "--no-eslint" })
+		const argv = bootstrapArgs(manifest, "npm", "cool-app", { linter: "--no-eslint", tailwind: "", reactCompiler: "" })
 		expect(argv?.slice(0, 4)).toEqual(["npm", "create", "next-app@latest", "cool-app"])
 		expect(argv).toContain("--use-npm")
 	})
@@ -39,7 +39,7 @@ describe("bootstrapArgs", () => {
 		expect(bootstrapArgs(tanstackManifest, "npm", "my-app")?.slice(0, 2)).toEqual(["npx", "@tanstack/cli@latest"])
 		expect(bootstrapArgs(tanstackManifest, "bun", "my-app")?.slice(0, 2)).toEqual(["bunx", "@tanstack/cli@latest"])
 		// The `create` subcommand and remaining flags follow the exec command, and no token remains.
-		const argv = bootstrapArgs(tanstackManifest, "pnpm", "my-app")
+		const argv = bootstrapArgs(tanstackManifest, "pnpm", "my-app", { toolchain: "--no-toolchain", deployment: "" })
 		expect(argv).toEqual([
 			"pnpm",
 			"dlx",
@@ -55,6 +55,7 @@ describe("bootstrapArgs", () => {
 			"pnpm",
 			"--no-install",
 			"--no-git",
+			"--no-toolchain",
 		])
 	})
 
@@ -77,24 +78,24 @@ describe("bootstrapArgs", () => {
 	})
 
 	it("splices a prompt fragment into the bootstrap via its {{token}}", () => {
-		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--eslint" })
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--eslint", tailwind: "", reactCompiler: "" })
 		expect(argv).toContain("--eslint")
 		expect(argv).not.toContain("--no-eslint")
 		expect(argv?.some((arg) => arg.includes("{{linter}}"))).toBe(false)
 	})
 
 	it("drops a prompt token whose fragment is empty, leaving the surrounding flags intact", () => {
-		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "" })
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "", tailwind: "", reactCompiler: "" })
 		// No stray empty token and no leftover placeholder.
 		expect(argv?.some((arg) => arg === "" || arg.includes("{{linter}}"))).toBe(false)
 		// The flags that flanked {{linter}} still line up.
 		const aliasFlag = argv?.indexOf("--import-alias")
 		expect(argv?.[(aliasFlag as number) + 1]).toBe("@/*")
-		expect(argv).toContain("--no-turbopack")
+		expect(argv).toContain("--skip-install")
 	})
 
 	it("expands a multi-flag prompt fragment into separate argv tokens", () => {
-		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--eslint --strict" })
+		const argv = bootstrapArgs(manifest, "pnpm", "my-app", { linter: "--eslint --strict", tailwind: "", reactCompiler: "" })
 		expect(argv).toContain("--eslint")
 		expect(argv).toContain("--strict")
 	})
