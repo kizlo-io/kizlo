@@ -4,7 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev:template": "vite dev",
 		"build": "vite build",
 		"typecheck": "tsr generate && tsc --noEmit",
 		"clean": "git clean -xdf .cache .turbo .kizlo .output .nitro .tanstack dist node_modules"
