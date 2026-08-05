@@ -1,0 +1,378 @@
+---
+title: TanStack Start (Solid)
+description: Wire Kizlo into a TanStack Start (Solid) app and make your first call.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+import { File, Folder, Files } from 'fumadocs-ui/components/files'
+
+<Callout>
+  This quickstart covers the app side. Make sure WordPress is ready first (see
+  [Installation](/docs/installation)) — either connect your own WordPress with the plugin and an
+  Application Password, or let Kizlo run one locally in Docker.
+</Callout>
+
+## Set up Kizlo in a new project
+
+Starting fresh? Scaffold a TanStack Start app with Kizlo already wired:
+
+```package-install
+npx kizlo@latest create tanstack-start-solid my-app
+```
+
+It scaffolds a fully wired project and walks you through your WordPress credentials. When it
+finishes, `cd my-app`. Building with React instead? See the [TanStack Start (React)](/docs/quickstarts/tanstack-start/react) quickstart.
+
+## Set up Kizlo in an existing project
+
+Add Kizlo to an app you already have. Use the CLI (recommended) or wire the files by hand —
+both produce the same result.
+
+<Callout>
+  TanStack Start ships SSR by default, so there's nothing extra to enable. Kizlo renders on demand,
+  and the server routes below run on that same server.
+</Callout>
+
+### CLI setup (recommended)
+
+Run the initializer in your project root:
+
+```package-install
+npx kizlo@latest init
+```
+
+It detects your framework, `src` dir (if present), package manager, import alias, etc. and scaffolds:
+
+<Files>
+  <Folder name="src" defaultOpen>
+    <Folder name="routes" defaultOpen>
+      <Folder name="api" defaultOpen>
+        <Folder name="kizlo" defaultOpen>
+          <File name="$.ts" />
+        </Folder>
+      </Folder>
+      <File name="__root.tsx" />
+      <File name="robots[.]txt.ts" />
+      <File name="sitemap[.]xml.ts" />
+      <File name="site[.]webmanifest.ts" />
+      <Folder name="sitemaps" defaultOpen>
+        <File name="$.ts" />
+      </Folder>
+    </Folder>
+    <Folder name="lib" defaultOpen>
+      <Folder name="kizlo" defaultOpen>
+        <Folder name="server" defaultOpen>
+          <File name="index.ts" />
+            <Folder name="generated">
+              <File name="contract.json" />
+              <File name="index.ts" />
+            </Folder>
+        </Folder>
+        <File name="client.ts" />
+      </Folder>
+    </Folder>
+  </Folder>
+  <File name="kizlo.config.ts" />
+  <File name=".env" />
+</Files>
+
+Along the way it asks whether to run WordPress locally in Docker or connect your own, writes
+the matching credentials to `.env`, and generates the contract — so when `init` finishes you're
+ready to make your first call.
+
+Kizlo's brand tags (icons, web manifest, theme color) render through the root route's `head`. `init`
+can't edit a `__root.tsx` you own, so it prints one manual step at the end: wire `resolveRootHead`
+into your root route's loader and spread its result into `head` (see the [step below](#create-the-root-route-head)).
+
+<Callout>
+  Feel free to customize this folder structure however you like — just point the `dir` option in
+  `kizlo.config.ts` at it, so kizlo knows where your server files and kizlo instance live and can
+  generate the server contract.
+</Callout>
+
+### Manual setup
+
+Prefer to wire it yourself? Create the same files the CLI would.
+
+<Steps>
+
+<Step>
+
+#### Install the package
+
+```package-install
+npm install kizlo@latest
+```
+
+</Step>
+
+<Step>
+
+#### Add `kizlo.config.ts`
+
+At your project root — it tells the CLI where Kizlo lives and which import alias to use:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  alias: "@",
+})
+```
+
+</Step>
+
+<Step>
+
+#### Create the server
+
+At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials from `process.env` on the
+TanStack Start server, so there's nothing to pass:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo/tanstack-start/server"
+
+export const { router, client, context, handler } = createKizlo()
+```
+
+</Step>
+
+<Step>
+
+#### Mount the route handler
+
+At `src/routes/api/kizlo/$.ts` — `createApiHandlers` fans Kizlo's single handler out to every HTTP
+method, and Kizlo's handler dispatches on the request internally:
+
+```ts title="src/routes/api/kizlo/$.ts"
+import { createFileRoute } from "@tanstack/solid-router"
+import { createApiHandlers } from "kizlo/tanstack-start/server"
+import { handler } from "@/lib/kizlo/server"
+
+export const Route = createFileRoute("/api/kizlo/$")({
+  server: {
+    handlers: createApiHandlers(handler),
+  },
+})
+```
+
+</Step>
+
+<Step>
+
+#### Generate the contract
+
+So `server/generated/` exists before the client imports it:
+
+```package-install
+npx kizlo generate
+```
+
+</Step>
+
+<Step>
+
+#### Create the client
+
+At `src/lib/kizlo/client.ts` from the generated contract — it's typed automatically. Pass the public
+API URL at the call site so Vite inlines it into the browser bundle:
+
+```ts title="src/lib/kizlo/client.ts"
+import { createKizloClient } from "kizlo/tanstack-start"
+import { contract } from "./server/generated"
+
+export const client = createKizloClient(contract, { url: import.meta.env.VITE_KIZLO_API_URL })
+```
+
+</Step>
+
+<Step>
+
+#### Create the root route head
+
+The root route feeds brand and site data (icons, web manifest, theme color) from WordPress into the
+document `<head>`. `resolveRootHead` holds the server-to-server client, so call it through a server
+function in the loader and spread the result into `head` — child routes layer their per-page SEO on top.
+Solid's SSR wants `HydrationScript` first in `<head>`, with `HeadContent` and `Scripts` in `<body>`:
+
+```tsx title="src/routes/__root.tsx"
+import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/solid-router"
+import { createServerFn } from "@tanstack/solid-start"
+import { resolveRootHead } from "kizlo/tanstack-start/server"
+import { type JSX, Suspense } from "solid-js"
+import { HydrationScript } from "solid-js/web"
+import { client } from "@/lib/kizlo/server"
+
+const getRootHead = createServerFn({ method: "GET" }).handler(() => resolveRootHead(client))
+
+export const Route = createRootRoute({
+  loader: () => getRootHead(),
+  head: ({ loaderData }) => ({
+    meta: [{ charSet: "utf-8" }, { name: "viewport", content: "width=device-width, initial-scale=1" }, ...(loaderData?.meta ?? [])],
+    links: loaderData?.links ?? [],
+  }),
+  component: () => (
+    <html lang="en">
+      <head>
+        <HydrationScript />
+      </head>
+      <body>
+        <HeadContent />
+        <Suspense>
+          <Outlet />
+        </Suspense>
+        <Scripts />
+      </body>
+    </html>
+  ),
+})
+```
+
+</Step>
+
+<Step>
+
+#### Wire robots, sitemaps, and the web manifest
+
+Each is a server route that refetches live from WordPress on every request. Create the four files:
+
+```ts title="src/routes/robots[.]txt.ts"
+import { createFileRoute } from "@tanstack/solid-router"
+import { createRobotsRoute } from "kizlo/tanstack-start/server"
+import { client } from "@/lib/kizlo/server"
+
+export const Route = createFileRoute("/robots.txt")({
+  server: { handlers: { GET: createRobotsRoute(client) } },
+})
+```
+
+```ts title="src/routes/sitemap[.]xml.ts"
+import { createFileRoute } from "@tanstack/solid-router"
+import { createSitemapRedirectRoute } from "kizlo/tanstack-start/server"
+
+// 308-redirects the well-known /sitemap.xml to the generated index at /sitemaps/index.xml.
+export const Route = createFileRoute("/sitemap.xml")({
+  server: { handlers: { GET: createSitemapRedirectRoute() } },
+})
+```
+
+```ts title="src/routes/sitemaps/$.ts"
+import { createFileRoute } from "@tanstack/solid-router"
+import { createSitemapRoute } from "kizlo/tanstack-start/server"
+import { client } from "@/lib/kizlo/server"
+
+// Splat route so /sitemaps/index.xml and every /sitemaps/{key}.xml page resolve to one handler.
+export const Route = createFileRoute("/sitemaps/$")({
+  server: { handlers: { GET: createSitemapRoute(client) } },
+})
+```
+
+```ts title="src/routes/site[.]webmanifest.ts"
+import { createFileRoute } from "@tanstack/solid-router"
+import { createManifestRoute } from "kizlo/tanstack-start/server"
+import { client } from "@/lib/kizlo/server"
+
+export const Route = createFileRoute("/site.webmanifest")({
+  server: { handlers: { GET: createManifestRoute(client) } },
+})
+```
+
+</Step>
+
+<Step>
+
+#### Environment
+
+Finally, connect WordPress — a local stack while you build, your hosted WordPress in production.
+
+#### Local
+
+Let Kizlo run WordPress for you — nothing to fill in:
+
+```package-install
+npx kizlo dev
+```
+
+It starts WordPress in Docker, writes its dev credentials to `.env` for you, and watches your server files
+to keep the contract in sync — one command for the whole local loop.
+
+#### Remote
+
+For your hosted WordPress, add its credentials to `.env`:
+
+```bash title=".env"
+KIZLO_WP_URL=https://your-site.com
+KIZLO_WP_USERNAME=admin
+KIZLO_WP_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
+KIZLO_WP_SECRET=                   # a long random string
+VITE_KIZLO_API_URL=http://localhost:3000/api/kizlo
+```
+
+Generate `KIZLO_WP_SECRET` with `openssl rand -hex 32`. While developing, run `npx kizlo dev` to keep
+the generated contract in sync as you edit your server files.
+
+</Step>
+
+</Steps>
+
+## Render a post
+
+That's it 🎉 — here's the payoff: a complete dynamic blog post route. A server function fetches the post
+by slug and returns a lean, serializable payload; the route's `head` maps its SEO straight into the
+document `<head>`:
+
+- **`resolvePageHead`** — maps the post's SEO head into the `meta`/`links`/`scripts` TanStack merges into
+  the head: title, description, canonical, Open Graph, and Twitter tags, so you never hand-write them.
+- **JSON-LD** — `renderJsonLd` serializes the post's `schema.org` graph to a string in the loader (so the
+  payload stays serializable); `resolvePageHead` emits it as a `<script type="application/ld+json">`.
+
+Each route renders on demand for its slug, so there's no build-time list step.
+
+```tsx title="src/routes/blog/$slug.tsx"
+import { createFileRoute, notFound } from "@tanstack/solid-router"
+import { createServerFn } from "@tanstack/solid-start"
+import { renderJsonLd, resolvePageHead } from "kizlo/tanstack-start"
+import { client } from "@/lib/kizlo/server"
+
+// Return only what the page renders (title, content, SEO) — a lean, serializable payload, not the
+// whole WordPress post. JSON-LD is rendered to a string here so the loader payload stays serializable.
+const getPost = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(async ({ data: slug }) => {
+    const { data } = await client.posts.get({ params: { identifier: slug } })
+    if (!data) return null
+    return {
+      title: data.title,
+      content: data.content,
+      head: data.seo?.head ?? null,
+      jsonLd: data.seo ? renderJsonLd(data.seo.schema) : null,
+    }
+  })
+
+export const Route = createFileRoute("/blog/$slug")({
+  loader: async ({ params }) => {
+    const post = await getPost({ data: params.slug })
+    if (!post) throw notFound()
+    return post
+  },
+  // SEO tags and JSON-LD mapped from the post's SEO head. Missing/unpublished posts 404 in the loader.
+  head: ({ loaderData }) => (loaderData?.head ? resolvePageHead(loaderData.head, loaderData.jsonLd) : {}),
+  component: Post,
+})
+
+function Post() {
+  // In Solid, loader data is a signal — call it to read the current value.
+  const post = Route.useLoaderData()
+
+  return (
+    <article>
+      <h1>{post().title ?? "Untitled"}</h1>
+      <div innerHTML={post().content ?? ""} />
+    </article>
+  )
+}
+```
+
+From here, head to [Concepts](/docs/concepts/extension) to see how procedures, extensions, and adapters
+compose into something production-ready.

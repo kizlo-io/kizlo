@@ -7,6 +7,8 @@ import { detectTemplates, isSingleTemplate, listTemplates, locateTemplate, resol
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const templatesDir = path.resolve(here, "../../../../../templates")
+const tanstackTemplateDir = path.join(templatesDir, "tanstack-start-react")
+const tanstackSolidTemplateDir = path.join(templatesDir, "tanstack-start-solid")
 
 describe("listTemplates", () => {
 	it("discovers every subdirectory that carries a template.json, by scanning not a hardcoded list", () => {
@@ -55,6 +57,18 @@ describe("listTemplates", () => {
 			fs.rmSync(dir, { recursive: true, force: true })
 		}
 	})
+
+	it("uses the framework-suffixed id when the TanStack Start React template is shipped standalone", () => {
+		expect(listTemplates(tanstackTemplateDir)).toEqual([
+			{ id: "tanstack-start-react", label: "TanStack Start (React)", dir: tanstackTemplateDir },
+		])
+	})
+
+	it("uses the framework-suffixed id when the TanStack Start Solid template is shipped standalone", () => {
+		expect(listTemplates(tanstackSolidTemplateDir)).toEqual([
+			{ id: "tanstack-start-solid", label: "TanStack Start (Solid)", dir: tanstackSolidTemplateDir },
+		])
+	})
 })
 
 describe("isSingleTemplate", () => {
@@ -89,6 +103,11 @@ describe("detectTemplates", () => {
 	it("picks the template whose init.requires dep values the project has", () => {
 		expect(detectTemplates(entries, { next: "^16.0.0", react: "^19.0.0" }).map((e) => e.id)).toEqual(["nextjs"])
 		expect(detectTemplates(entries, { astro: "^5.0.0" }).map((e) => e.id)).toEqual(["astro"])
+	})
+
+	it("distinguishes the two TanStack Start templates by their framework-specific start package", () => {
+		expect(detectTemplates(entries, { "@tanstack/react-start": "^1.0.0" }).map((e) => e.id)).toEqual(["tanstack-start-react"])
+		expect(detectTemplates(entries, { "@tanstack/solid-start": "^1.0.0" }).map((e) => e.id)).toEqual(["tanstack-start-solid"])
 	})
 
 	it("returns an empty array when no template's dependencies match", () => {

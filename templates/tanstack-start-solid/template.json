@@ -1,6 +1,6 @@
 {
-	"id": "tanstack-start-react",
-	"name": "TanStack Start (React)",
+	"id": "tanstack-start-solid",
+	"name": "TanStack Start (Solid)",
 	"minCli": "0.14.0",
 	"config": {
 		"alias": "@",
@@ -11,7 +11,7 @@
 		"requires": [
 			{
 				"kind": "dep",
-				"values": ["@tanstack/react-start"]
+				"values": ["@tanstack/solid-start"]
 			},
 			{
 				"kind": "dir",
@@ -22,12 +22,12 @@
 		"notes": [
 			{
 				"title": "Wire Kizlo's SEO defaults into your root route",
-				"body": "In src/routes/__root.tsx, load the brand head from WordPress and merge it into `head`:\n\nimport { createServerFn } from \"@tanstack/react-start\"\nimport { resolveRootHead } from \"kizlo/tanstack-start/server\"\nimport { client } from \"{{importPrefix}}lib/kizlo/server\"\n\nconst getRootHead = createServerFn().handler(() => resolveRootHead(client))\n\nexport const Route = createRootRoute({\n\tloader: () => getRootHead(),\n\thead: ({ loaderData }) => ({ meta: [...(loaderData?.meta ?? [])], links: loaderData?.links ?? [] }),\n})"
+				"body": "In src/routes/__root.tsx, load the brand head from WordPress and merge it into `head`:\n\nimport { createServerFn } from \"@tanstack/solid-start\"\nimport { resolveRootHead } from \"kizlo/tanstack-start/server\"\nimport { client } from \"{{importPrefix}}lib/kizlo/server\"\n\nconst getRootHead = createServerFn().handler(() => resolveRootHead(client))\n\nexport const Route = createRootRoute({\n\tloader: () => getRootHead(),\n\thead: ({ loaderData }) => ({ meta: [...(loaderData?.meta ?? [])], links: loaderData?.links ?? [] }),\n})"
 			}
 		]
 	},
 	"create": {
-		"command": "{{dlx}} @tanstack/cli@latest create --target-dir {{name}} --blank --framework react -y --package-manager {{pm}} --no-install --no-git"
+		"command": "{{dlx}} @tanstack/cli@latest create --target-dir {{name}} --blank --framework solid -y --package-manager {{pm}} --no-install --no-git"
 	},
 	"changes": {
 		"base": [

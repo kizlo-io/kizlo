@@ -48,6 +48,8 @@ describe("bootstrapArgs", () => {
 			"--target-dir",
 			"my-app",
 			"--blank",
+			"--framework",
+			"react",
 			"-y",
 			"--package-manager",
 			"pnpm",
