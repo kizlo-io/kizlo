@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
+import { createFileRoute, Link } from "@tanstack/solid-router"
+import { createServerFn } from "@tanstack/solid-start"
 import { renderJsonLd, resolvePageHead } from "kizlo/tanstack-start"
+import { For, Show } from "solid-js"
 import { client } from "@/lib/kizlo/server"
 
 // The server-to-server client runs only on the server, so the data fetch lives in a server function; the
@@ -25,26 +26,32 @@ export const Route = createFileRoute("/")({
 })
 
 function Home() {
-	const { posts } = Route.useLoaderData()
+	// In Solid, loader data is a signal — call it to read the current value.
+	const data = Route.useLoaderData()
 
 	return (
-		<main style={{ maxWidth: 640, margin: "0 auto", padding: "4rem 1.5rem" }}>
-			<h1>Kizlo + TanStack Start (React)</h1>
-			{posts.length === 0 ? (
-				<p>
-					No published posts yet. Add one in WordPress (run <code>npx kizlo dev</code> for a local stack), then refresh.
-				</p>
-			) : (
+		<main style={{ "max-width": "640px", margin: "0 auto", padding: "4rem 1.5rem" }}>
+			<h1>Kizlo + TanStack Start (Solid)</h1>
+			<Show
+				when={data().posts.length > 0}
+				fallback={
+					<p>
+						No published posts yet. Add one in WordPress (run <code>npx kizlo dev</code> for a local stack), then refresh.
+					</p>
+				}
+			>
 				<ul>
-					{posts.map((post) => (
-						<li key={post.id}>
-							<Link to="/blog/$slug" params={{ slug: post.slug }}>
-								{post.title ?? "Untitled"}
-							</Link>
-						</li>
-					))}
+					<For each={data().posts}>
+						{(post) => (
+							<li>
+								<Link to="/blog/$slug" params={{ slug: post.slug }}>
+									{post.title ?? "Untitled"}
+								</Link>
+							</li>
+						)}
+					</For>
 				</ul>
-			)}
+			</Show>
 		</main>
 	)
 }
