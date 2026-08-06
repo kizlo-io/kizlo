@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { FieldError, PasswordInputField, SwitchField, TextInputField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
+import { FieldLabel } from "@/shared/components/ui/field-label"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { SiteSettingsSchema, type SiteSettingsSchemaInput, type SiteSettingsSchemaOutput } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
@@ -118,7 +119,11 @@ export function SiteSettingsPage() {
 					control={form.control}
 					render={({ field, fieldState }) => (
 						<div className="flex flex-col gap-3">
-							<span className="font-medium text-neutral-900 text-sm">Title Separator</span>
+							<FieldLabel
+								label="Title Separator"
+								desc="The character placed between the page name and the site name in the HTML title tag. Common choices: | – · »."
+								descMode="below"
+							/>
 
 							<div className="flex flex-wrap gap-2">
 								{settings?.constants.site.title_separators.map((item) => {
@@ -145,10 +150,6 @@ export function SiteSettingsPage() {
 									)
 								})}
 							</div>
-
-							<p className="my-0 text-neutral-500 text-sm leading-relaxed">
-								The character placed between the page name and the site name in the HTML title tag. Common choices: | – · ».
-							</p>
 
 							<FieldError message={fieldState.error?.message} />
 						</div>

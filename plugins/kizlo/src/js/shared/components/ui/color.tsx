@@ -1,6 +1,7 @@
 import { PaintBucketIcon } from "@phosphor-icons/react"
 import { BaseControl, ColorPicker, Dropdown } from "@wordpress/components"
 import { cn } from "@/shared/lib/utils"
+import { FieldLabel } from "./field-label"
 import { type BaseInputProps, TextInput } from "./input"
 
 export interface ColorInputProps extends Omit<React.HTMLAttributes<HTMLInputElement>, "onChange">, BaseInputProps {}
@@ -9,7 +10,7 @@ export function ColorInput({ ...props }: ColorInputProps) {
 	const color = props.value ?? ""
 
 	return (
-		<BaseControl id={`${props.name}-color-input`} label={props.label} help={props.desc as React.ComponentProps<typeof BaseControl>["help"]}>
+		<BaseControl id={`${props.name}-color-input`} label={<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />}>
 			<div className="flex items-center gap-4">
 				<Dropdown
 					className={cn("block", props.className)}

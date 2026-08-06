@@ -1,6 +1,7 @@
 import { ComboboxControl, FormTokenField, SelectControl } from "@wordpress/components"
 import { useMemo } from "react"
 import { cn } from "@/shared/lib/utils"
+import { type FieldDescMode, FieldLabel } from "./field-label"
 
 export interface SelectOption {
 	label: string
@@ -13,6 +14,7 @@ export interface BaseSelectProps {
 	options: SelectOption[]
 	value?: string
 	desc?: React.ReactNode
+	descMode?: FieldDescMode
 	label?: string
 	disabled?: boolean
 	className?: string
@@ -27,8 +29,11 @@ export function Select({ ...props }: SelectProps) {
 	return (
 		<SelectControl
 			id={`${props.name}-select`}
-			label={props.label}
-			help={props.desc as React.ComponentProps<typeof SelectControl>["help"]}
+			label={
+				(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as React.ComponentProps<
+					typeof SelectControl
+				>["label"]
+			}
 			value={props.value ?? ""}
 			disabled={props.disabled}
 			options={props.placeholder ? [{ label: props.placeholder, value: "", disabled: true }, ...props.options] : props.options}
@@ -51,8 +56,11 @@ export interface ComboboxProps extends BaseSelectProps {
 export function Combobox({ allowReset = true, ...props }: ComboboxProps) {
 	return (
 		<ComboboxControl
-			label={props.label ?? ""}
-			help={props.desc as React.ComponentProps<typeof ComboboxControl>["help"]}
+			label={
+				(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as React.ComponentProps<
+					typeof ComboboxControl
+				>["label"]
+			}
 			value={props.value}
 			options={props.options}
 			placeholder={props.placeholder}
@@ -88,7 +96,11 @@ export function MultiSelect({ ...props }: MultiSelectProps) {
 	return (
 		<div className={cn("kizlo-multiselect w-full", props.className)}>
 			<FormTokenField
-				label={props.label}
+				label={
+					(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as unknown as React.ComponentProps<
+						typeof FormTokenField
+					>["label"]
+				}
 				placeholder={props.placeholder}
 				disabled={props.disabled}
 				maxLength={props.maxLength}
@@ -106,8 +118,6 @@ export function MultiSelect({ ...props }: MultiSelectProps) {
 				__experimentalShowHowTo={false}
 				__next40pxDefaultSize
 			/>
-
-			{props.desc ? <p className="components-base-control__help mt-2 mb-0!">{props.desc}</p> : null}
 		</div>
 	)
 }

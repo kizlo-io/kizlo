@@ -4,6 +4,7 @@ namespace Kizlo\Modules\PostType;
 
 use Kizlo\Modules\Post\PostSchema;
 use Kizlo\Modules\Settings\Settings;
+use Kizlo\Modules\CustomFields\CustomFieldsStore;
 use Kizlo\Support\Utils;
 
 class PostTypeExtension
@@ -26,7 +27,7 @@ class PostTypeExtension
             ]
         );
 
-        return $data;
+        return $this->injectCustomFields($data);
     }
 
     public function extendListItem(array $data): array
@@ -37,7 +38,27 @@ class PostTypeExtension
             ['extend' => $extend]
         );
 
-        return $data;
+        return $this->injectCustomFields($data);
+    }
+
+    /**
+     * Merge the post's resolved custom fields onto the response root, keyed by
+     * field name. Reserved names are rejected at save time, so nothing here can
+     * clobber an existing key (see {@see CustomFieldsStore::inject}).
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function injectCustomFields(array $data): array
+    {
+        $post = get_post($data['id']);
+        if (!$post) {
+            return $data;
+        }
+
+        $definitions = Utils::getSettings()->postTypes->get($post->post_type)->getCustomFields();
+
+        return CustomFieldsStore::inject($data, CustomFieldsStore::META_POST, $post->ID, $definitions);
     }
 
     private function extendBase(array $data, Settings $settings): array

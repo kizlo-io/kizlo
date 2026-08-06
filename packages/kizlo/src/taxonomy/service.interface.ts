@@ -12,6 +12,8 @@ import type {
  * The `kizlo` enrichment block injected onto term responses by the plugin's
  * `TermExtension` (`rest_prepare_{taxonomy}`). `url` (the resolver-built archive
  * link) rides on every response; `seo` is only present on single-term fetches.
+ * Resolved custom fields are injected onto the response root (keyed by field
+ * name), not here.
  */
 export interface WPK_TaxonomyEnrichment {
 	url?: string
@@ -62,6 +64,8 @@ export interface WPK_CreateTaxonomyInput {
 	description?: string
 	parent?: number
 	meta?: Record<string, unknown>
+	/** Custom-field values are sent at the request root, keyed by field name. */
+	[customField: string]: unknown
 }
 
 export interface WPK_UpdateTaxonomyInput extends WPK_CreateTaxonomyInput {

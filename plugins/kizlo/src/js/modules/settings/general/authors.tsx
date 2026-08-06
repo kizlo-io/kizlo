@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form"
 import { getContent } from "@/modules/settings/shared/content"
 import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
-import { SettingsForm, SettingsSection } from "@/shared/components/settings"
+import { SettingsCard, SettingsForm, SettingsGroup, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
 import { type AuthorSettingsInput, type AuthorSettingsOutput, AuthorSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
@@ -47,46 +47,52 @@ export function AuthorsSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection title={content.seo.heading} desc={content.seo.description}>
-				<VariableField
-					control={form.control}
-					name="title_structure"
-					label={content.seo.title.label}
-					placeholder={settings?.constants.author.default_title_format}
-					description={content.seo.title.description}
-					variables={settings?.constants.author.content_variables ?? []}
-					variant="text"
-				/>
+			<SettingsGroup title={content.seo.heading} desc={content.seo.description}>
+				<SettingsCard>
+					<SwitchField
+						name="search_engine_visibility"
+						control={form.control}
+						label={content.seo.visibility.label}
+						description={content.seo.visibility.description}
+					/>
+				</SettingsCard>
 
-				<VariableField
-					variant="textarea"
-					control={form.control}
-					name="description_structure"
-					label={content.seo.description_.label}
-					placeholder={settings?.constants.author.default_desc_format}
-					description={content.seo.description_.description}
-					variables={settings?.constants.author.content_variables ?? []}
-				/>
+				<SettingsCard>
+					<VariableField
+						control={form.control}
+						name="title_structure"
+						label={content.meta.title.label}
+						placeholder={settings?.constants.author.default_title_format}
+						description={content.meta.title.description}
+						variables={settings?.constants.author.content_variables ?? []}
+						variant="text"
+					/>
 
-				<SwitchField
-					name="search_engine_visibility"
-					control={form.control}
-					label={content.seo.visibility.label}
-					description={content.seo.visibility.description}
-				/>
+					<VariableField
+						variant="textarea"
+						control={form.control}
+						name="description_structure"
+						label={content.meta.description_.label}
+						placeholder={settings?.constants.author.default_desc_format}
+						description={content.meta.description_.description}
+						variables={settings?.constants.author.content_variables ?? []}
+					/>
+				</SettingsCard>
 
-				<BreadcrumbsField
-					control={form.control}
-					name="breadcrumbs"
-					label="Breadcrumb trail"
-					description={
-						<>
-							The crumbs between <strong>Home</strong> and the author. Add pages, or the dynamic <strong>Parent</strong> slot. Order matters
-							— reorder with the arrows. Leave empty for <strong>Home → author</strong>.
-						</>
-					}
-				/>
-			</SettingsSection>
+				<SettingsCard>
+					<BreadcrumbsField
+						control={form.control}
+						name="breadcrumbs"
+						label="Breadcrumb trail"
+						description={
+							<>
+								The crumbs between <strong>Home</strong> and the author. Add pages, or the dynamic <strong>Parent</strong> slot. Order
+								matters — reorder with the arrows. Leave empty for <strong>Home → author</strong>.
+							</>
+						}
+					/>
+				</SettingsCard>
+			</SettingsGroup>
 		</SettingsForm>
 	)
 }

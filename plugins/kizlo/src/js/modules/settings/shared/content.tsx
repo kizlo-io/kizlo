@@ -48,6 +48,18 @@ export function getContent({ name }: ContentArgs) {
 					</>
 				),
 			},
+			visibility: {
+				label: "Show in search results",
+				description: (
+					<>
+						When off, Kizlo adds <code>noindex, nofollow</code> to all {lowercaseName} and removes them from the XML sitemap. Useful for
+						private types like orders or user profiles.
+					</>
+				),
+			},
+		},
+
+		meta: {
 			title: {
 				label: "Page title structure",
 				description: (
@@ -61,6 +73,9 @@ export function getContent({ name }: ContentArgs) {
 				label: "Meta description structure",
 				description: "Shown in search snippets. Keep it under 160 characters. Leave blank to fall back to the excerpt.",
 			},
+		},
+
+		schema: {
 			pageType: {
 				description: (
 					<>
@@ -83,15 +98,6 @@ export function getContent({ name }: ContentArgs) {
 					<>
 						The URL pointing to the comments section. Use <code>{"{{pathname}}"}</code> for the resolved path — for example{" "}
 						<code>{"{{pathname}}#comments"}</code>.
-					</>
-				),
-			},
-			visibility: {
-				label: "Show in search results",
-				description: (
-					<>
-						When off, Kizlo adds <code>noindex, nofollow</code> to all {lowercaseName} and removes them from the XML sitemap. Useful for
-						private types like orders or user profiles.
 					</>
 				),
 			},

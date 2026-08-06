@@ -1,6 +1,7 @@
 import type { Icon } from "@phosphor-icons/react"
 import { RadioControl } from "@wordpress/components"
 import { cn } from "@/shared/lib/utils"
+import { type FieldDescMode, FieldLabel } from "./field-label"
 
 export interface RadioOption {
 	label: string
@@ -15,6 +16,7 @@ export interface RadioProps {
 	value?: string
 	label?: string
 	desc?: string
+	descMode?: FieldDescMode
 	disabled?: boolean
 	onChange?: (value: string) => void
 	className?: string
@@ -23,8 +25,11 @@ export interface RadioProps {
 export function Radio({ ...props }: RadioProps) {
 	return (
 		<RadioControl
-			label={props.label}
-			help={props.desc}
+			label={
+				(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as React.ComponentProps<
+					typeof RadioControl
+				>["label"]
+			}
 			selected={props.value}
 			options={props.options.map((option) => ({ label: option.label, value: option.value }))}
 			onChange={(value) => {
@@ -45,6 +50,7 @@ export interface RadioCardsProps {
 	value?: string
 	label?: string
 	desc?: string
+	descMode?: FieldDescMode
 	disabled?: boolean
 	columns?: number
 	onChange?: (value: string) => void
@@ -55,7 +61,7 @@ export interface RadioCardsProps {
 export function RadioCards({ columns = 2, ...props }: RadioCardsProps) {
 	return (
 		<div className={cn("flex w-full flex-col gap-3", props.className)}>
-			{props.label ? <span className="font-medium text-neutral-900 text-sm">{props.label}</span> : null}
+			{props.label ? <FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} /> : null}
 
 			<div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
 				{props.options.map((option) => {
@@ -99,8 +105,6 @@ export function RadioCards({ columns = 2, ...props }: RadioCardsProps) {
 					)
 				})}
 			</div>
-
-			{props.desc ? <p className="text-neutral-500 text-sm leading-relaxed">{props.desc}</p> : null}
 		</div>
 	)
 }

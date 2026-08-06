@@ -3,6 +3,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { type MediaItem, type MediaType, useMediaLibrary } from "@/shared/hooks/use-media-library"
 import { cn } from "@/shared/lib/utils"
+import { type FieldDescMode, FieldLabel } from "./field-label"
 
 const TYPE_ICON: Record<MediaType, Icon> = {
 	image: ImageIcon,
@@ -42,10 +43,11 @@ export interface MediaInputProps extends React.HTMLAttributes<HTMLElement> {
 	type: MediaType
 	label: string
 	desc?: React.ReactNode
+	descMode?: FieldDescMode
 	onValueChange?: (item: MediaItem | null) => void
 }
 
-export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
+export function MediaPicker({ label, desc, descMode, ...props }: MediaInputProps) {
 	const [picked, setPicked] = useState<MediaItem | null>(props.url ? { id: 0, url: props.url, title: "", mime: "" } : null)
 	const [isDragging, setDragging] = useState(false)
 	const [isUploading, setUploading] = useState(false)
@@ -132,7 +134,9 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 
 	return (
 		<div className={cn("", props.className)}>
-			<div className="mb-2 text-[11px] uppercase">{label}</div>
+			<div className="mb-2 text-[11px] uppercase">
+				<FieldLabel label={label} desc={desc} descMode={descMode} />
+			</div>
 
 			{hasPreview ? (
 				<div>
@@ -157,7 +161,6 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 
 							<div>
 								<div className="mb-1 font-medium group-hover:text-primary">Select or Drag & Drop</div>
-								{desc ? <p className="m-0 text-neutral-500 text-xs leading-relaxed">{desc}</p> : null}
 							</div>
 						</div>
 					) : (
@@ -216,8 +219,6 @@ export function MediaPicker({ label, desc, ...props }: MediaInputProps) {
 					)}
 				</button>
 			)}
-
-			{item && desc ? <p className="mt-2 mb-0 text-neutral-500 text-xs leading-relaxed">{desc}</p> : null}
 		</div>
 	)
 }

@@ -1,6 +1,9 @@
 import { type Control, Controller, type FieldPath, type FieldValues } from "react-hook-form"
 import { ColorInput } from "./ui/color"
+import { type FieldDescMode, FieldLabel } from "./ui/field-label"
 import { NumberInput, PasswordInput, TextareaInput, TextInput } from "./ui/input"
+import { MediaPicker } from "./ui/media-picker"
+import { RichTextInput } from "./ui/rich-text"
 import { Combobox, MultiSelect, Select, type SelectOption } from "./ui/select"
 import { Toggle } from "./ui/toggle"
 
@@ -10,6 +13,7 @@ export interface BaseFieldProps<TFieldValues extends FieldValues = FieldValues, 
 	label?: string
 	name: FieldPath<TFieldValues>
 	description?: React.ReactNode
+	descMode?: FieldDescMode
 	control: Control<TFieldValues, TContext, TTransformedValues>
 }
 
@@ -34,6 +38,7 @@ export function TextInputField<TFieldValues extends FieldValues = FieldValues, T
 	label,
 	type,
 	description,
+	descMode,
 	placeholder,
 }: TextInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
@@ -47,6 +52,7 @@ export function TextInputField<TFieldValues extends FieldValues = FieldValues, T
 						type={type}
 						label={label}
 						desc={description}
+						descMode={descMode}
 						placeholder={placeholder}
 						value={field.value ?? ""}
 						onChange={field.onChange}
@@ -72,6 +78,7 @@ export function PasswordInputField<TFieldValues extends FieldValues = FieldValue
 	name,
 	label,
 	description,
+	descMode,
 	placeholder,
 }: PasswordInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
@@ -84,6 +91,7 @@ export function PasswordInputField<TFieldValues extends FieldValues = FieldValue
 						name={name}
 						label={label}
 						desc={description}
+						descMode={descMode}
 						placeholder={placeholder}
 						value={field.value ?? ""}
 						onChange={field.onChange}
@@ -109,6 +117,7 @@ export function TextareaInputField<TFieldValues extends FieldValues = FieldValue
 	name,
 	label,
 	description,
+	descMode,
 	placeholder,
 }: TextareaInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
@@ -121,6 +130,7 @@ export function TextareaInputField<TFieldValues extends FieldValues = FieldValue
 						name={name}
 						label={label}
 						desc={description}
+						descMode={descMode}
 						placeholder={placeholder}
 						value={field.value ?? ""}
 						onChange={field.onChange}
@@ -146,6 +156,7 @@ export function NumberInputField<TFieldValues extends FieldValues = FieldValues,
 	name,
 	label,
 	description,
+	descMode,
 	placeholder,
 }: NumberInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
@@ -158,6 +169,7 @@ export function NumberInputField<TFieldValues extends FieldValues = FieldValues,
 						name={name}
 						label={label}
 						desc={description}
+						descMode={descMode}
 						placeholder={placeholder}
 						value={field.value == null ? "" : String(field.value)}
 						onChange={(value) => field.onChange(value === "" ? null : Number(value))}
@@ -185,6 +197,7 @@ export function SelectField<TFieldValues extends FieldValues = FieldValues, TCon
 	label,
 	options,
 	description,
+	descMode,
 	placeholder,
 }: SelectFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
@@ -197,6 +210,7 @@ export function SelectField<TFieldValues extends FieldValues = FieldValues, TCon
 						name={name}
 						label={label}
 						desc={description}
+						descMode={descMode}
 						options={options}
 						placeholder={placeholder}
 						value={field.value ?? ""}
@@ -226,6 +240,7 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 	label,
 	options,
 	description,
+	descMode,
 	placeholder,
 	multiple = false,
 }: ComboboxFieldProps<TFieldValues, TContext, TTransformedValues>) {
@@ -240,6 +255,7 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 							name={name}
 							label={label}
 							desc={description}
+							descMode={descMode}
 							options={options}
 							placeholder={placeholder}
 							value={field.value ?? []}
@@ -250,6 +266,7 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 							name={name}
 							label={label}
 							desc={description}
+							descMode={descMode}
 							options={options}
 							placeholder={placeholder}
 							allowReset={false}
@@ -278,6 +295,7 @@ export function SwitchField<TFieldValues extends FieldValues = FieldValues, TCon
 	name,
 	label,
 	description,
+	descMode = "below",
 	disabled,
 }: SwitchFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
@@ -286,17 +304,147 @@ export function SwitchField<TFieldValues extends FieldValues = FieldValues, TCon
 			control={control}
 			render={({ field, fieldState }) => (
 				<div>
-					<Toggle
+					<div className="flex items-center justify-between gap-4">
+						<FieldLabel label={label} desc={description} descMode={descMode} />
+						<Toggle name={name} label={label} hideLabel disabled={disabled} checked={field.value ?? false} onChange={field.onChange} />
+					</div>
+					<FieldError message={fieldState.error?.message} />
+				</div>
+			)}
+		/>
+	)
+}
+
+// ====================================================
+// EMAIL / URL / DATE
+// ====================================================
+
+interface TypedTextFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
+	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
+	placeholder?: string
+}
+
+function makeTypedTextField(type: "email" | "url" | "date") {
+	return function TypedTextField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
+		control,
+		name,
+		label,
+		description,
+		descMode,
+		placeholder,
+	}: TypedTextFieldProps<TFieldValues, TContext, TTransformedValues>) {
+		return (
+			<Controller
+				name={name}
+				control={control}
+				render={({ field, fieldState }) => (
+					<div>
+						<TextInput
+							name={name}
+							type={type}
+							label={label}
+							desc={description}
+							descMode={descMode}
+							placeholder={placeholder}
+							value={field.value ?? ""}
+							onChange={field.onChange}
+						/>
+						<FieldError message={fieldState.error?.message} />
+					</div>
+				)}
+			/>
+		)
+	}
+}
+
+export const EmailField = makeTypedTextField("email")
+export const UrlField = makeTypedTextField("url")
+export const DateField = makeTypedTextField("date")
+
+// ====================================================
+// RICH TEXT
+// ====================================================
+
+interface RichTextFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
+	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
+	placeholder?: string
+}
+
+export function RichTextField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
+	control,
+	name,
+	label,
+	description,
+	descMode,
+	placeholder,
+}: RichTextFieldProps<TFieldValues, TContext, TTransformedValues>) {
+	return (
+		<Controller
+			name={name}
+			control={control}
+			render={({ field, fieldState }) => (
+				<div>
+					<RichTextInput
 						name={name}
 						label={label}
 						desc={description}
-						disabled={disabled}
-						checked={field.value ?? false}
+						descMode={descMode}
+						placeholder={placeholder}
+						value={field.value ?? ""}
 						onChange={field.onChange}
 					/>
 					<FieldError message={fieldState.error?.message} />
 				</div>
 			)}
+		/>
+	)
+}
+
+// ====================================================
+// MEDIA (image / file)
+// ====================================================
+
+/** Form value for a media field: the attachment id plus a preview url. */
+export interface MediaFieldValue {
+	id: number
+	url?: string
+	src?: string
+}
+
+interface MediaFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
+	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
+	mediaType: "image" | "application"
+}
+
+export function MediaField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
+	control,
+	name,
+	label,
+	description,
+	descMode,
+	mediaType,
+}: MediaFieldProps<TFieldValues, TContext, TTransformedValues>) {
+	return (
+		<Controller
+			name={name}
+			control={control}
+			render={({ field, fieldState }) => {
+				const value = field.value as MediaFieldValue | null | undefined
+				return (
+					<div>
+						<MediaPicker
+							type={mediaType}
+							label={label ?? ""}
+							desc={description}
+							descMode={descMode}
+							value={value?.id ?? null}
+							url={value?.src ?? value?.url}
+							onValueChange={(item) => field.onChange(item ? { id: item.id, url: item.url } : null)}
+						/>
+						<FieldError message={fieldState.error?.message} />
+					</div>
+				)
+			}}
 		/>
 	)
 }
@@ -315,6 +463,7 @@ export function ColorField<TFieldValues extends FieldValues = FieldValues, TCont
 	name,
 	label,
 	description,
+	descMode,
 	placeholder,
 }: ColorFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
@@ -327,6 +476,7 @@ export function ColorField<TFieldValues extends FieldValues = FieldValues, TCont
 						name={name}
 						label={label}
 						desc={description}
+						descMode={descMode}
 						placeholder={placeholder}
 						value={field.value ?? ""}
 						onChange={(value) => field.onChange(value || null)}
