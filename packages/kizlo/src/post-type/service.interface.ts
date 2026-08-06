@@ -23,7 +23,8 @@ export interface WPK_TermRef {
  * The `kizlo` enrichment block injected by the plugin's post-type controller.
  * Every field is optional: the PHP layer omits `url`/`categories`/`tags`/`author`/
  * `featured_media` when unavailable, and `seo` is only present on single fetches
- * (never on list items).
+ * (never on list items). Resolved custom fields are injected onto the response
+ * root (keyed by field name), not here.
  */
 export interface WPK_PostEnrichment {
 	seo?: WPK_Seo
@@ -148,6 +149,8 @@ export interface WPK_CreatePostTypeInput {
 	categories?: number[]
 	tags?: number[]
 	password?: string
+	/** Custom-field values are sent at the request root, keyed by field name. */
+	[customField: string]: unknown
 }
 
 export interface WPK_UpdatePostTypeInput extends WPK_CreatePostTypeInput {

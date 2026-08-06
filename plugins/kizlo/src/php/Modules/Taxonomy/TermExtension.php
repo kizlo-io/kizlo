@@ -8,6 +8,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\Support\Utils;
 use Kizlo\Modules\Seo\TermSchema;
+use Kizlo\Modules\CustomFields\CustomFieldsStore;
 
 /**
  * Injects resolved SEO into the term REST responses the headless frontend reads,
@@ -31,11 +32,14 @@ class TermExtension
     {
         if (is_wp_error($response)) return $response;
 
-        if ($request->get_param('id')) {
-            $response->set_data($this->extendSingle($response->get_data(), $term));
-        } else {
-            $response->set_data($this->extendListItem($response->get_data(), $term));
-        }
+        $data = $request->get_param('id')
+            ? $this->extendSingle($response->get_data(), $term)
+            : $this->extendListItem($response->get_data(), $term);
+
+        $definitions = Utils::getSettings()->taxonomies->get($term->taxonomy)->getCustomFields();
+        $data        = CustomFieldsStore::inject($data, CustomFieldsStore::META_TERM, $term->term_id, $definitions);
+
+        $response->set_data($data);
 
         return $response;
     }
@@ -70,14 +74,16 @@ class TermExtension
     {
         $settings = Utils::getSettings();
 
+        $taxonomy = $settings->taxonomies->get($term->taxonomy);
+
         return [
-            'id'          => $term->term_id,
-            'name'        => $term->name,
-            'slug'        => $term->slug,
-            'description' => $term->description,
-            'parent'      => $term->parent,
-            'count'       => $term->count,
-            'url'         => $settings->resolveTermUrl($term, $settings->taxonomies->get($term->taxonomy)),
+            'id'            => $term->term_id,
+            'name'          => $term->name,
+            'slug'          => $term->slug,
+            'description'   => $term->description,
+            'parent'        => $term->parent,
+            'count'         => $term->count,
+            'url'           => $settings->resolveTermUrl($term, $taxonomy),
         ];
     }
 }

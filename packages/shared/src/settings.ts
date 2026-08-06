@@ -127,6 +127,7 @@ export interface PostTypeSettings extends BaseContentSettings {
 	internal: boolean
 	content_variables: Variable[]
 	supports: PostTypeSupports
+	custom_fields: CustomFieldDefinition[]
 }
 
 export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_type" | "article_type"> {
@@ -137,6 +138,145 @@ export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_typ
 	pathname_structure: string | null
 	rest_api_enabled: boolean
 	internal: boolean
+	custom_fields: CustomFieldDefinition[]
+}
+
+// ====================================================
+// CUSTOM FIELDS — ACF-style definitions + values
+// ====================================================
+
+export type CustomFieldType =
+	| "text"
+	| "textarea"
+	| "richtext"
+	| "number"
+	| "toggle"
+	| "select"
+	| "multiselect"
+	| "url"
+	| "email"
+	| "date"
+	| "image"
+	| "file"
+	| "group"
+	| "repeater"
+
+export interface CustomFieldChoice {
+	value: string
+	label: string
+}
+
+interface CustomFieldBase {
+	/** Permanent generated identifier, e.g. `field_a1b2c3`. Never changes once created. */
+	key: string
+	/** Meta-key segment. Locked after first save; drives the generated `kcf_*` key. */
+	name: string
+	label: string
+	instructions: string
+	required: boolean
+}
+
+export interface TextFieldDefinition extends CustomFieldBase {
+	type: "text"
+	default: string | null
+}
+
+export interface TextareaFieldDefinition extends CustomFieldBase {
+	type: "textarea"
+	default: string | null
+}
+
+export interface RichTextFieldDefinition extends CustomFieldBase {
+	type: "richtext"
+	default: string | null
+}
+
+export interface NumberFieldDefinition extends CustomFieldBase {
+	type: "number"
+	default: number | null
+	min: number | null
+	max: number | null
+	step: number | null
+}
+
+export interface ToggleFieldDefinition extends CustomFieldBase {
+	type: "toggle"
+	default: boolean
+}
+
+export interface SelectFieldDefinition extends CustomFieldBase {
+	type: "select"
+	choices: CustomFieldChoice[]
+	default: string | null
+}
+
+export interface MultiSelectFieldDefinition extends CustomFieldBase {
+	type: "multiselect"
+	choices: CustomFieldChoice[]
+	default: string[]
+}
+
+export interface UrlFieldDefinition extends CustomFieldBase {
+	type: "url"
+	default: string | null
+}
+
+export interface EmailFieldDefinition extends CustomFieldBase {
+	type: "email"
+	default: string | null
+}
+
+export interface DateFieldDefinition extends CustomFieldBase {
+	type: "date"
+	default: string | null
+}
+
+export interface ImageFieldDefinition extends CustomFieldBase {
+	type: "image"
+}
+
+export interface FileFieldDefinition extends CustomFieldBase {
+	type: "file"
+}
+
+export interface GroupFieldDefinition extends CustomFieldBase {
+	type: "group"
+	fields: CustomFieldDefinition[]
+}
+
+export interface RepeaterFieldDefinition extends CustomFieldBase {
+	type: "repeater"
+	fields: CustomFieldDefinition[]
+	/** Row bounds; null means unbounded (reserves the 10-digit index in key-length checks). */
+	min: number | null
+	max: number | null
+}
+
+export type CustomFieldDefinition =
+	| TextFieldDefinition
+	| TextareaFieldDefinition
+	| RichTextFieldDefinition
+	| NumberFieldDefinition
+	| ToggleFieldDefinition
+	| SelectFieldDefinition
+	| MultiSelectFieldDefinition
+	| UrlFieldDefinition
+	| EmailFieldDefinition
+	| DateFieldDefinition
+	| ImageFieldDefinition
+	| FileFieldDefinition
+	| GroupFieldDefinition
+	| RepeaterFieldDefinition
+
+/**
+ * Resolved custom-field value. Top-level fields are injected onto the REST response
+ * root (keyed by field name) and accepted on Kizlo writes. Media fields resolve to
+ * {@link Media}; groups nest an object and repeaters an array of row objects.
+ */
+export type CustomFieldValue = string | number | boolean | null | string[] | Media | CustomFieldValues | CustomFieldValues[]
+
+export interface CustomFieldValues {
+	[name: string]: CustomFieldValue
 }
 
 export interface CrawlingSettings {
@@ -223,7 +363,9 @@ export interface SettingsConstants {
 		title_separators: string[]
 		default_title_separator: string
 	}
-	taxonomy: SettingsVariableGroup
-	post_type: SettingsVariableGroup
+	/** Reserved field names collide with the term REST response keys (+ `kizlo`). */
+	taxonomy: SettingsVariableGroup & { reserved_field_names: string[] }
+	/** Reserved field names collide with the post REST response keys (+ `kizlo`). */
+	post_type: SettingsVariableGroup & { reserved_field_names: string[] }
 	author: SettingsVariableGroup
 }

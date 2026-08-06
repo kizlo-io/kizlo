@@ -6,6 +6,7 @@ use WP_Post;
 use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\Support\Utils;
+use Kizlo\Modules\CustomFields\CustomFieldsStore;
 
 class PostExtension
 {
@@ -16,11 +17,14 @@ class PostExtension
 
     public function prepare(WP_REST_Response $response, WP_Post $post, WP_REST_Request $request): WP_REST_Response
     {
-        if ($request->get_param('id')) {
-            $response->set_data($this->extendSingle($response->get_data(), $post));
-        } else {
-            $response->set_data($this->extendListItem($response->get_data(), $post));
-        }
+        $data = $request->get_param('id')
+            ? $this->extendSingle($response->get_data(), $post)
+            : $this->extendListItem($response->get_data(), $post);
+
+        $definitions = Utils::getSettings()->postTypes->get($post->post_type)->getCustomFields();
+        $data        = CustomFieldsStore::inject($data, CustomFieldsStore::META_POST, $post->ID, $definitions);
+
+        $response->set_data($data);
 
         return $response;
     }

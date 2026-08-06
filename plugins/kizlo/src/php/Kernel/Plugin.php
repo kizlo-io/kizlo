@@ -5,6 +5,7 @@ namespace Kizlo\Kernel;
 use Kizlo\Modules\Admin\AdminModule;
 use Kizlo\Modules\Appearance\AppearanceModule;
 use Kizlo\Modules\Comment\CommentModule;
+use Kizlo\Modules\CustomFields\CustomFieldsModule;
 use Kizlo\Modules\Email\EmailModule;
 use Kizlo\Modules\Headless\HeadlessModule;
 use Kizlo\Modules\Post\PostModule;
@@ -46,6 +47,7 @@ class Plugin
         TaxonomyModule::class,
         CommentModule::class,
         UploadModule::class,
+        CustomFieldsModule::class,
     ];
 
     private function __construct() {}

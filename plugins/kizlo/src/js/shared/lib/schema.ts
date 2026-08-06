@@ -1,4 +1,4 @@
-import type { Settings as ApiSettings, SettingsConstants } from "@kizlo/shared"
+import type { Settings as ApiSettings, CustomFieldDefinition, SettingsConstants } from "@kizlo/shared"
 import z from "zod"
 
 // ====================================================
@@ -189,6 +189,91 @@ export type CrawlingSettingsInput = z.input<typeof CrawlingSettingsSchema>
 export type CrawlingSettingsOutput = z.output<typeof CrawlingSettingsSchema>
 
 // ====================================================
+// CUSTOM FIELDS
+// ====================================================
+
+/**
+ * Definitions are edited structurally by the field builder and re-validated on the
+ * server (name-locking, key length, safe type changes), so the client schema only
+ * carries the type through — it never re-implements that server-side contract. The
+ * client-side checks are field-name validity (see {@link refineFieldNames}) and
+ * reserved top-level names (see {@link refineReservedNames}), both applied through the
+ * settings-schema factories below.
+ */
+export const CustomFieldsSchema = z.array(z.custom<CustomFieldDefinition>())
+export type CustomFieldsSchema = z.infer<typeof CustomFieldsSchema>
+
+/**
+ * Reduce a name to its stored meta-key segment, mirroring PHP's
+ * FieldDefinitions::normalizeName (lowercase, non `[a-z0-9_]` runs to `_`, trim `_`).
+ * A name that reduces to "" is silently dropped by the server on save.
+ */
+function normalizeFieldName(name: string): string {
+	return name
+		.toLowerCase()
+		.replace(/[^a-z0-9_]+/g, "_")
+		.replace(/^_+|_+$/g, "")
+}
+
+/**
+ * A valid name is an identifier: a leading letter followed by letters, digits, or
+ * underscores. Mirrors CustomFieldsValidator::NAME_PATTERN. Names surface as REST
+ * response keys / object properties, so a digit-leading name like `123123` is only
+ * reachable via bracket access and is rejected.
+ */
+const FIELD_NAME_PATTERN = /^[a-z][a-z0-9_]*$/
+
+/**
+ * Validate every field name (including nested group/repeater children). An empty
+ * name is silently dropped by the server, making the whole field card vanish on save;
+ * a digit-leading name saves but becomes bracket-only. Catching both here keeps the
+ * card and points the error at the offending Name input.
+ */
+function refineFieldNames(fields: CustomFieldDefinition[], ctx: z.RefinementCtx, path: (string | number)[] = ["custom_fields"]): void {
+	fields.forEach((field, index) => {
+		const fieldPath = [...path, index]
+		const normalized = normalizeFieldName(field.name ?? "")
+
+		if (normalized === "") {
+			ctx.addIssue({
+				code: "custom",
+				path: [...fieldPath, "name"],
+				message: "Name is required and must include letters or numbers.",
+			})
+		} else if (!FIELD_NAME_PATTERN.test(normalized)) {
+			ctx.addIssue({
+				code: "custom",
+				path: [...fieldPath, "name"],
+				message: "Name must start with a letter.",
+			})
+		}
+
+		if ((field.type === "group" || field.type === "repeater") && Array.isArray(field.fields)) {
+			refineFieldNames(field.fields, ctx, [...fieldPath, "fields"])
+		}
+	})
+}
+
+/**
+ * Flag any top-level custom-field name that collides with a reserved response key.
+ * The reserved list is delivered per object type via the settings bootstrap
+ * (`constants.post_type` / `constants.taxonomy`); PHP remains the authoritative gate.
+ * Nested (group/repeater) children are namespaced under their parent, so only the
+ * top level is checked. The issue path targets the offending field's Name input.
+ */
+function refineReservedNames(fields: CustomFieldDefinition[], reserved: Set<string>, ctx: z.RefinementCtx): void {
+	fields.forEach((field, index) => {
+		if (reserved.has(field.name)) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["custom_fields", index, "name"],
+				message: `"${field.name}" is a reserved field name and would collide with an existing response field.`,
+			})
+		}
+	})
+}
+
+// ====================================================
 // POST TYPE SCHEMA
 // ====================================================
 
@@ -203,9 +288,19 @@ export const PostTypeSettingsSchema = z.object({
 	seo_enabled: z.boolean(),
 	rest_api_enabled: z.boolean(),
 	breadcrumbs: z.array(z.string()),
+	custom_fields: CustomFieldsSchema,
 })
 export type PostTypeSettingsInput = z.input<typeof PostTypeSettingsSchema>
 export type PostTypeSettingsOutput = z.output<typeof PostTypeSettingsSchema>
+
+/** Post-type settings schema that requires field names and rejects reserved top-level ones. */
+export function createPostTypeSettingsSchema(reservedFieldNames: Iterable<string>) {
+	const reserved = new Set(reservedFieldNames)
+	return PostTypeSettingsSchema.superRefine((val, ctx) => {
+		refineFieldNames(val.custom_fields, ctx)
+		refineReservedNames(val.custom_fields, reserved, ctx)
+	})
+}
 
 export const TaxonomySettingsSchema = z.object({
 	pathname_structure: createNulledPathnameStructureSchema("{{slug}}"),
@@ -215,9 +310,19 @@ export const TaxonomySettingsSchema = z.object({
 	seo_enabled: z.boolean(),
 	rest_api_enabled: z.boolean(),
 	breadcrumbs: z.array(z.string()),
+	custom_fields: CustomFieldsSchema,
 })
 export type TaxonomySettingsInput = z.input<typeof TaxonomySettingsSchema>
 export type TaxonomySettingsOutput = z.output<typeof TaxonomySettingsSchema>
+
+/** Taxonomy settings schema that requires field names and rejects reserved top-level ones. */
+export function createTaxonomySettingsSchema(reservedFieldNames: Iterable<string>) {
+	const reserved = new Set(reservedFieldNames)
+	return TaxonomySettingsSchema.superRefine((val, ctx) => {
+		refineFieldNames(val.custom_fields, ctx)
+		refineReservedNames(val.custom_fields, reserved, ctx)
+	})
+}
 
 // ====================================================
 // INTEGRATION SCHEMA

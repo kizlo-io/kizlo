@@ -4,6 +4,7 @@ import { type Control, Controller, type FieldPath, useFieldArray, useForm } from
 import { ComboboxField, FieldError, NumberInputField, TextareaInputField, TextInputField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { Button } from "@/shared/components/ui/button"
+import { FieldLabel } from "@/shared/components/ui/field-label"
 import { TextInput } from "@/shared/components/ui/input"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { type RadioCardOption, RadioCards } from "@/shared/components/ui/radio"
@@ -392,10 +393,7 @@ function SocialProfilesField({ control, name, legend, description }: SocialProfi
 
 	return (
 		<div className="flex flex-col gap-3">
-			<div className="flex flex-col gap-1">
-				<span className="font-medium text-neutral-900 text-sm">{legend}</span>
-				<p className="my-0 text-neutral-500 text-sm leading-relaxed">{description}</p>
-			</div>
+			<FieldLabel label={legend} desc={description} descMode="below" />
 
 			<div className="flex flex-col gap-2">
 				{fields.map((item, index) => (

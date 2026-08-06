@@ -3,18 +3,20 @@ import { BaseControl, __experimentalNumberControl as NumberControl, TextareaCont
 import { useState } from "react"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "./button"
+import { type FieldDescMode, FieldLabel } from "./field-label"
 
 export interface BaseInputProps {
 	name: string
 	value?: string
 	desc?: React.ReactNode
+	descMode?: FieldDescMode
 	onChange?: (value: string) => void
 	label?: string
 	placeholder?: string
 }
 
 export interface TextInputProps extends Omit<React.HTMLAttributes<HTMLInputElement>, "onChange">, BaseInputProps {
-	type?: "text" | "password"
+	type?: "text" | "password" | "email" | "url" | "date"
 }
 
 export function TextInput({ ...props }: TextInputProps) {
@@ -23,8 +25,11 @@ export function TextInput({ ...props }: TextInputProps) {
 			id={`${props.name}-text-input`}
 			name={props.name}
 			type={props.type}
-			label={props.label}
-			help={props.desc as React.ComponentProps<typeof TextControl>["help"]}
+			label={
+				(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as React.ComponentProps<
+					typeof TextControl
+				>["label"]
+			}
 			placeholder={props.placeholder}
 			value={props.value ?? ""}
 			onChange={(e) => {
@@ -43,7 +48,7 @@ export function PasswordInput({ ...props }: PasswordInputProps) {
 	const id = `${props.name}-password-input`
 
 	return (
-		<BaseControl id={id} label={props.label} help={props.desc as React.ComponentProps<typeof BaseControl>["help"]} __nextHasNoMarginBottom>
+		<BaseControl id={id} label={<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />} __nextHasNoMarginBottom>
 			<div className="relative">
 				<input
 					id={id}
@@ -85,9 +90,12 @@ export function TextareaInput({ ...props }: TextareaInputProps) {
 		<TextareaControl
 			id={`${props.name}-textarea-input`}
 			name={props.name}
-			label={props.label}
+			label={
+				(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as React.ComponentProps<
+					typeof TextareaControl
+				>["label"]
+			}
 			rows={props.rows}
-			help={props.desc as React.ComponentProps<typeof TextareaControl>["help"]}
 			placeholder={props.placeholder}
 			value={props.value ?? ""}
 			onChange={(e) => {
@@ -105,8 +113,11 @@ export function NumberInput({ ...props }: NumberInputProps) {
 		<NumberControl
 			id={`${props.name}-number-input`}
 			name={props.name}
-			label={props.label}
-			help={props.desc as React.ComponentProps<typeof NumberControl>["help"]}
+			label={
+				(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as React.ComponentProps<
+					typeof NumberControl
+				>["label"]
+			}
 			placeholder={props.placeholder}
 			value={props.value ?? ""}
 			onChange={(e) => {

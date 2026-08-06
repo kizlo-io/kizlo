@@ -5,6 +5,8 @@ namespace Kizlo\Modules\Settings\PostType;
 use WP_Post_Type;
 use Kizlo\Modules\Settings\SettingsIndexedAbstract;
 use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
+use Kizlo\Modules\CustomFields\FieldDefinitions;
+use Kizlo\Modules\CustomFields\CustomFieldsValidator;
 
 class PostTypeSettings extends SettingsIndexedAbstract
 {
@@ -23,6 +25,7 @@ class PostTypeSettings extends SettingsIndexedAbstract
         'seo_enabled'              => null,
         'rest_api_enabled'         => true,
         'breadcrumbs'              => [],
+        'custom_fields'            => [],
     ];
 
     protected const INTERNAL_POST_TYPES = [
@@ -67,6 +70,18 @@ class PostTypeSettings extends SettingsIndexedAbstract
         return $instance;
     }
 
+    protected function validate(string $key, mixed $value): void
+    {
+        if ($key === 'custom_fields') {
+            $previous = is_array($this->get('custom_fields')) ? $this->get('custom_fields') : [];
+            CustomFieldsValidator::assert(
+                FieldDefinitions::normalize($value, $previous),
+                $previous,
+                CustomFieldsValidator::RESERVED_POST_FIELD_NAMES
+            );
+        }
+    }
+
     protected function sanitize(string $key, mixed $value): mixed
     {
         return match ($key) {
@@ -83,8 +98,21 @@ class PostTypeSettings extends SettingsIndexedAbstract
 
             'breadcrumbs'              => $this->sanitizeBreadcrumbs($value),
 
+            'custom_fields'            => FieldDefinitions::normalize($value, is_array($this->get('custom_fields')) ? $this->get('custom_fields') : []),
+
             default => $value,
         };
+    }
+
+    /**
+     * Ordered custom-field definitions configured for this post type.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getCustomFields(): array
+    {
+        $fields = $this->get('custom_fields');
+        return is_array($fields) ? $fields : [];
     }
 
     /**

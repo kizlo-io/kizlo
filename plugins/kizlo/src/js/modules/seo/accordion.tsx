@@ -75,7 +75,7 @@ export function AccordionRow({ id, icon: Glyph, label, value, tone = "neutral", 
 				)}
 			>
 				<Glyph className={cn("size-4 shrink-0 transition-colors", open ? "text-primary" : "text-neutral-400")} weight="regular" />
-				<span className="font-medium text-black text-sm">{label}</span>
+				<span className="text-black text-sm">{label}</span>
 				<span className="ms-auto flex items-center gap-2 truncate">
 					{value ? <span className="truncate text-neutral-600 text-sm">{value}</span> : null}
 					{tone !== "neutral" ? <span className={cn("size-1.5 shrink-0 rounded-full", toneDot[tone])} aria-hidden /> : null}

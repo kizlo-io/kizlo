@@ -96,7 +96,13 @@ export function SettingsForm({ isLoading, isDirty, submitLabel = "Update", onCan
 	)
 }
 
-export function SettingsSection({ title, desc, children }: { title: React.ReactNode; desc?: React.ReactNode; children: React.ReactNode }) {
+/**
+ * A titled block of settings. Renders the heading/description once, then stacks
+ * one or more {@link SettingsCard}s beneath it — use several cards to cluster
+ * related fields under a single heading without giving each cluster its own
+ * top-level title.
+ */
+export function SettingsGroup({ title, desc, children }: { title: React.ReactNode; desc?: React.ReactNode; children: React.ReactNode }) {
 	return (
 		<section className="flex flex-col gap-4">
 			<div className="flex flex-col gap-1">
@@ -104,9 +110,23 @@ export function SettingsSection({ title, desc, children }: { title: React.ReactN
 				{desc ? <p className="my-0! text-neutral-500! text-sm! leading-relaxed!">{desc}</p> : null}
 			</div>
 
-			<Card>
-				<CardContent className="flex flex-col gap-6 p-6!">{children}</CardContent>
-			</Card>
+			<div className="flex flex-col gap-4">{children}</div>
 		</section>
+	)
+}
+
+export function SettingsCard({ children }: { children: React.ReactNode }) {
+	return (
+		<Card>
+			<CardContent className="flex flex-col gap-6 p-6!">{children}</CardContent>
+		</Card>
+	)
+}
+
+export function SettingsSection({ title, desc, children }: { title: React.ReactNode; desc?: React.ReactNode; children: React.ReactNode }) {
+	return (
+		<SettingsGroup title={title} desc={desc}>
+			<SettingsCard>{children}</SettingsCard>
+		</SettingsGroup>
 	)
 }

@@ -2,6 +2,7 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "@phosphor-icons/rea
 import { type Control, Controller, type FieldPath, type FieldValues } from "react-hook-form"
 import { usePages } from "@/shared/hooks/use-pages"
 import { Button } from "./ui/button"
+import { FieldLabel } from "./ui/field-label"
 import { Combobox } from "./ui/select"
 
 export const BREADCRUMB_PARENT_TOKEN = "__parent__"
@@ -53,12 +54,7 @@ export function BreadcrumbsField<TFieldValues extends FieldValues = FieldValues,
 
 				return (
 					<div className="flex flex-col gap-3">
-						{(label || description) && (
-							<div className="flex flex-col gap-1">
-								{label && <span className="font-medium text-neutral-900 text-sm">{label}</span>}
-								{description && <p className="my-0 text-neutral-500 text-sm leading-relaxed">{description}</p>}
-							</div>
-						)}
+						{(label || description) && <FieldLabel label={label} desc={description} descMode="below" />}
 
 						<div className="flex flex-col gap-2">
 							{rows.map((row, index) => (
