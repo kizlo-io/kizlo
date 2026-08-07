@@ -44,7 +44,7 @@ export const FEATURES: Feature[] = [
 		id: "type-safe",
 		title: "Catch mistakes before they ship",
 		description:
-			"Kizlo is typed end to end, from your content to the APIs you build. Autocomplete guides every call, and mismatches surface at build time instead of as a white screen in production.",
+			"Kizlo is typed end to end, from your content to the APIs you build. Autocomplete guides every call, and mismatches surface at build time instead of as a white screen after deploy.",
 		cols: "md:col-span-2",
 		visual: (
 			<div className="w-full border border-neutral-800 bg-neutral-950 p-3 font-mono text-neutral-400 text-xs">

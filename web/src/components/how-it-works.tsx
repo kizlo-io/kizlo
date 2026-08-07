@@ -6,7 +6,7 @@ import { AnimatePresence, motion, type Variants } from "motion/react"
 import Image from "next/image"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
-import { Container } from "./layout"
+import { Container, Wrapper } from "./layout"
 
 const TABS = ["Edit", "Code", "Display"] as const
 
@@ -89,7 +89,18 @@ export function HowItWorks() {
 
 	return (
 		<section>
-			<Container className="relative overflow-hidden pt-28">
+			<Container className="relative overflow-hidden pt-20 sm:pt-28">
+				<Wrapper className="relative z-10 mx-auto mb-12 max-w-4xl px-6 text-center sm:mb-16 sm:px-10">
+					<p className="text-[#e7a6e0] text-xs uppercase tracking-widest">One change, all the way through</p>
+					<h2 className="mt-4 text-balance text-3xl tracking-tight sm:text-4xl">
+						Edit in WordPress. Build in TypeScript. Publish everywhere.
+					</h2>
+					<p className="mx-auto mt-5 max-w-2xl text-balance text-neutral-300 leading-relaxed sm:text-lg">
+						Kizlo carries content and SEO from the editor to your application through one typed workflow—without making WordPress your
+						frontend.
+					</p>
+				</Wrapper>
+
 				<div className="relative z-10 mx-auto max-w-6xl rounded-t-xl border border-neutral-400 px-1 pt-1 md:-mb-4">
 					<div role="cell" className="relative w-full overflow-hidden rounded-t-xl">
 						<div className="relative aspect-2940/1672 w-full">

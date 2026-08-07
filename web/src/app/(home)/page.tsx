@@ -1,9 +1,12 @@
 import { createPageMetadata } from "kizlo/nextjs/server"
 import type { Metadata } from "next"
 import { Features } from "@/components/features"
+import { FinalCta } from "@/components/final-cta"
 import { Hero } from "@/components/hero"
 import { HowItWorks } from "@/components/how-it-works"
 import { JsonLd } from "@/components/json-ld"
+import { KizloSystem } from "@/components/kizlo-system"
+import { Problem } from "@/components/problem"
 import { client } from "@/lib/kizlo/server"
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,9 +23,15 @@ export default async function HomePage() {
 
 			<Hero />
 
+			<Problem />
+
 			<HowItWorks />
 
+			<KizloSystem />
+
 			<Features />
+
+			<FinalCta />
 		</main>
 	)
 }

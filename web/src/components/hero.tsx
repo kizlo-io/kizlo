@@ -10,7 +10,7 @@ const INSTALL_COMMAND = "npx kizlo@latest create"
 export function Hero({ className, ...props }: React.ComponentProps<"section">) {
 	return (
 		<Container className="relative">
-			<Wrapper className="px-6 pt-40 pb-24 text-center sm:px-8 sm:pb-20">
+			<Wrapper className="px-6 pt-40 pb-24 text-center sm:px-8 sm:pb-28">
 				<Link
 					target="_blank"
 					href="https://github.com/kizlo-io/kizlo"
@@ -28,8 +28,9 @@ export function Hero({ className, ...props }: React.ComponentProps<"section">) {
 					<br className="hidden sm:block" /> <span className="">your content and SEO again.</span>
 				</h1>
 
-				<p className="mx-auto mt-6 max-w-5xl text-balance text-base text-neutral-400 sm:text-lg">
-					Manage content and rich SEO in WordPress, then build content-driven applications with the frontend framework you already use.
+				<p className="mx-auto mt-6 max-w-3xl text-balance text-base text-neutral-400 leading-relaxed sm:text-lg">
+					Kizlo is an open-source, two-part system: a WordPress plugin for managing content and rich SEO, and a TypeScript framework that
+					brings it into the frontend stack you already use.
 				</p>
 
 				<div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -48,7 +49,7 @@ export function Hero({ className, ...props }: React.ComponentProps<"section">) {
 	)
 }
 
-function CopyCommand({ command = INSTALL_COMMAND }: { command?: string }) {
+export function CopyCommand({ command = INSTALL_COMMAND }: { command?: string }) {
 	const [copied, setCopied] = useState(false)
 
 	async function copy() {
