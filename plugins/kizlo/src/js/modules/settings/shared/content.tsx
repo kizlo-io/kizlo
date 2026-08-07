@@ -2,35 +2,24 @@ type ContentArgs = {
 	name: string
 }
 
+/**
+ * Field-level copy for the post-type / taxonomy / authors forms. Section-level
+ * headings and descriptions are served by PHP (SettingsNav) and rendered from
+ * the nav; only the individual field labels and descriptions live here, some
+ * templated with the object name.
+ */
 export function getContent({ name }: ContentArgs) {
 	const lowercaseName = name.toLowerCase()
 
 	return {
 		access: {
-			heading: <>REST API</>,
-			description: <>Defines who and how {lowercaseName} type can be accessed through the REST API.</>,
 			enabled: {
 				label: "Allow API access",
 				description: <>When off, all API access to this post type is blocked, including secret key access.</>,
 			},
-			base: {
-				label: "REST API Base",
-				description: 'The base route for this post type\'s REST API endpoint (e.g. "posts", "products").',
-			},
-			namespace: {
-				label: "REST API Namespace",
-				description: 'The namespace for this post type\'s REST API endpoint (e.g. "wp/v2", "wc/v3").',
-			},
 		},
 
 		url: {
-			heading: <>URL Structure</>,
-			description: (
-				<>
-					Defines the URL pattern for {lowercaseName}. The resolved path is used across canonical links, SEO meta tags, structured data, and
-					the preview link inside the {lowercaseName} editor.
-				</>
-			),
 			pathname: {
 				label: "Pathname structure",
 				description: <>Use variables to build dynamic URLs. The resolved path is used for canonical links and sitemaps.</>,
@@ -38,8 +27,6 @@ export function getContent({ name }: ContentArgs) {
 		},
 
 		seo: {
-			heading: <>SEO</>,
-			description: <>Control how search engines see and display {lowercaseName}.</>,
 			enabled: {
 				label: "Enable SEO support",
 				description: (

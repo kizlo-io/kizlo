@@ -19,7 +19,8 @@ import {
 	SidebarSection,
 } from "@/shared/components/sidebar"
 import { ComponentGallery } from "@/shared/components/ui/gallery"
-import { useNav } from "@/shared/lib/settings"
+import { resolveIcon } from "@/shared/lib/icons"
+import { pageJumpLinks, useNav } from "@/shared/lib/nav"
 import { $sidebar } from "@/shared/lib/store"
 import type { NavBlock } from "@/shared/lib/types"
 import { AuthorsSettingsPage } from "./general/authors"
@@ -112,13 +113,13 @@ function stackFor(blocks: NavBlock[], pathname: string): string[] {
 	for (const block of blocks) {
 		for (const node of block.items) {
 			if (node.type === "page") {
-				if (node.path === pathname) return node.sections.length > 0 ? [node.id] : []
+				if (node.path === pathname) return pageJumpLinks(node).length > 0 ? [node.id] : []
 				continue
 			}
 
 			if (node.onCreate === pathname) return [node.id]
 			for (const page of node.items) {
-				if (page.path === pathname) return page.sections.length > 0 ? [node.id, page.id] : [node.id]
+				if (page.path === pathname) return pageJumpLinks(page).length > 0 ? [node.id, page.id] : [node.id]
 			}
 		}
 	}
@@ -133,7 +134,7 @@ function Sidebar() {
 
 	const groups = blocks.flatMap((block) => block.items).filter((node) => node.type === "group")
 	const pages = blocks.flatMap((block) => block.items).flatMap((node) => (node.type === "group" ? node.items : [node]))
-	const drillablePages = pages.filter((page) => page.sections.length > 0)
+	const drillablePages = pages.filter((page) => pageJumpLinks(page).length > 0)
 
 	const [stack, setStack] = useState<string[]>(() => stackFor(blocks, pathname))
 
@@ -167,9 +168,9 @@ function Sidebar() {
 										<SidebarLink
 											key={node.path}
 											to={node.path}
-											icon={node.icon}
+											icon={resolveIcon(node.icon)}
 											onClick={closeDrawer}
-											trailing={node.sections.length > 0 ? <CaretRightIcon className="size-4 shrink-0 text-neutral-400" /> : null}
+											trailing={pageJumpLinks(node).length > 0 ? <CaretRightIcon className="size-4 shrink-0 text-neutral-400" /> : null}
 										>
 											{node.name}
 										</SidebarLink>
@@ -182,7 +183,7 @@ function Sidebar() {
 									<div key={node.id} className="flex items-center gap-0.5">
 										<SidebarButton
 											className="flex-1"
-											icon={node.icon}
+											icon={resolveIcon(node.icon)}
 											active={node.items.some((item) => item.path === pathname)}
 											trailing={<CaretRightIcon className="size-4 shrink-0" />}
 											onClick={() => setStack((current) => [...current, node.id])}
@@ -219,12 +220,12 @@ function Sidebar() {
 							<SidebarLink
 								key={item.path}
 								to={item.path}
-								icon={item.icon}
+								icon={resolveIcon(item.icon)}
 								onClick={closeDrawer}
 								trailing={
 									item.inactive ? (
 										<SidebarBadge>Inactive</SidebarBadge>
-									) : item.sections.length > 0 ? (
+									) : pageJumpLinks(item).length > 0 ? (
 										<CaretRightIcon className="size-4 shrink-0 text-neutral-400" />
 									) : null
 								}
@@ -239,15 +240,15 @@ function Sidebar() {
 					<SidebarPanel key={page.id} panelId={page.id} stack={stack}>
 						<SidebarBack onClick={back}>{page.name}</SidebarBack>
 
-						{page.sections.map((section) => (
+						{pageJumpLinks(page).map((link) => (
 							<SidebarLink
-								key={section.id}
-								to={`${page.path}#${section.id}`}
-								icon={section.icon}
+								key={link.id}
+								to={`${page.path}#${link.id}`}
+								icon={resolveIcon(link.icon)}
 								onClick={closeDrawer}
-								active={pathname === page.path && hash === `#${section.id}`}
+								active={pathname === page.path && hash === `#${link.id}`}
 							>
-								{section.name}
+								{link.name}
 							</SidebarLink>
 						))}
 					</SidebarPanel>

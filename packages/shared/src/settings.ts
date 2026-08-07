@@ -141,19 +141,11 @@ export interface PostTypeRegistration {
 	show_in_nav_menus: boolean
 	exclude_from_search: boolean
 	publicly_queryable: boolean
-	rewrite_enabled: boolean
-	rewrite_slug: string | null
-	rewrite_with_front: boolean
-	rewrite_feeds: boolean
-	rewrite_pages: boolean
-	archive: "disabled" | "default" | "custom"
-	archive_slug: string | null
 	capability_type: "post" | "page" | "custom"
 	capability_singular: string | null
 	capability_plural: string | null
 	can_export: boolean
 	delete_with_user: boolean
-	rest_base: string | null
 }
 
 /** Editable registration definition of a Kizlo-owned taxonomy. Mirrors the PHP `TaxonomyRegistration` shape. */
@@ -182,11 +174,6 @@ export interface TaxonomyRegistration {
 	show_in_quick_edit: boolean
 	show_admin_column: boolean
 	publicly_queryable: boolean
-	rewrite_enabled: boolean
-	rewrite_slug: string | null
-	rewrite_with_front: boolean
-	rewrite_hierarchical: boolean
-	rest_base: string | null
 }
 
 export interface PostTypeSettings extends BaseContentSettings {

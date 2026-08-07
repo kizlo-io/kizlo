@@ -9,9 +9,9 @@ import { TextInput } from "@/shared/components/ui/input"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { type RadioCardOption, RadioCards } from "@/shared/components/ui/radio"
 import { useUsers } from "@/shared/hooks/use-users"
+import { sectionsFor } from "@/shared/lib/nav"
 import { type IdentitySettingsInput, type IdentitySettingsOutput, IdentitySettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
-import { sectionsFor } from "../nav-model"
 
 const S = sectionsFor("general/identity")
 

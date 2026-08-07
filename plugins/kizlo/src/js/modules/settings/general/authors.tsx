@@ -5,9 +5,9 @@ import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
 import { SettingsCard, SettingsForm, SettingsGroup, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
+import { sectionsFor } from "@/shared/lib/nav"
 import { type AuthorSettingsInput, type AuthorSettingsOutput, AuthorSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
-import { sectionsFor } from "../nav-model"
 
 const S = sectionsFor("general/authors")
 

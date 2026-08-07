@@ -6,9 +6,9 @@ import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { Button } from "@/shared/components/ui/button"
 import { TextInput } from "@/shared/components/ui/input"
 import { Select } from "@/shared/components/ui/select"
+import { sectionsFor } from "@/shared/lib/nav"
 import { type CrawlingSettingsInput, type CrawlingSettingsOutput, CrawlingSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
-import { sectionsFor } from "../nav-model"
 
 const S = sectionsFor("general/crawling")
 

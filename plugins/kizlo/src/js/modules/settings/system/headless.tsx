@@ -2,9 +2,9 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { SwitchField, TextInputField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
+import { sectionsFor } from "@/shared/lib/nav"
 import { type HeadlessSettingsInput, type HeadlessSettingsOutput, HeadlessSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
-import { sectionsFor } from "../nav-model"
 
 const S = sectionsFor("system/headless")
 

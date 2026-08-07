@@ -3,9 +3,9 @@ import { type Control, Controller, type FieldPath, useForm } from "react-hook-fo
 import { ColorField, FieldError } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
+import { sectionsFor } from "@/shared/lib/nav"
 import { BrandSettingsSchema, type BrandSettingsSchemaInput, type BrandSettingsSchemaOutput } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
-import { sectionsFor } from "../nav-model"
 
 const S = sectionsFor("general/branding")
 

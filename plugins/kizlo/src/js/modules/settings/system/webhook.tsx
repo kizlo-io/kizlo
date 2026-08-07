@@ -5,9 +5,9 @@ import { ComboboxField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { Button } from "@/shared/components/ui/button"
 import { TextInput } from "@/shared/components/ui/input"
+import { sectionsFor } from "@/shared/lib/nav"
 import { type WebhookSettingsInput, type WebhookSettingsOutput, WebhookSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
-import { sectionsFor } from "../nav-model"
 
 const S = sectionsFor("system/webhooks")
 

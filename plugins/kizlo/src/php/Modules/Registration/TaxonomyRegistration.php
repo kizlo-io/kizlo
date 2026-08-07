@@ -38,11 +38,6 @@ class TaxonomyRegistration extends RegistrationAbstract
         'show_in_quick_edit'       => true,
         'show_admin_column'        => false,
         'publicly_queryable'       => true,
-        'rewrite_enabled'          => true,
-        'rewrite_slug'             => null,
-        'rewrite_with_front'       => true,
-        'rewrite_hierarchical'     => false,
-        'rest_base'                => null,
     ];
 
     /**
@@ -75,16 +70,11 @@ class TaxonomyRegistration extends RegistrationAbstract
             'show_admin_column'  => (bool) $this->get('show_admin_column'),
             'publicly_queryable' => (bool) $this->get('publicly_queryable'),
             'sort'               => (bool) $this->get('sort'),
-            'rewrite'            => $this->rewriteArg(),
         ];
 
         $meta_box = $this->metaBoxArg();
         if ($meta_box !== null) {
             $args['meta_box_cb'] = $meta_box;
-        }
-
-        if (!empty($this->get('rest_base'))) {
-            $args['rest_base'] = (string) $this->get('rest_base');
         }
 
         $default_term = $this->defaultTermArg();
@@ -132,22 +122,6 @@ class TaxonomyRegistration extends RegistrationAbstract
             'item_link'                  => $fromSingular("{$s} Link"),
             'item_link_description'      => $fromSingular("A link to a {$sl}."),
         ];
-    }
-
-    /**
-     * @return array<string, mixed>|false
-     */
-    private function rewriteArg(): array|false
-    {
-        $rewrite = $this->baseRewriteArg();
-
-        if ($rewrite === false) {
-            return false;
-        }
-
-        $rewrite['hierarchical'] = (bool) $this->get('rewrite_hierarchical');
-
-        return $rewrite;
     }
 
     /**
@@ -203,10 +177,7 @@ class TaxonomyRegistration extends RegistrationAbstract
             'show_tagcloud',
             'show_in_quick_edit',
             'show_admin_column',
-            'publicly_queryable',
-            'rewrite_enabled',
-            'rewrite_with_front',
-            'rewrite_hierarchical'     => (bool) $value,
+            'publicly_queryable'       => (bool) $value,
 
             'key',
             'default_term_slug'        => sanitize_key((string) $value) ?: null,
@@ -220,9 +191,6 @@ class TaxonomyRegistration extends RegistrationAbstract
             'object_types'             => $this->stringList($value),
 
             'labels'                   => $this->sanitizeLabels($value),
-
-            'rewrite_slug',
-            'rest_base'                => $this->nullableText($value),
 
             'meta_box'                 => in_array($value, ['automatic', 'category', 'tag', 'hidden'], true) ? $value : 'automatic',
 

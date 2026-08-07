@@ -11,7 +11,7 @@ import { cn } from "@/shared/lib/utils"
 export type CardProps = React.ComponentProps<typeof WP_Card>
 
 export function Card({ className, ...props }: CardProps) {
-	return <WP_Card data-slot="card" className={cn("rounded-lg border-neutral-200 bg-white shadow-sm", className)} {...props} />
+	return <WP_Card data-slot="card" className={cn("rounded-xs! border-neutral-200 bg-white shadow-sm", className)} {...props} />
 }
 
 export type CardHeaderProps = React.ComponentProps<typeof WP_CardHeader>

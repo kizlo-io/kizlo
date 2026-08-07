@@ -145,24 +145,6 @@ abstract class RegistrationAbstract extends SettingsIndexedAbstract
     }
 
     /**
-     * Rewrite argument shared shape (slug + front prefix). Returns false when
-     * rewriting is disabled.
-     *
-     * @return array<string, mixed>|false
-     */
-    protected function baseRewriteArg(): array|false
-    {
-        if (!$this->get('rewrite_enabled')) {
-            return false;
-        }
-
-        return [
-            'slug'       => !empty($this->get('rewrite_slug')) ? (string) $this->get('rewrite_slug') : $this->getKey(),
-            'with_front' => (bool) $this->get('rewrite_with_front'),
-        ];
-    }
-
-    /**
      * Coerce a stored value to a clean list of non-empty strings.
      *
      * @param mixed $value

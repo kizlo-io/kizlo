@@ -1,5 +1,6 @@
 import type { Settings as ApiSettings, CustomFieldDefinition, SettingsConstants } from "@kizlo/shared"
 import z from "zod"
+import type { NavBlock } from "./types"
 
 // ====================================================
 // INTERFACE
@@ -9,6 +10,8 @@ export type { SettingsConstants, Variable } from "@kizlo/shared"
 
 export interface Settings extends ApiSettings {
 	constants: SettingsConstants
+	/** Admin-only settings navigation tree, built server-side by SettingsNav. */
+	nav: NavBlock[]
 }
 
 // ====================================================
@@ -364,19 +367,11 @@ export const PostTypeRegistrationSchema = z.object({
 	show_in_nav_menus: z.boolean(),
 	exclude_from_search: z.boolean(),
 	publicly_queryable: z.boolean(),
-	rewrite_enabled: z.boolean(),
-	rewrite_slug: NulledStringSchema,
-	rewrite_with_front: z.boolean(),
-	rewrite_feeds: z.boolean(),
-	rewrite_pages: z.boolean(),
-	archive: z.enum(["disabled", "default", "custom"]),
-	archive_slug: NulledStringSchema,
 	capability_type: z.enum(["post", "page", "custom"]),
 	capability_singular: NulledStringSchema,
 	capability_plural: NulledStringSchema,
 	can_export: z.boolean(),
 	delete_with_user: z.boolean(),
-	rest_base: NulledStringSchema,
 })
 export type PostTypeRegistrationInput = z.input<typeof PostTypeRegistrationSchema>
 export type PostTypeRegistrationOutput = z.output<typeof PostTypeRegistrationSchema>
@@ -408,11 +403,6 @@ export const TaxonomyRegistrationSchema = z.object({
 	show_in_quick_edit: z.boolean(),
 	show_admin_column: z.boolean(),
 	publicly_queryable: z.boolean(),
-	rewrite_enabled: z.boolean(),
-	rewrite_slug: NulledStringSchema,
-	rewrite_with_front: z.boolean(),
-	rewrite_hierarchical: z.boolean(),
-	rest_base: NulledStringSchema,
 })
 export type TaxonomyRegistrationInput = z.input<typeof TaxonomyRegistrationSchema>
 export type TaxonomyRegistrationOutput = z.output<typeof TaxonomyRegistrationSchema>
@@ -422,6 +412,43 @@ export const CreateTaxonomyRegistrationSchema = TaxonomyRegistrationSchema.exten
 })
 export type CreateTaxonomyRegistrationInput = z.input<typeof CreateTaxonomyRegistrationSchema>
 export type CreateTaxonomyRegistrationOutput = z.output<typeof CreateTaxonomyRegistrationSchema>
+
+// ====================================================
+// UNIFIED SCHEMA
+// ====================================================
+
+// A Kizlo-owned type is edited as one form saved to /settings/{kind}/{slug}:
+// the per-slug Kizlo settings plus the WordPress definition. The two shapes are
+// key-disjoint, so they merge cleanly. The definition half is optional so the
+// same schema also validates a built-in type (settings only, no definition);
+// for a Kizlo-owned type every definition field is always present, so its own
+// constraints (e.g. a required label) still apply.
+
+export const PostTypeUnifiedSchema = PostTypeSettingsSchema.extend(PostTypeRegistrationSchema.partial().shape)
+export type PostTypeUnifiedInput = z.input<typeof PostTypeUnifiedSchema>
+export type PostTypeUnifiedOutput = z.output<typeof PostTypeUnifiedSchema>
+
+/** Unified post-type schema carrying the same custom-field refinements as the settings-only one. */
+export function createPostTypeUnifiedSchema(reservedFieldNames: Iterable<string>) {
+	const reserved = new Set(reservedFieldNames)
+	return PostTypeUnifiedSchema.superRefine((val, ctx) => {
+		refineFieldNames(val.custom_fields, ctx)
+		refineReservedNames(val.custom_fields, reserved, ctx)
+	})
+}
+
+export const TaxonomyUnifiedSchema = TaxonomySettingsSchema.extend(TaxonomyRegistrationSchema.partial().shape)
+export type TaxonomyUnifiedInput = z.input<typeof TaxonomyUnifiedSchema>
+export type TaxonomyUnifiedOutput = z.output<typeof TaxonomyUnifiedSchema>
+
+/** Unified taxonomy schema carrying the same custom-field refinements as the settings-only one. */
+export function createTaxonomyUnifiedSchema(reservedFieldNames: Iterable<string>) {
+	const reserved = new Set(reservedFieldNames)
+	return TaxonomyUnifiedSchema.superRefine((val, ctx) => {
+		refineFieldNames(val.custom_fields, ctx)
+		refineReservedNames(val.custom_fields, reserved, ctx)
+	})
+}
 
 // ====================================================
 // INTEGRATION SCHEMA
@@ -542,8 +569,10 @@ export interface SettingsMap {
 	brand: BrandSettingsSchemaOutput
 	identity: IdentitySettingsOutput
 	authors: AuthorSettingsOutput
-	post_types: PostTypeSettingsOutput
-	taxonomies: TaxonomySettingsOutput
+	// Kizlo-owned types send settings + definition in one payload; built-in types
+	// send settings only (the definition half of the unified output is optional).
+	post_types: PostTypeUnifiedOutput
+	taxonomies: TaxonomyUnifiedOutput
 	webhook: WebhookSettingsOutput
 	crawling: CrawlingSettingsOutput
 	uploads: UploadsSettingsOutput

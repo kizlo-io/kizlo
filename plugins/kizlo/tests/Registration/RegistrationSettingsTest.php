@@ -87,4 +87,40 @@ class RegistrationSettingsTest extends TestCase
         $this->assertTrue($response->get_data()['kizlo_owned']);
         $this->assertFalse($response->get_data()['active']);
     }
+
+    public function test_put_updates_definition_and_settings_in_one_request(): void
+    {
+        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+
+        $definition = new PostTypeRegistration();
+        $definition->setData(['key' => 'book', 'singular_label' => 'Book', 'plural_label' => 'Books', 'active' => true, 'supports' => ['title']]);
+        $definition->save('book');
+
+        // One payload carries both a definition field (supports) and a settings
+        // field (seo_enabled); each object keeps only the keys it declares.
+        $request = new \WP_REST_Request('PUT', '/kizlo/v1/settings/post_types/book');
+        $request->set_header('Content-Type', 'application/json');
+        $request->set_body(wp_json_encode(['supports' => ['title', 'editor', 'thumbnail'], 'seo_enabled' => true]));
+
+        $response = rest_get_server()->dispatch($request);
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertTrue(PostTypeSettings::load('book')->getSeoEnabled());
+        $this->assertSame(['title', 'editor', 'thumbnail'], PostTypeRegistration::load('book')->getData()['supports']);
+    }
+
+    public function test_post_creates_a_definition(): void
+    {
+        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+
+        $request = new \WP_REST_Request('POST', '/kizlo/v1/settings/post_types');
+        $request->set_header('Content-Type', 'application/json');
+        $request->set_body(wp_json_encode(['key' => 'book', 'singular_label' => 'Book', 'plural_label' => 'Books']));
+
+        $response = rest_get_server()->dispatch($request);
+
+        $this->assertSame(201, $response->get_status());
+        $this->assertSame('book', $response->get_data()['slug']);
+        $this->assertTrue(PostTypeRegistration::exists('book'));
+    }
 }

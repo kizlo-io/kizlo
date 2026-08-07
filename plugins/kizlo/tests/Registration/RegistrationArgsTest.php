@@ -21,20 +21,13 @@ class RegistrationArgsTest extends TestCase
             'plural_label'    => 'Books',
             'hierarchical'    => true,
             'supports'        => ['title', 'editor', 'custom-fields'],
-            'archive'         => 'custom',
-            'archive_slug'    => 'library',
-            'rewrite_slug'    => 'books',
-            'rewrite_feeds'   => true,
             'capability_type' => 'custom',
-            'rest_base'       => 'library',
         ]);
 
         $args = $definition->toArgs();
 
         $this->assertTrue($args['show_in_rest']);
         $this->assertTrue($args['hierarchical']);
-        $this->assertSame('library', $args['has_archive']);
-        $this->assertSame('library', $args['rest_base']);
         $this->assertSame(['book', 'books'], $args['capability_type']);
         $this->assertTrue($args['map_meta_cap']);
 
@@ -42,27 +35,14 @@ class RegistrationArgsTest extends TestCase
         $this->assertNotContains('custom-fields', $args['supports']);
         $this->assertContains('title', $args['supports']);
 
-        $this->assertSame('books', $args['rewrite']['slug']);
-        $this->assertTrue($args['rewrite']['feeds']);
+        // WordPress-frontend URL machinery is never emitted; Kizlo is headless.
+        $this->assertArrayNotHasKey('has_archive', $args);
+        $this->assertArrayNotHasKey('rewrite', $args);
+        $this->assertArrayNotHasKey('rest_base', $args);
 
         // No unsafe low-level inputs.
         $this->assertArrayNotHasKey('register_meta_box_cb', $args);
         $this->assertArrayNotHasKey('rest_controller_class', $args);
-    }
-
-    public function test_disabled_archive_and_rewrite_map_to_false(): void
-    {
-        $definition = new PostTypeRegistration();
-        $definition->setData([
-            'key'             => 'book',
-            'archive'         => 'disabled',
-            'rewrite_enabled' => false,
-        ]);
-
-        $args = $definition->toArgs();
-
-        $this->assertFalse($args['has_archive']);
-        $this->assertFalse($args['rewrite']);
     }
 
     public function test_taxonomy_args_force_rest_and_map_meta_box(): void
@@ -74,7 +54,6 @@ class RegistrationArgsTest extends TestCase
             'plural_label'       => 'Genres',
             'meta_box'           => 'category',
             'default_term_name'  => 'Uncategorized',
-            'rewrite_hierarchical' => true,
         ]);
 
         $args = $definition->toArgs();
@@ -82,7 +61,10 @@ class RegistrationArgsTest extends TestCase
         $this->assertTrue($args['show_in_rest']);
         $this->assertSame('post_categories_meta_box', $args['meta_box_cb']);
         $this->assertSame('Uncategorized', $args['default_term']['name']);
-        $this->assertTrue($args['rewrite']['hierarchical']);
+
+        // WordPress-frontend URL machinery is never emitted; Kizlo is headless.
+        $this->assertArrayNotHasKey('rewrite', $args);
+        $this->assertArrayNotHasKey('rest_base', $args);
     }
 
     public function test_hidden_meta_box_maps_to_false(): void

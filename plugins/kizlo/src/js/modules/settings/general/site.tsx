@@ -4,10 +4,10 @@ import { FieldError, PasswordInputField, SwitchField, TextInputField } from "@/s
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { FieldLabel } from "@/shared/components/ui/field-label"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
+import { sectionsFor } from "@/shared/lib/nav"
 import { SiteSettingsSchema, type SiteSettingsSchemaInput, type SiteSettingsSchemaOutput } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 import { cn } from "@/shared/lib/utils"
-import { sectionsFor } from "../nav-model"
 
 const S = sectionsFor("general/site")
 

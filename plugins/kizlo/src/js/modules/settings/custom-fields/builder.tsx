@@ -79,12 +79,13 @@ function BuilderList({ control, name }: { control: Control<any>; name: string })
 				/>
 			))}
 
-			<div>
-				<Button type="button" variant="secondary" size="sm" onClick={addField}>
-					<PlusIcon className="size-4" />
-					Add field
-				</Button>
-			</div>
+			<button
+				type="button"
+				className="flex h-12 w-full cursor-pointer items-center gap-2 rounded-xs border border-neutral-200 border-dashed bg-white px-3 py-2 hover:border-solid"
+				onClick={addField}
+			>
+				<PlusIcon className="size-4" /> Add Field
+			</button>
 		</div>
 	)
 }
@@ -109,14 +110,14 @@ function FieldCard({ control, base, defaultOpen, isFirst, isLast, onMoveUp, onMo
 	const typeLabel = TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type
 
 	return (
-		<div className="rounded-lg border border-neutral-200 bg-white">
-			<div className="flex items-center gap-2 px-3 py-2">
-				<button
-					type="button"
-					aria-label={open ? "Collapse" : "Expand"}
-					onClick={() => setOpen((value) => !value)}
-					className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left"
-				>
+		<div className="rounded-xs border border-neutral-200 bg-white">
+			<button
+				className="flex w-full min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent p-0 px-3 py-2 text-left"
+				type="button"
+				aria-label={open ? "Collapse" : "Expand"}
+				onClick={() => setOpen((value) => !value)}
+			>
+				<div className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left">
 					<span className="flex size-6 shrink-0 items-center justify-center text-neutral-500">
 						{open ? <CaretDownIcon className="size-4" /> : <CaretRightIcon className="size-4" />}
 					</span>
@@ -124,18 +125,38 @@ function FieldCard({ control, base, defaultOpen, isFirst, isLast, onMoveUp, onMo
 						<span className="text-sm">{label || fieldName || "Untitled field"}</span>
 						<span className="ml-2 rounded bg-neutral-100 px-1.5 py-0.5 text-neutral-500 text-xs">{typeLabel}</span>
 					</span>
-				</button>
+				</div>
 
-				<IconButton label="Move up" disabled={isFirst} onClick={onMoveUp}>
+				<IconButton
+					title="Move up"
+					disabled={isFirst}
+					onClick={(e) => {
+						e.stopPropagation()
+						onMoveUp()
+					}}
+				>
 					<ArrowUpIcon className="size-4" />
 				</IconButton>
-				<IconButton label="Move down" disabled={isLast} onClick={onMoveDown}>
+				<IconButton
+					title="Move down"
+					disabled={isLast}
+					onClick={(e) => {
+						e.stopPropagation()
+						onMoveDown()
+					}}
+				>
 					<ArrowDownIcon className="size-4" />
 				</IconButton>
-				<IconButton label="Remove field" onClick={onRemove}>
+				<IconButton
+					title="Remove field"
+					onClick={(e) => {
+						e.stopPropagation()
+						onRemove()
+					}}
+				>
 					<TrashIcon className="size-4" />
 				</IconButton>
-			</div>
+			</button>
 
 			{open ? (
 				<div className="flex flex-col gap-4 border-neutral-200 border-t p-4">
@@ -149,7 +170,7 @@ function FieldCard({ control, base, defaultOpen, isFirst, isLast, onMoveUp, onMo
 						/>
 					</div>
 
-					<SelectField control={control} name={`${base}.type`} label="Type" options={TYPE_OPTIONS} />
+					<ComboboxField control={control} name={`${base}.type`} label="Type" options={TYPE_OPTIONS} />
 
 					<TextInputField control={control} name={`${base}.instructions`} label="Instructions" />
 
@@ -235,7 +256,7 @@ function DefaultValueField({
 
 function NestedFields({ control, base }: { control: Control<any>; base: string }) {
 	return (
-		<div className="rounded-lg border border-neutral-200 border-dashed bg-neutral-50/50 p-3">
+		<div className="rounded-xs border border-neutral-200 border-dashed bg-neutral-50/50 p-3">
 			<BuilderList control={control} name={`${base}.fields`} />
 		</div>
 	)
@@ -256,7 +277,7 @@ function ChoicesEditor({ control, name }: { control: Control<any>; name: string 
 					<div className="flex-1">
 						<TextInputField control={control} name={`${name}.${index}.label`} label={index === 0 ? "Label" : undefined} />
 					</div>
-					<IconButton label="Remove choice" onClick={() => remove(index)}>
+					<IconButton title="Remove choice" onClick={() => remove(index)}>
 						<TrashIcon className="size-4" />
 					</IconButton>
 				</div>
@@ -272,22 +293,12 @@ function ChoicesEditor({ control, name }: { control: Control<any>; name: string 
 	)
 }
 
-function IconButton({
-	label,
-	disabled,
-	onClick,
-	children,
-}: {
-	label: string
-	disabled?: boolean
-	onClick: () => void
-	children: React.ReactNode
-}) {
+function IconButton({ title, disabled, onClick, children }: React.ComponentProps<"button">) {
 	return (
 		<button
 			type="button"
-			aria-label={label}
-			title={label}
+			title={title}
+			aria-label={title}
 			disabled={disabled}
 			onClick={onClick}
 			className={cn(

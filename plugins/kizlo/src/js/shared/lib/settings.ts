@@ -1,16 +1,11 @@
 import { useStore } from "@nanostores/react"
-import { ArticleIcon, FileIcon, FileTextIcon, FolderIcon, HashIcon, type Icon, ImageIcon, TagIcon } from "@phosphor-icons/react"
 import apiFetch from "@wordpress/api-fetch"
-import { type BaseSyntheticEvent, useMemo, useState } from "react"
+import { type BaseSyntheticEvent, useState } from "react"
 import type { FieldValues, UseFormReturn } from "react-hook-form"
 import { toast } from "sonner"
-import { type PageDef, postTypeSections, STATIC_PAGES, taxonomySections } from "@/modules/settings/nav-model"
+import { refreshSettings } from "@/modules/settings/registration/lib"
 import type { Settings, SettingsMap } from "./schema"
 import { $settings } from "./store"
-import type { NavBlock, NavPage } from "./types"
-
-const POST_TYPE_ICONS: Record<string, Icon> = { post: ArticleIcon, page: FileIcon, attachment: ImageIcon }
-const TAXONOMY_ICONS: Record<string, Icon> = { category: FolderIcon, post_tag: HashIcon }
 
 export type SettingsKeys = keyof Settings
 
@@ -47,6 +42,10 @@ export function useSettings() {
 
 			const existing = $settings.get()
 			if (existing) $settings.set(applyUpdate(existing, key, slug, response ?? data))
+
+			// Post types / taxonomies feed the served nav (sidebar name, Inactive
+			// badge, which sections show). Re-fetch so the sidebar reflects the save.
+			if (key === "post_types" || key === "taxonomies") await refreshSettings()
 		} catch {
 			toast.error("Something went wrong, please try again.")
 		} finally {
@@ -112,72 +111,4 @@ export function useSettingsForm(
 		}),
 		onCancel: () => form.reset(),
 	}
-}
-
-function staticPageNode(page: PageDef): NavPage {
-	return {
-		type: "page",
-		id: page.id,
-		name: page.name,
-		path: page.path,
-		icon: page.icon,
-		sections: page.sections.map((section) => ({ id: section.id, name: section.title, icon: section.icon })),
-	}
-}
-
-export function useNav(): NavBlock[] {
-	const { settings } = useSettings()
-
-	return useMemo<NavBlock[]>(
-		() => [
-			{ label: "General", items: STATIC_PAGES.filter((page) => page.block === "General").map(staticPageNode) },
-			{
-				label: "Content",
-				items: [
-					{
-						type: "group",
-						id: "post-types",
-						name: "Post Types",
-						icon: FileTextIcon,
-						onCreate: "/post-types/new",
-						items: (settings?.post_types ?? []).map<NavPage>((item) => ({
-							type: "page",
-							id: `post-types/${item.slug}`,
-							name: item.name,
-							path: `/post-types/${item.slug}`,
-							icon: POST_TYPE_ICONS[item.slug] ?? FileTextIcon,
-							inactive: item.kizlo_owned && !item.active,
-							sections: postTypeSections({
-								internal: item.internal,
-								kizlo_owned: item.kizlo_owned,
-								hasRegistration: Boolean(item.registration),
-							}),
-						})),
-					},
-					{
-						type: "group",
-						id: "taxonomies",
-						name: "Taxonomies",
-						icon: TagIcon,
-						onCreate: "/taxonomies/new",
-						items: (settings?.taxonomies ?? []).map<NavPage>((item) => ({
-							type: "page",
-							id: `taxonomies/${item.slug}`,
-							name: item.name,
-							path: `/taxonomies/${item.slug}`,
-							icon: TAXONOMY_ICONS[item.slug] ?? TagIcon,
-							inactive: item.kizlo_owned && !item.active,
-							sections: taxonomySections({
-								internal: item.internal,
-								kizlo_owned: item.kizlo_owned,
-								hasRegistration: Boolean(item.registration),
-							}),
-						})),
-					},
-				],
-			},
-			{ label: "System", items: STATIC_PAGES.filter((page) => page.block === "System").map(staticPageNode) },
-		],
-		[settings],
-	)
 }

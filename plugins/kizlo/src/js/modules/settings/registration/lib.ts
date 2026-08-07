@@ -7,6 +7,7 @@ import type {
 	TaxonomyRegistrationOutput,
 } from "@/shared/lib/schema"
 import { $settings } from "@/shared/lib/store"
+import type { NavBlock } from "@/shared/lib/types"
 
 export type RegistrationKind = "post_types" | "taxonomies"
 
@@ -16,7 +17,7 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
 	return typeof message === "string" && message.trim() !== "" ? message : fallback
 }
 
-const BASE = "/kizlo/v1/registrations"
+const BASE = "/kizlo/v1/settings"
 
 export interface DeletionProgress {
 	slug: string
@@ -133,7 +134,11 @@ export function generateKey(label: string, maxLength: number): string {
  * the existing ones are preserved.
  */
 export async function refreshSettings(): Promise<void> {
-	const data = await apiFetch<SharedSettings>({ path: "/kizlo/v1/settings" })
+	// The admin nav is only attached to GET /settings when this internal flag is
+	// present (see SettingsModule::INTERNAL_QUERY_FLAG); the SDK contract omits it, so
+	// widen the fetch here. Constants are bootstrap-only (absent from GET
+	// /settings), so the existing ones are kept.
+	const data = await apiFetch<SharedSettings & { nav: NavBlock[] }>({ path: "/kizlo/v1/settings?__internals=1" })
 	const existing = $settings.get()
 
 	if (existing) $settings.set({ ...data, constants: existing.constants })
@@ -155,15 +160,6 @@ export async function createRegistration(
 
 	await refreshSettings()
 	return result
-}
-
-export async function updateRegistration(
-	kind: RegistrationKind,
-	slug: string,
-	payload: PostTypeRegistrationOutput | TaxonomyRegistrationOutput,
-): Promise<void> {
-	await apiFetch({ method: "PUT", path: `${BASE}/${kind}/${slug}`, data: payload })
-	await refreshSettings()
 }
 
 export async function deleteRegistration(
@@ -205,19 +201,11 @@ const POST_TYPE_DEFAULTS: PostTypeRegistrationInput = {
 	show_in_nav_menus: true,
 	exclude_from_search: false,
 	publicly_queryable: true,
-	rewrite_enabled: true,
-	rewrite_slug: "",
-	rewrite_with_front: true,
-	rewrite_feeds: false,
-	rewrite_pages: true,
-	archive: "default",
-	archive_slug: "",
 	capability_type: "post",
 	capability_singular: "",
 	capability_plural: "",
 	can_export: true,
 	delete_with_user: false,
-	rest_base: "",
 }
 
 const TAXONOMY_DEFAULTS: TaxonomyRegistrationInput = {
@@ -241,11 +229,6 @@ const TAXONOMY_DEFAULTS: TaxonomyRegistrationInput = {
 	show_in_quick_edit: true,
 	show_admin_column: false,
 	publicly_queryable: true,
-	rewrite_enabled: true,
-	rewrite_slug: "",
-	rewrite_with_front: true,
-	rewrite_hierarchical: false,
-	rest_base: "",
 }
 
 const text = (value: string | null): string => value ?? ""
@@ -273,19 +256,11 @@ export function postTypeRegistrationValues(registration: PostTypeRegistration | 
 		show_in_nav_menus: registration.show_in_nav_menus,
 		exclude_from_search: registration.exclude_from_search,
 		publicly_queryable: registration.publicly_queryable,
-		rewrite_enabled: registration.rewrite_enabled,
-		rewrite_slug: text(registration.rewrite_slug),
-		rewrite_with_front: registration.rewrite_with_front,
-		rewrite_feeds: registration.rewrite_feeds,
-		rewrite_pages: registration.rewrite_pages,
-		archive: registration.archive,
-		archive_slug: text(registration.archive_slug),
 		capability_type: registration.capability_type,
 		capability_singular: text(registration.capability_singular),
 		capability_plural: text(registration.capability_plural),
 		can_export: registration.can_export,
 		delete_with_user: registration.delete_with_user,
-		rest_base: text(registration.rest_base),
 	}
 }
 
@@ -314,10 +289,5 @@ export function taxonomyRegistrationValues(registration: TaxonomyRegistration | 
 		show_in_quick_edit: registration.show_in_quick_edit,
 		show_admin_column: registration.show_admin_column,
 		publicly_queryable: registration.publicly_queryable,
-		rewrite_enabled: registration.rewrite_enabled,
-		rewrite_slug: text(registration.rewrite_slug),
-		rewrite_with_front: registration.rewrite_with_front,
-		rewrite_hierarchical: registration.rewrite_hierarchical,
-		rest_base: text(registration.rest_base),
 	}
 }

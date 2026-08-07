@@ -1,10 +1,11 @@
-import { ListIcon, MagnifyingGlassIcon, SpinnerGapIcon } from "@phosphor-icons/react"
+import { CaretDownIcon, ListIcon, MagnifyingGlassIcon, SpinnerGapIcon } from "@phosphor-icons/react"
 import { useEffect, useState } from "react"
 import { useLocation } from "react-router-dom"
 import { $search, $sidebar } from "@/shared/lib/store"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
+import { FieldLabel } from "./ui/field-label"
 
 /** Briefly rings a section when it becomes the URL's jump target, then fades out. */
 function useSectionHighlight(id?: string): boolean {
@@ -138,7 +139,7 @@ export function SettingsGroup({
 	const highlight = useSectionHighlight(id)
 
 	return (
-		<section id={id} className={cn("flex scroll-mt-[calc(var(--kizlo-admin-bar)+var(--kizlo-header)+1rem)] flex-col gap-4 rounded-lg")}>
+		<section id={id} className={cn("flex scroll-mt-[calc(var(--kizlo-admin-bar)+var(--kizlo-header)+1rem)] flex-col gap-4")}>
 			<div className="flex flex-col gap-1">
 				<h2
 					className={cn(
@@ -160,6 +161,41 @@ export function SettingsCard({ children }: { children: React.ReactNode }) {
 	return (
 		<Card>
 			<CardContent className="flex flex-col gap-6 p-6!">{children}</CardContent>
+		</Card>
+	)
+}
+
+/**
+ * A {@link SettingsCard} whose body is hidden behind a header toggle. Use for a
+ * cluster of secondary fields that would otherwise crowd a section — the header
+ * carries the label/description; the fields reveal on expand.
+ */
+export function SettingsCollapsibleCard({
+	title,
+	description,
+	defaultOpen = false,
+	children,
+}: {
+	title: React.ReactNode
+	description?: React.ReactNode
+	defaultOpen?: boolean
+	children: React.ReactNode
+}) {
+	const [open, setOpen] = useState(defaultOpen)
+
+	return (
+		<Card aria-expanded={open} className="group">
+			<button
+				type="button"
+				onClick={() => setOpen((value) => !value)}
+				className="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent p-6 pr-8 text-left"
+			>
+				<FieldLabel label={title} desc={description} descMode="below" />
+
+				<CaretDownIcon data-open className="size-4 transition-transform group-aria-expanded:rotate-180" />
+			</button>
+
+			{open ? <CardContent className="flex flex-col gap-6 rounded-none! border-neutral-200 border-t p-6!">{children}</CardContent> : null}
 		</Card>
 	)
 }

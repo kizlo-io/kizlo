@@ -54,19 +54,11 @@ class PostTypeRegistration extends RegistrationAbstract
         'show_in_nav_menus'   => true,
         'exclude_from_search' => false,
         'publicly_queryable'  => true,
-        'rewrite_enabled'     => true,
-        'rewrite_slug'        => null,
-        'rewrite_with_front'  => true,
-        'rewrite_feeds'       => false,
-        'rewrite_pages'       => true,
-        'archive'             => 'default',
-        'archive_slug'        => null,
         'capability_type'     => 'post',
         'capability_singular' => null,
         'capability_plural'   => null,
         'can_export'          => true,
         'delete_with_user'    => false,
-        'rest_base'           => null,
     ];
 
     /**
@@ -117,8 +109,6 @@ class PostTypeRegistration extends RegistrationAbstract
             'show_in_nav_menus'   => (bool) $this->get('show_in_nav_menus'),
             'exclude_from_search' => (bool) $this->get('exclude_from_search'),
             'publicly_queryable'  => (bool) $this->get('publicly_queryable'),
-            'has_archive'         => $this->archiveArg(),
-            'rewrite'             => $this->rewriteArg(),
             'can_export'          => (bool) $this->get('can_export'),
             'delete_with_user'    => (bool) $this->get('delete_with_user'),
             'map_meta_cap'        => true,
@@ -130,10 +120,6 @@ class PostTypeRegistration extends RegistrationAbstract
 
         if (!empty($this->get('menu_icon'))) {
             $args['menu_icon'] = (string) $this->get('menu_icon');
-        }
-
-        if (!empty($this->get('rest_base'))) {
-            $args['rest_base'] = (string) $this->get('rest_base');
         }
 
         $args['capability_type'] = $this->capabilityTypeArg();
@@ -210,35 +196,6 @@ class PostTypeRegistration extends RegistrationAbstract
     }
 
     /**
-     * @return bool|string
-     */
-    private function archiveArg(): bool|string
-    {
-        return match ($this->get('archive')) {
-            'disabled' => false,
-            'custom'   => !empty($this->get('archive_slug')) ? (string) $this->get('archive_slug') : true,
-            default    => true,
-        };
-    }
-
-    /**
-     * @return array<string, mixed>|false
-     */
-    private function rewriteArg(): array|false
-    {
-        $rewrite = $this->baseRewriteArg();
-
-        if ($rewrite === false) {
-            return false;
-        }
-
-        $rewrite['feeds'] = (bool) $this->get('rewrite_feeds');
-        $rewrite['pages'] = (bool) $this->get('rewrite_pages');
-
-        return $rewrite;
-    }
-
-    /**
      * @return string|array{0: string, 1: string}
      */
     private function capabilityTypeArg(): string|array
@@ -265,10 +222,6 @@ class PostTypeRegistration extends RegistrationAbstract
             'show_in_nav_menus',
             'exclude_from_search',
             'publicly_queryable',
-            'rewrite_enabled',
-            'rewrite_with_front',
-            'rewrite_feeds',
-            'rewrite_pages',
             'can_export',
             'delete_with_user'    => (bool) $value,
 
@@ -285,15 +238,10 @@ class PostTypeRegistration extends RegistrationAbstract
 
             'menu_parent',
             'menu_icon',
-            'rewrite_slug',
-            'archive_slug',
             'capability_singular',
-            'capability_plural',
-            'rest_base'           => $this->nullableText($value),
+            'capability_plural'   => $this->nullableText($value),
 
             'menu_position'       => ($value === null || $value === '') ? null : (int) $value,
-
-            'archive'             => in_array($value, ['disabled', 'default', 'custom'], true) ? $value : 'default',
 
             'capability_type'     => in_array($value, ['post', 'page', 'custom'], true) ? $value : 'post',
 
