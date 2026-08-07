@@ -11,6 +11,9 @@ import { type RadioCardOption, RadioCards } from "@/shared/components/ui/radio"
 import { useUsers } from "@/shared/hooks/use-users"
 import { type IdentitySettingsInput, type IdentitySettingsOutput, IdentitySettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+import { sectionsFor } from "../nav-model"
+
+const S = sectionsFor("general/identity")
 
 const IDENTITY_OPTIONS: RadioCardOption[] = [
 	{ value: "person", label: "Person", desc: "A personal brand, blogger, freelancer, or individual creator.", icon: UserIcon },
@@ -69,10 +72,7 @@ export function IdentitySettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("identity", form)}>
-			<SettingsSection
-				title="Identity"
-				desc="Select whether this site represents a person or an organization. This determines which structured data (Schema.org) Kizlo outputs and which fields are shown below."
-			>
+			<SettingsSection {...S("identity")}>
 				<Controller
 					name="type"
 					control={form.control}
@@ -81,10 +81,7 @@ export function IdentitySettingsPage() {
 			</SettingsSection>
 
 			{identityType === "person" ? (
-				<SettingsSection
-					title="Person"
-					desc="Details about the individual behind this site. Used in Schema.org Person structured data and author metadata across your posts."
-				>
+				<SettingsSection {...S("person")}>
 					<ComboboxField
 						control={form.control}
 						name="person.user_id"
@@ -125,10 +122,7 @@ export function IdentitySettingsPage() {
 
 			{identityType === "organization" ? (
 				<>
-					<SettingsSection
-						title="Organization"
-						desc="Core details about your organization. Used in Schema.org Organization structured data across your site."
-					>
+					<SettingsSection {...S("organization")}>
 						<TextInputField
 							control={form.control}
 							name="organization.name"
@@ -189,10 +183,7 @@ export function IdentitySettingsPage() {
 						/>
 					</SettingsSection>
 
-					<SettingsSection
-						title="Contact & Legal"
-						desc="Contact details and legal information. These help search engines and knowledge panels display accurate business info."
-					>
+					<SettingsSection {...S("contact-legal")}>
 						<TextInputField
 							control={form.control}
 							name="organization.email"
@@ -242,10 +233,7 @@ export function IdentitySettingsPage() {
 						</div>
 					</SettingsSection>
 
-					<SettingsSection
-						title="Founder"
-						desc="Optionally attribute the organization to a founder. Maps to Schema.org founder and helps Google associate the brand with an individual."
-					>
+					<SettingsSection {...S("founder")}>
 						<TextInputField
 							control={form.control}
 							name="organization.founder.name"
@@ -262,10 +250,7 @@ export function IdentitySettingsPage() {
 						/>
 					</SettingsSection>
 
-					<SettingsSection
-						title="Business Identifiers"
-						desc="Registry and tax identifiers. Optional; fill in only what applies to your organization. Each maps to the matching Schema.org property."
-					>
+					<SettingsSection {...S("business-identifiers")}>
 						<TextInputField
 							control={form.control}
 							name="organization.vat_id"
@@ -315,10 +300,7 @@ export function IdentitySettingsPage() {
 						/>
 					</SettingsSection>
 
-					<SettingsSection
-						title="Publishing & Policies"
-						desc="Policy page URLs used mainly by publishers and news sites. Each maps to the matching Schema.org property and helps Google understand your editorial standards."
-					>
+					<SettingsSection {...S("publishing-policies")}>
 						<TextInputField
 							control={form.control}
 							name="organization.publishing_principles"

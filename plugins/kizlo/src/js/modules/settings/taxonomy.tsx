@@ -1,8 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMemo } from "react"
 import { useForm } from "react-hook-form"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { CustomFieldsBuilder } from "@/modules/settings/custom-fields/builder"
+import { DeleteRegistration } from "@/modules/settings/registration/delete-dialog"
+import { TaxonomyRegistrationSection } from "@/modules/settings/registration/section"
 import { getContent } from "@/modules/settings/shared/content"
 import { NotFound } from "@/modules/settings/shared/not-found"
 import { RestApiSection } from "@/modules/settings/shared/rest-api-section"
@@ -12,11 +14,14 @@ import { SettingsCard, SettingsForm, SettingsGroup, SettingsSection } from "@/sh
 import { VariableField } from "@/shared/components/variable-field"
 import { createTaxonomySettingsSchema, type TaxonomySettingsInput, type TaxonomySettingsOutput } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+import { REG_DELETE, SECTION_CUSTOM_FIELDS, SECTION_SEO, SECTION_URL } from "./nav-model"
 
 export function TaxonomySettingsPage() {
 	const params = useParams<{ slug: string }>()
+	const navigate = useNavigate()
 	const { settings } = useSettings()
 	const taxonomy = settings?.taxonomies.find((a) => a.slug === params.slug)
+	const postTypeOptions = useMemo(() => (settings?.post_types ?? []).map((t) => ({ value: t.slug, label: t.name })), [settings])
 
 	const reservedFieldNames = settings?.constants.taxonomy.reserved_field_names
 	const schema = useMemo(() => createTaxonomySettingsSchema(reservedFieldNames ?? []), [reservedFieldNames])
@@ -43,85 +48,103 @@ export function TaxonomySettingsPage() {
 	const content = getContent({ name: taxonomy.name })
 
 	return (
-		<SettingsForm key={params.slug} {...formProps}>
-			<SettingsSection title={content.url.heading} desc={content.url.description}>
-				<VariableField
-					name="pathname_structure"
-					label={content.url.pathname.label}
-					control={form.control}
-					variables={settings?.constants.taxonomy.path_variables ?? []}
-					description={content.url.pathname.description}
-				/>
-			</SettingsSection>
+		<>
+			{taxonomy.kizlo_owned && taxonomy.registration ? (
+				<TaxonomyRegistrationSection slug={taxonomy.slug} registration={taxonomy.registration} postTypeOptions={postTypeOptions} />
+			) : null}
 
-			<SettingsSection
-				title="Custom fields"
-				desc="Define fields editors fill in on each term. Values are exposed at the top level of each term in the API, keyed by field name."
-			>
-				<CustomFieldsBuilder control={form.control} name="custom_fields" />
-			</SettingsSection>
-
-			<SettingsGroup title={content.seo.heading} desc={content.seo.description}>
-				<SettingsCard>
-					<SwitchField
+			<SettingsForm key={params.slug} {...formProps}>
+				<SettingsSection id={SECTION_URL} title={content.url.heading} desc={content.url.description}>
+					<VariableField
+						name="pathname_structure"
+						label={content.url.pathname.label}
 						control={form.control}
-						name="seo_enabled"
-						label={content.seo.enabled.label}
-						description={content.seo.enabled.description}
+						variables={settings?.constants.taxonomy.path_variables ?? []}
+						description={content.url.pathname.description}
 					/>
-				</SettingsCard>
+				</SettingsSection>
 
-				{isSeoSupported ? (
-					<>
-						<SettingsCard>
-							<SwitchField
-								name="search_engine_visibility"
-								control={form.control}
-								label={content.seo.visibility.label}
-								description={content.seo.visibility.description}
-							/>
-						</SettingsCard>
+				<SettingsSection
+					id={SECTION_CUSTOM_FIELDS}
+					title="Custom fields"
+					desc="Define fields editors fill in on each term. Values are exposed at the top level of each term in the API, keyed by field name."
+				>
+					<CustomFieldsBuilder control={form.control} name="custom_fields" />
+				</SettingsSection>
 
-						<SettingsCard>
-							<VariableField
-								control={form.control}
-								name="title_structure"
-								label={content.meta.title.label}
-								placeholder={settings?.constants.taxonomy.default_title_format}
-								description={content.meta.title.description}
-								variables={settings?.constants.taxonomy.content_variables ?? []}
-								variant="text"
-							/>
+				<SettingsGroup id={SECTION_SEO} title={content.seo.heading} desc={content.seo.description}>
+					<SettingsCard>
+						<SwitchField
+							control={form.control}
+							name="seo_enabled"
+							label={content.seo.enabled.label}
+							description={content.seo.enabled.description}
+						/>
+					</SettingsCard>
 
-							<VariableField
-								variant="textarea"
-								control={form.control}
-								name="description_structure"
-								label={content.meta.description_.label}
-								placeholder={settings?.constants.taxonomy.default_desc_format}
-								description={content.meta.description_.description}
-								variables={settings?.constants.taxonomy.content_variables ?? []}
-							/>
-						</SettingsCard>
+					{isSeoSupported ? (
+						<>
+							<SettingsCard>
+								<SwitchField
+									name="search_engine_visibility"
+									control={form.control}
+									label={content.seo.visibility.label}
+									description={content.seo.visibility.description}
+								/>
+							</SettingsCard>
 
-						<SettingsCard>
-							<BreadcrumbsField
-								control={form.control}
-								name="breadcrumbs"
-								label="Breadcrumb trail"
-								description={
-									<>
-										The crumbs between <strong>Home</strong> and the current term. Add pages, or the dynamic <strong>Parent</strong> slot
-										(expands to parent terms). Order matters — reorder with the arrows. Leave empty for <strong>Home → current</strong>.
-									</>
-								}
-							/>
-						</SettingsCard>
-					</>
+							<SettingsCard>
+								<VariableField
+									control={form.control}
+									name="title_structure"
+									label={content.meta.title.label}
+									placeholder={settings?.constants.taxonomy.default_title_format}
+									description={content.meta.title.description}
+									variables={settings?.constants.taxonomy.content_variables ?? []}
+									variant="text"
+								/>
+
+								<VariableField
+									variant="textarea"
+									control={form.control}
+									name="description_structure"
+									label={content.meta.description_.label}
+									placeholder={settings?.constants.taxonomy.default_desc_format}
+									description={content.meta.description_.description}
+									variables={settings?.constants.taxonomy.content_variables ?? []}
+								/>
+							</SettingsCard>
+
+							<SettingsCard>
+								<BreadcrumbsField
+									control={form.control}
+									name="breadcrumbs"
+									label="Breadcrumb trail"
+									description={
+										<>
+											The crumbs between <strong>Home</strong> and the current term. Add pages, or the dynamic <strong>Parent</strong> slot
+											(expands to parent terms). Order matters — reorder with the arrows. Leave empty for <strong>Home → current</strong>.
+										</>
+									}
+								/>
+							</SettingsCard>
+						</>
+					) : null}
+				</SettingsGroup>
+
+				<RestApiSection control={form.control} access={content.access} internal={taxonomy.internal} />
+
+				{taxonomy.kizlo_owned && taxonomy.registration ? (
+					<SettingsSection id={REG_DELETE} title="Delete" desc="Permanently remove this Kizlo-owned taxonomy. There is no trash.">
+						<DeleteRegistration
+							kind="taxonomies"
+							slug={taxonomy.slug}
+							name={taxonomy.registration.plural_label || taxonomy.slug}
+							onDeleted={() => navigate("/general/site")}
+						/>
+					</SettingsSection>
 				) : null}
-			</SettingsGroup>
-
-			<RestApiSection control={form.control} access={content.access} internal={taxonomy.internal} />
-		</SettingsForm>
+			</SettingsForm>
+		</>
 	)
 }

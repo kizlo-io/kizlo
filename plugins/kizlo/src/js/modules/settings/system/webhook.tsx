@@ -7,6 +7,9 @@ import { Button } from "@/shared/components/ui/button"
 import { TextInput } from "@/shared/components/ui/input"
 import { type WebhookSettingsInput, type WebhookSettingsOutput, WebhookSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+import { sectionsFor } from "../nav-model"
+
+const S = sectionsFor("system/webhooks")
 
 export function WebhookSettingsPage() {
 	const { settings } = useSettings()
@@ -24,10 +27,7 @@ export function WebhookSettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("webhook", form)}>
-			<SettingsSection
-				title="Webhook URLs"
-				desc="One or more endpoints that will receive a POST request when triggered content changes. Each URL must be publicly accessible."
-			>
+			<SettingsSection {...S("webhook-urls")}>
 				<div className="flex flex-col gap-3">
 					{fields.map((item, index) => (
 						<div key={item.id} className="flex items-center gap-2">
@@ -58,10 +58,7 @@ export function WebhookSettingsPage() {
 				</div>
 			</SettingsSection>
 
-			<SettingsSection
-				title="Triggers"
-				desc="Choose which post types and taxonomies cause a webhook to fire when their content is created, updated, or deleted."
-			>
+			<SettingsSection {...S("triggers")}>
 				<ComboboxField
 					multiple
 					control={form.control}

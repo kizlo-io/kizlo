@@ -1,14 +1,15 @@
 import { useStore } from "@nanostores/react"
-import { BookOpenIcon, CaretRightIcon, DiscordLogoIcon, GithubLogoIcon, type Icon } from "@phosphor-icons/react"
+import { BookOpenIcon, CaretRightIcon, DiscordLogoIcon, GithubLogoIcon, type Icon, PlusIcon } from "@phosphor-icons/react"
 import { useEffect, useState } from "react"
-import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom"
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom"
 import { Logo } from "@/modules/settings/shared/logo"
 import { NotFound } from "@/modules/settings/shared/not-found"
 import { CommandMenu, CommandTrigger } from "@/shared/components/command-menu"
-import { ScrollToTop } from "@/shared/components/scroll-to-top"
+import { ScrollManager } from "@/shared/components/scroll-manager"
 import { Shell, ShellBody, ShellHeader, ShellMain, ShellSidebar } from "@/shared/components/shell"
 import {
 	SidebarBack,
+	SidebarBadge,
 	SidebarButton,
 	SidebarDrillDown,
 	SidebarFooter,
@@ -20,12 +21,14 @@ import {
 import { ComponentGallery } from "@/shared/components/ui/gallery"
 import { useNav } from "@/shared/lib/settings"
 import { $sidebar } from "@/shared/lib/store"
+import type { NavBlock } from "@/shared/lib/types"
 import { AuthorsSettingsPage } from "./general/authors"
 import { BrandSettingsPage } from "./general/brand"
 import { CrawlingSettingsPage } from "./general/crawling"
 import { IdentitySettingsPage } from "./general/identity"
 import { SiteSettingsPage } from "./general/site"
 import { PostTypeSettingsPage } from "./post-type"
+import { CreatePostTypePage, CreateTaxonomyPage } from "./registration/create"
 import { HeadlessSettingsPage } from "./system/headless"
 import { UploadsSettingsPage } from "./system/uploads"
 import { WebhookSettingsPage } from "./system/webhook"
@@ -47,7 +50,9 @@ export default function App() {
 				<Route path="/general/identity" element={<IdentitySettingsPage />} />
 				<Route path="/general/authors" element={<AuthorsSettingsPage />} />
 				<Route path="/general/crawling" element={<CrawlingSettingsPage />} />
+				<Route path="/post-types/new" element={<CreatePostTypePage />} />
 				<Route path="/post-types/:slug" element={<PostTypeSettingsPage />} />
+				<Route path="/taxonomies/new" element={<CreateTaxonomyPage />} />
 				<Route path="/taxonomies/:slug" element={<TaxonomySettingsPage />} />
 				<Route path="/system/webhooks" element={<WebhookSettingsPage />} />
 				<Route path="/system/uploads" element={<UploadsSettingsPage />} />
@@ -66,7 +71,7 @@ function Layout() {
 
 	return (
 		<Shell>
-			<ScrollToTop />
+			<ScrollManager />
 
 			<ShellSidebar open={sidebarOpen} onClose={() => $sidebar.set(false)}>
 				<Sidebar />
@@ -102,20 +107,44 @@ function Layout() {
 	)
 }
 
+/** Resolve the drill stack that reveals the panel for the current route. */
+function stackFor(blocks: NavBlock[], pathname: string): string[] {
+	for (const block of blocks) {
+		for (const node of block.items) {
+			if (node.type === "page") {
+				if (node.path === pathname) return node.sections.length > 0 ? [node.id] : []
+				continue
+			}
+
+			if (node.onCreate === pathname) return [node.id]
+			for (const page of node.items) {
+				if (page.path === pathname) return page.sections.length > 0 ? [node.id, page.id] : [node.id]
+			}
+		}
+	}
+
+	return []
+}
+
 function Sidebar() {
-	const sections = useNav()
-	const { pathname } = useLocation()
-	const groups = sections.flatMap((section) => section.items).filter((node) => node.type === "group")
+	const blocks = useNav()
+	const navigate = useNavigate()
+	const { pathname, hash } = useLocation()
 
-	const [active, setActive] = useState<string | null>(
-		() => groups.find((group) => group.items.some((item) => item.path === pathname))?.id ?? null,
-	)
+	const groups = blocks.flatMap((block) => block.items).filter((node) => node.type === "group")
+	const pages = blocks.flatMap((block) => block.items).flatMap((node) => (node.type === "group" ? node.items : [node]))
+	const drillablePages = pages.filter((page) => page.sections.length > 0)
 
+	const [stack, setStack] = useState<string[]>(() => stackFor(blocks, pathname))
+
+	// Auto-drill: landing on a page opens its section list. Re-runs when the nav
+	// data arrives (settings load asynchronously) as well as on navigation.
 	useEffect(() => {
-		setActive(groups.find((group) => group.items.some((item) => item.path === pathname))?.id ?? null)
+		setStack(stackFor(blocks, pathname))
 		$sidebar.set(false)
-	}, [pathname])
+	}, [pathname, blocks])
 
+	const back = () => setStack((current) => current.slice(0, -1))
 	const closeDrawer = () => $sidebar.set(false)
 
 	return (
@@ -129,37 +158,96 @@ function Sidebar() {
 			</SidebarHeader>
 
 			<SidebarDrillDown>
-				<SidebarPanel root active={active}>
-					{sections.map((section) => (
-						<SidebarSection key={section.label} label={section.label}>
-							{section.items.map((node) =>
-								node.type === "link" ? (
-									<SidebarLink key={node.path} to={node.path} icon={node.icon} onClick={closeDrawer}>
-										{node.name}
-									</SidebarLink>
-								) : (
-									<SidebarButton
-										key={node.id}
-										icon={node.icon}
-										active={node.items.some((item) => item.path === pathname)}
-										trailing={<CaretRightIcon className="size-4 shrink-0" />}
-										onClick={() => setActive(node.id)}
-									>
-										{node.name}
-									</SidebarButton>
-								),
-							)}
+				<SidebarPanel stack={stack}>
+					{blocks.map((block) => (
+						<SidebarSection key={block.label} label={block.label}>
+							{block.items.map((node) => {
+								if (node.type === "page") {
+									return (
+										<SidebarLink
+											key={node.path}
+											to={node.path}
+											icon={node.icon}
+											onClick={closeDrawer}
+											trailing={node.sections.length > 0 ? <CaretRightIcon className="size-4 shrink-0 text-neutral-400" /> : null}
+										>
+											{node.name}
+										</SidebarLink>
+									)
+								}
+
+								const createPath = node.onCreate
+
+								return (
+									<div key={node.id} className="flex items-center gap-0.5">
+										<SidebarButton
+											className="flex-1"
+											icon={node.icon}
+											active={node.items.some((item) => item.path === pathname)}
+											trailing={<CaretRightIcon className="size-4 shrink-0" />}
+											onClick={() => setStack((current) => [...current, node.id])}
+										>
+											{node.name}
+										</SidebarButton>
+
+										{createPath ? (
+											<button
+												type="button"
+												aria-label={`Add ${node.name}`}
+												onClick={(event) => {
+													event.stopPropagation()
+													closeDrawer()
+													navigate(createPath)
+												}}
+												className="flex size-8 shrink-0 cursor-pointer appearance-none items-center justify-center rounded-xs border-0 bg-transparent text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+											>
+												<PlusIcon className="size-4" />
+											</button>
+										) : null}
+									</div>
+								)
+							})}
 						</SidebarSection>
 					))}
 				</SidebarPanel>
 
 				{groups.map((group) => (
-					<SidebarPanel key={group.id} id={group.id} active={active}>
-						<SidebarBack onClick={() => setActive(null)}>{group.name}</SidebarBack>
+					<SidebarPanel key={group.id} panelId={group.id} stack={stack}>
+						<SidebarBack onClick={back}>{group.name}</SidebarBack>
 
 						{group.items.map((item) => (
-							<SidebarLink key={item.path} to={item.path} icon={item.icon} onClick={closeDrawer}>
+							<SidebarLink
+								key={item.path}
+								to={item.path}
+								icon={item.icon}
+								onClick={closeDrawer}
+								trailing={
+									item.inactive ? (
+										<SidebarBadge>Inactive</SidebarBadge>
+									) : item.sections.length > 0 ? (
+										<CaretRightIcon className="size-4 shrink-0 text-neutral-400" />
+									) : null
+								}
+							>
 								{item.name}
+							</SidebarLink>
+						))}
+					</SidebarPanel>
+				))}
+
+				{drillablePages.map((page) => (
+					<SidebarPanel key={page.id} panelId={page.id} stack={stack}>
+						<SidebarBack onClick={back}>{page.name}</SidebarBack>
+
+						{page.sections.map((section) => (
+							<SidebarLink
+								key={section.id}
+								to={`${page.path}#${section.id}`}
+								icon={section.icon}
+								onClick={closeDrawer}
+								active={pathname === page.path && hash === `#${section.id}`}
+							>
+								{section.name}
 							</SidebarLink>
 						))}
 					</SidebarPanel>

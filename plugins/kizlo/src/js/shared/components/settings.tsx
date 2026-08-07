@@ -1,8 +1,29 @@
 import { ListIcon, MagnifyingGlassIcon, SpinnerGapIcon } from "@phosphor-icons/react"
+import { useEffect, useState } from "react"
+import { useLocation } from "react-router-dom"
 import { $search, $sidebar } from "@/shared/lib/store"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
+
+/** Briefly rings a section when it becomes the URL's jump target, then fades out. */
+function useSectionHighlight(id?: string): boolean {
+	const { hash, key } = useLocation()
+	const [on, setOn] = useState(false)
+
+	useEffect(() => {
+		if (!id || hash !== `#${id}`) {
+			setOn(false)
+			return
+		}
+
+		setOn(true)
+		const timer = setTimeout(() => setOn(false), 1600)
+		return () => clearTimeout(timer)
+	}, [id, hash, key])
+
+	return on
+}
 
 interface SettingsFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
 	isLoading?: boolean
@@ -102,11 +123,31 @@ export function SettingsForm({ isLoading, isDirty, submitLabel = "Update", onCan
  * related fields under a single heading without giving each cluster its own
  * top-level title.
  */
-export function SettingsGroup({ title, desc, children }: { title: React.ReactNode; desc?: React.ReactNode; children: React.ReactNode }) {
+export function SettingsGroup({
+	id,
+	title,
+	desc,
+	children,
+}: {
+	/** Anchor id for the sidebar's section jump-links. */
+	id?: string
+	title: React.ReactNode
+	desc?: React.ReactNode
+	children: React.ReactNode
+}) {
+	const highlight = useSectionHighlight(id)
+
 	return (
-		<section className="flex flex-col gap-4">
+		<section id={id} className={cn("flex scroll-mt-[calc(var(--kizlo-admin-bar)+var(--kizlo-header)+1rem)] flex-col gap-4 rounded-lg")}>
 			<div className="flex flex-col gap-1">
-				<h2 className="m-0! p-0! font-semibold! text-base! text-neutral-900!">{title}</h2>
+				<h2
+					className={cn(
+						"m-0! p-0! font-semibold! text-base! text-neutral-900! transition-colors duration-500",
+						highlight && "text-primary!",
+					)}
+				>
+					{title}
+				</h2>
 				{desc ? <p className="my-0! text-neutral-500! text-sm! leading-relaxed!">{desc}</p> : null}
 			</div>
 
@@ -123,9 +164,19 @@ export function SettingsCard({ children }: { children: React.ReactNode }) {
 	)
 }
 
-export function SettingsSection({ title, desc, children }: { title: React.ReactNode; desc?: React.ReactNode; children: React.ReactNode }) {
+export function SettingsSection({
+	id,
+	title,
+	desc,
+	children,
+}: {
+	id?: string
+	title: React.ReactNode
+	desc?: React.ReactNode
+	children: React.ReactNode
+}) {
 	return (
-		<SettingsGroup title={title} desc={desc}>
+		<SettingsGroup id={id} title={title} desc={desc}>
 			<SettingsCard>{children}</SettingsCard>
 		</SettingsGroup>
 	)

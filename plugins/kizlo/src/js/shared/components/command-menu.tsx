@@ -15,7 +15,7 @@ function isTypingTarget(target: EventTarget | null) {
 
 export function CommandMenu() {
 	const open = useStore($search)
-	const sections = useNav()
+	const blocks = useNav()
 	const navigate = useNavigate()
 
 	useEffect(() => {
@@ -41,10 +41,10 @@ export function CommandMenu() {
 			<CommandList>
 				<CommandEmpty>No results found.</CommandEmpty>
 
-				{sections.map((section) => (
-					<CommandGroup key={section.label} heading={section.label}>
-						{section.items.flatMap((node) =>
-							node.type === "link" ? (
+				{blocks.map((block) => (
+					<CommandGroup key={block.label} heading={block.label}>
+						{block.items.flatMap((node) =>
+							node.type === "page" ? (
 								<CommandItem key={node.path} value={node.name} onSelect={() => go(node.path)}>
 									<node.icon />
 									{node.name}

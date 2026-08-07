@@ -116,6 +116,79 @@ export interface PostTypeSupports {
 	"post-formats": boolean
 }
 
+/** Editable registration definition of a Kizlo-owned custom post type. Mirrors the PHP `PostTypeRegistration` shape. */
+export interface PostTypeRegistration {
+	active: boolean
+	/** Registration key. Generated on creation and immutable afterward. */
+	key: string
+	singular_label: string
+	plural_label: string
+	description: string
+	public: boolean
+	hierarchical: boolean
+	/** Individual WordPress label overrides; unset labels are generated from the singular/plural. */
+	labels: Record<string, string>
+	/** Connected taxonomy keys. */
+	taxonomies: string[]
+	/** Enabled editor supports (excludes the legacy custom-fields metabox). */
+	supports: string[]
+	show_ui: boolean
+	show_in_menu: boolean
+	menu_parent: string | null
+	menu_position: number | null
+	menu_icon: string | null
+	show_in_admin_bar: boolean
+	show_in_nav_menus: boolean
+	exclude_from_search: boolean
+	publicly_queryable: boolean
+	rewrite_enabled: boolean
+	rewrite_slug: string | null
+	rewrite_with_front: boolean
+	rewrite_feeds: boolean
+	rewrite_pages: boolean
+	archive: "disabled" | "default" | "custom"
+	archive_slug: string | null
+	capability_type: "post" | "page" | "custom"
+	capability_singular: string | null
+	capability_plural: string | null
+	can_export: boolean
+	delete_with_user: boolean
+	rest_base: string | null
+}
+
+/** Editable registration definition of a Kizlo-owned taxonomy. Mirrors the PHP `TaxonomyRegistration` shape. */
+export interface TaxonomyRegistration {
+	active: boolean
+	/** Registration key. Generated on creation and immutable afterward. */
+	key: string
+	singular_label: string
+	plural_label: string
+	description: string
+	public: boolean
+	hierarchical: boolean
+	labels: Record<string, string>
+	/** Connected post type keys. */
+	object_types: string[]
+	sort: boolean
+	default_term_name: string | null
+	default_term_slug: string | null
+	default_term_description: string | null
+	show_ui: boolean
+	show_in_menu: boolean
+	/** Editor control: automatic default, WordPress category/tag metabox, or hidden. */
+	meta_box: "automatic" | "category" | "tag" | "hidden"
+	show_in_nav_menus: boolean
+	show_tagcloud: boolean
+	show_in_quick_edit: boolean
+	show_admin_column: boolean
+	publicly_queryable: boolean
+	rewrite_enabled: boolean
+	rewrite_slug: string | null
+	rewrite_with_front: boolean
+	rewrite_hierarchical: boolean
+	rest_base: string | null
+}
+
 export interface PostTypeSettings extends BaseContentSettings {
 	name: string
 	slug: string
@@ -128,6 +201,12 @@ export interface PostTypeSettings extends BaseContentSettings {
 	content_variables: Variable[]
 	supports: PostTypeSupports
 	custom_fields: CustomFieldDefinition[]
+	/** True when Kizlo owns this post type's WordPress registration and can edit it. */
+	kizlo_owned: boolean
+	/** Whether the object is registered with WordPress. Always true for core/third-party objects. */
+	active: boolean
+	/** Editable registration; null unless `kizlo_owned`. */
+	registration: PostTypeRegistration | null
 }
 
 export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_type" | "article_type"> {
@@ -139,6 +218,12 @@ export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_typ
 	rest_api_enabled: boolean
 	internal: boolean
 	custom_fields: CustomFieldDefinition[]
+	/** True when Kizlo owns this taxonomy's WordPress registration and can edit it. */
+	kizlo_owned: boolean
+	/** Whether the object is registered with WordPress. Always true for core/third-party objects. */
+	active: boolean
+	/** Editable registration; null unless `kizlo_owned`. */
+	registration: TaxonomyRegistration | null
 }
 
 // ====================================================

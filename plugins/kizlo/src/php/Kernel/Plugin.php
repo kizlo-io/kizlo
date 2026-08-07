@@ -11,6 +11,7 @@ use Kizlo\Modules\Headless\HeadlessModule;
 use Kizlo\Modules\Post\PostModule;
 use Kizlo\Modules\PostType\PostTypeModule;
 use Kizlo\Modules\Preview\PreviewModule;
+use Kizlo\Modules\Registration\RegistrationModule;
 use Kizlo\Modules\RestApi\RestApiModule;
 use Kizlo\Modules\Seo\SeoModule;
 use Kizlo\Modules\Settings\SettingsModule;
@@ -39,6 +40,7 @@ class Plugin
         PreviewModule::class,
         PostModule::class,
         PostTypeModule::class,
+        RegistrationModule::class,
         UserModule::class,
         SeoModule::class,
         EmailModule::class,

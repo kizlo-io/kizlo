@@ -7,6 +7,9 @@ import { MediaPicker } from "@/shared/components/ui/media-picker"
 import { SiteSettingsSchema, type SiteSettingsSchemaInput, type SiteSettingsSchemaOutput } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
 import { cn } from "@/shared/lib/utils"
+import { sectionsFor } from "../nav-model"
+
+const S = sectionsFor("general/site")
 
 export function SiteSettingsPage() {
 	const { settings } = useSettings()
@@ -29,10 +32,7 @@ export function SiteSettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("site", form)}>
-			<SettingsSection
-				title="Site identity"
-				desc="Core settings that identify your site to Kizlo and secure communication between the plugin and Kizlo sdk."
-			>
+			<SettingsSection {...S("site-identity")}>
 				<TextInputField
 					control={form.control}
 					name="url"
@@ -58,10 +58,7 @@ export function SiteSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="Site info"
-				desc="Configure your website's core details such as name, URL, branding defaults, and search behavior used across metadata and structured data."
-			>
+			<SettingsSection {...S("site-info")}>
 				<TextInputField
 					name="name"
 					label="Site Name"
@@ -87,10 +84,7 @@ export function SiteSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="SEO Defaults"
-				desc="Fallback assets used when a post or page has no SEO image set. Shown when your content is shared on X, Facebook, LinkedIn, and similar platforms."
-			>
+			<SettingsSection {...S("seo-defaults")}>
 				<Controller
 					name="fallback_image"
 					control={form.control}
@@ -164,7 +158,7 @@ export function SiteSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection title="Search engine visibility" desc="Controls whether search engines are allowed to index your headless frontend.">
+			<SettingsSection {...S("search-visibility")}>
 				<SwitchField
 					name="discourage_search_engines"
 					control={form.control}

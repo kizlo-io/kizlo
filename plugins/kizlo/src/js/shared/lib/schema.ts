@@ -325,6 +325,105 @@ export function createTaxonomySettingsSchema(reservedFieldNames: Iterable<string
 }
 
 // ====================================================
+// REGISTRATION SCHEMA
+// ====================================================
+
+/** Nullable integer from a number/text input; blank clears to null. */
+const RegNullableNumberSchema: z.ZodType<number | null, number | string | null> = z.preprocess(
+	(val) => (val === "" || val === null || val === undefined ? null : Number(val)),
+	z.number().int().nullable(),
+) as never
+
+/** Label overrides keyed by WordPress label name; blanks fall back to generated labels. */
+export const RegistrationLabelsSchema = z.record(z.string(), z.string())
+
+function createRegistrationKeySchema(maxLength: number) {
+	return z
+		.string()
+		.min(1, "A key is required.")
+		.max(maxLength, `Key must be at most ${maxLength} characters.`)
+		.regex(/^[a-z][a-z0-9_-]*$/, "Use lowercase letters, numbers, hyphens, and underscores; start with a letter.")
+}
+
+export const PostTypeRegistrationSchema = z.object({
+	active: z.boolean(),
+	singular_label: z.string().min(1, "A singular label is required."),
+	plural_label: z.string().min(1, "A plural label is required."),
+	description: z.string(),
+	public: z.boolean(),
+	hierarchical: z.boolean(),
+	labels: RegistrationLabelsSchema,
+	taxonomies: z.array(z.string()),
+	supports: z.array(z.string()),
+	show_ui: z.boolean(),
+	show_in_menu: z.boolean(),
+	menu_parent: NulledStringSchema,
+	menu_position: RegNullableNumberSchema,
+	menu_icon: NulledStringSchema,
+	show_in_admin_bar: z.boolean(),
+	show_in_nav_menus: z.boolean(),
+	exclude_from_search: z.boolean(),
+	publicly_queryable: z.boolean(),
+	rewrite_enabled: z.boolean(),
+	rewrite_slug: NulledStringSchema,
+	rewrite_with_front: z.boolean(),
+	rewrite_feeds: z.boolean(),
+	rewrite_pages: z.boolean(),
+	archive: z.enum(["disabled", "default", "custom"]),
+	archive_slug: NulledStringSchema,
+	capability_type: z.enum(["post", "page", "custom"]),
+	capability_singular: NulledStringSchema,
+	capability_plural: NulledStringSchema,
+	can_export: z.boolean(),
+	delete_with_user: z.boolean(),
+	rest_base: NulledStringSchema,
+})
+export type PostTypeRegistrationInput = z.input<typeof PostTypeRegistrationSchema>
+export type PostTypeRegistrationOutput = z.output<typeof PostTypeRegistrationSchema>
+
+export const CreatePostTypeRegistrationSchema = PostTypeRegistrationSchema.extend({
+	key: createRegistrationKeySchema(20),
+})
+export type CreatePostTypeRegistrationInput = z.input<typeof CreatePostTypeRegistrationSchema>
+export type CreatePostTypeRegistrationOutput = z.output<typeof CreatePostTypeRegistrationSchema>
+
+export const TaxonomyRegistrationSchema = z.object({
+	active: z.boolean(),
+	singular_label: z.string().min(1, "A singular label is required."),
+	plural_label: z.string().min(1, "A plural label is required."),
+	description: z.string(),
+	public: z.boolean(),
+	hierarchical: z.boolean(),
+	labels: RegistrationLabelsSchema,
+	object_types: z.array(z.string()),
+	sort: z.boolean(),
+	default_term_name: NulledStringSchema,
+	default_term_slug: NulledStringSchema,
+	default_term_description: NulledStringSchema,
+	show_ui: z.boolean(),
+	show_in_menu: z.boolean(),
+	meta_box: z.enum(["automatic", "category", "tag", "hidden"]),
+	show_in_nav_menus: z.boolean(),
+	show_tagcloud: z.boolean(),
+	show_in_quick_edit: z.boolean(),
+	show_admin_column: z.boolean(),
+	publicly_queryable: z.boolean(),
+	rewrite_enabled: z.boolean(),
+	rewrite_slug: NulledStringSchema,
+	rewrite_with_front: z.boolean(),
+	rewrite_hierarchical: z.boolean(),
+	rest_base: NulledStringSchema,
+})
+export type TaxonomyRegistrationInput = z.input<typeof TaxonomyRegistrationSchema>
+export type TaxonomyRegistrationOutput = z.output<typeof TaxonomyRegistrationSchema>
+
+export const CreateTaxonomyRegistrationSchema = TaxonomyRegistrationSchema.extend({
+	key: createRegistrationKeySchema(32),
+})
+export type CreateTaxonomyRegistrationInput = z.input<typeof CreateTaxonomyRegistrationSchema>
+export type CreateTaxonomyRegistrationOutput = z.output<typeof CreateTaxonomyRegistrationSchema>
+
+// ====================================================
 // INTEGRATION SCHEMA
 // ====================================================
 

@@ -8,6 +8,9 @@ import { TextInput } from "@/shared/components/ui/input"
 import { Select } from "@/shared/components/ui/select"
 import { type CrawlingSettingsInput, type CrawlingSettingsOutput, CrawlingSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+import { sectionsFor } from "../nav-model"
+
+const S = sectionsFor("general/crawling")
 
 const RULE_OPTIONS = [
 	{ label: "Allow", value: "allow" },
@@ -34,7 +37,7 @@ export function CrawlingSettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("crawling", form)}>
-			<SettingsSection title="Sitemap" desc="Control how your sitemap is exposed to search engines.">
+			<SettingsSection {...S("sitemap")}>
 				<SwitchField
 					control={form.control}
 					name="robots.include_sitemap"
@@ -43,10 +46,7 @@ export function CrawlingSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="Robots"
-				desc="Control how search engines crawl your site. These settings are used to generate your robots.txt data."
-			>
+			<SettingsSection {...S("robots")}>
 				<div className="flex flex-col gap-4">
 					{fields.map((item, index) => (
 						<div key={item.id} className="flex flex-col gap-2 border-neutral-200 border-b pb-4 sm:flex-row sm:items-end">

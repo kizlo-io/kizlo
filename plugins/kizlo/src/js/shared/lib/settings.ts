@@ -1,29 +1,13 @@
 import { useStore } from "@nanostores/react"
-import {
-	ArticleIcon,
-	FileIcon,
-	FileTextIcon,
-	FolderIcon,
-	GlobeIcon,
-	HashIcon,
-	type Icon,
-	IdentificationBadgeIcon,
-	ImageIcon,
-	PaletteIcon,
-	RobotIcon,
-	ShieldIcon,
-	TagIcon,
-	UploadSimpleIcon,
-	UsersIcon,
-	WebhooksLogoIcon,
-} from "@phosphor-icons/react"
+import { ArticleIcon, FileIcon, FileTextIcon, FolderIcon, HashIcon, type Icon, ImageIcon, TagIcon } from "@phosphor-icons/react"
 import apiFetch from "@wordpress/api-fetch"
 import { type BaseSyntheticEvent, useMemo, useState } from "react"
 import type { FieldValues, UseFormReturn } from "react-hook-form"
 import { toast } from "sonner"
+import { type PageDef, postTypeSections, STATIC_PAGES, taxonomySections } from "@/modules/settings/nav-model"
 import type { Settings, SettingsMap } from "./schema"
 import { $settings } from "./store"
-import type { NavSection } from "./types"
+import type { NavBlock, NavPage } from "./types"
 
 const POST_TYPE_ICONS: Record<string, Icon> = { post: ArticleIcon, page: FileIcon, attachment: ImageIcon }
 const TAXONOMY_ICONS: Record<string, Icon> = { category: FolderIcon, post_tag: HashIcon }
@@ -130,21 +114,23 @@ export function useSettingsForm(
 	}
 }
 
-export function useNav(): NavSection[] {
+function staticPageNode(page: PageDef): NavPage {
+	return {
+		type: "page",
+		id: page.id,
+		name: page.name,
+		path: page.path,
+		icon: page.icon,
+		sections: page.sections.map((section) => ({ id: section.id, name: section.title, icon: section.icon })),
+	}
+}
+
+export function useNav(): NavBlock[] {
 	const { settings } = useSettings()
 
-	return useMemo<NavSection[]>(
+	return useMemo<NavBlock[]>(
 		() => [
-			{
-				label: "General",
-				items: [
-					{ type: "link", name: "Site", path: "/general/site", icon: GlobeIcon },
-					{ type: "link", name: "Identity", path: "/general/identity", icon: IdentificationBadgeIcon },
-					{ type: "link", name: "Branding", path: "/general/branding", icon: PaletteIcon },
-					{ type: "link", name: "Authors", path: "/general/authors", icon: UsersIcon },
-					{ type: "link", name: "Crawling", path: "/general/crawling", icon: RobotIcon },
-				],
-			},
+			{ label: "General", items: STATIC_PAGES.filter((page) => page.block === "General").map(staticPageNode) },
 			{
 				label: "Content",
 				items: [
@@ -153,10 +139,19 @@ export function useNav(): NavSection[] {
 						id: "post-types",
 						name: "Post Types",
 						icon: FileTextIcon,
-						items: (settings?.post_types ?? []).map((item) => ({
+						onCreate: "/post-types/new",
+						items: (settings?.post_types ?? []).map<NavPage>((item) => ({
+							type: "page",
+							id: `post-types/${item.slug}`,
 							name: item.name,
 							path: `/post-types/${item.slug}`,
 							icon: POST_TYPE_ICONS[item.slug] ?? FileTextIcon,
+							inactive: item.kizlo_owned && !item.active,
+							sections: postTypeSections({
+								internal: item.internal,
+								kizlo_owned: item.kizlo_owned,
+								hasRegistration: Boolean(item.registration),
+							}),
 						})),
 					},
 					{
@@ -164,22 +159,24 @@ export function useNav(): NavSection[] {
 						id: "taxonomies",
 						name: "Taxonomies",
 						icon: TagIcon,
-						items: (settings?.taxonomies ?? []).map((item) => ({
+						onCreate: "/taxonomies/new",
+						items: (settings?.taxonomies ?? []).map<NavPage>((item) => ({
+							type: "page",
+							id: `taxonomies/${item.slug}`,
 							name: item.name,
 							path: `/taxonomies/${item.slug}`,
 							icon: TAXONOMY_ICONS[item.slug] ?? TagIcon,
+							inactive: item.kizlo_owned && !item.active,
+							sections: taxonomySections({
+								internal: item.internal,
+								kizlo_owned: item.kizlo_owned,
+								hasRegistration: Boolean(item.registration),
+							}),
 						})),
 					},
 				],
 			},
-			{
-				label: "System",
-				items: [
-					{ type: "link", name: "Uploads", path: "/system/uploads", icon: UploadSimpleIcon },
-					{ type: "link", name: "Headless", path: "/system/headless", icon: ShieldIcon },
-					{ type: "link", name: "Webhooks", path: "/system/webhooks", icon: WebhooksLogoIcon },
-				],
-			},
+			{ label: "System", items: STATIC_PAGES.filter((page) => page.block === "System").map(staticPageNode) },
 		],
 		[settings],
 	)

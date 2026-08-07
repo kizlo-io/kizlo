@@ -4,6 +4,9 @@ import { SwitchField, TextInputField } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { type HeadlessSettingsInput, type HeadlessSettingsOutput, HeadlessSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+import { sectionsFor } from "../nav-model"
+
+const S = sectionsFor("system/headless")
 
 export function HeadlessSettingsPage() {
 	const { settings } = useSettings()
@@ -36,10 +39,7 @@ export function HeadlessSettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("headless", form)}>
-			<SettingsSection
-				title="Headless Mode"
-				desc="Shut down or redirect the WordPress surfaces that only exist to display or advertise your WordPress origin. This is the master switch. When it is off, every option below is inert and WordPress behaves natively."
-			>
+			<SettingsSection {...S("headless-mode")}>
 				<SwitchField
 					control={form.control}
 					name="enabled"
@@ -48,10 +48,7 @@ export function HeadlessSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="Editor experience"
-				desc="Redirect the two editor affordances that assume a rendered WordPress site to your headless frontend instead."
-			>
+			<SettingsSection {...S("editor-experience")}>
 				<SwitchField
 					control={form.control}
 					name="preview"
@@ -68,7 +65,7 @@ export function HeadlessSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection title="Display & routing" desc="Close down public theme output that a headless setup does not use.">
+			<SettingsSection {...S("display-routing")}>
 				<SwitchField
 					control={form.control}
 					name="frontend_lockout"
@@ -99,7 +96,7 @@ export function HeadlessSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection title="Search-engine control" desc="Index your headless frontend, not the WordPress backend.">
+			<SettingsSection {...S("search-engine-control")}>
 				<SwitchField
 					control={form.control}
 					name="block_indexing"
@@ -109,7 +106,7 @@ export function HeadlessSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection title="Security hardening" desc="Shrink the attack and information-leak surface of the WordPress origin.">
+			<SettingsSection {...S("security-hardening")}>
 				<SwitchField
 					control={form.control}
 					name="disable_xmlrpc"

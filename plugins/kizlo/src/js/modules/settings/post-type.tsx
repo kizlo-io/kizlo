@@ -1,8 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMemo } from "react"
 import { useForm } from "react-hook-form"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { CustomFieldsBuilder } from "@/modules/settings/custom-fields/builder"
+import { DeleteRegistration } from "@/modules/settings/registration/delete-dialog"
+import { PostTypeRegistrationSection } from "@/modules/settings/registration/section"
 import { ArticleTypeField } from "@/modules/settings/shared/article-type-field"
 import { getContent } from "@/modules/settings/shared/content"
 import { NotFound } from "@/modules/settings/shared/not-found"
@@ -14,11 +16,14 @@ import { SettingsCard, SettingsForm, SettingsGroup, SettingsSection } from "@/sh
 import { VariableField } from "@/shared/components/variable-field"
 import { createPostTypeSettingsSchema, type PostTypeSettingsInput, type PostTypeSettingsOutput } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+import { REG_DELETE, SECTION_CUSTOM_FIELDS, SECTION_SEO, SECTION_URL } from "./nav-model"
 
 export function PostTypeSettingsPage() {
 	const params = useParams<{ slug: string }>()
+	const navigate = useNavigate()
 	const { settings } = useSettings()
 	const postType = settings?.post_types.find((a) => a.slug === params.slug)
+	const taxonomyOptions = useMemo(() => (settings?.taxonomies ?? []).map((t) => ({ value: t.slug, label: t.name })), [settings])
 
 	const reservedFieldNames = settings?.constants.post_type.reserved_field_names
 	const schema = useMemo(() => createPostTypeSettingsSchema(reservedFieldNames ?? []), [reservedFieldNames])
@@ -49,105 +54,123 @@ export function PostTypeSettingsPage() {
 	const content = getContent({ name: postType.name ?? "Posts" })
 
 	return (
-		<SettingsForm key={params.slug} {...formProps}>
-			<SettingsSection title={content.url.heading} desc={content.url.description}>
-				<VariableField
-					name="pathname_structure"
-					label={content.url.pathname.label}
-					control={form.control}
-					variables={settings?.constants.post_type.path_variables ?? []}
-					description={content.url.pathname.description}
-				/>
-			</SettingsSection>
+		<>
+			{postType.kizlo_owned && postType.registration ? (
+				<PostTypeRegistrationSection slug={postType.slug} registration={postType.registration} taxonomyOptions={taxonomyOptions} />
+			) : null}
 
-			<SettingsSection
-				title="Custom fields"
-				desc="Define fields editors fill in on each entry. Values are exposed at the top level of each entry in the API, keyed by field name."
-			>
-				<CustomFieldsBuilder control={form.control} name="custom_fields" />
-			</SettingsSection>
-
-			<SettingsGroup title={content.seo.heading} desc={content.seo.description}>
-				<SettingsCard>
-					<SwitchField
+			<SettingsForm key={params.slug} {...formProps}>
+				<SettingsSection id={SECTION_URL} title={content.url.heading} desc={content.url.description}>
+					<VariableField
+						name="pathname_structure"
+						label={content.url.pathname.label}
 						control={form.control}
-						name="seo_enabled"
-						label={content.seo.enabled.label}
-						description={content.seo.enabled.description}
+						variables={settings?.constants.post_type.path_variables ?? []}
+						description={content.url.pathname.description}
 					/>
-				</SettingsCard>
+				</SettingsSection>
 
-				{isSeoSupported ? (
-					<>
-						<SettingsCard>
-							<SwitchField
-								name="search_engine_visibility"
-								control={form.control}
-								label={content.seo.visibility.label}
-								description={content.seo.visibility.description}
-							/>
-						</SettingsCard>
+				<SettingsSection
+					id={SECTION_CUSTOM_FIELDS}
+					title="Custom fields"
+					desc="Define fields editors fill in on each entry. Values are exposed at the top level of each entry in the API, keyed by field name."
+				>
+					<CustomFieldsBuilder control={form.control} name="custom_fields" />
+				</SettingsSection>
 
-						<SettingsCard>
-							<VariableField
-								control={form.control}
-								name="title_structure"
-								label={content.meta.title.label}
-								placeholder={settings?.constants.post_type.default_title_format}
-								description={content.meta.title.description}
-								variables={postType.content_variables}
-								variant="text"
-							/>
+				<SettingsGroup id={SECTION_SEO} title={content.seo.heading} desc={content.seo.description}>
+					<SettingsCard>
+						<SwitchField
+							control={form.control}
+							name="seo_enabled"
+							label={content.seo.enabled.label}
+							description={content.seo.enabled.description}
+						/>
+					</SettingsCard>
 
-							<VariableField
-								variant="textarea"
-								control={form.control}
-								name="description_structure"
-								label={content.meta.description_.label}
-								placeholder={settings?.constants.post_type.default_desc_format}
-								description={content.meta.description_.description}
-								variables={postType.content_variables}
-							/>
-						</SettingsCard>
-
-						<SettingsCard>
-							<PageTypeField control={form.control} name="webpage_type" description={content.schema.pageType.description} />
-
-							<ArticleTypeField control={form.control} name="article_type" description={content.schema.articleType.description} />
-
-							{postType.supports.comments && isArticleType ? (
-								<VariableField
-									name="comment_action_structure"
+					{isSeoSupported ? (
+						<>
+							<SettingsCard>
+								<SwitchField
+									name="search_engine_visibility"
 									control={form.control}
-									label={content.schema.commentUrl.label}
-									variables={[
-										...(settings?.constants.post_type.path_variables ?? []),
-										{ label: "pathname", description: "Resolved pathname of the post.", value: "{{pathname}}" },
-									]}
-									description={content.schema.commentUrl.description}
+									label={content.seo.visibility.label}
+									description={content.seo.visibility.description}
 								/>
-							) : null}
-						</SettingsCard>
+							</SettingsCard>
 
-						<SettingsCard>
-							<BreadcrumbsField
-								control={form.control}
-								name="breadcrumbs"
-								label="Breadcrumb trail"
-								description={
-									<>
-										The crumbs between <strong>Home</strong> and the current item. Add pages, or the dynamic <strong>Parent</strong> slot
-										(expands to the item's real parents). Order matters — reorder with the arrows. Leave empty for{" "}
-										<strong>Home → current</strong>.
-									</>
-								}
-							/>
-						</SettingsCard>
-					</>
+							<SettingsCard>
+								<VariableField
+									control={form.control}
+									name="title_structure"
+									label={content.meta.title.label}
+									placeholder={settings?.constants.post_type.default_title_format}
+									description={content.meta.title.description}
+									variables={postType.content_variables}
+									variant="text"
+								/>
+
+								<VariableField
+									variant="textarea"
+									control={form.control}
+									name="description_structure"
+									label={content.meta.description_.label}
+									placeholder={settings?.constants.post_type.default_desc_format}
+									description={content.meta.description_.description}
+									variables={postType.content_variables}
+								/>
+							</SettingsCard>
+
+							<SettingsCard>
+								<PageTypeField control={form.control} name="webpage_type" description={content.schema.pageType.description} />
+
+								<ArticleTypeField control={form.control} name="article_type" description={content.schema.articleType.description} />
+
+								{postType.supports.comments && isArticleType ? (
+									<VariableField
+										name="comment_action_structure"
+										control={form.control}
+										label={content.schema.commentUrl.label}
+										variables={[
+											...(settings?.constants.post_type.path_variables ?? []),
+											{ label: "pathname", description: "Resolved pathname of the post.", value: "{{pathname}}" },
+										]}
+										description={content.schema.commentUrl.description}
+									/>
+								) : null}
+							</SettingsCard>
+
+							<SettingsCard>
+								<BreadcrumbsField
+									control={form.control}
+									name="breadcrumbs"
+									label="Breadcrumb trail"
+									description={
+										<>
+											The crumbs between <strong>Home</strong> and the current item. Add pages, or the dynamic <strong>Parent</strong> slot
+											(expands to the item's real parents). Order matters — reorder with the arrows. Leave empty for{" "}
+											<strong>Home → current</strong>.
+										</>
+									}
+								/>
+							</SettingsCard>
+						</>
+					) : null}
+				</SettingsGroup>
+
+				<RestApiSection control={form.control} access={content.access} internal={postType.internal} />
+
+				{postType.kizlo_owned && postType.registration ? (
+					<SettingsSection id={REG_DELETE} title="Delete" desc="Permanently remove this Kizlo-owned post type. There is no trash.">
+						<DeleteRegistration
+							kind="post_types"
+							slug={postType.slug}
+							name={postType.registration.plural_label || postType.slug}
+							onDeleted={() => navigate("/general/site")}
+						/>
+					</SettingsSection>
 				) : null}
-			</SettingsGroup>
-
-			<RestApiSection control={form.control} access={content.access} internal={postType.internal} />
-		</SettingsForm>
+			</SettingsForm>
+		</>
 	)
 }

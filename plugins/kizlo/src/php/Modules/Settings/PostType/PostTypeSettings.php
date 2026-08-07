@@ -7,6 +7,7 @@ use Kizlo\Modules\Settings\SettingsIndexedAbstract;
 use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\CustomFields\CustomFieldsValidator;
+use Kizlo\Modules\Registration\PostTypeRegistration;
 
 class PostTypeSettings extends SettingsIndexedAbstract
 {
@@ -43,7 +44,7 @@ class PostTypeSettings extends SettingsIndexedAbstract
         return $cache;
     }
 
-    protected const KNOWN_SUPPORTS = [
+    public const KNOWN_SUPPORTS = [
         'title',
         'editor',
         'author',
@@ -342,6 +343,17 @@ class PostTypeSettings extends SettingsIndexedAbstract
                     $available[$post_type] = $pt;
                 }
             }
+        }
+
+        // Inactive Kizlo-owned definitions have no runtime object but must stay
+        // navigable and editable. Build a synthetic object from the definition
+        // (constructing WP_Post_Type does not register it).
+        foreach (PostTypeRegistration::all() as $post_type => $definition) {
+            if (isset($available[$post_type]) || post_type_exists($post_type)) {
+                continue;
+            }
+
+            $available[$post_type] = new WP_Post_Type($post_type, $definition->toArgs());
         }
 
         return $available;
