@@ -8,7 +8,7 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
 	return (
 		<CommandPrimitive
 			data-slot="command"
-			className={cn("flex h-full w-full flex-col overflow-hidden rounded-md bg-white text-neutral-900", className)}
+			className={cn("flex h-full w-full flex-col overflow-hidden rounded-xs bg-white text-neutral-900", className)}
 			{...props}
 		/>
 	)
@@ -37,7 +37,7 @@ function CommandDialog({
 			focusOnMount={false}
 			onRequestClose={() => onOpenChange?.(false)}
 			className={cn(
-				"kizlo-finder mx-auto! my-auto! max-h-[85vh]! w-[calc(100%-2rem)]! max-w-2xl! overflow-hidden rounded-2xl! p-0! max-sm:mt-4! max-sm:mb-auto!",
+				"kizlo-finder mx-auto! my-auto! max-h-[85vh]! w-[calc(100%-2rem)]! max-w-2xl! overflow-hidden rounded-xs! p-0! max-sm:mt-4! max-sm:mb-auto!",
 				className,
 			)}
 		>
@@ -54,7 +54,7 @@ function CommandInput({ className, ...props }: React.ComponentProps<typeof Comma
 				data-slot="command-input"
 				autoFocus
 				className={cn(
-					"flex h-10 min-h-0 w-full rounded-md border-none! bg-transparent py-3 text-base shadow-none! outline-hidden placeholder:text-neutral-400 focus:border-none! focus:shadow-none! disabled:cursor-not-allowed disabled:opacity-50",
+					"flex h-10 min-h-0 w-full rounded-xs border-none! bg-transparent py-3 text-base shadow-none! outline-hidden placeholder:text-neutral-400 focus:border-none! focus:shadow-none! disabled:cursor-not-allowed disabled:opacity-50",
 					className,
 				)}
 				{...props}
@@ -92,7 +92,7 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
 		<CommandPrimitive.Item
 			data-slot="command-item"
 			className={cn(
-				"relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden hover:bg-neutral-100 data-[disabled=true]:pointer-events-none data-[selected=true]:bg-neutral-100 data-[disabled=true]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-neutral-500 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+				"relative flex cursor-pointer select-none items-center gap-2 rounded-xs px-2 py-1.5 text-sm outline-hidden hover:bg-neutral-100 data-[disabled=true]:pointer-events-none data-[selected=true]:bg-neutral-100 data-[disabled=true]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-neutral-500 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 				className,
 			)}
 			{...props}

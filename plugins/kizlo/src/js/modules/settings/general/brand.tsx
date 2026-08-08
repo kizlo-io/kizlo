@@ -3,8 +3,11 @@ import { type Control, Controller, type FieldPath, useForm } from "react-hook-fo
 import { ColorField, FieldError } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { MediaPicker } from "@/shared/components/ui/media-picker"
+import { sectionsFor } from "@/shared/lib/nav"
 import { BrandSettingsSchema, type BrandSettingsSchemaInput, type BrandSettingsSchemaOutput } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+
+const S = sectionsFor("general/branding")
 
 type BrandControl = Control<BrandSettingsSchemaInput, unknown, BrandSettingsSchemaOutput>
 type BrandFieldName = FieldPath<BrandSettingsSchemaInput>
@@ -64,10 +67,7 @@ export function BrandSettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("brand", form)}>
-			<SettingsSection
-				title="Colors"
-				desc="The theme color tints the mobile browser chrome and the installed app's window; its dark variant is used when the visitor prefers a dark color scheme. The background color fills the app launch screen while it loads."
-			>
+			<SettingsSection {...S("colors")}>
 				<ColorField
 					control={form.control}
 					name="theme_color"
@@ -91,10 +91,7 @@ export function BrandSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="Primary logo"
-				desc="The full lockup, typically the icon plus the word mark. The dark variant is shown when the visitor prefers a dark color scheme; the light version is used when it's empty."
-			>
+			<SettingsSection {...S("primary-logo")}>
 				<MediaField
 					control={form.control}
 					{...{
@@ -124,10 +121,7 @@ export function BrandSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="Icon"
-				desc="The square mark on its own, without the wordmark. Used in tight spaces such as a collapsed header or an avatar."
-			>
+			<SettingsSection {...S("icon")}>
 				<MediaField
 					control={form.control}
 					{...{
@@ -157,7 +151,7 @@ export function BrandSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection title="Wordmark" desc="The brand name set as a logotype, without the icon.">
+			<SettingsSection {...S("wordmark")}>
 				<MediaField
 					control={form.control}
 					{...{
@@ -187,10 +181,7 @@ export function BrandSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="Favicon"
-				desc="The icon browsers show in tabs and bookmarks. A single icon is used across light and dark browser themes, so choose one that stays legible on both."
-			>
+			<SettingsSection {...S("favicon")}>
 				<MediaField
 					control={form.control}
 					{...{
@@ -209,10 +200,7 @@ export function BrandSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsSection
-				title="App icon"
-				desc="Used when your site is added to a home screen or installed as an app on any platform. One icon serves them all."
-			>
+			<SettingsSection {...S("app-icon")}>
 				<MediaField
 					control={form.control}
 					label="Icon"

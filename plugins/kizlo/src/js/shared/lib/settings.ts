@@ -1,32 +1,11 @@
 import { useStore } from "@nanostores/react"
-import {
-	ArticleIcon,
-	FileIcon,
-	FileTextIcon,
-	FolderIcon,
-	GlobeIcon,
-	HashIcon,
-	type Icon,
-	IdentificationBadgeIcon,
-	ImageIcon,
-	PaletteIcon,
-	RobotIcon,
-	ShieldIcon,
-	TagIcon,
-	UploadSimpleIcon,
-	UsersIcon,
-	WebhooksLogoIcon,
-} from "@phosphor-icons/react"
 import apiFetch from "@wordpress/api-fetch"
-import { type BaseSyntheticEvent, useMemo, useState } from "react"
+import { type BaseSyntheticEvent, useState } from "react"
 import type { FieldValues, UseFormReturn } from "react-hook-form"
 import { toast } from "sonner"
+import { refreshSettings } from "@/modules/settings/registration/lib"
 import type { Settings, SettingsMap } from "./schema"
 import { $settings } from "./store"
-import type { NavSection } from "./types"
-
-const POST_TYPE_ICONS: Record<string, Icon> = { post: ArticleIcon, page: FileIcon, attachment: ImageIcon }
-const TAXONOMY_ICONS: Record<string, Icon> = { category: FolderIcon, post_tag: HashIcon }
 
 export type SettingsKeys = keyof Settings
 
@@ -63,6 +42,10 @@ export function useSettings() {
 
 			const existing = $settings.get()
 			if (existing) $settings.set(applyUpdate(existing, key, slug, response ?? data))
+
+			// Post types / taxonomies feed the served nav (sidebar name, Inactive
+			// badge, which sections show). Re-fetch so the sidebar reflects the save.
+			if (key === "post_types" || key === "taxonomies") await refreshSettings()
 		} catch {
 			toast.error("Something went wrong, please try again.")
 		} finally {
@@ -128,59 +111,4 @@ export function useSettingsForm(
 		}),
 		onCancel: () => form.reset(),
 	}
-}
-
-export function useNav(): NavSection[] {
-	const { settings } = useSettings()
-
-	return useMemo<NavSection[]>(
-		() => [
-			{
-				label: "General",
-				items: [
-					{ type: "link", name: "Site", path: "/general/site", icon: GlobeIcon },
-					{ type: "link", name: "Identity", path: "/general/identity", icon: IdentificationBadgeIcon },
-					{ type: "link", name: "Branding", path: "/general/branding", icon: PaletteIcon },
-					{ type: "link", name: "Authors", path: "/general/authors", icon: UsersIcon },
-					{ type: "link", name: "Crawling", path: "/general/crawling", icon: RobotIcon },
-				],
-			},
-			{
-				label: "Content",
-				items: [
-					{
-						type: "group",
-						id: "post-types",
-						name: "Post Types",
-						icon: FileTextIcon,
-						items: (settings?.post_types ?? []).map((item) => ({
-							name: item.name,
-							path: `/post-types/${item.slug}`,
-							icon: POST_TYPE_ICONS[item.slug] ?? FileTextIcon,
-						})),
-					},
-					{
-						type: "group",
-						id: "taxonomies",
-						name: "Taxonomies",
-						icon: TagIcon,
-						items: (settings?.taxonomies ?? []).map((item) => ({
-							name: item.name,
-							path: `/taxonomies/${item.slug}`,
-							icon: TAXONOMY_ICONS[item.slug] ?? TagIcon,
-						})),
-					},
-				],
-			},
-			{
-				label: "System",
-				items: [
-					{ type: "link", name: "Uploads", path: "/system/uploads", icon: UploadSimpleIcon },
-					{ type: "link", name: "Headless", path: "/system/headless", icon: ShieldIcon },
-					{ type: "link", name: "Webhooks", path: "/system/webhooks", icon: WebhooksLogoIcon },
-				],
-			},
-		],
-		[settings],
-	)
 }

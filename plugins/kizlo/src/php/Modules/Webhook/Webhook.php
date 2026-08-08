@@ -26,6 +26,10 @@ class Webhook
     const SETTINGS_TAXONOMY_UPDATED_EVENT = 'settings.taxonomy.updated';
     const SETTINGS_INTEGRATION_UPDATED_EVENT = 'settings.integration.updated';
 
+    const REGISTRATION_CREATED_EVENT = 'registration.created';
+    const REGISTRATION_UPDATED_EVENT = 'registration.updated';
+    const REGISTRATION_DELETED_EVENT = 'registration.deleted';
+
     const WEBHOOK_PATH = '/webhooks';
 
     public static function sendEvent(string $type, array|null $data = null): bool

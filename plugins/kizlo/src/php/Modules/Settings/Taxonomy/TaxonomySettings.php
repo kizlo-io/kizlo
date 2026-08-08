@@ -7,6 +7,7 @@ use Kizlo\Modules\Settings\SettingsIndexedAbstract;
 use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\CustomFields\CustomFieldsValidator;
+use Kizlo\Modules\Registration\TaxonomyRegistration;
 
 class TaxonomySettings extends SettingsIndexedAbstract
 {
@@ -228,6 +229,21 @@ class TaxonomySettings extends SettingsIndexedAbstract
                     $available[$taxonomy] = $tax;
                 }
             }
+        }
+
+        // Inactive Kizlo-owned definitions have no runtime object but must stay
+        // navigable and editable. Build a synthetic object from the definition
+        // (constructing WP_Taxonomy does not register it).
+        foreach (TaxonomyRegistration::all() as $taxonomy => $definition) {
+            if (isset($available[$taxonomy]) || taxonomy_exists($taxonomy)) {
+                continue;
+            }
+
+            $available[$taxonomy] = new WP_Taxonomy(
+                $taxonomy,
+                $definition->getConnectedPostTypes(),
+                $definition->toArgs()
+            );
         }
 
         return $available;

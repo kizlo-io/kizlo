@@ -1,5 +1,6 @@
 import type { Settings as ApiSettings, CustomFieldDefinition, SettingsConstants } from "@kizlo/shared"
 import z from "zod"
+import type { NavBlock } from "./types"
 
 // ====================================================
 // INTERFACE
@@ -9,6 +10,8 @@ export type { SettingsConstants, Variable } from "@kizlo/shared"
 
 export interface Settings extends ApiSettings {
 	constants: SettingsConstants
+	/** Admin-only settings navigation tree, built server-side by SettingsNav. */
+	nav: NavBlock[]
 }
 
 // ====================================================
@@ -325,6 +328,129 @@ export function createTaxonomySettingsSchema(reservedFieldNames: Iterable<string
 }
 
 // ====================================================
+// REGISTRATION SCHEMA
+// ====================================================
+
+/** Nullable integer from a number/text input; blank clears to null. */
+const RegNullableNumberSchema: z.ZodType<number | null, number | string | null> = z.preprocess(
+	(val) => (val === "" || val === null || val === undefined ? null : Number(val)),
+	z.number().int().nullable(),
+) as never
+
+/** Label overrides keyed by WordPress label name; blanks fall back to generated labels. */
+export const RegistrationLabelsSchema = z.record(z.string(), z.string())
+
+function createRegistrationKeySchema(maxLength: number) {
+	return z
+		.string()
+		.min(1, "A key is required.")
+		.max(maxLength, `Key must be at most ${maxLength} characters.`)
+		.regex(/^[a-z][a-z0-9_-]*$/, "Use lowercase letters, numbers, hyphens, and underscores; start with a letter.")
+}
+
+export const PostTypeRegistrationSchema = z.object({
+	active: z.boolean(),
+	singular_label: z.string().min(1, "A singular label is required."),
+	plural_label: z.string().min(1, "A plural label is required."),
+	description: z.string(),
+	public: z.boolean(),
+	hierarchical: z.boolean(),
+	labels: RegistrationLabelsSchema,
+	taxonomies: z.array(z.string()),
+	supports: z.array(z.string()),
+	show_ui: z.boolean(),
+	show_in_menu: z.boolean(),
+	menu_parent: NulledStringSchema,
+	menu_position: RegNullableNumberSchema,
+	menu_icon: NulledStringSchema,
+	show_in_admin_bar: z.boolean(),
+	show_in_nav_menus: z.boolean(),
+	exclude_from_search: z.boolean(),
+	publicly_queryable: z.boolean(),
+	capability_type: z.enum(["post", "page", "custom"]),
+	capability_singular: NulledStringSchema,
+	capability_plural: NulledStringSchema,
+	can_export: z.boolean(),
+	delete_with_user: z.boolean(),
+})
+export type PostTypeRegistrationInput = z.input<typeof PostTypeRegistrationSchema>
+export type PostTypeRegistrationOutput = z.output<typeof PostTypeRegistrationSchema>
+
+export const CreatePostTypeRegistrationSchema = PostTypeRegistrationSchema.extend({
+	key: createRegistrationKeySchema(20),
+})
+export type CreatePostTypeRegistrationInput = z.input<typeof CreatePostTypeRegistrationSchema>
+export type CreatePostTypeRegistrationOutput = z.output<typeof CreatePostTypeRegistrationSchema>
+
+export const TaxonomyRegistrationSchema = z.object({
+	active: z.boolean(),
+	singular_label: z.string().min(1, "A singular label is required."),
+	plural_label: z.string().min(1, "A plural label is required."),
+	description: z.string(),
+	public: z.boolean(),
+	hierarchical: z.boolean(),
+	labels: RegistrationLabelsSchema,
+	object_types: z.array(z.string()),
+	sort: z.boolean(),
+	default_term_name: NulledStringSchema,
+	default_term_slug: NulledStringSchema,
+	default_term_description: NulledStringSchema,
+	show_ui: z.boolean(),
+	show_in_menu: z.boolean(),
+	meta_box: z.enum(["automatic", "category", "tag", "hidden"]),
+	show_in_nav_menus: z.boolean(),
+	show_tagcloud: z.boolean(),
+	show_in_quick_edit: z.boolean(),
+	show_admin_column: z.boolean(),
+	publicly_queryable: z.boolean(),
+})
+export type TaxonomyRegistrationInput = z.input<typeof TaxonomyRegistrationSchema>
+export type TaxonomyRegistrationOutput = z.output<typeof TaxonomyRegistrationSchema>
+
+export const CreateTaxonomyRegistrationSchema = TaxonomyRegistrationSchema.extend({
+	key: createRegistrationKeySchema(32),
+})
+export type CreateTaxonomyRegistrationInput = z.input<typeof CreateTaxonomyRegistrationSchema>
+export type CreateTaxonomyRegistrationOutput = z.output<typeof CreateTaxonomyRegistrationSchema>
+
+// ====================================================
+// UNIFIED SCHEMA
+// ====================================================
+
+// A Kizlo-owned type is edited as one form saved to /settings/{kind}/{slug}:
+// the per-slug Kizlo settings plus the WordPress definition. The two shapes are
+// key-disjoint, so they merge cleanly. The definition half is optional so the
+// same schema also validates a built-in type (settings only, no definition);
+// for a Kizlo-owned type every definition field is always present, so its own
+// constraints (e.g. a required label) still apply.
+
+export const PostTypeUnifiedSchema = PostTypeSettingsSchema.extend(PostTypeRegistrationSchema.partial().shape)
+export type PostTypeUnifiedInput = z.input<typeof PostTypeUnifiedSchema>
+export type PostTypeUnifiedOutput = z.output<typeof PostTypeUnifiedSchema>
+
+/** Unified post-type schema carrying the same custom-field refinements as the settings-only one. */
+export function createPostTypeUnifiedSchema(reservedFieldNames: Iterable<string>) {
+	const reserved = new Set(reservedFieldNames)
+	return PostTypeUnifiedSchema.superRefine((val, ctx) => {
+		refineFieldNames(val.custom_fields, ctx)
+		refineReservedNames(val.custom_fields, reserved, ctx)
+	})
+}
+
+export const TaxonomyUnifiedSchema = TaxonomySettingsSchema.extend(TaxonomyRegistrationSchema.partial().shape)
+export type TaxonomyUnifiedInput = z.input<typeof TaxonomyUnifiedSchema>
+export type TaxonomyUnifiedOutput = z.output<typeof TaxonomyUnifiedSchema>
+
+/** Unified taxonomy schema carrying the same custom-field refinements as the settings-only one. */
+export function createTaxonomyUnifiedSchema(reservedFieldNames: Iterable<string>) {
+	const reserved = new Set(reservedFieldNames)
+	return TaxonomyUnifiedSchema.superRefine((val, ctx) => {
+		refineFieldNames(val.custom_fields, ctx)
+		refineReservedNames(val.custom_fields, reserved, ctx)
+	})
+}
+
+// ====================================================
 // INTEGRATION SCHEMA
 // ====================================================
 
@@ -443,8 +569,10 @@ export interface SettingsMap {
 	brand: BrandSettingsSchemaOutput
 	identity: IdentitySettingsOutput
 	authors: AuthorSettingsOutput
-	post_types: PostTypeSettingsOutput
-	taxonomies: TaxonomySettingsOutput
+	// Kizlo-owned types send settings + definition in one payload; built-in types
+	// send settings only (the definition half of the unified output is optional).
+	post_types: PostTypeUnifiedOutput
+	taxonomies: TaxonomyUnifiedOutput
 	webhook: WebhookSettingsOutput
 	crawling: CrawlingSettingsOutput
 	uploads: UploadsSettingsOutput

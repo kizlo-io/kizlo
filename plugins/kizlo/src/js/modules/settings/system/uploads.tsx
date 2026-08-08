@@ -5,8 +5,11 @@ import { FieldError } from "@/shared/components/fields"
 import { SettingsForm, SettingsSection } from "@/shared/components/settings"
 import { Button } from "@/shared/components/ui/button"
 import { TextInput } from "@/shared/components/ui/input"
+import { sectionsFor } from "@/shared/lib/nav"
 import { type UploadsSettingsInput, type UploadsSettingsOutput, UploadsSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+
+const S = sectionsFor("system/uploads")
 
 export function UploadsSettingsPage() {
 	const { settings } = useSettings()
@@ -22,10 +25,7 @@ export function UploadsSettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("uploads", form)}>
-			<SettingsSection
-				title="Allowed File Types"
-				desc="Let editors upload file types that WordPress blocks by default, such as SVG logos and ICO favicons. Add each type as a file extension and its matching MIME type. Uploaded SVGs are automatically sanitized to remove scripts and other unsafe content. Executable and script types are refused for security."
-			>
+			<SettingsSection {...S("allowed-file-types")}>
 				<div className="flex flex-col gap-3">
 					{fields.length > 0 && (
 						<div className="flex items-center gap-2 text-muted-foreground text-sm">

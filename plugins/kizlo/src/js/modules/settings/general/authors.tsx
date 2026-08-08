@@ -5,8 +5,11 @@ import { BreadcrumbsField } from "@/shared/components/breadcrumbs-field"
 import { SwitchField } from "@/shared/components/fields"
 import { SettingsCard, SettingsForm, SettingsGroup, SettingsSection } from "@/shared/components/settings"
 import { VariableField } from "@/shared/components/variable-field"
+import { sectionsFor } from "@/shared/lib/nav"
 import { type AuthorSettingsInput, type AuthorSettingsOutput, AuthorSettingsSchema } from "@/shared/lib/schema"
 import { useSettings, useSettingsForm } from "@/shared/lib/settings"
+
+const S = sectionsFor("general/authors")
 
 export function AuthorsSettingsPage() {
 	const { settings } = useSettings()
@@ -27,10 +30,7 @@ export function AuthorsSettingsPage() {
 
 	return (
 		<SettingsForm {...useSettingsForm("authors", form)}>
-			<SettingsSection
-				title="Authors"
-				desc="Manage the URL structure and SEO configuration for author archive pages, including title templates, meta descriptions, and search visibility."
-			>
+			<SettingsSection {...S("authors")}>
 				<SwitchField
 					control={form.control}
 					name="enabled"
@@ -47,7 +47,7 @@ export function AuthorsSettingsPage() {
 				/>
 			</SettingsSection>
 
-			<SettingsGroup title={content.seo.heading} desc={content.seo.description}>
+			<SettingsGroup {...S("seo")}>
 				<SettingsCard>
 					<SwitchField
 						name="search_engine_visibility"

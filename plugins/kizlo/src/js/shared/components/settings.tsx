@@ -1,8 +1,10 @@
-import { ListIcon, MagnifyingGlassIcon, SpinnerGapIcon } from "@phosphor-icons/react"
+import { CaretDownIcon, ListIcon, MagnifyingGlassIcon, SpinnerGapIcon } from "@phosphor-icons/react"
+import { useState } from "react"
 import { $search, $sidebar } from "@/shared/lib/store"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
+import { FieldLabel } from "./ui/field-label"
 
 interface SettingsFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
 	isLoading?: boolean
@@ -30,7 +32,7 @@ export function SettingsForm({ isLoading, isDirty, submitLabel = "Update", onCan
 
 	return (
 		<form className={cn("flex flex-1 flex-col", className)} {...props}>
-			<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-4 pb-24 md:px-6 md:pt-10">{children}</div>
+			<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-14 p-4 pb-24 md:px-6 md:pt-10">{children}</div>
 
 			<div
 				className={cn(
@@ -102,15 +104,26 @@ export function SettingsForm({ isLoading, isDirty, submitLabel = "Update", onCan
  * related fields under a single heading without giving each cluster its own
  * top-level title.
  */
-export function SettingsGroup({ title, desc, children }: { title: React.ReactNode; desc?: React.ReactNode; children: React.ReactNode }) {
+export function SettingsGroup({
+	id,
+	title,
+	desc,
+	children,
+}: {
+	/** Anchor id for the sidebar's section jump-links. */
+	id?: string
+	title: React.ReactNode
+	desc?: React.ReactNode
+	children: React.ReactNode
+}) {
 	return (
-		<section className="flex flex-col gap-4">
+		<section id={id} className={cn("flex scroll-mt-[calc(var(--kizlo-admin-bar)+var(--kizlo-header)+1rem)] flex-col gap-4")}>
 			<div className="flex flex-col gap-1">
-				<h2 className="m-0! p-0! font-semibold! text-base! text-neutral-900!">{title}</h2>
+				<h2 className={cn("m-0! p-0! font-semibold! text-base! text-neutral-900! transition-colors duration-500")}>{title}</h2>
 				{desc ? <p className="my-0! text-neutral-500! text-sm! leading-relaxed!">{desc}</p> : null}
 			</div>
 
-			<div className="flex flex-col gap-4">{children}</div>
+			{children}
 		</section>
 	)
 }
@@ -123,9 +136,54 @@ export function SettingsCard({ children }: { children: React.ReactNode }) {
 	)
 }
 
-export function SettingsSection({ title, desc, children }: { title: React.ReactNode; desc?: React.ReactNode; children: React.ReactNode }) {
+/**
+ * A {@link SettingsCard} whose body is hidden behind a header toggle. Use for a
+ * cluster of secondary fields that would otherwise crowd a section — the header
+ * carries the label/description; the fields reveal on expand.
+ */
+export function SettingsCollapsibleCard({
+	title,
+	description,
+	defaultOpen = false,
+	children,
+}: {
+	title: React.ReactNode
+	description?: React.ReactNode
+	defaultOpen?: boolean
+	children: React.ReactNode
+}) {
+	const [open, setOpen] = useState(defaultOpen)
+
 	return (
-		<SettingsGroup title={title} desc={desc}>
+		<Card aria-expanded={open} className="group">
+			<button
+				type="button"
+				onClick={() => setOpen((value) => !value)}
+				className="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent p-6 pr-8 text-left"
+			>
+				<FieldLabel label={title} desc={description} descMode="below" />
+
+				<CaretDownIcon data-open className="size-4 transition-transform group-aria-expanded:rotate-180" />
+			</button>
+
+			{open ? <CardContent className="flex flex-col gap-6 rounded-none! border-neutral-200 border-t p-6!">{children}</CardContent> : null}
+		</Card>
+	)
+}
+
+export function SettingsSection({
+	id,
+	title,
+	desc,
+	children,
+}: {
+	id?: string
+	title: React.ReactNode
+	desc?: React.ReactNode
+	children: React.ReactNode
+}) {
+	return (
+		<SettingsGroup id={id} title={title} desc={desc}>
 			<SettingsCard>{children}</SettingsCard>
 		</SettingsGroup>
 	)

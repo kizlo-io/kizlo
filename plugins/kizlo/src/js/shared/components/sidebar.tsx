@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom"
 import { cn } from "@/shared/lib/utils"
 
 export function SidebarHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-	return <div data-slot="sidebar-header" className={cn("flex w-full min-w-0 flex-col gap-2 px-2 py-2", className)} {...props} />
+	return <div data-slot="sidebar-header" className={cn("flex w-full min-w-0 flex-col gap-2 px-2 pt-2", className)} {...props} />
 }
 
 export function SidebarDrillDown({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -24,16 +24,19 @@ export function SidebarSection({ label, className, children, ...props }: { label
 }
 
 interface SidebarPanelProps extends React.HTMLAttributes<HTMLDivElement> {
-	/** The root panel: visible at rest, slides left when a group is open. */
-	root?: boolean
-	/** Group id for a drill-down panel; matched against `active`. */
-	id?: string
-	/** The currently open group id, or null for the root. */
-	active: string | null
+	/** Node id this panel represents; omit for the root panel. */
+	panelId?: string
+	/** The current open stack of node ids, from root. Empty = root is shown. */
+	stack: string[]
 }
 
-export function SidebarPanel({ root, id, active, className, ...props }: SidebarPanelProps) {
-	const shown = root ? active == null : active === id
+export function SidebarPanel({ panelId, stack, className, ...props }: SidebarPanelProps) {
+	const isRoot = panelId == null
+	const top = stack[stack.length - 1] ?? null
+	const shown = isRoot ? stack.length === 0 : top === panelId
+	// A panel drilled *past* (an ancestor of the current top) slides left; anything
+	// else that's hidden is *ahead* of the current panel and slides in from the right.
+	const isAncestor = isRoot ? stack.length > 0 : panelId != null && stack.includes(panelId) && top !== panelId
 
 	return (
 		<div
@@ -41,7 +44,7 @@ export function SidebarPanel({ root, id, active, className, ...props }: SidebarP
 			aria-hidden={!shown}
 			className={cn(
 				"absolute inset-0 flex flex-col gap-0.5 overflow-y-auto px-2 transition duration-150 ease-out",
-				shown ? "translate-x-0 opacity-100" : cn("pointer-events-none opacity-0", root ? "-translate-x-2" : "translate-x-2"),
+				shown ? "translate-x-0 opacity-100" : cn("pointer-events-none opacity-0", isAncestor ? "-translate-x-2" : "translate-x-2"),
 				className,
 			)}
 			{...props}
@@ -56,19 +59,36 @@ interface SidebarLinkProps extends React.HTMLAttributes<HTMLAnchorElement> {
 	to: string
 	icon?: Icon
 	end?: boolean
+	/** Rendered at the end of the row, e.g. a status badge. */
+	trailing?: React.ReactNode
+	/** Override the active state. Use for links that differ only by hash, where
+	 *  NavLink's pathname-only matching would light every one at once. */
+	active?: boolean
 }
 
-export function SidebarLink({ to, icon: LinkIcon, end, className, children, ...props }: SidebarLinkProps) {
+export function SidebarLink({ to, icon: LinkIcon, end, trailing, active, className, children, ...props }: SidebarLinkProps) {
 	return (
 		<NavLink
 			to={to}
 			end={end}
-			className={({ isActive }) => cn("h-10", rowClasses, isActive && "bg-neutral-200/70! focus:text-neutral-600", className)}
+			data-active={active}
+			className={({ isActive }) =>
+				cn("group h-10", rowClasses, (active ?? isActive) && "bg-neutral-200/70! focus:text-neutral-600", className)
+			}
 			{...props}
 		>
 			{LinkIcon ? <LinkIcon className="size-4 shrink-0" /> : null}
 			<span className="min-w-0 flex-1 truncate">{children}</span>
+			{trailing}
 		</NavLink>
+	)
+}
+
+export function SidebarBadge({ children }: { children: React.ReactNode }) {
+	return (
+		<span className="shrink-0 rounded-sm bg-neutral-200 px-1.5 py-0.5 font-medium text-[10px] text-neutral-600 uppercase tracking-wide">
+			{children}
+		</span>
 	)
 }
 
@@ -88,7 +108,7 @@ export function SidebarButton({ icon: ButtonIcon, trailing, active, className, c
 		>
 			{ButtonIcon ? <ButtonIcon className="size-4 shrink-0" /> : null}
 			<span className="min-w-0 flex-1 truncate">{children}</span>
-			<div className="flex size-7 items-center justify-center rounded-xs group-hover:bg-neutral-200 [&_svg]:size-3">{trailing}</div>
+			{trailing}
 		</button>
 	)
 }
@@ -97,7 +117,7 @@ export function SidebarBack({ className, children, ...props }: React.ComponentPr
 	return (
 		<div
 			className={cn(
-				"relative my-2 flex w-max cursor-pointer items-center gap-1 rounded-sm border border-neutral-300 p-0.5 pr-2 pl-1.5",
+				"relative my-2 flex w-full cursor-pointer items-center gap-1 rounded-xs p-0.5 py-2 pr-2 pl-1.5 hover:bg-neutral-100",
 				"text-neutral-900",
 				className,
 			)}

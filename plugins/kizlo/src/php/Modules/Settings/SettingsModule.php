@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Settings;
 
+use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\Modules\Settings\Site\SiteSettings;
 use Kizlo\Support\Variables;
@@ -21,6 +22,13 @@ use Kizlo\Support\Utils;
 
 class SettingsModule
 {
+    /**
+     * Internal, undocumented query flag that opts a `/settings` GET into the
+     * admin navigation tree. Absent by default, so SDK consumers never receive
+     * (nor pay to compute) the nav; only the plugin admin sends it.
+     */
+    private const INTERNAL_QUERY_FLAG = '__internals';
+
     private SiteSettingsService $site;
     private BrandSettingsService $brand;
     private IdentitySettingsService $identity;
@@ -73,8 +81,8 @@ class SettingsModule
         kizlo_register_route([
             'methods'  => 'GET',
             'route'    => '/settings',
-            'callback' => function () {
-                return new WP_REST_Response($this->toResponse());
+            'callback' => function (WP_REST_Request $request) {
+                return new WP_REST_Response($this->toResponse($request->get_param(self::INTERNAL_QUERY_FLAG) !== null));
             },
         ]);
     }
@@ -82,19 +90,26 @@ class SettingsModule
     /**
      * Aggregate all settings sections into a single response payload.
      *
+     * The admin navigation tree is only computed and attached when $includeNav is
+     * true (the plugin admin passes the INTERNAL_QUERY_FLAG). SDK consumers get the
+     * plain contract with no nav and no extra work.
+     *
      * @return array<string, mixed>
      */
-    public function toResponse(): array
+    public function toResponse(bool $includeNav = false): array
     {
         $settings = Utils::getSettings();
 
-        return [
+        $postTypes  = $this->postType->toResponse($settings->postTypes);
+        $taxonomies = $this->taxonomy->toResponse($settings->taxonomies);
+
+        $response = [
             'site'             => $this->site->toResponse($settings->site),
             'brand'            => $this->brand->toResponse($settings->brand),
             'identity'         => $this->identity->toResponse($settings->identity),
             'authors'          => $this->authors->toResponse($settings->authors),
-            'post_types'       => $this->postType->toResponse($settings->postTypes),
-            'taxonomies'       => $this->taxonomy->toResponse($settings->taxonomies),
+            'post_types'       => $postTypes,
+            'taxonomies'       => $taxonomies,
             'crawling'         => $this->crawling->toResponse($settings->crawling),
             'webhook'          => $this->webhook->toResponse($settings->webhook),
             'uploads'          => $this->uploads->toResponse($settings->uploads),
@@ -102,11 +117,17 @@ class SettingsModule
             'plain_permalinks' => empty(get_option('permalink_structure')),
             'statuses'         => PostTypeSettings::getStatuses(),
         ];
+
+        if ($includeNav) {
+            $response['nav'] = (new SettingsNav())->build($postTypes, $taxonomies);
+        }
+
+        return $response;
     }
 
     public function getPluginData()
     {
-        return array_merge($this->toResponse(), [
+        return array_merge($this->toResponse(true), [
             'constants'   => [
                 'site'  => [
                     'title_separators' => SiteSettings::TITLE_SEPARATORS,
