@@ -34,14 +34,14 @@ class SettingsNav
                         'post-types',
                         'Post Types',
                         'file-text',
-                        '/post-types/new',
+                        ['path' => '/post-types/new', 'label' => 'New post type'],
                         array_map(fn(array $item): array => $this->postTypePage($item), $postTypes)
                     ),
                     $this->drillGroup(
                         'taxonomies',
                         'Taxonomies',
                         'tag',
-                        '/taxonomies/new',
+                        ['path' => '/taxonomies/new', 'label' => 'New taxonomy'],
                         array_map(fn(array $item): array => $this->taxonomyPage($item), $taxonomies)
                     ),
                 ],
@@ -139,6 +139,7 @@ class SettingsNav
             'name'     => $name,
             'path'     => "/post-types/{$slug}",
             'icon'     => $this->postTypeIcon($slug),
+            'variant'  => 'collapse',
             'inactive' => $owned && ! $active,
             'sections' => $this->postTypeSections($name, $internal, $owned && $hasReg),
             'delete'   => $owned && $hasReg ? $this->deleteCopy($name, 'entries') : null,
@@ -164,6 +165,7 @@ class SettingsNav
             'name'     => $name,
             'path'     => "/taxonomies/{$slug}",
             'icon'     => $this->taxonomyIcon($slug),
+            'variant'  => 'collapse',
             'inactive' => $owned && ! $active,
             'sections' => $this->taxonomySections($name, $internal, $owned && $hasReg),
             'delete'   => $owned && $hasReg ? $this->deleteCopy($name, 'terms') : null,
@@ -254,30 +256,38 @@ class SettingsNav
     // ── Builders ────────────────────────────────────────────────────────────
 
     /**
-     * A drill-down group in the sidebar root (Post Types, Taxonomies).
+     * A parent group in the sidebar root (Post Types, Taxonomies). `$variant`
+     * controls how its child pages are revealed: 'drill' slides them in over the
+     * root list; 'collapse' expands them inline beneath the group.
      *
-     * @param array<int, array<string, mixed>> $items
+     * @param array{path: string, label: string} $create The inline create (+) action: its route and command-menu label.
+     * @param array<int, array<string, mixed>>   $items
+     * @param 'drill'|'collapse'                  $variant
      * @return array<string, mixed>
      */
-    private function drillGroup(string $id, string $name, string $icon, string $onCreate, array $items): array
+    private function drillGroup(string $id, string $name, string $icon, array $create, array $items, string $variant = 'drill'): array
     {
         return [
-            'type'     => 'group',
-            'id'       => $id,
-            'name'     => $name,
-            'icon'     => $icon,
-            'onCreate' => $onCreate,
-            'items'    => $items,
+            'type'    => 'group',
+            'id'      => $id,
+            'name'    => $name,
+            'icon'    => $icon,
+            'variant' => $variant,
+            'create'  => $create,
+            'items'   => $items,
         ];
     }
 
     /**
      * A settings page whose sections are the sidebar jump-links (menu items).
+     * `$variant` controls how those sections are revealed: 'drill' slides them in
+     * over the parent list; 'collapse' expands them inline beneath the page.
      *
      * @param array<int, array<string, mixed>> $sections
+     * @param 'drill'|'collapse'               $variant
      * @return array<string, mixed>
      */
-    private function page(string $id, string $name, string $path, string $icon, array $sections): array
+    private function page(string $id, string $name, string $path, string $icon, array $sections, string $variant = 'collapse'): array
     {
         return [
             'type'     => 'page',
@@ -285,6 +295,7 @@ class SettingsNav
             'name'     => $name,
             'path'     => $path,
             'icon'     => $icon,
+            'variant'  => $variant,
             'sections' => $sections,
         ];
     }

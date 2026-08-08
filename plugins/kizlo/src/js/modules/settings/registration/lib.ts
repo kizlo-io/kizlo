@@ -116,16 +116,49 @@ export function taxonomyGeneratedLabels(singular: string, plural: string): Recor
 	}
 }
 
-/** Turn a human label into a valid registration key. */
-export function generateKey(label: string, maxLength: number): string {
-	return label
-		.toLowerCase()
+/** Turn a registration key into a human label: "news_article" → "News Article". */
+export function humanizeKey(key: string): string {
+	return key
 		.trim()
-		.replace(/[^a-z0-9]+/g, "_")
-		.replace(/^[^a-z]+/, "")
-		.replace(/_+/g, "_")
-		.replace(/^_|_$/g, "")
-		.slice(0, maxLength)
+		.split(/[_-]+/)
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ")
+}
+
+// English words that read the same singular and plural; left untouched by both helpers.
+const UNCOUNTABLE = new Set(["news", "series", "species"])
+
+/** Apply `transform` to the last word of a label, preserving the leading words. */
+function mapLastWord(label: string, transform: (word: string, lower: string) => string): string {
+	const trimmed = label.trim()
+	if (!trimmed) return ""
+
+	const words = trimmed.split(/\s+/)
+	const last = words[words.length - 1] ?? ""
+	words[words.length - 1] = transform(last, last.toLowerCase())
+	return words.join(" ")
+}
+
+/** Pluralize the last word of a singular English label: "Box" → "Boxes". */
+export function pluralizeLabel(label: string): string {
+	return mapLastWord(label, (word, lower) => {
+		if (UNCOUNTABLE.has(lower)) return word
+		if (/(s|x|z|ch|sh)$/.test(lower)) return `${word}es`
+		if (/[^aeiou]y$/.test(lower)) return `${word.slice(0, -1)}ies`
+		return `${word}s`
+	})
+}
+
+/** Singularize the last word of a plural English label: "Products" → "Product". */
+export function singularizeLabel(label: string): string {
+	return mapLastWord(label, (word, lower) => {
+		// Not plural to begin with (no trailing "s", "ss" words like "Class", or uncountable).
+		if (!/s$/.test(lower) || /ss$/.test(lower) || UNCOUNTABLE.has(lower)) return word
+		if (/(x|z|ch|sh)es$/.test(lower)) return word.slice(0, -2)
+		if (/[^aeiou]ies$/.test(lower)) return `${word.slice(0, -3)}y`
+		return word.slice(0, -1)
+	})
 }
 
 /**

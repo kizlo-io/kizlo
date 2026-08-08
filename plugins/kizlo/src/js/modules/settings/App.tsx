@@ -1,6 +1,6 @@
 import { useStore } from "@nanostores/react"
 import { BookOpenIcon, CaretRightIcon, DiscordLogoIcon, GithubLogoIcon, type Icon, PlusIcon } from "@phosphor-icons/react"
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom"
 import { Logo } from "@/modules/settings/shared/logo"
 import { NotFound } from "@/modules/settings/shared/not-found"
@@ -20,9 +20,10 @@ import {
 } from "@/shared/components/sidebar"
 import { ComponentGallery } from "@/shared/components/ui/gallery"
 import { resolveIcon } from "@/shared/lib/icons"
-import { pageJumpLinks, useNav } from "@/shared/lib/nav"
+import { navVariant, pageJumpLinks, useNav } from "@/shared/lib/nav"
 import { $sidebar } from "@/shared/lib/store"
-import type { NavBlock } from "@/shared/lib/types"
+import type { NavBlock, NavDrillGroup, NavPage } from "@/shared/lib/types"
+import { cn } from "@/shared/lib/utils"
 import { AuthorsSettingsPage } from "./general/authors"
 import { BrandSettingsPage } from "./general/brand"
 import { CrawlingSettingsPage } from "./general/crawling"
@@ -108,23 +109,168 @@ function Layout() {
 	)
 }
 
-/** Resolve the drill stack that reveals the panel for the current route. */
-function stackFor(blocks: NavBlock[], pathname: string): string[] {
+/**
+ * Resolve which nodes must be open to reveal the current route: the drill `stack`
+ * of sliding panels plus the ids of `collapse` nodes whose children hold it. A
+ * node contributes to whichever set matches its variant, so a route reached
+ * through a collapse group never pushes that group onto the drill stack.
+ */
+function resolveOpen(blocks: NavBlock[], pathname: string): { stack: string[]; expanded: string[] } {
+	const stack: string[] = []
+	const expanded: string[] = []
+
+	const open = (node: NavPage | NavDrillGroup, hasChildren: boolean) => {
+		if (!hasChildren) return
+		if (navVariant(node) === "collapse") expanded.push(node.id)
+		else stack.push(node.id)
+	}
+
 	for (const block of blocks) {
 		for (const node of block.items) {
 			if (node.type === "page") {
-				if (node.path === pathname) return pageJumpLinks(node).length > 0 ? [node.id] : []
+				if (node.path === pathname) {
+					open(node, pageJumpLinks(node).length > 0)
+					return { stack, expanded }
+				}
 				continue
 			}
 
-			if (node.onCreate === pathname) return [node.id]
+			if (node.create?.path === pathname) {
+				open(node, true)
+				return { stack, expanded }
+			}
+
 			for (const page of node.items) {
-				if (page.path === pathname) return pageJumpLinks(page).length > 0 ? [node.id, page.id] : [node.id]
+				if (page.path === pathname) {
+					open(node, true)
+					open(page, pageJumpLinks(page).length > 0)
+					return { stack, expanded }
+				}
 			}
 		}
 	}
 
-	return []
+	return { stack, expanded }
+}
+
+/**
+ * The collapse nodes that must stay open to reveal a node: its collapse ancestors
+ * plus itself. Used by the accordion so opening a nested child doesn't close the
+ * parent that contains it.
+ */
+function collapseChain(blocks: NavBlock[], id: string): string[] {
+	for (const block of blocks) {
+		for (const node of block.items) {
+			if (node.id === id) return [id]
+			if (node.type === "group") {
+				for (const page of node.items) {
+					if (page.id === id) return navVariant(node) === "collapse" ? [node.id, id] : [id]
+				}
+			}
+		}
+	}
+
+	return [id]
+}
+
+/** Wraps the inline children of an expanded collapse node, indenting them and hosting the tree guide. */
+function TreeGroup({ children }: { children: React.ReactNode }) {
+	return <div className="relative ml-5 flex flex-col">{children}</div>
+}
+
+/**
+ * Tree-line classes for one inline collapse child: a vertical guide down the left
+ * plus a horizontal connector into the row. `isLast` trims the guide to the
+ * connector so the line ends cleanly at the final child.
+ */
+function treeRow(isLast: boolean): string {
+	return cn(
+		"relative pl-5",
+		"before:absolute before:left-0 before:w-px before:bg-neutral-200 before:content-['']",
+		isLast ? "before:top-0 before:h-1/2" : "before:inset-y-0",
+		"after:absolute after:left-0 after:top-1/2 after:h-px after:w-3 after:bg-neutral-200 after:content-['']",
+	)
+}
+
+/** The expand/collapse caret for a collapse row, toggling without triggering the row's link. */
+function CollapseToggle({ open, label, onToggle }: { open: boolean; label: string; onToggle: () => void }) {
+	return (
+		<button
+			type="button"
+			aria-label={`Toggle ${label}`}
+			aria-expanded={open}
+			onClick={(event) => {
+				event.preventDefault()
+				event.stopPropagation()
+				onToggle()
+			}}
+			className="relative flex size-8 shrink-0 cursor-pointer appearance-none items-center justify-center rounded-xs border-0 bg-transparent text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900"
+		>
+			<CaretRightIcon className={cn("size-4 transition-transform", open && "rotate-90")} />
+		</button>
+	)
+}
+
+/**
+ * Scroll-spy: the id of the section currently under the header, driving the
+ * sidebar's active jump-link as the page scrolls. Watches the sections named by
+ * `ids` (in document order) and returns whichever one has scrolled up to the
+ * header line; the last section wins once the page is scrolled to the bottom so a
+ * short final section still highlights. Returns `null` when disabled or before a
+ * section is measured, letting the hash-based highlight stand. Visual only — it
+ * never rewrites the URL hash, so it won't spam history or retrigger the scroll
+ * manager.
+ */
+function useActiveSection(ids: string[], enabled: boolean): string | null {
+	const key = ids.join("|")
+	const [active, setActive] = useState<string | null>(null)
+
+	useEffect(() => {
+		const sectionIds = key ? key.split("|") : []
+		if (!enabled || sectionIds.length === 0) {
+			setActive(null)
+			return
+		}
+
+		let frame = 0
+		const compute = () => {
+			frame = 0
+			let current: string | null = sectionIds[0] ?? null
+			for (const id of sectionIds) {
+				const el = document.getElementById(id)
+				if (!el) continue
+				// scrollMarginTop resolves the section's scroll-mt: the offset its top
+				// lands at when jumped to. Put the detection line a third of the way
+				// down from there so a clicked section (top parked at the offset) — or a
+				// near-bottom one that can't scroll all the way up — still counts as
+				// active instead of crediting the section above it.
+				const offset = Number.parseFloat(getComputedStyle(el).scrollMarginTop) || 0
+				const line = offset + (window.innerHeight - offset) / 3
+				if (el.getBoundingClientRect().top <= line) current = id
+			}
+			// The last section may be too short to ever reach the line; at the page
+			// bottom it's the one in view, so force it.
+			if (window.innerHeight + Math.ceil(window.scrollY) >= document.documentElement.scrollHeight - 2) {
+				current = sectionIds[sectionIds.length - 1] ?? current
+			}
+			setActive(current)
+		}
+
+		const onScroll = () => {
+			if (!frame) frame = requestAnimationFrame(compute)
+		}
+
+		compute()
+		window.addEventListener("scroll", onScroll, { passive: true })
+		window.addEventListener("resize", onScroll)
+		return () => {
+			if (frame) cancelAnimationFrame(frame)
+			window.removeEventListener("scroll", onScroll)
+			window.removeEventListener("resize", onScroll)
+		}
+	}, [key, enabled])
+
+	return active
 }
 
 function Sidebar() {
@@ -132,21 +278,163 @@ function Sidebar() {
 	const navigate = useNavigate()
 	const { pathname, hash } = useLocation()
 
-	const groups = blocks.flatMap((block) => block.items).filter((node) => node.type === "group")
+	const groups = blocks.flatMap((block) => block.items).filter((node): node is NavDrillGroup => node.type === "group")
 	const pages = blocks.flatMap((block) => block.items).flatMap((node) => (node.type === "group" ? node.items : [node]))
-	const drillablePages = pages.filter((page) => pageJumpLinks(page).length > 0)
 
-	const [stack, setStack] = useState<string[]>(() => stackFor(blocks, pathname))
+	// Only drill-variant nodes get their own sliding panel; collapse nodes reveal
+	// their children inline inside the panel they already live in.
+	const drillGroups = groups.filter((group) => navVariant(group) === "drill")
+	const drillablePages = pages.filter((page) => pageJumpLinks(page).length > 0 && navVariant(page) === "drill")
 
-	// Auto-drill: landing on a page opens its section list. Re-runs when the nav
-	// data arrives (settings load asynchronously) as well as on navigation.
+	// Scroll-spy for the section links of whichever page is currently open, so the
+	// active jump-link tracks what's in view rather than staying pinned to the hash.
+	const currentPage = pages.find((page) => page.path === pathname)
+	const sectionIds = currentPage ? pageJumpLinks(currentPage).map((link) => link.id) : []
+	const activeSection = useActiveSection(sectionIds, sectionIds.length > 0)
+
+	const [stack, setStack] = useState<string[]>(() => resolveOpen(blocks, pathname).stack)
+	const [expanded, setExpanded] = useState<Set<string>>(() => new Set(resolveOpen(blocks, pathname).expanded))
+
+	// Landing on a page opens the branch that reveals it. Re-runs when the nav data
+	// arrives (settings load asynchronously) as well as on navigation. Both sets are
+	// exclusive (accordion): only the active branch stays open, so navigating away
+	// closes whatever collapse section was showing.
 	useEffect(() => {
-		setStack(stackFor(blocks, pathname))
+		const target = resolveOpen(blocks, pathname)
+		setStack(target.stack)
+		setExpanded(new Set(target.expanded))
 		$sidebar.set(false)
 	}, [pathname, blocks])
 
 	const back = () => setStack((current) => current.slice(0, -1))
 	const closeDrawer = () => $sidebar.set(false)
+	// Accordion: opening a node keeps only its own branch (its collapse ancestors
+	// plus itself), closing every sibling; closing just drops the node.
+	const toggle = (id: string) =>
+		setExpanded((current) => {
+			if (!current.has(id)) return new Set(collapseChain(blocks, id))
+			const next = new Set(current)
+			next.delete(id)
+			return next
+		})
+
+	// A page's section jump-links. `tree` draws the connecting tree lines when the
+	// links are shown inline (collapse); the drill panel renders them flat.
+	const sectionRows = (page: NavPage, tree: boolean) =>
+		pageJumpLinks(page).map((link, index, links) => (
+			<SidebarLink
+				key={link.id}
+				to={`${page.path}#${link.id}`}
+				icon={resolveIcon(link.icon)}
+				className={tree ? treeRow(index === links.length - 1) : undefined}
+				onClick={closeDrawer}
+				active={pathname === page.path && link.id === (activeSection ?? hash.slice(1))}
+			>
+				{link.name}
+			</SidebarLink>
+		))
+
+	// A page row. In a collapse node's inline list it takes `tree` styling; drill
+	// pages reveal their sections in a sliding panel, collapse pages reveal them
+	// inline just below the row.
+	const renderPage = (page: NavPage, tree?: { isLast: boolean }) => {
+		const jumpLinks = pageJumpLinks(page)
+		const firstSection = jumpLinks[0]
+		const collapsible = jumpLinks.length > 0 && navVariant(page) === "collapse"
+		const drillable = jumpLinks.length > 0 && navVariant(page) === "drill"
+		const isOpen = expanded.has(page.id)
+
+		return (
+			<Fragment key={page.id}>
+				<SidebarLink
+					to={firstSection ? `${page.path}#${firstSection.id}` : page.path}
+					icon={resolveIcon(page.icon)}
+					className={tree ? treeRow(tree.isLast) : undefined}
+					onClick={() => {
+						closeDrawer()
+						const target = resolveOpen(blocks, page.path)
+						setStack(target.stack)
+						setExpanded((current) => new Set([...current, ...target.expanded]))
+					}}
+					trailing={
+						page.inactive ? (
+							<SidebarBadge>Inactive</SidebarBadge>
+						) : collapsible ? (
+							<CollapseToggle open={isOpen} label={page.name} onToggle={() => toggle(page.id)} />
+						) : drillable ? (
+							<CaretRightIcon className="size-4 shrink-0 text-neutral-400" />
+						) : null
+					}
+				>
+					{page.name}
+				</SidebarLink>
+
+				{collapsible && isOpen ? <TreeGroup>{sectionRows(page, true)}</TreeGroup> : null}
+			</Fragment>
+		)
+	}
+
+	// A parent group row. Drill groups slide their child pages in over the root
+	// list; collapse groups expand them inline just below the row.
+	const renderGroup = (group: NavDrillGroup) => {
+		const createPath = group.create?.path
+		const active = group.items.some((item) => item.path === pathname)
+		const isOpen = expanded.has(group.id)
+
+		const createButton = createPath ? (
+			<button
+				type="button"
+				aria-label={`Add ${group.name}`}
+				onClick={(event) => {
+					event.stopPropagation()
+					closeDrawer()
+					navigate(createPath)
+				}}
+				className="relative flex size-8 shrink-0 cursor-pointer appearance-none items-center justify-center rounded-xs border-0 bg-transparent text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-neutral-900"
+			>
+				<PlusIcon className="size-4" />
+			</button>
+		) : null
+
+		if (navVariant(group) === "collapse") {
+			return (
+				<Fragment key={group.id}>
+					<SidebarButton
+						icon={resolveIcon(group.icon)}
+						active={active}
+						aria-expanded={isOpen}
+						trailing={
+							<span className="flex items-center gap-0.5">
+								{createButton}
+								<CaretRightIcon className={cn("size-4 shrink-0 text-neutral-400 transition-transform", isOpen && "rotate-90")} />
+							</span>
+						}
+						onClick={() => toggle(group.id)}
+					>
+						{group.name}
+					</SidebarButton>
+
+					{isOpen ? (
+						<TreeGroup>{group.items.map((page, index, items) => renderPage(page, { isLast: index === items.length - 1 }))}</TreeGroup>
+					) : null}
+				</Fragment>
+			)
+		}
+
+		return (
+			<div key={group.id} className="flex items-center gap-0.5">
+				<SidebarButton
+					className="flex-1"
+					icon={resolveIcon(group.icon)}
+					active={active}
+					trailing={createButton ?? <CaretRightIcon className="size-4 shrink-0" />}
+					onClick={() => setStack((current) => [...current, group.id])}
+				>
+					{group.name}
+				</SidebarButton>
+			</div>
+		)
+	}
 
 	return (
 		<>
@@ -159,80 +447,23 @@ function Sidebar() {
 			</SidebarHeader>
 
 			<SidebarDrillDown>
-				<SidebarPanel stack={stack}>
+				{/* Static fades hint at scrollable content above and below the fold. */}
+				<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-linear-to-b from-white to-transparent" />
+				<div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-6 bg-linear-to-t from-white to-transparent" />
+
+				<SidebarPanel stack={stack} className="py-4">
 					{blocks.map((block) => (
 						<SidebarSection key={block.label} label={block.label}>
-							{block.items.map((node) => {
-								if (node.type === "page") {
-									return (
-										<SidebarLink
-											key={node.path}
-											to={node.path}
-											icon={resolveIcon(node.icon)}
-											onClick={closeDrawer}
-											trailing={pageJumpLinks(node).length > 0 ? <CaretRightIcon className="size-4 shrink-0 text-neutral-400" /> : null}
-										>
-											{node.name}
-										</SidebarLink>
-									)
-								}
-
-								const createPath = node.onCreate
-
-								return (
-									<div key={node.id} className="flex items-center gap-0.5">
-										<SidebarButton
-											className="flex-1"
-											icon={resolveIcon(node.icon)}
-											active={node.items.some((item) => item.path === pathname)}
-											trailing={<CaretRightIcon className="size-4 shrink-0" />}
-											onClick={() => setStack((current) => [...current, node.id])}
-										>
-											{node.name}
-										</SidebarButton>
-
-										{createPath ? (
-											<button
-												type="button"
-												aria-label={`Add ${node.name}`}
-												onClick={(event) => {
-													event.stopPropagation()
-													closeDrawer()
-													navigate(createPath)
-												}}
-												className="flex size-8 shrink-0 cursor-pointer appearance-none items-center justify-center rounded-xs border-0 bg-transparent text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-											>
-												<PlusIcon className="size-4" />
-											</button>
-										) : null}
-									</div>
-								)
-							})}
+							{block.items.map((node) => (node.type === "page" ? renderPage(node) : renderGroup(node)))}
 						</SidebarSection>
 					))}
 				</SidebarPanel>
 
-				{groups.map((group) => (
+				{drillGroups.map((group) => (
 					<SidebarPanel key={group.id} panelId={group.id} stack={stack}>
 						<SidebarBack onClick={back}>{group.name}</SidebarBack>
 
-						{group.items.map((item) => (
-							<SidebarLink
-								key={item.path}
-								to={item.path}
-								icon={resolveIcon(item.icon)}
-								onClick={closeDrawer}
-								trailing={
-									item.inactive ? (
-										<SidebarBadge>Inactive</SidebarBadge>
-									) : pageJumpLinks(item).length > 0 ? (
-										<CaretRightIcon className="size-4 shrink-0 text-neutral-400" />
-									) : null
-								}
-							>
-								{item.name}
-							</SidebarLink>
-						))}
+						{group.items.map((page) => renderPage(page))}
 					</SidebarPanel>
 				))}
 
@@ -240,17 +471,7 @@ function Sidebar() {
 					<SidebarPanel key={page.id} panelId={page.id} stack={stack}>
 						<SidebarBack onClick={back}>{page.name}</SidebarBack>
 
-						{pageJumpLinks(page).map((link) => (
-							<SidebarLink
-								key={link.id}
-								to={`${page.path}#${link.id}`}
-								icon={resolveIcon(link.icon)}
-								onClick={closeDrawer}
-								active={pathname === page.path && hash === `#${link.id}`}
-							>
-								{link.name}
-							</SidebarLink>
-						))}
+						{sectionRows(page, false)}
 					</SidebarPanel>
 				))}
 			</SidebarDrillDown>

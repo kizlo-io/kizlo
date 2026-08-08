@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom"
 import { cn } from "@/shared/lib/utils"
 
 export function SidebarHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-	return <div data-slot="sidebar-header" className={cn("flex w-full min-w-0 flex-col gap-2 px-2 py-2", className)} {...props} />
+	return <div data-slot="sidebar-header" className={cn("flex w-full min-w-0 flex-col gap-2 px-2 pt-2", className)} {...props} />
 }
 
 export function SidebarDrillDown({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -71,7 +71,10 @@ export function SidebarLink({ to, icon: LinkIcon, end, trailing, active, classNa
 		<NavLink
 			to={to}
 			end={end}
-			className={({ isActive }) => cn("h-10", rowClasses, (active ?? isActive) && "bg-neutral-200/70! focus:text-neutral-600", className)}
+			data-active={active}
+			className={({ isActive }) =>
+				cn("group h-10", rowClasses, (active ?? isActive) && "bg-neutral-200/70! focus:text-neutral-600", className)
+			}
 			{...props}
 		>
 			{LinkIcon ? <LinkIcon className="size-4 shrink-0" /> : null}
@@ -105,7 +108,7 @@ export function SidebarButton({ icon: ButtonIcon, trailing, active, className, c
 		>
 			{ButtonIcon ? <ButtonIcon className="size-4 shrink-0" /> : null}
 			<span className="min-w-0 flex-1 truncate">{children}</span>
-			<div className="flex size-7 items-center justify-center rounded-xs group-hover:bg-neutral-200 [&_svg]:size-3">{trailing}</div>
+			{trailing}
 		</button>
 	)
 }
@@ -114,7 +117,7 @@ export function SidebarBack({ className, children, ...props }: React.ComponentPr
 	return (
 		<div
 			className={cn(
-				"relative my-2 flex w-max cursor-pointer items-center gap-1 rounded-sm border border-neutral-300 p-0.5 pr-2 pl-1.5",
+				"relative my-2 flex w-full cursor-pointer items-center gap-1 rounded-xs p-0.5 py-2 pr-2 pl-1.5 hover:bg-neutral-100",
 				"text-neutral-900",
 				className,
 			)}

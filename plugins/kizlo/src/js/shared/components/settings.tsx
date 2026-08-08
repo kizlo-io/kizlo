@@ -1,30 +1,10 @@
 import { CaretDownIcon, ListIcon, MagnifyingGlassIcon, SpinnerGapIcon } from "@phosphor-icons/react"
-import { useEffect, useState } from "react"
-import { useLocation } from "react-router-dom"
+import { useState } from "react"
 import { $search, $sidebar } from "@/shared/lib/store"
 import { cn } from "@/shared/lib/utils"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
 import { FieldLabel } from "./ui/field-label"
-
-/** Briefly rings a section when it becomes the URL's jump target, then fades out. */
-function useSectionHighlight(id?: string): boolean {
-	const { hash, key } = useLocation()
-	const [on, setOn] = useState(false)
-
-	useEffect(() => {
-		if (!id || hash !== `#${id}`) {
-			setOn(false)
-			return
-		}
-
-		setOn(true)
-		const timer = setTimeout(() => setOn(false), 1600)
-		return () => clearTimeout(timer)
-	}, [id, hash, key])
-
-	return on
-}
 
 interface SettingsFormProps extends React.FormHTMLAttributes<HTMLFormElement> {
 	isLoading?: boolean
@@ -52,7 +32,7 @@ export function SettingsForm({ isLoading, isDirty, submitLabel = "Update", onCan
 
 	return (
 		<form className={cn("flex flex-1 flex-col", className)} {...props}>
-			<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-4 pb-24 md:px-6 md:pt-10">{children}</div>
+			<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-14 p-4 pb-24 md:px-6 md:pt-10">{children}</div>
 
 			<div
 				className={cn(
@@ -136,23 +116,14 @@ export function SettingsGroup({
 	desc?: React.ReactNode
 	children: React.ReactNode
 }) {
-	const highlight = useSectionHighlight(id)
-
 	return (
 		<section id={id} className={cn("flex scroll-mt-[calc(var(--kizlo-admin-bar)+var(--kizlo-header)+1rem)] flex-col gap-4")}>
 			<div className="flex flex-col gap-1">
-				<h2
-					className={cn(
-						"m-0! p-0! font-semibold! text-base! text-neutral-900! transition-colors duration-500",
-						highlight && "text-primary!",
-					)}
-				>
-					{title}
-				</h2>
+				<h2 className={cn("m-0! p-0! font-semibold! text-base! text-neutral-900! transition-colors duration-500")}>{title}</h2>
 				{desc ? <p className="my-0! text-neutral-500! text-sm! leading-relaxed!">{desc}</p> : null}
 			</div>
 
-			<div className="flex flex-col gap-4">{children}</div>
+			{children}
 		</section>
 	)
 }

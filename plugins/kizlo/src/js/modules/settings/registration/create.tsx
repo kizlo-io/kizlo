@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useForm } from "react-hook-form"
+import { type UseFormGetValues, type UseFormSetValue, useForm } from "react-hook-form"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { FieldError, type SelectOption } from "@/shared/components/fields"
@@ -17,7 +17,15 @@ import {
 	TaxonomyRegistrationSchema,
 } from "@/shared/lib/schema"
 import { useSettings } from "@/shared/lib/settings"
-import { apiErrorMessage, createRegistration, generateKey, postTypeRegistrationValues, taxonomyRegistrationValues } from "./lib"
+import {
+	apiErrorMessage,
+	createRegistration,
+	humanizeKey,
+	pluralizeLabel,
+	postTypeRegistrationValues,
+	singularizeLabel,
+	taxonomyRegistrationValues,
+} from "./lib"
 import {
 	PostTypeAdminFields,
 	PostTypeApiFields,
@@ -43,13 +51,44 @@ function toOptions(items: { slug: string; name: string }[]): SelectOption[] {
 	return items.map((item) => ({ value: item.slug, label: item.name }))
 }
 
+/**
+ * Autofill the singular and plural labels from the key the user types ("news_article"
+ * → "News Article" / "News Articles"), without clobbering a label the user has edited
+ * by hand. Create-only: the key is locked once a registration exists.
+ */
+function useLabelsFromKey<T extends { singular_label: string; plural_label: string }>(
+	key: string,
+	getValues: UseFormGetValues<T>,
+	setValue: UseFormSetValue<T>,
+): void {
+	const previous = useRef({ singular: "", plural: "" })
+
+	useEffect(() => {
+		// Singularize the humanized key for the singular field; for the plural, keep the
+		// key as typed when it was already plural, otherwise pluralize the singular.
+		const humanized = humanizeKey(key)
+		const singular = singularizeLabel(humanized)
+		const plural = singular === humanized ? pluralizeLabel(singular) : humanized
+
+		// react-hook-form's Path<T> can't resolve string literals for a generic T, so
+		// reach for the two known label fields through loosely typed accessors.
+		const get = getValues as (name: string) => string | undefined
+		const set = setValue as (name: string, value: string, options: { shouldDirty: boolean }) => void
+		const untouched = (current: string | undefined, prev: string): boolean => current === undefined || current === "" || current === prev
+
+		if (untouched(get("singular_label"), previous.current.singular)) set("singular_label", singular, { shouldDirty: false })
+		if (untouched(get("plural_label"), previous.current.plural)) set("plural_label", plural, { shouldDirty: false })
+
+		previous.current = { singular, plural }
+	}, [key, getValues, setValue])
+}
+
 export function CreatePostTypePage() {
 	const navigate = useNavigate()
 	const { settings } = useSettings()
 	const [isLoading, setLoading] = useState(false)
 	const [key, setKey] = useState("")
 	const [keyError, setKeyError] = useState<string>()
-	const keyTouched = useRef(false)
 
 	const form = useForm<PostTypeRegistrationInput, unknown, PostTypeRegistrationOutput>({
 		resolver: zodResolver(PostTypeRegistrationSchema),
@@ -57,12 +96,7 @@ export function CreatePostTypePage() {
 	})
 
 	usePostTypeLabelSync(form)
-
-	const singular = form.watch("singular_label")
-
-	useEffect(() => {
-		if (!keyTouched.current) setKey(generateKey(singular ?? "", 20))
-	}, [singular])
+	useLabelsFromKey(key, form.getValues, form.setValue)
 
 	const taxonomyOptions = useMemo(() => toOptions(settings?.taxonomies ?? []), [settings])
 
@@ -94,7 +128,7 @@ export function CreatePostTypePage() {
 			onSubmit={onSubmit}
 			onCancel={() => navigate("/general/site")}
 		>
-			<SettingsSection title="New post type" desc="The key is generated from the singular label and locked once created.">
+			<SettingsSection title="New post type" desc="The key seeds the singular and plural labels and is locked once created.">
 				<div>
 					<TextInput
 						name="key"
@@ -103,7 +137,6 @@ export function CreatePostTypePage() {
 						value={key}
 						placeholder="book"
 						onChange={(value) => {
-							keyTouched.current = true
 							setKeyError(undefined)
 							setKey(value)
 						}}
@@ -146,7 +179,6 @@ export function CreateTaxonomyPage() {
 	const [isLoading, setLoading] = useState(false)
 	const [key, setKey] = useState("")
 	const [keyError, setKeyError] = useState<string>()
-	const keyTouched = useRef(false)
 
 	const form = useForm<TaxonomyRegistrationInput, unknown, TaxonomyRegistrationOutput>({
 		resolver: zodResolver(TaxonomyRegistrationSchema),
@@ -154,12 +186,7 @@ export function CreateTaxonomyPage() {
 	})
 
 	useTaxonomyLabelSync(form)
-
-	const singular = form.watch("singular_label")
-
-	useEffect(() => {
-		if (!keyTouched.current) setKey(generateKey(singular ?? "", 32))
-	}, [singular])
+	useLabelsFromKey(key, form.getValues, form.setValue)
 
 	const postTypeOptions = useMemo(() => toOptions(settings?.post_types ?? []), [settings])
 
@@ -191,7 +218,7 @@ export function CreateTaxonomyPage() {
 			onSubmit={onSubmit}
 			onCancel={() => navigate("/general/site")}
 		>
-			<SettingsSection title="New taxonomy" desc="The key is generated from the singular label and locked once created.">
+			<SettingsSection title="New taxonomy" desc="The key seeds the singular and plural labels and is locked once created.">
 				<div>
 					<TextInput
 						name="key"
@@ -200,7 +227,6 @@ export function CreateTaxonomyPage() {
 						value={key}
 						placeholder="genre"
 						onChange={(value) => {
-							keyTouched.current = true
 							setKeyError(undefined)
 							setKey(value)
 						}}

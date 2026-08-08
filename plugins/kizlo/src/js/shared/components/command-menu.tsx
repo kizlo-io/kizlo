@@ -20,13 +20,15 @@ interface Entry {
 	icon: string
 	/** Ancestor labels leading to this entry, e.g. ["Post Types", "Book"]. */
 	crumbs: string[]
-	/** Whether this is a page (vs. a section within one). */
+	/** Whether this is a page (vs. a section within one, or a create action). */
 	isPage: boolean
+	/** Extra search terms folded into the cmdk value but not displayed. */
+	keywords?: string[]
 }
 
-/** cmdk search string for an entry: its breadcrumb plus its own title. */
+/** cmdk search string for an entry: its breadcrumb, own title, and hidden keywords. */
 function entryValue(entry: Entry): string {
-	return [...entry.crumbs, entry.title].join(" ")
+	return [...entry.crumbs, entry.title, ...(entry.keywords ?? [])].join(" ")
 }
 
 /**
@@ -48,8 +50,26 @@ function flatten(blocks: NavBlock[]): Entry[] {
 
 	for (const block of blocks) {
 		for (const node of block.items) {
-			if (node.type === "page") pushPage(node, [])
-			else for (const page of node.items) pushPage(page, [node.name])
+			if (node.type === "page") {
+				pushPage(node, [])
+				continue
+			}
+
+			for (const page of node.items) pushPage(page, [node.name])
+
+			// A group's inline create action (e.g. "New post type") — reachable from the
+			// sidebar "+" and here, searchable by its label plus create/add synonyms.
+			if (node.create) {
+				out.push({
+					key: node.create.path,
+					path: node.create.path,
+					title: node.create.label,
+					icon: "plus",
+					crumbs: [node.name],
+					isPage: false,
+					keywords: ["create", "add", "new"],
+				})
+			}
 		}
 	}
 
@@ -65,7 +85,7 @@ function EntryItem({ entry, onSelect }: { entry: Entry; onSelect: (entry: Entry)
 			<span className="flex min-w-0 items-center gap-1">
 				{entry.crumbs.map((crumb) => (
 					<Fragment key={crumb}>
-						<span className="truncate text-neutral-400">{crumb}</span>
+						<span className="truncate text-neutral-500">{crumb}</span>
 						<CaretRightIcon className="size-3 shrink-0 text-neutral-300" />
 					</Fragment>
 				))}
@@ -172,7 +192,7 @@ export function CommandTrigger({ className }: { className?: string }) {
 			aria-label="Search settings"
 			onClick={() => $search.set(true)}
 			className={cn(
-				"flex h-10 w-full cursor-pointer appearance-none items-center gap-2 rounded-md border border-neutral-200 bg-white pr-1.5 pl-2.5 text-neutral-500 text-sm transition-colors hover:border-neutral-300 hover:text-neutral-700",
+				"flex h-10 w-full cursor-pointer appearance-none items-center gap-2 rounded-xs border border-neutral-200 bg-white pr-1.5 pl-2.5 text-neutral-500 text-sm transition-colors hover:border-neutral-300 hover:text-neutral-700",
 				className,
 			)}
 		>

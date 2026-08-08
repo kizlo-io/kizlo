@@ -27,6 +27,13 @@ export interface NavDelete {
 	desc: string
 }
 
+/**
+ * How a node with children reveals them in the sidebar. `drill` (default) slides
+ * the children in over the parent list; `collapse` expands them inline beneath the
+ * parent, keeping the parent list visible.
+ */
+export type NavVariant = "drill" | "collapse"
+
 /** A settings page: navigable via `path` and drillable into its sections. */
 export interface NavPage {
 	type: "page"
@@ -36,6 +43,8 @@ export interface NavPage {
 	path: string
 	/** Icon name. */
 	icon: string
+	/** How this page's sections are revealed in the sidebar. Defaults to `drill`. */
+	variant?: NavVariant
 	/** Kizlo-owned object that is not currently registered; renders an Inactive badge. */
 	inactive?: boolean
 	sections: NavSection[]
@@ -43,15 +52,25 @@ export interface NavPage {
 	delete?: NavDelete | null
 }
 
-/** A drill-down entry: its child pages replace the root list via the sliding panel. */
+/** An inline "create" action on a group: its route plus the label shown for it. */
+export interface NavCreate {
+	/** Route for the create page, e.g. "/post-types/new". */
+	path: string
+	/** Label for the action, e.g. "New post type". Shown in the command menu. */
+	label: string
+}
+
+/** A parent entry whose child pages are revealed by drilling or inline collapse. */
 export interface NavDrillGroup {
 	type: "group"
 	id: string
 	name: string
 	/** Icon name. */
 	icon: string
-	/** Route for the inline create (+) action. */
-	onCreate?: string
+	/** How this group's child pages are revealed in the sidebar. Defaults to `drill`. */
+	variant?: NavVariant
+	/** Inline create (+) action: the sidebar "+" button and command-menu entry. */
+	create?: NavCreate
 	items: NavPage[]
 }
 

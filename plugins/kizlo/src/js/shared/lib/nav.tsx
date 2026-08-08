@@ -4,7 +4,7 @@ import { z } from "zod"
 import { SectionDesc } from "@/shared/components/section-desc"
 import { hasIcon } from "./icons"
 import { $settings } from "./store"
-import type { NavBlock, NavPage } from "./types"
+import type { NavBlock, NavNode, NavPage, NavVariant } from "./types"
 
 // ── Boundary guard ──────────────────────────────────────────────────────────
 // A runtime mirror of the served shape (see types.ts). PHP builds the nav, so a
@@ -22,15 +22,23 @@ const NavDeleteSchema = z.object({
 	desc: z.string(),
 })
 
+const NavVariantSchema = z.enum(["drill", "collapse"])
+
 const NavPageSchema = z.object({
 	type: z.literal("page"),
 	id: z.string(),
 	name: z.string(),
 	path: z.string(),
 	icon: z.string(),
+	variant: NavVariantSchema.optional(),
 	inactive: z.boolean().optional(),
 	sections: z.array(NavSectionSchema),
 	delete: NavDeleteSchema.nullish(),
+})
+
+const NavCreateSchema = z.object({
+	path: z.string(),
+	label: z.string(),
 })
 
 const NavDrillGroupSchema = z.object({
@@ -38,7 +46,8 @@ const NavDrillGroupSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	icon: z.string(),
-	onCreate: z.string().optional(),
+	variant: NavVariantSchema.optional(),
+	create: NavCreateSchema.optional(),
 	items: z.array(NavPageSchema),
 })
 
@@ -82,6 +91,11 @@ function assertIcons(blocks: NavBlock[]): void {
 /** All pages in a nav tree, flattening drill groups. */
 function allPages(blocks: NavBlock[]): NavPage[] {
 	return blocks.flatMap((block) => block.items).flatMap((node) => (node.type === "group" ? node.items : [node]))
+}
+
+/** How a node reveals its children in the sidebar. Falls back to `drill`. */
+export function navVariant(node: NavNode): NavVariant {
+	return node.variant ?? "drill"
 }
 
 /** The sidebar jump-links for a page: one per section. */
