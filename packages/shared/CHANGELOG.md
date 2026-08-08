@@ -1,5 +1,11 @@
 # @kizlo/shared
 
+## 0.7.0
+
+### Minor Changes
+
+- [#107](https://github.com/kizlo-io/kizlo/pull/107) [`cb1648e`](https://github.com/kizlo-io/kizlo/commit/cb1648eff6e3d1813afb8b54956ac3e78f2ad94a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add Kizlo-owned post type and taxonomy registration fields to the settings contract.
+
 ## 0.6.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # kizlo
 
+## 0.14.2
+
+### Patch Changes
+
+- Updated dependencies [[`cb1648e`](https://github.com/kizlo-io/kizlo/commit/cb1648eff6e3d1813afb8b54956ac3e78f2ad94a)]:
+  - @kizlo/shared@0.7.0
+
 ## 0.14.1
 
 ### Patch Changes
