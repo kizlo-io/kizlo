@@ -56,12 +56,16 @@ function kizlo_log($data = '✨', $append = true)
  * @param string $path Route path with parameter placeholders, e.g. '/forms/:id/fields/:field_id'.
  * @return string
  *
+ * Parameters match any identifier-safe segment, not digits only, so a route can
+ * take an ID or a slug. Kizlo never infers a parameter's type from this pattern;
+ * the declared `input` is the only source of truth.
+ *
  * @example
  * kizlo_route( '/cf7/submit/:form_id' );
- * // → '/cf7/submit/(?P<form_id>\d+)'
+ * // → '/cf7/submit/(?P<form_id>[a-zA-Z0-9_.%+-]+)'
  *
  * kizlo_route( '/cf7/:form_id/fields/:field_id' );
- * // → '/cf7/(?P<form_id>\d+)/fields/(?P<field_id>\d+)'
+ * // → '/cf7/(?P<form_id>[a-zA-Z0-9_.%+-]+)/fields/(?P<field_id>[a-zA-Z0-9_.%+-]+)'
  */
 function kizlo_route(string $path): string
 {
@@ -86,63 +90,131 @@ function kizlo_route_match(string $route, WP_REST_Request $request): bool
 }
 
 /**
- * Register an admin-only REST API endpoint.
+ * Register an admin-only REST API endpoint under `kizlo/v1`.
+ *
+ * Passing an `id` opts the route into introspection. The declaration is then flat:
+ * the same array configures the WordPress route, drives its request validation and
+ * sanitization, and contributes the operation to `GET /kizlo/v1/introspect`. There
+ * is no nested spec and no second `args` array to keep in step.
+ *
+ * Routes without an `id` register exactly as before and contribute nothing.
  *
  * @since 1.0.0
  *
  * @param array $args {
- *     @type string          $route    Required. Route pattern, e.g. '/forms/(?P<id>\d+)'.
- *     @type string|string[] $methods  HTTP method(s). Use WP_REST_Server constants.
- *     @type callable        $callback Handler that receives WP_REST_Request and returns WP_REST_Response|WP_Error.
- *     @type array           $args     Optional. Per-parameter validation/sanitization rules.
+ *     @type string          $route       Required. Route pattern, e.g. kizlo_route('/orders/:id').
+ *     @type string|string[] $methods     Required. HTTP method(s).
+ *     @type callable        $callback    Required. Handler receiving WP_REST_Request.
+ *     @type array           $args        Optional. Legacy per-parameter rules. Not used with `input`.
+ *
+ *     @type string          $id          Optional. API ID that groups this route's operations.
+ *     @type string          $operation   Operation name. Prefer list|retrieve|create|update|delete.
+ *     @type array           $input       Request schema. Top-level properties become route arguments.
+ *     @type array           $responses   Status-keyed response contracts.
+ *     @type string          $summary     Optional.
+ *     @type string          $description Optional.
+ *     @type bool            $deprecated  Optional.
  * }
  *
  * @example
  * kizlo_register_route([
- *     'route'    => '/forms/(?P<id>\d+)',
- *     'methods'  => WP_REST_Server::READABLE,
- *     'callback' => function( WP_REST_Request $request ): WP_REST_Response {
- *         return new WP_REST_Response( [ 'id' => $request->get_param( 'id' ) ] );
- *     },
+ *     'id'        => 'orders',
+ *     'operation' => 'create',
+ *     'route'     => '/orders',
+ *     'methods'   => ['POST'],
+ *     'callback'  => [$controller, 'create'],
+ *     'input'     => [
+ *         'type'       => 'object',
+ *         'properties' => [
+ *             'customer_id' => ['type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint'],
+ *         ],
+ *     ],
+ *     'responses' => [
+ *         '201' => ['description' => 'Order created.', 'body' => ['$ref' => 'orders.order']],
+ *     ],
  * ]);
  *
  * @return void
  */
 function kizlo_register_route(array $args): void
 {
-    $route = $args['route'] ?? '';
+    \Kizlo\Modules\Introspection\RouteRegistrar::registerRuntime(
+        $args,
+        \Kizlo\Modules\Introspection\SpecStore::callerIsCore(),
+    );
+}
 
-    if (empty($route)) {
-        _doing_it_wrong(__FUNCTION__, '"route" is required.', '1.0.0');
-        return;
-    }
+/**
+ * Describe an existing core or third-party route without registering it.
+ *
+ * Uses the same flat operation format as kizlo_register_route(), but requires a
+ * `namespace` and accepts no runtime callback and no validation/sanitization
+ * callbacks. Nothing is registered, no request is made, and the described route
+ * is not verified to exist.
+ *
+ * @since 1.0.0
+ *
+ * @param array $args Flat operation, plus a required `namespace` (e.g. 'wc/v3').
+ *
+ * @example
+ * kizlo_register_spec_route([
+ *     'id'        => 'woocommerce.orders',
+ *     'operation' => 'list',
+ *     'namespace' => 'wc/v3',
+ *     'route'     => '/orders',
+ *     'methods'   => ['GET'],
+ *     'input'     => [
+ *         'type'       => 'object',
+ *         'properties' => ['page' => ['type' => 'integer', 'minimum' => 1]],
+ *     ],
+ *     'responses' => [
+ *         '200' => ['body' => ['type' => 'array', 'items' => ['$ref' => 'woocommerce.order']]],
+ *     ],
+ * ]);
+ *
+ * @return void
+ */
+function kizlo_register_spec_route(array $args): void
+{
+    \Kizlo\Modules\Introspection\RouteRegistrar::registerSpec(
+        $args,
+        \Kizlo\Modules\Introspection\SpecStore::callerIsCore(),
+    );
+}
 
-    $permission_callback = static function () {
-        if (! current_user_can('manage_options')) {
-            return new WP_Error(
-                'rest_forbidden',
-                'You do not have permission to access this endpoint.',
-                ['status' => 403]
-            );
-        }
-        return true;
-    };
-
-    $route_args = array_diff_key($args, array_flip(['route']));
-    $route_args['permission_callback'] = $permission_callback;
-
-    $original_callback = $route_args['callback'];
-    $route_args['callback'] = function (WP_REST_Request $request) use ($original_callback) {
-        try {
-            return $original_callback($request);
-        } catch (\InvalidArgumentException $e) {
-            return new WP_Error('invalid_param', $e->getMessage(), ['status' => 400]);
-        }
-    };
-
-    add_action('rest_api_init', static function () use ($route, $route_args): void {
-        register_rest_route(KIZLO_API_NAMESPACE, $route, $route_args);
-    });
+/**
+ * Register a globally reusable schema.
+ *
+ * Schema IDs are global, so they must be vendor- or domain-qualified. The
+ * `kizlo.*`, `post-types.*` and `taxonomies.*` prefixes belong to core and are
+ * rejected from outside this plugin.
+ *
+ * Always write '$ref' and '$extends' in single quotes — in double quotes PHP
+ * interpolates them to an empty string.
+ *
+ * @since 1.0.0
+ *
+ * @param string $id     Globally unique, vendor-qualified ID, e.g. 'orders.order'.
+ * @param array  $schema Kizlo schema.
+ *
+ * @example
+ * kizlo_register_spec_schema('orders.order', [
+ *     'type'       => 'object',
+ *     'properties' => [
+ *         'id'     => ['type' => 'integer', 'required' => true],
+ *         'status' => ['type' => 'string', 'required' => true, 'enum' => ['pending', 'completed']],
+ *     ],
+ * ]);
+ *
+ * @return void
+ */
+function kizlo_register_spec_schema(string $id, array $schema): void
+{
+    \Kizlo\Modules\Introspection\RouteRegistrar::registerSchema(
+        $id,
+        $schema,
+        \Kizlo\Modules\Introspection\SpecStore::callerIsCore(),
+    );
 }
 
 /**
