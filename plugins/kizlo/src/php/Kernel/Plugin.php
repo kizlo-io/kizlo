@@ -8,6 +8,7 @@ use Kizlo\Modules\Comment\CommentModule;
 use Kizlo\Modules\CustomFields\CustomFieldsModule;
 use Kizlo\Modules\Email\EmailModule;
 use Kizlo\Modules\Headless\HeadlessModule;
+use Kizlo\Modules\Introspection\IntrospectionModule;
 use Kizlo\Modules\Post\PostModule;
 use Kizlo\Modules\PostType\PostTypeModule;
 use Kizlo\Modules\Preview\PreviewModule;
@@ -50,6 +51,7 @@ class Plugin
         CommentModule::class,
         UploadModule::class,
         CustomFieldsModule::class,
+        IntrospectionModule::class,
     ];
 
     private function __construct() {}

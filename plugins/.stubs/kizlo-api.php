@@ -37,6 +37,11 @@ namespace {
 
     function kizlo_register_route(array $args): void {}
 
+    function kizlo_register_spec_route(array $args): void {}
+
+    /** @param array $schema */
+    function kizlo_register_spec_schema(string $id, array $schema): void {}
+
     /**
      * @param array $args
      * @throws \InvalidArgumentException
