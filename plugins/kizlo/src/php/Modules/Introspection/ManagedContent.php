@@ -41,5 +41,7 @@ class ManagedContent
     {
         self::$schemas = null;
         self::$routes  = null;
+
+        CoreCollectionParams::flush();
     }
 }

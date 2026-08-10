@@ -102,8 +102,8 @@ class ManagedPostTypes
     {
         $routes = [];
 
-        foreach (self::managed() as $slug => $object) {
-            foreach (self::routesFor($slug, $object) as $declaration) {
+        foreach (array_keys(self::managed()) as $slug) {
+            foreach (self::routesFor($slug) as $declaration) {
                 $routes[] = $declaration;
             }
         }
@@ -121,7 +121,7 @@ class ManagedPostTypes
      *
      * @return array<string, array<string, mixed>>
      */
-    public static function routesFor(string $slug, WP_Post_Type $object): array
+    public static function routesFor(string $slug): array
     {
         $routes     = [];
         $id         = self::apiId($slug);
@@ -135,7 +135,7 @@ class ManagedPostTypes
             'route'     => $collection,
             'methods'   => ['GET'],
             'summary'   => sprintf('List %s entries', $slug),
-            'input'     => ['type' => 'object', 'properties' => self::listParameters($slug, $object)],
+            'input'     => ['type' => 'object', 'properties' => self::listParameters($slug)],
             'responses' => [
                 '200' => [
                     'description' => 'A page of entries.',
@@ -457,53 +457,21 @@ class ManagedPostTypes
     }
 
     /**
+     * Derived from the controller that serves the route, so the two cannot
+     * disagree. {@see CoreCollectionParams} explains why this is not written out
+     * by hand any more.
+     *
      * @return array<string, array<string, mixed>>
      */
-    private static function listParameters(string $slug, WP_Post_Type $object): array
+    private static function listParameters(string $slug): array
     {
-        $supports = PostTypeSettings::getSupports($slug);
+        $properties = CoreCollectionParams::forPostType($slug);
 
-        $properties = [
-            'context'         => self::context(),
-            'page'            => ['type' => 'integer', 'minimum' => 1, 'default' => 1],
-            'per_page'        => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 10],
-            'search'          => ['type' => 'string'],
-            'after'           => ['type' => 'string', 'format' => 'date-time'],
-            'before'          => ['type' => 'string', 'format' => 'date-time'],
-            'modified_after'  => ['type' => 'string', 'format' => 'date-time'],
-            'modified_before' => ['type' => 'string', 'format' => 'date-time'],
-            'include'         => ['type' => 'array', 'items' => ['type' => 'integer']],
-            'exclude'         => ['type' => 'array', 'items' => ['type' => 'integer']],
-            'offset'          => ['type' => 'integer'],
-            'order'           => ['type' => 'string', 'enum' => ['asc', 'desc'], 'default' => 'desc'],
-            'orderby'         => [
-                'type'    => 'string',
-                'enum'    => ['author', 'date', 'id', 'include', 'modified', 'parent', 'relevance', 'slug', 'include_slugs', 'title'],
-                'default' => 'date',
-            ],
-            'slug'            => ['type' => 'array', 'items' => ['type' => 'string']],
-            'status'          => ['type' => 'array', 'items' => ['type' => 'string'], 'default' => ['publish']],
-        ];
-
-        if ($supports['author']) {
-            $properties['author']         = ['type' => 'array', 'items' => ['type' => 'integer']];
-            $properties['author_exclude'] = ['type' => 'array', 'items' => ['type' => 'integer']];
-        }
-
-        if ($object->hierarchical) {
-            $properties['parent']         = ['type' => 'array', 'items' => ['type' => 'integer']];
-            $properties['parent_exclude'] = ['type' => 'array', 'items' => ['type' => 'integer']];
-        }
-
-        if ($slug === 'post') {
-            $properties['sticky'] = ['type' => 'boolean'];
-        }
-
-        foreach (self::taxonomies($slug) as $taxonomy) {
-            $base                              = $taxonomy->rest_base ?: $taxonomy->name;
-            $properties[$base]                 = ['type' => 'array', 'items' => ['type' => 'integer']];
-            $properties[$base . '_exclude']    = ['type' => 'array', 'items' => ['type' => 'integer']];
-        }
+        // KIZ-71 settles how `status` is described. Core declares it twice with
+        // different enums, its list enum carries every globally registered status
+        // including other plugins', and its default is a scalar on an array type.
+        // Until that is decided it keeps the declaration it has always had.
+        $properties['status'] = ['type' => 'array', 'items' => ['type' => 'string'], 'default' => ['publish']];
 
         return $properties;
     }
