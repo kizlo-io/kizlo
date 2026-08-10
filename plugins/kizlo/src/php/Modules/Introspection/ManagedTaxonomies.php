@@ -65,8 +65,8 @@ class ManagedTaxonomies
     {
         $routes = [];
 
-        foreach (self::managed() as $slug => $object) {
-            foreach (self::routesFor($slug, $object) as $declaration) {
+        foreach (array_keys(self::managed()) as $slug) {
+            foreach (self::routesFor($slug) as $declaration) {
                 $routes[] = $declaration;
             }
         }
@@ -81,7 +81,7 @@ class ManagedTaxonomies
      *
      * @return array<string, array<string, mixed>>
      */
-    public static function routesFor(string $slug, WP_Taxonomy $object): array
+    public static function routesFor(string $slug): array
     {
         $id         = self::apiId($slug);
         $collection = sprintf('/taxonomies/%s', $slug);
@@ -95,7 +95,10 @@ class ManagedTaxonomies
                 'route'     => $collection,
                 'methods'   => ['GET'],
                 'summary'   => sprintf('List %s terms', $slug),
-                'input'     => ['type' => 'object', 'properties' => self::listParameters($object)],
+                // Derived from the controller that serves the route, so the two
+                // cannot disagree. {@see CoreCollectionParams} explains why this
+                // is no longer written out by hand.
+                'input'     => ['type' => 'object', 'properties' => CoreCollectionParams::forTaxonomy($slug)],
                 'responses' => [
                     '200' => [
                         'description' => 'A page of terms.',
@@ -284,37 +287,6 @@ class ManagedTaxonomies
                 : sprintf('A new "%s" term. Required custom fields must be present.', $slug),
             'properties'  => $properties + CustomFieldSchema::inputProperties($fields, $partial),
         ];
-    }
-
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    private static function listParameters(WP_Taxonomy $object): array
-    {
-        $properties = [
-            'context'    => self::context(),
-            'page'       => ['type' => 'integer', 'minimum' => 1, 'default' => 1],
-            'per_page'   => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 10],
-            'search'     => ['type' => 'string'],
-            'include'    => ['type' => 'array', 'items' => ['type' => 'integer']],
-            'exclude'    => ['type' => 'array', 'items' => ['type' => 'integer']],
-            'offset'     => ['type' => 'integer'],
-            'order'      => ['type' => 'string', 'enum' => ['asc', 'desc'], 'default' => 'asc'],
-            'orderby'    => [
-                'type'    => 'string',
-                'enum'    => ['id', 'include', 'name', 'slug', 'include_slugs', 'term_group', 'description', 'count'],
-                'default' => 'name',
-            ],
-            'hide_empty' => ['type' => 'boolean', 'default' => false],
-            'post'       => ['type' => 'integer', 'description' => 'Limit to terms assigned to this post.'],
-            'slug'       => ['type' => 'array', 'items' => ['type' => 'string']],
-        ];
-
-        if ($object->hierarchical) {
-            $properties['parent'] = ['type' => 'integer'];
-        }
-
-        return $properties;
     }
 
     // ============================================================

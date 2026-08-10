@@ -34,8 +34,8 @@ class PostTypeApi
     public function register(): void
     {
         add_action('rest_api_init', function (): void {
-            foreach (ManagedPostTypes::managed() as $slug => $object) {
-                foreach (ManagedPostTypes::routesFor($slug, $object) as $operation => $declaration) {
+            foreach (array_keys(ManagedPostTypes::managed()) as $slug) {
+                foreach (ManagedPostTypes::routesFor($slug) as $operation => $declaration) {
                     $handler = $this->handler($slug, $operation);
 
                     if ($handler === null) {

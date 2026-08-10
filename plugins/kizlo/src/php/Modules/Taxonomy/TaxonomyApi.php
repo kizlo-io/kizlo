@@ -25,8 +25,8 @@ class TaxonomyApi
     public function register(): void
     {
         add_action('rest_api_init', function (): void {
-            foreach (ManagedTaxonomies::managed() as $slug => $object) {
-                foreach (ManagedTaxonomies::routesFor($slug, $object) as $operation => $declaration) {
+            foreach (array_keys(ManagedTaxonomies::managed()) as $slug) {
+                foreach (ManagedTaxonomies::routesFor($slug) as $operation => $declaration) {
                     $handler = $this->handler($slug, $operation);
 
                     if ($handler === null) {
