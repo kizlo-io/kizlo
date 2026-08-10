@@ -13,5 +13,9 @@ export const LIST_TAG_ERROR_MAP = defineErrorMap({
 		status: 400,
 		message: "The requested page does not exist.",
 	},
+	TAG_NOT_FOUND: {
+		status: 404,
+		message: "Tags are not available.",
+	},
 })
 export type ListTagErrorMap = typeof LIST_TAG_ERROR_MAP

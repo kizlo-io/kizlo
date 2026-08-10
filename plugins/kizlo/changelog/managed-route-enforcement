@@ -1,0 +1,4 @@
+Significance: minor
+Type: fixed
+
+Enforce each managed post type and taxonomy route's declared input, fixing a delete with force=false destroying content instead of trashing it

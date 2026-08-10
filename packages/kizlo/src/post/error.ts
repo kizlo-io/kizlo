@@ -17,5 +17,9 @@ export const LIST_POST_ERROR_MAP = defineErrorMap({
 		status: 400,
 		message: "The requested page does not exist.",
 	},
+	POST_NOT_FOUND: {
+		status: 404,
+		message: "Posts are not available.",
+	},
 })
 export type ListPostErrorMap = typeof LIST_POST_ERROR_MAP

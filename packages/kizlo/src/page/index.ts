@@ -32,6 +32,7 @@ export const PAGE_ROUTER_MAP = {
 						case "invalid_post_type":
 						case "post_type_not_found":
 						case "rest_post_invalid_id":
+						case "rest_no_route":
 							throw errors.PAGE_NOT_FOUND()
 						case "rest_post_incorrect_password":
 							throw errors.PAGE_PASSWORD_INVALID()
@@ -53,6 +54,7 @@ export const PAGE_ROUTER_MAP = {
 					case "invalid_post_type":
 					case "post_type_not_found":
 					case "rest_post_invalid_id":
+					case "rest_no_route":
 						throw errors.PAGE_NOT_FOUND()
 					case "rest_post_incorrect_password":
 						throw errors.PAGE_PASSWORD_INVALID()
@@ -122,6 +124,8 @@ export const PAGE_ROUTER_MAP = {
 				switch (response.error.code) {
 					case "rest_post_invalid_page_number":
 						throw errors.PAGE_INVALID_PAGE()
+					case "rest_no_route":
+						throw errors.PAGE_NOT_FOUND()
 					default:
 						context.logger.error("List pages unhandled error", response.error, { code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()

@@ -9,10 +9,11 @@ use Kizlo\Modules\Settings\Taxonomy\TaxonomySettings;
 /**
  * Contracts for the taxonomies Kizlo manages.
  *
- * The same approach as {@see ManagedPostTypes}: the runtime route stays generic
- * and each managed slug is described at the URL it is callable on. Hierarchy is
- * the shape-changing option here — it decides whether a term carries `parent`
- * and whether the list accepts a parent filter.
+ * The same approach as {@see ManagedPostTypes}: each managed slug is described at
+ * the URL it is callable on, and {@see \Kizlo\Modules\Taxonomy\TaxonomyApi}
+ * registers the runtime routes from these declarations. Hierarchy is the
+ * shape-changing option here — it decides whether a term carries `parent` and
+ * whether the list accepts a parent filter.
  */
 class ManagedTaxonomies
 {
@@ -65,11 +66,29 @@ class ManagedTaxonomies
         $routes = [];
 
         foreach (self::managed() as $slug => $object) {
-            $id         = self::apiId($slug);
-            $collection = sprintf('/taxonomies/%s', $slug);
-            $single     = kizlo_route(sprintf('/taxonomies/%s/:identifier', $slug));
+            foreach (self::routesFor($slug, $object) as $declaration) {
+                $routes[] = $declaration;
+            }
+        }
 
-            $routes[] = [
+        return $routes;
+    }
+
+    /**
+     * One slug's declarations, keyed by operation.
+     *
+     * @see ManagedPostTypes::routesFor() for why the key is there.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function routesFor(string $slug, WP_Taxonomy $object): array
+    {
+        $id         = self::apiId($slug);
+        $collection = sprintf('/taxonomies/%s', $slug);
+        $single     = kizlo_route(sprintf('/taxonomies/%s/:identifier', $slug));
+
+        return [
+            'list' => [
                 'id'        => $id,
                 'operation' => 'list',
                 'namespace' => KIZLO_API_NAMESPACE,
@@ -85,9 +104,9 @@ class ManagedTaxonomies
                     ],
                     '404' => ['description' => 'Taxonomy not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
-            ];
+            ],
 
-            $routes[] = [
+            'retrieve' => [
                 'id'        => $id,
                 'operation' => 'retrieve',
                 'namespace' => KIZLO_API_NAMESPACE,
@@ -105,9 +124,9 @@ class ManagedTaxonomies
                     '200' => ['description' => 'The term.', 'body' => ['$ref' => "{$id}.item"]],
                     '404' => ['description' => 'Term not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
-            ];
+            ],
 
-            $routes[] = [
+            'create' => [
                 'id'        => $id,
                 'operation' => 'create',
                 'namespace' => KIZLO_API_NAMESPACE,
@@ -120,9 +139,9 @@ class ManagedTaxonomies
                     '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                     '404' => ['description' => 'Taxonomy not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
-            ];
+            ],
 
-            $routes[] = [
+            'update' => [
                 'id'        => $id,
                 'operation' => 'update',
                 'namespace' => KIZLO_API_NAMESPACE,
@@ -140,9 +159,9 @@ class ManagedTaxonomies
                     '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                     '404' => ['description' => 'Term not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
-            ];
+            ],
 
-            $routes[] = [
+            'delete' => [
                 'id'        => $id,
                 'operation' => 'delete',
                 'namespace' => KIZLO_API_NAMESPACE,
@@ -164,10 +183,8 @@ class ManagedTaxonomies
                     '200' => ['description' => 'The deletion result.', 'body' => ['$ref' => "{$id}.delete-response"]],
                     '404' => ['description' => 'Term not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
-            ];
-        }
-
-        return $routes;
+            ],
+        ];
     }
 
     public static function apiId(string $slug): string

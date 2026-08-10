@@ -5,81 +5,77 @@ namespace Kizlo\Modules\Taxonomy;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Terms_Controller;
+use Kizlo\Modules\Introspection\ManagedTaxonomies;
+use Kizlo\Modules\Introspection\RouteRegistrar;
 
 /**
- * Custom `kizlo/v1/taxonomies/:taxonomy` routes that mirror {@see \Kizlo\Modules\PostType\PostTypeApi}
+ * Custom `kizlo/v1/taxonomies/…` routes that mirror {@see \Kizlo\Modules\PostType\PostTypeApi}
  * for terms. Their reason to exist is the same: WordPress only fetches a single
  * term by numeric id, so slug lookups otherwise need a list-then-get round trip.
  * `retrieve`/`update`/`delete` resolve the identifier (id or slug) server-side and
  * delegate to {@see WP_REST_Terms_Controller}, whose responses are enriched by the
  * registered `rest_prepare_{taxonomy}` filter ({@see TermExtension}).
+ *
+ * Registration mirrors it too: one route per managed slug per operation, built
+ * from the declarations {@see ManagedTaxonomies} publishes, so the arguments the
+ * route enforces are the ones the contract advertises.
  */
 class TaxonomyApi
 {
     public function register(): void
     {
-        kizlo_register_route([
-            'methods'  => ['GET'],
-            'route'    => kizlo_route('/taxonomies/:taxonomy'),
-            'callback' => fn(WP_REST_Request $request) => $this->list($request->get_param('taxonomy'), $request),
-        ]);
+        add_action('rest_api_init', function (): void {
+            foreach (ManagedTaxonomies::managed() as $slug => $object) {
+                foreach (ManagedTaxonomies::routesFor($slug, $object) as $operation => $declaration) {
+                    $handler = $this->handler($slug, $operation);
 
-        kizlo_register_route([
-            'methods'  => ['GET'],
-            'route'    => kizlo_route('/taxonomies/:taxonomy/:identifier'),
-            'callback' => fn(WP_REST_Request $request) => $this->retrieve($request->get_param('taxonomy'), $request->get_param('identifier'), $request),
-        ]);
+                    if ($handler === null) {
+                        continue;
+                    }
 
-        kizlo_register_route([
-            'methods'  => ['POST'],
-            'route'    => kizlo_route('/taxonomies/:taxonomy'),
-            'callback' => fn(WP_REST_Request $request) => $this->create($request->get_param('taxonomy'), $request),
-        ]);
-
-        kizlo_register_route([
-            'methods'  => ['PUT', 'PATCH'],
-            'route'    => kizlo_route('/taxonomies/:taxonomy/:identifier'),
-            'callback' => fn(WP_REST_Request $request) => $this->update($request->get_param('taxonomy'), $request->get_param('identifier'), $request),
-        ]);
-
-        kizlo_register_route([
-            'methods'  => ['DELETE'],
-            'route'    => kizlo_route('/taxonomies/:taxonomy/:identifier'),
-            'callback' => fn(WP_REST_Request $request) => $this->delete($request->get_param('taxonomy'), $request->get_param('identifier'), $request),
-        ]);
-    }
-
-    public function list(string $taxonomy, WP_REST_Request $request): mixed
-    {
-        if (!taxonomy_exists($taxonomy)) {
-            return new WP_Error('invalid_taxonomy', 'Taxonomy not found.', ['status' => 404]);
-        }
-
-        $controller = new WP_REST_Terms_Controller($taxonomy);
-        $params     = $controller->get_collection_params();
-
-        $attributes         = $request->get_attributes();
-        $attributes['args'] = $params;
-        $request->set_attributes($attributes);
-
-        foreach ($params as $key => $arg) {
-            if (isset($arg['default']) && null === $request->get_param($key)) {
-                $request->set_param($key, $arg['default']);
+                    RouteRegistrar::registerManaged($declaration, $handler);
+                }
             }
-        }
-
-        $sanitized = $request->sanitize_params();
-        if (is_wp_error($sanitized)) return $sanitized;
-
-        return $controller->get_items($request);
+        });
     }
 
-    public function retrieve(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
+    /** @see \Kizlo\Modules\PostType\PostTypeApi::handler() for why this can return null. */
+    private function handler(string $slug, string $operation): ?callable
     {
-        if (!taxonomy_exists($taxonomy)) {
-            return new WP_Error('invalid_taxonomy', 'Taxonomy not found.', ['status' => 404]);
+        switch ($operation) {
+            case 'list':
+                return fn(WP_REST_Request $request) => $this->list($slug, $request);
+            case 'retrieve':
+                return fn(WP_REST_Request $request) => $this->retrieve($slug, $request->get_param('identifier'), $request);
+            case 'create':
+                return fn(WP_REST_Request $request) => $this->create($slug, $request);
+            case 'update':
+                return fn(WP_REST_Request $request) => $this->update($slug, $request->get_param('identifier'), $request);
+            case 'delete':
+                return fn(WP_REST_Request $request) => $this->delete($slug, $request->get_param('identifier'), $request);
         }
 
+        _doing_it_wrong(
+            __METHOD__,
+            esc_html(sprintf('The "%s" operation is described for "%s" but has no handler.', $operation, $slug)),
+            '1.0.0'
+        );
+
+        return null;
+    }
+
+    /**
+     * The terms controller reads `per_page` and `page` straight out of the request
+     * to build its `number` and `offset`, so it depends on their defaults being
+     * present. The route's declared arguments apply them.
+     */
+    private function list(string $taxonomy, WP_REST_Request $request): mixed
+    {
+        return (new WP_REST_Terms_Controller($taxonomy))->get_items($request);
+    }
+
+    private function retrieve(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
+    {
         $id = $this->resolve_id($identifier, $taxonomy);
         if (!$id) {
             return new WP_Error('term_not_found', 'Term not found.', ['status' => 404]);
@@ -90,21 +86,13 @@ class TaxonomyApi
         return (new WP_REST_Terms_Controller($taxonomy))->get_item($request);
     }
 
-    public function create(string $taxonomy, WP_REST_Request $request): mixed
+    private function create(string $taxonomy, WP_REST_Request $request): mixed
     {
-        if (!taxonomy_exists($taxonomy)) {
-            return new WP_Error('invalid_taxonomy', 'Taxonomy not found.', ['status' => 404]);
-        }
-
         return (new WP_REST_Terms_Controller($taxonomy))->create_item($request);
     }
 
-    public function update(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
+    private function update(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
     {
-        if (!taxonomy_exists($taxonomy)) {
-            return new WP_Error('invalid_taxonomy', 'Taxonomy not found.', ['status' => 404]);
-        }
-
         $id = $this->resolve_id($identifier, $taxonomy);
         if (!$id) {
             return new WP_Error('term_not_found', 'Term not found.', ['status' => 404]);
@@ -115,12 +103,13 @@ class TaxonomyApi
         return (new WP_REST_Terms_Controller($taxonomy))->update_item($request);
     }
 
-    public function delete(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
+    /**
+     * Terms cannot be trashed, so core refuses anything but `force=true`. It reads
+     * the flag as `(bool) $request['force']`, which made the string "false" delete
+     * the term outright until the route started declaring it a boolean.
+     */
+    private function delete(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
     {
-        if (!taxonomy_exists($taxonomy)) {
-            return new WP_Error('invalid_taxonomy', 'Taxonomy not found.', ['status' => 404]);
-        }
-
         $id = $this->resolve_id($identifier, $taxonomy);
         if (!$id) {
             return new WP_Error('term_not_found', 'Term not found.', ['status' => 404]);

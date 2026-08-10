@@ -5,7 +5,23 @@ namespace Kizlo\Modules\PostType;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Posts_Controller;
+use Kizlo\Modules\Introspection\ManagedPostTypes;
+use Kizlo\Modules\Introspection\RouteRegistrar;
 
+/**
+ * The `kizlo/v1/post-types/…` routes.
+ *
+ * One route per managed slug per operation, registered from the very
+ * declarations {@see ManagedPostTypes} publishes to `/introspect`. A generic
+ * `/post-types/:post_type` route would be shorter, but it can only carry one set
+ * of arguments, and supports, hierarchy, connected taxonomies and custom fields
+ * all differ per type — so a generic route can enforce nothing, which is what it
+ * used to do. Registering from the declaration means the arguments WordPress
+ * validates against and the constraints the contract advertises cannot disagree.
+ *
+ * Registration waits for `rest_api_init` because which slugs are managed depends
+ * on post types existing and on settings, neither of which is true at load time.
+ */
 class PostTypeApi
 {
     private PostTypeExtension $extension;
@@ -17,81 +33,62 @@ class PostTypeApi
 
     public function register(): void
     {
-        kizlo_register_route([
-            'methods'  => ['GET'],
-            'route'    => kizlo_route('/post-types/:post_type'),
-            'callback' => function (WP_REST_Request $request) {
-                return $this->list(
-                    $request->get_param('post_type'),
-                    $request
-                );
-            },
-        ]);
+        add_action('rest_api_init', function (): void {
+            foreach (ManagedPostTypes::managed() as $slug => $object) {
+                foreach (ManagedPostTypes::routesFor($slug, $object) as $operation => $declaration) {
+                    $handler = $this->handler($slug, $operation);
 
-        kizlo_register_route([
-            'methods'  => ['GET'],
-            'route'    => kizlo_route('/post-types/:post_type/:identifier'),
-            'callback' => function (WP_REST_Request $request) {
-                return $this->retrieve(
-                    $request->get_param('post_type'),
-                    $request->get_param('identifier'),
-                    $request
-                );
-            },
-        ]);
+                    if ($handler === null) {
+                        continue;
+                    }
 
-        kizlo_register_route([
-            'methods'  => ['POST'],
-            'route'    => kizlo_route('/post-types/:post_type'),
-            'callback' => function (WP_REST_Request $request) {
-                return $this->create(
-                    $request->get_param('post_type'),
-                    $request
-                );
-            },
-        ]);
-
-        kizlo_register_route([
-            'methods'  => ['PATCH'],
-            'route'    => kizlo_route('/post-types/:post_type/:identifier'),
-            'callback' => function (WP_REST_Request $request) {
-                return $this->update(
-                    $request->get_param('post_type'),
-                    $request->get_param('identifier'),
-                    $request
-                );
-            },
-        ]);
-
-        kizlo_register_route([
-            'methods'  => ['DELETE'],
-            'route'    => kizlo_route('/post-types/:post_type/:identifier'),
-            'callback' => function (WP_REST_Request $request) {
-                return $this->delete(
-                    $request->get_param('post_type'),
-                    $request->get_param('identifier'),
-                    $request
-                );
-            },
-        ]);
+                    RouteRegistrar::registerManaged($declaration, $handler);
+                }
+            }
+        });
     }
 
-    public function list(string $key, WP_REST_Request $request): mixed
+    /**
+     * What actually runs for a declared operation.
+     *
+     * Null when nothing does. That is a bug rather than a configuration, since
+     * both sides of this pairing ship together, so it is reported — a described
+     * route with no handler behind it is the failure this whole arrangement
+     * exists to rule out. It is not fatal, because taking the entire REST API
+     * down is a worse answer to it than serving the other four operations.
+     */
+    private function handler(string $slug, string $operation): ?callable
     {
-        if (!post_type_exists($key)) {
-            return new WP_Error('invalid_post_type', 'Post type not found.', ['status' => 404]);
+        switch ($operation) {
+            case 'list':
+                return fn(WP_REST_Request $request) => $this->list($slug, $request);
+            case 'retrieve':
+                return fn(WP_REST_Request $request) => $this->retrieve($slug, $request->get_param('identifier'), $request);
+            case 'create':
+                return fn(WP_REST_Request $request) => $this->create($slug, $request);
+            case 'update':
+                return fn(WP_REST_Request $request) => $this->update($slug, $request->get_param('identifier'), $request);
+            case 'delete':
+                return fn(WP_REST_Request $request) => $this->delete($slug, $request->get_param('identifier'), $request);
         }
 
-        $controller = new WP_REST_Posts_Controller($key);
+        _doing_it_wrong(
+            __METHOD__,
+            esc_html(sprintf('The "%s" operation is described for "%s" but has no handler.', $operation, $slug)),
+            '1.0.0'
+        );
 
-        $attributes         = $request->get_attributes();
-        $attributes['args'] = $controller->get_collection_params();
-        $request->set_attributes($attributes);
+        return null;
+    }
 
-        $sanitized = $request->sanitize_params();
-        if (is_wp_error($sanitized)) return $sanitized;
-
-        $response = $controller->get_items($request);
+    /**
+     * The route carries the declared collection parameters, so they arrive
+     * validated and sanitized with their defaults already applied. Nothing is
+     * re-derived from the controller here.
+     */
+    private function list(string $key, WP_REST_Request $request): mixed
+    {
+        $response = (new WP_REST_Posts_Controller($key))->get_items($request);
 
         if (is_wp_error($response)) return $response;
 
@@ -103,12 +100,8 @@ class PostTypeApi
         return $response;
     }
 
-    public function retrieve(string $key, string $identifier, WP_REST_Request $request): mixed
+    private function retrieve(string $key, string $identifier, WP_REST_Request $request): mixed
     {
-        if (!post_type_exists($key)) {
-            return new WP_Error('invalid_post_type', 'Post type not found.', ['status' => 404]);
-        }
-
         $id = $this->resolve_id($identifier, $key);
 
         if (!$id) {
@@ -128,12 +121,8 @@ class PostTypeApi
         return $response;
     }
 
-    public function create(string $key, WP_REST_Request $request): mixed
+    private function create(string $key, WP_REST_Request $request): mixed
     {
-        if (!post_type_exists($key)) {
-            return new WP_Error('invalid_post_type', 'Post type not found.', ['status' => 404]);
-        }
-
         $controller = new WP_REST_Posts_Controller($key);
         $response   = $controller->create_item($request);
 
@@ -144,12 +133,8 @@ class PostTypeApi
         return $response;
     }
 
-    public function update(string $key, string $identifier, WP_REST_Request $request): mixed
+    private function update(string $key, string $identifier, WP_REST_Request $request): mixed
     {
-        if (!post_type_exists($key)) {
-            return new WP_Error('invalid_post_type', 'Post type not found.', ['status' => 404]);
-        }
-
         $id = $this->resolve_id($identifier, $key);
 
         if (!$id) {
@@ -168,12 +153,14 @@ class PostTypeApi
         return $response;
     }
 
-    public function delete(string $key, string $identifier, WP_REST_Request $request): mixed
+    /**
+     * `force` reaches the controller as a real boolean because the route declares
+     * it as one. Core reads it as `(bool) $request['force']`, and every non-empty
+     * string is truthy in PHP, so an undeclared `force=false` used to delete
+     * permanently.
+     */
+    private function delete(string $key, string $identifier, WP_REST_Request $request): mixed
     {
-        if (!post_type_exists($key)) {
-            return new WP_Error('invalid_post_type', 'Post type not found.', ['status' => 404]);
-        }
-
         $id = $this->resolve_id($identifier, $key);
 
         if (!$id) {
