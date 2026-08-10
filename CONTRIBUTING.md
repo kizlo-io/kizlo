@@ -149,9 +149,11 @@ npm packages. **If your change affects a published package, add a changeset:**
 pnpm changeset
 ```
 
-Pick the affected packages and a semver bump (the project is currently in
-`alpha` pre-release mode), and commit the generated file in `.changeset/`
-alongside your changes.
+Pick the affected packages and a standard 0.x semver bump, then commit the
+generated file in `.changeset/` alongside your changes.
+
+Give the changeset **one line**: a single imperative sentence describing the
+user-visible effect. No essays, no internals, no bullet lists.
 
 > Changesets **ignores** `web`, `@kizlo/plugin-*`, and `@tooling/*` (see
 > `.changeset/config.json`). Adding a changeset for a plugin does nothing — use
@@ -170,6 +172,16 @@ cd plugins/kizlo            # or plugins/kizlo-cf7, plugins/kizlo-woocommerce
 composer changelog add     # prompts for significance (patch/minor/major), type, and entry
 ```
 
+To write the fragment in one shot, call the binary directly. The `composer`
+wrapper prompts even with `--no-interaction`:
+
+```bash
+vendor/bin/changelogger add -f <slug> -s <significance> -t <type> -e "<entry>" -n
+```
+
+`-s` takes `patch`, `minor`, or `major`; `-t` takes `added`, `changed`,
+`deprecated`, `removed`, `fixed`, or `security`.
+
 This writes a small file to `plugins/<plugin>/changelog/`. Commit it with your
 change. **Do not hand-edit `CHANGELOG.md`** — it's generated from these fragments
 at release time, when the fragments are compiled and the version is bumped across
@@ -177,11 +189,51 @@ the plugin's `kizlo.php` header, `KIZLO_VERSION` define, `readme.txt`, and
 `package.json` (kept in sync by `scripts/check-versions.mjs`). Releasing is
 triggered by pushing a `<plugin>-v<version>` tag (see `.github/workflows/plugin-release.yml`).
 
+## Branch names
+
+```
+<type>/<short-slug>
+```
+
+The type is the same Conventional Commit type the PR title will use. Keep the
+slug to three or four lowercase hyphenated words naming the change, not the
+symptom:
+
+```
+fix/derive-list-parameters
+feat/managed-custom-content
+```
+
+Maintainers working from a tracked issue insert the issue number after the type,
+which is what links the branch back to the tracker:
+
+```
+fix/kiz-70-derive-list-parameters
+```
+
+Cut every branch from a clean tree and a freshly pulled `main`
+(`git status` clean, then `git checkout main && git pull`). Branching on top of
+uncommitted work or a stale `main` is what produces avoidable conflicts later.
+
+Never commit directly to `main`.
+
 ## Commit messages & pull requests
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for commit
   subjects (e.g. `feat:`, `fix:`, `chore:`, `docs:`).
+- Scope names are **singular** and follow the code: `kizlo`, `shared`,
+  `woocommerce`, `cf7` for `packages/*`; `plugin` for any `plugins/*`;
+  `template` for `templates/`; `web` for `web/`; `ci` for workflows. Omit the
+  scope rather than inventing a new one. History contains `plugins`,
+  `templates`, and `cli`; those are drift, not the convention.
+- The PR title must match the commit subject.
+  `.github/workflows/lint-pr.yml` validates it and fails the PR otherwise.
 - Keep PRs focused; describe what changed and why.
+- Write the PR body as plain prose, two or three short paragraphs: what was
+  wrong and what happens instead, or for a feature, what it does and the shape
+  of the approach. No headings, no checklists, no filler sections.
+- Reference an issue with `Closes #123` only when a GitHub issue actually
+  exists. Otherwise leave the issue line out.
 - Make sure the following pass locally before opening a PR — they're the same
   checks CI runs:
 

@@ -13,10 +13,14 @@
 		"source.organizeImports.biome": "explicit"
 	},
 	"cSpell.words": [
+		"automations",
 		"bacs",
+		"behaviour",
+		"changelogger",
 		"dangurousload",
 		"healthcheck",
 		"mysqladmin",
+		"phpunit",
 		"prerender",
 		"prerenders",
 		"Retruningprocedure",
