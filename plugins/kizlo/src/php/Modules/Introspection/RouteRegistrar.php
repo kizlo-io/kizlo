@@ -15,6 +15,11 @@ use WP_REST_Request;
  * sanitization arguments, and it contributes the same normalized shape a
  * standalone spec route would. One declaration, no second `args` array to drift
  * out of step with it.
+ *
+ * Managed content comes in through {@see registerManaged()} instead. Those
+ * declarations are per slug and are built too late for the load-time path, but
+ * they get the same argument translation, which is the half that has to be true
+ * of every route for the contract to mean anything.
  */
 class RouteRegistrar
 {
@@ -36,7 +41,7 @@ class RouteRegistrar
         $describes = isset($args['id']);
 
         if (!$describes) {
-            self::registerEndpoint($route, self::routeArgs($args), null);
+            self::deferEndpoint($route, self::routeArgs($args), null);
             return;
         }
 
@@ -61,7 +66,31 @@ class RouteRegistrar
 
         SpecStore::addRoute($declaration, $core);
 
-        self::registerEndpoint($route, self::routeArgs($args), $input);
+        self::deferEndpoint($route, self::routeArgs($args), $input);
+    }
+
+    /**
+     * Register the runtime half of a declaration that already describes itself.
+     *
+     * {@see ManagedContent} builds one declaration per managed slug and hands it
+     * to the registry directly, so there is nothing to add to {@see SpecStore}
+     * here — only the endpoint that declaration has been promising. Registration
+     * happens immediately rather than on `rest_api_init`, because which slugs are
+     * managed is only knowable once post types and taxonomies exist, which is to
+     * say from inside that hook.
+     *
+     * @param array<string, mixed> $declaration
+     */
+    public static function registerManaged(array $declaration, callable $callback): void
+    {
+        $route = is_string($declaration['route'] ?? null) ? $declaration['route'] : '';
+        $input = is_array($declaration['input'] ?? null) ? $declaration['input'] : [];
+
+        self::registerEndpoint(
+            $route,
+            self::routeArgs(['methods' => $declaration['methods'] ?? [], 'callback' => $callback]),
+            $input,
+        );
     }
 
     /**
@@ -211,33 +240,42 @@ class RouteRegistrar
      * @param array<string, mixed>      $routeArgs
      * @param array<string, mixed>|null $input
      */
-    private static function registerEndpoint(string $route, array $routeArgs, ?array $input): void
+    private static function deferEndpoint(string $route, array $routeArgs, ?array $input): void
     {
         add_action('rest_api_init', static function () use ($route, $routeArgs, $input): void {
-            if ($input !== null) {
-                // Coerced first, so a repairable declaration reaches WordPress in
-                // the form it was meant to take: `'required' => 1` is enforced
-                // rather than being treated as an unusable flag.
-                $input    = SchemaCoercer::coerce($input);
-                $schemas  = Registry::schemaMap();
-                $critical = ArgTranslator::criticalErrors($input, $schemas);
+            self::registerEndpoint($route, $routeArgs, $input);
+        });
+    }
 
-                if ($critical !== []) {
-                    foreach ($critical as $message) {
-                        self::fail(
-                            'kizlo_register_route',
-                            ['path' => $route, 'keyword' => 'input'],
-                            sprintf('%s The endpoint was not registered, because it would have skipped its declared validation.', $message),
-                        );
-                    }
-                    return;
+    /**
+     * @param array<string, mixed>      $routeArgs
+     * @param array<string, mixed>|null $input
+     */
+    private static function registerEndpoint(string $route, array $routeArgs, ?array $input): void
+    {
+        if ($input !== null) {
+            // Coerced first, so a repairable declaration reaches WordPress in the
+            // form it was meant to take: `'required' => 1` is enforced rather than
+            // being treated as an unusable flag.
+            $input    = SchemaCoercer::coerce($input);
+            $schemas  = Registry::schemaMap();
+            $critical = ArgTranslator::criticalErrors($input, $schemas);
+
+            if ($critical !== []) {
+                foreach ($critical as $message) {
+                    self::fail(
+                        'kizlo_register_route',
+                        ['path' => $route, 'keyword' => 'input'],
+                        sprintf('%s The endpoint was not registered, because it would have skipped its declared validation.', $message),
+                    );
                 }
-
-                $routeArgs['args'] = ArgTranslator::toArgs($input, $schemas);
+                return;
             }
 
-            register_rest_route(KIZLO_API_NAMESPACE, $route, $routeArgs);
-        });
+            $routeArgs['args'] = ArgTranslator::toArgs($input, $schemas);
+        }
+
+        register_rest_route(KIZLO_API_NAMESPACE, $route, $routeArgs);
     }
 
     /**

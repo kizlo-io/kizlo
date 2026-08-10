@@ -10,10 +10,12 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 /**
  * Contracts for the post types Kizlo manages.
  *
- * The runtime routes stay generic — one `/post-types/(?P<post_type>…)` handler
- * serves every type — but a generic contract would be useless to a generator, so
- * each managed slug is described at the URL it is actually callable on. Nothing
- * new is registered.
+ * Each managed slug is described at the URL it is callable on, and
+ * {@see \Kizlo\Modules\PostType\PostTypeApi} registers the runtime routes from
+ * these same declarations. That direction matters: a single generic
+ * `/post-types/(?P<post_type>…)` route can only carry one set of arguments,
+ * which is no use when supports, hierarchy, connected taxonomies and custom
+ * fields all differ per type, so it could enforce none of what is described here.
  *
  * What a type's schemas contain follows from its configuration: enabled supports
  * decide which WordPress fields exist, hierarchy decides whether `parent` does,
@@ -26,11 +28,12 @@ class ManagedPostTypes
      * Managed post types that can be read through `/post-types/` but not written.
      *
      * `attachment` is a Kizlo-included built-in like `post` and `page`, so it is
-     * described. But {@see \Kizlo\Modules\PostType\PostTypeApi} sends every type
-     * through `WP_REST_Posts_Controller`, which knows nothing about `$_FILES` —
-     * an attachment created that way is a row with no file behind it. Listing,
+     * described. But {@see \Kizlo\Modules\PostType\PostTypeApi} serves it through
+     * `WP_REST_Posts_Controller`, which knows nothing about `$_FILES` — an
+     * attachment created that way is a row with no file behind it. Listing,
      * retrieving and deleting all work, so those are described and `create` and
-     * `update` are not. Uploads belong on the WordPress media route.
+     * `update` are not, and neither is registered. Uploads belong on the
+     * WordPress media route.
      *
      * @var array<int, string>
      */
@@ -100,110 +103,130 @@ class ManagedPostTypes
         $routes = [];
 
         foreach (self::managed() as $slug => $object) {
-            $id         = self::apiId($slug);
-            $collection = sprintf('/post-types/%s', $slug);
-            $single     = kizlo_route(sprintf('/post-types/%s/:identifier', $slug));
+            foreach (self::routesFor($slug, $object) as $declaration) {
+                $routes[] = $declaration;
+            }
+        }
 
-            $routes[] = [
-                'id'          => $id,
-                'operation'   => 'list',
-                'namespace'   => KIZLO_API_NAMESPACE,
-                'route'       => $collection,
-                'methods'     => ['GET'],
-                'summary'     => sprintf('List %s entries', $slug),
-                'input'       => ['type' => 'object', 'properties' => self::listParameters($slug, $object)],
-                'responses'   => [
-                    '200' => [
-                        'description' => 'A page of entries.',
-                        'headers'     => self::paginationHeaders(),
-                        'body'        => ['type' => 'array', 'items' => ['$ref' => "{$id}.list-item"]],
-                    ],
+        return $routes;
+    }
+
+    /**
+     * One slug's declarations, keyed by operation.
+     *
+     * Keyed rather than listed because {@see \Kizlo\Modules\PostType\PostTypeApi}
+     * registers from exactly this array and has to pair each declaration with the
+     * handler that serves it. An operation name is already unique per API, so the
+     * key costs nothing.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function routesFor(string $slug, WP_Post_Type $object): array
+    {
+        $routes     = [];
+        $id         = self::apiId($slug);
+        $collection = sprintf('/post-types/%s', $slug);
+        $single     = kizlo_route(sprintf('/post-types/%s/:identifier', $slug));
+
+        $routes['list'] = [
+            'id'        => $id,
+            'operation' => 'list',
+            'namespace' => KIZLO_API_NAMESPACE,
+            'route'     => $collection,
+            'methods'   => ['GET'],
+            'summary'   => sprintf('List %s entries', $slug),
+            'input'     => ['type' => 'object', 'properties' => self::listParameters($slug, $object)],
+            'responses' => [
+                '200' => [
+                    'description' => 'A page of entries.',
+                    'headers'     => self::paginationHeaders(),
+                    'body'        => ['type' => 'array', 'items' => ['$ref' => "{$id}.list-item"]],
+                ],
+                '404' => ['description' => 'Post type not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+        ];
+
+        $routes['retrieve'] = [
+            'id'        => $id,
+            'operation' => 'retrieve',
+            'namespace' => KIZLO_API_NAMESPACE,
+            'route'     => $single,
+            'methods'   => ['GET'],
+            'summary'   => sprintf('Retrieve a single %s entry', $slug),
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'identifier' => self::identifier(),
+                    'context'    => self::context(),
+                    'password'   => ['type' => 'string', 'description' => 'Password for a password-protected entry.'],
+                ],
+            ],
+            'responses' => [
+                '200' => ['description' => 'The entry.', 'body' => ['$ref' => "{$id}.item"]],
+                '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+        ];
+
+        if (self::isWritable($slug)) {
+            $routes['create'] = [
+                'id'        => $id,
+                'operation' => 'create',
+                'namespace' => KIZLO_API_NAMESPACE,
+                'route'     => $collection,
+                'methods'   => ['POST'],
+                'summary'   => sprintf('Create a %s entry', $slug),
+                'input'     => ['$extends' => "{$id}.create-input", 'type' => 'object', 'content_type' => Spec::JSON_CONTENT_TYPE],
+                'responses' => [
+                    '201' => ['description' => 'The created entry.', 'body' => ['$ref' => "{$id}.item"]],
+                    '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                     '404' => ['description' => 'Post type not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
             ];
 
-            $routes[] = [
+            $routes['update'] = [
                 'id'        => $id,
-                'operation' => 'retrieve',
+                'operation' => 'update',
                 'namespace' => KIZLO_API_NAMESPACE,
                 'route'     => $single,
-                'methods'   => ['GET'],
-                'summary'   => sprintf('Retrieve a single %s entry', $slug),
+                'methods'   => ['PATCH'],
+                'summary'   => sprintf('Update a %s entry', $slug),
                 'input'     => [
-                    'type'       => 'object',
-                    'properties' => [
-                        'identifier' => self::identifier(),
-                        'context'    => self::context(),
-                        'password'   => ['type' => 'string', 'description' => 'Password for a password-protected entry.'],
-                    ],
+                    '$extends'     => "{$id}.update-input",
+                    'type'         => 'object',
+                    'content_type' => Spec::JSON_CONTENT_TYPE,
+                    'properties'   => ['identifier' => self::identifier()],
                 ],
                 'responses' => [
-                    '200' => ['description' => 'The entry.', 'body' => ['$ref' => "{$id}.item"]],
-                    '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                ],
-            ];
-
-            if (self::isWritable($slug)) {
-                $routes[] = [
-                    'id'        => $id,
-                    'operation' => 'create',
-                    'namespace' => KIZLO_API_NAMESPACE,
-                    'route'     => $collection,
-                    'methods'   => ['POST'],
-                    'summary'   => sprintf('Create a %s entry', $slug),
-                    'input'     => ['$extends' => "{$id}.create-input", 'type' => 'object', 'content_type' => Spec::JSON_CONTENT_TYPE],
-                    'responses' => [
-                        '201' => ['description' => 'The created entry.', 'body' => ['$ref' => "{$id}.item"]],
-                        '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                        '404' => ['description' => 'Post type not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                    ],
-                ];
-
-                $routes[] = [
-                    'id'        => $id,
-                    'operation' => 'update',
-                    'namespace' => KIZLO_API_NAMESPACE,
-                    'route'     => $single,
-                    'methods'   => ['PATCH'],
-                    'summary'   => sprintf('Update a %s entry', $slug),
-                    'input'     => [
-                        '$extends'     => "{$id}.update-input",
-                        'type'         => 'object',
-                        'content_type' => Spec::JSON_CONTENT_TYPE,
-                        'properties'   => ['identifier' => self::identifier()],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'The updated entry.', 'body' => ['$ref' => "{$id}.item"]],
-                        '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                        '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                    ],
-                ];
-            }
-
-            $routes[] = [
-                'id'        => $id,
-                'operation' => 'delete',
-                'namespace' => KIZLO_API_NAMESPACE,
-                'route'     => $single,
-                'methods'   => ['DELETE'],
-                'summary'   => sprintf('Delete a %s entry', $slug),
-                'input'     => [
-                    'type'       => 'object',
-                    'properties' => [
-                        'identifier' => self::identifier(),
-                        'force'      => [
-                            'type'        => 'boolean',
-                            'default'     => false,
-                            'description' => 'Bypass the trash and delete permanently.',
-                        ],
-                    ],
-                ],
-                'responses' => [
-                    '200' => ['description' => 'The trashed entry, or the deletion result when forced.', 'body' => ['$ref' => "{$id}.delete-response"]],
+                    '200' => ['description' => 'The updated entry.', 'body' => ['$ref' => "{$id}.item"]],
+                    '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                     '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
             ];
         }
+
+        $routes['delete'] = [
+            'id'        => $id,
+            'operation' => 'delete',
+            'namespace' => KIZLO_API_NAMESPACE,
+            'route'     => $single,
+            'methods'   => ['DELETE'],
+            'summary'   => sprintf('Delete a %s entry', $slug),
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'identifier' => self::identifier(),
+                    'force'      => [
+                        'type'        => 'boolean',
+                        'default'     => false,
+                        'description' => 'Bypass the trash and delete permanently.',
+                    ],
+                ],
+            ],
+            'responses' => [
+                '200' => ['description' => 'The trashed entry, or the deletion result when forced.', 'body' => ['$ref' => "{$id}.delete-response"]],
+                '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+        ];
 
         return $routes;
     }

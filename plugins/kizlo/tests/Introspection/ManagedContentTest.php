@@ -9,9 +9,10 @@ use Kizlo\Modules\Registration\TaxonomyRegistration;
 /**
  * Contracts generated for Kizlo-managed post types and taxonomies.
  *
- * The runtime routes stay generic, so what is asserted here is that each managed
- * slug is described at the URL it is really callable on, and that the schemas
- * follow the type's actual configuration rather than a fixed template.
+ * What is asserted here is that each managed slug is described at the URL it is
+ * really callable on, and that the schemas follow the type's actual
+ * configuration rather than a fixed template. That the routes then registered
+ * match these descriptions is {@see ManagedRouteTest}'s job.
  */
 class ManagedContentTest extends IntrospectionTestCase
 {
@@ -39,9 +40,9 @@ class ManagedContentTest extends IntrospectionTestCase
     public function test_attachments_are_described_for_reading_but_not_for_writing(): void
     {
         // A Kizlo-included built-in like post and page, so it belongs in the
-        // contract. But PostTypeApi routes every type through
-        // WP_REST_Posts_Controller, which never looks at $_FILES, so a create
-        // here would produce a row with no file. Reads and deletes work.
+        // contract. But PostTypeApi serves it through WP_REST_Posts_Controller,
+        // which never looks at $_FILES, so a create here would produce a row with
+        // no file. Reads and deletes work.
         $document = $this->document();
 
         $paths = $document['apis']['post-types.attachment']['paths'];

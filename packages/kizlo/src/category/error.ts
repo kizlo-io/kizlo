@@ -13,5 +13,9 @@ export const LIST_CATEGORY_ERROR_MAP = defineErrorMap({
 		status: 400,
 		message: "The requested page does not exist.",
 	},
+	CATEGORY_NOT_FOUND: {
+		status: 404,
+		message: "Categories are not available.",
+	},
 })
 export type ListCategoryErrorMap = typeof LIST_CATEGORY_ERROR_MAP

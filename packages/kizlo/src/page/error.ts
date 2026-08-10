@@ -17,5 +17,9 @@ export const LIST_PAGE_ERROR_MAP = defineErrorMap({
 		status: 400,
 		message: "The requested page does not exist.",
 	},
+	PAGE_NOT_FOUND: {
+		status: 404,
+		message: "Pages are not available.",
+	},
 })
 export type ListPageErrorMap = typeof LIST_PAGE_ERROR_MAP

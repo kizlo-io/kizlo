@@ -29,6 +29,7 @@ export const CATEGORY_ROUTER_MAP = {
 					case "invalid_taxonomy":
 					case "term_not_found":
 					case "rest_term_invalid":
+					case "rest_no_route":
 						throw errors.CATEGORY_NOT_FOUND()
 					default:
 						context.logger.error("Get category unhandled error", response.error, { identifier, code: response.error.code })
@@ -71,6 +72,8 @@ export const CATEGORY_ROUTER_MAP = {
 				switch (response.error.code) {
 					case "rest_post_invalid_page_number":
 						throw errors.CATEGORY_INVALID_PAGE()
+					case "rest_no_route":
+						throw errors.CATEGORY_NOT_FOUND()
 					default:
 						context.logger.error("List categories unhandled error", response.error, { code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()
