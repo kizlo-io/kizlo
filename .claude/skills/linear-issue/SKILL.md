@@ -1,15 +1,48 @@
 ---
 name: linear-issue
-description: Implement a Linear issue end to end with this repo's branch, changelog, commit, and PR conventions. Use when the user hands over a Linear issue to pick up or continue, e.g. "do KIZ-70", "pick up KIZ-82", "implement this issue", or pastes a linear.app issue URL. Covers the clean-tree and up-to-date main preflight, branch naming, choosing between Changesets and changelogger, the conventional commit scope vocabulary, the PR title and body shape, and Linear status handling.
+description: Explain a Linear issue, then implement it end to end with this repo's branch, changelog, commit, and PR conventions. Use when the user hands over a Linear issue to pick up or continue, e.g. "do KIZ-70", "pick up KIZ-82", "implement this issue", or pastes a linear.app issue URL. Covers the read-and-brief step that comes before any git work, the clean-tree and up-to-date main preflight, branch naming, choosing between Changesets and changelogger, the conventional commit scope vocabulary, the PR title and body shape, and Linear status handling.
 ---
 
 # linear-issue, take an issue from Linear to open PR
 
 Input is an issue key (`KIZ-70`) or a `linear.app` URL; ask if neither is given. One team, `Kizlo`, key `KIZ`.
 
-**Ask before `git commit`. Ask again before `git push`.** Separate approvals; "do the rest" covers neither. No em-dash and no LLM filler anywhere. No Claude or Anthropic attribution in any commit, PR, or file.
+The first half of this skill is read-only. **Nothing touches git until the user says go**, because handing over an issue key is a request to understand it, not yet a decision to build it now. **Then ask before `git commit`, and ask again before `git push`.** Three separate approvals; "do the rest" covers none of them. No em-dash and no LLM filler anywhere. No Claude or Anthropic attribution in any commit, PR, or file.
 
-## 1. Clean start
+## 1. Read the issue and the code around it
+
+`get_issue` with the key. These are design documents, so read all of it and treat two sections as binding:
+
+- **Out of scope**, left alone even when it sits in the file you are editing. If it blocks you, say so and stop rather than widening.
+- **Acceptance**, which names the behaviour to build and usually the test that proves it. Write that test.
+
+Then open the files the issue points at, before saying anything about it. A brief written from the issue text alone repeats the ticket back and is worth nothing; the value is in what the code actually does today versus what the issue assumes. Where the two contradict, the code wins.
+
+Check for prior work too, so the brief can say whether this is a fresh start or a resume:
+
+```bash
+git branch --list "*kiz-<number>*"    # read-only, safe on a dirty tree
+```
+
+## 2. Explain it, then wait
+
+Write a short brief in the chat and stop there. No branch, no checkout, no edits. Prose and small lists, no headings-and-bullets wall:
+
+- **What it is.** The problem in your own words, in terms of the actual code paths, not the issue's phrasing.
+- **What changes.** The files and functions you expect to touch, and the shape of the change.
+- **What proves it.** The acceptance criteria and the test you would write.
+- **What you are leaving alone.** Anything out of scope that sits close enough to look like an omission.
+- **What is unclear.** Contradictions with the code, gaps in the issue, decisions that could go two ways. Give your recommendation on each rather than a menu.
+
+Keep it to something readable in a minute or so. The point is a shared picture, not a design document.
+
+Then **stop and wait for an explicit go-ahead.** The user may want to edit the issue, add detail, reprioritise, or shelve it, and all of that is cheaper before a branch exists. Silence is not a go-ahead, and neither is the original "do KIZ-70". If they come back with changes, refresh the issue with `get_issue`, brief again on what moved, and wait again.
+
+On a resume, brief on what is already done on the branch and what is left, then wait the same way.
+
+## 3. Clean start, branch, mark it started
+
+Only once the user has agreed. First the preflight:
 
 ```bash
 git status --porcelain   # must print nothing
@@ -23,18 +56,7 @@ Then refresh `main`, even if already on it. Stop rather than branch off a stale 
 git checkout main && git pull
 ```
 
-If `git branch --list "*kiz-<number>*"` finds an existing branch, this is a resume: check it out and continue instead of starting a second one.
-
-## 2. Read the issue
-
-`get_issue` with the key. These are design documents, so read all of it and treat two sections as binding:
-
-- **Out of scope**, left alone even when it sits in the file you are editing. If it blocks you, say so and stop rather than widening.
-- **Acceptance**, which names the behaviour to build and usually the test that proves it. Write that test.
-
-Where the issue contradicts the code, the code wins; raise it before implementing.
-
-## 3. Branch, then mark it started
+If step 1 found an existing `kiz-<number>` branch, this is a resume: check it out and continue instead of starting a second one. Otherwise the new branch is:
 
 ```
 <type>/kiz-<number>-<short-slug>      fix/kiz-70-derive-list-parameters

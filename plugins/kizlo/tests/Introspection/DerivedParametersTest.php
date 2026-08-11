@@ -6,6 +6,7 @@ use WP_REST_Request;
 use WP_REST_Server;
 use WP_REST_Posts_Controller;
 use WP_REST_Terms_Controller;
+use Kizlo\Modules\Introspection\CoreSchemas;
 
 /**
  * The managed list contract being derived rather than written out.
@@ -212,6 +213,89 @@ class DerivedParametersTest extends IntrospectionTestCase
 
         $this->assertArrayNotHasKey('operator', $this->objectForm($properties['categories_exclude'])['properties']);
         $this->assertArrayHasKey('include_children', $this->objectForm($properties['categories_exclude'])['properties']);
+    }
+
+    // ============================================================
+    // STATUS
+    // ============================================================
+
+    /**
+     * `status` was the one parameter held back from the derivation, because core
+     * declares two different things under the name: an array-typed list filter
+     * built from every registered status plus `any`, and the post's own
+     * single-valued status, whose enum excludes internal ones. They are not
+     * variants of each other, since you cannot write a post with status `inherit`
+     * but can legitimately list trashed or scheduled ones, so the list filter
+     * derives from the list filter, like every other parameter.
+     *
+     * The enum itself is named rather than inlined. {@see PostStatusTest} covers
+     * the vocabulary; what matters here is that naming it did not change it.
+     */
+    public function test_the_status_filter_refers_to_the_shared_vocabulary(): void
+    {
+        $status = $this->listProperties('post-types.post', '/post-types/post')['status'];
+
+        $this->assertSame('array', $status['type']);
+        $this->assertSame(['$ref' => CoreSchemas::POST_STATUS_FILTER], $status['items']);
+    }
+
+    /**
+     * The guard on that indirection. A reference is only safe while the schema it
+     * points at still says what the controller says, so the two are compared
+     * directly. Without this the shared vocabulary could drift from core exactly
+     * the way the old hand-written declaration did, just one level further away
+     * from the route where nobody would look.
+     */
+    public function test_the_shared_filter_vocabulary_matches_the_controller(): void
+    {
+        $this->assertSame(
+            $this->sorted((new WP_REST_Posts_Controller('post'))->get_collection_params()['status']['items']['enum']),
+            $this->sorted($this->document()['schemas'][CoreSchemas::POST_STATUS_FILTER]['enum']),
+        );
+    }
+
+    /**
+     * Kizlo used to declare the default as `['publish']` where core declares the
+     * scalar `'publish'`, and core depends on the scalar:
+     * `sanitize_post_statuses()` reads the registered default back off the request
+     * and compares each requested status to it by identity, so an array default
+     * never matches and every request falls through to a capability check instead.
+     *
+     * A scalar default on an array type looks like a mistake and is not one, which
+     * is why it is pinned here rather than left to be tidied later. It reaches the
+     * generator as `status?: PostStatus[]` either way, because `type` and
+     * `items.enum` decide that.
+     */
+    public function test_the_status_default_is_core_s_scalar(): void
+    {
+        $this->assertSame('publish', $this->listProperties('post-types.post', '/post-types/post')['status']['default']);
+    }
+
+    /**
+     * Enforcement follows from the enum. With `items` declared as a bare string
+     * array, any value at all reached `WP_Query`, which answered a nonsense status
+     * with an empty page rather than an error.
+     */
+    public function test_an_unknown_status_is_rejected(): void
+    {
+        $this->boot();
+
+        $rejected = $this->dispatch('GET', '/kizlo/v1/post-types/post', ['status' => ['nonsense']]);
+
+        $this->assertSame(400, $rejected->get_status());
+        $this->assertSame('rest_invalid_param', $rejected->get_data()['code']);
+    }
+
+    public function test_listing_by_a_non_default_status_is_accepted(): void
+    {
+        $this->boot();
+
+        self::factory()->post->create(['post_type' => 'post', 'post_status' => 'draft']);
+
+        $response = $this->dispatch('GET', '/kizlo/v1/post-types/post', ['status' => ['draft']]);
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertCount(1, $response->get_data());
     }
 
     // ============================================================

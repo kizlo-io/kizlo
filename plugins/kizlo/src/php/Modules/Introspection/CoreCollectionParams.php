@@ -25,6 +25,17 @@ use WP_REST_Terms_Controller;
  * dropped for being untidy — only shapes Kizlo spells differently are rewritten,
  * and only a parameter that cannot be expressed at all is dropped, which is
  * reported rather than done quietly.
+ *
+ * `status` is where that rule costs something visible. Core builds its list enum
+ * from `array_keys( get_post_stati() )`, and `register_post_status()` takes no
+ * post type, so WooCommerce registering `wc-processing` puts it in the enum for
+ * `post`, `page` and every other type too. Nothing native separates a type's own
+ * statuses from another's, not even the `internal` flag, which WooCommerce's
+ * `'public' => false` already clears, because WordPress does not model that
+ * relationship at all. Any filter here would be a guess, and a wrong guess drops
+ * a status the route honours, which is the defect this class exists to end. So
+ * the enum is emitted whole and reads noisily; narrowing it for display is the
+ * generator's problem, not the contract's.
  */
 final class CoreCollectionParams
 {
