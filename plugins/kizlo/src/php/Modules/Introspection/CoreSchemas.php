@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Introspection;
 
+use WP_REST_Posts_Controller;
+
 /**
  * The base schemas everything else extends or references.
  *
@@ -23,17 +25,110 @@ class CoreSchemas
     public const TERM   = 'kizlo.term';
     public const SEO    = 'kizlo.seo';
 
+    /** A status a post can be read back as. */
+    public const POST_STATUS = 'kizlo.post-status';
+
+    /** A status a post can be written with. */
+    public const POST_STATUS_WRITABLE = 'kizlo.post-status-writable';
+
+    /** A status a list can be filtered by. */
+    public const POST_STATUS_FILTER = 'kizlo.post-status-filter';
+
     /**
      * @return array<string, array<string, mixed>>
      */
     public static function all(): array
     {
+        $status = self::statusVocabularies();
+
         return [
-            self::ERROR => self::error(),
-            self::MEDIA => self::media(),
-            self::POST  => self::post(),
-            self::TERM  => self::term(),
-            self::SEO   => self::seo(),
+            self::ERROR                => self::error(),
+            self::MEDIA                => self::media(),
+            self::POST                 => self::post(),
+            self::TERM                 => self::term(),
+            self::SEO                  => self::seo(),
+            self::POST_STATUS          => self::postStatus($status['filter']),
+            self::POST_STATUS_WRITABLE => self::postStatusWritable($status['writable']),
+            self::POST_STATUS_FILTER   => self::postStatusFilter($status['filter']),
+        ];
+    }
+
+    /**
+     * The status vocabularies, read from the controller rather than rebuilt.
+     *
+     * Core declares two of them and they are the only source worth having:
+     * `get_item_schema()` carries the statuses a post may be written with, and
+     * `get_collection_params()` carries the ones a list may be filtered by.
+     * Calling `get_post_stati()` here with a guess at the right flags would put
+     * Kizlo back to deciding what core has already decided, which is the
+     * hand-written fork {@see CoreCollectionParams} exists to end. Both are taken
+     * verbatim, plugin-registered statuses included.
+     *
+     * Both are global. `register_post_status()` takes no post type, and every
+     * managed type reports the same two enums, which {@see \Kizlo\Tests\Introspection\PostStatusTest}
+     * pins so that a plugin filtering one type's schema cannot go unnoticed.
+     *
+     * @return array{writable: array<int, string>, filter: array<int, string>}
+     */
+    private static function statusVocabularies(): array
+    {
+        // Not memoized: WP_REST_Posts_Controller caches its own schema, so a
+        // status registered after the first call would never reach a later build.
+        $controller = new WP_REST_Posts_Controller('post');
+
+        return [
+            'writable' => $controller->get_item_schema()['properties']['status']['enum'],
+            'filter'   => $controller->get_collection_params()['status']['items']['enum'],
+        ];
+    }
+
+    /**
+     * The one vocabulary core does not declare, and the one thing Kizlo decides.
+     *
+     * Core reuses its item schema for the response, and that enum is wrong for
+     * the job: it excludes `trash` and `inherit`, but the delete route returns a
+     * trashed entry on every call and every attachment reads back as `inherit`.
+     * Adopting it would publish a contract Kizlo's own routes break constantly.
+     *
+     * So it is the filter vocabulary less `any`, which is a query verb rather
+     * than a status: no post is ever stored with it. That keeps the derivation on
+     * core's numbers and leaves exactly one token to justify.
+     *
+     * @param array<int, string> $filter
+     * @return array<string, mixed>
+     */
+    private static function postStatus(array $filter): array
+    {
+        return [
+            'type'        => 'string',
+            'description' => 'A status a post can be read back as, including internal ones such as "trash" and "inherit" that no write accepts.',
+            'enum'        => array_values(array_diff($filter, ['any'])),
+        ];
+    }
+
+    /**
+     * @param array<int, string> $writable
+     * @return array<string, mixed>
+     */
+    private static function postStatusWritable(array $writable): array
+    {
+        return [
+            'type'        => 'string',
+            'description' => 'A status a post can be created or updated with.',
+            'enum'        => $writable,
+        ];
+    }
+
+    /**
+     * @param array<int, string> $filter
+     * @return array<string, mixed>
+     */
+    private static function postStatusFilter(array $filter): array
+    {
+        return [
+            'type'        => 'string',
+            'description' => 'A status a list can be filtered by. "any" matches every status.',
+            'enum'        => $filter,
         ];
     }
 
@@ -118,7 +213,7 @@ class CoreSchemas
                 'modified'     => ['type' => 'string', 'required' => true, 'format' => 'date-time'],
                 'modified_gmt' => ['type' => 'string', 'required' => true, 'format' => 'date-time'],
                 'slug'         => ['type' => 'string', 'required' => true],
-                'status'       => ['type' => 'string', 'required' => true],
+                'status'       => ['$ref' => self::POST_STATUS, 'required' => true],
                 'type'         => ['type' => 'string', 'required' => true],
                 'link'         => ['type' => 'string', 'required' => true, 'format' => 'uri'],
                 'template'     => ['type' => 'string', 'required' => true],

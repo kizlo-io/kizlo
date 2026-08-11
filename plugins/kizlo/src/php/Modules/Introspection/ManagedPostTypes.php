@@ -393,7 +393,7 @@ class ManagedPostTypes
             'date'     => ['type' => 'string', 'nullable' => true, 'format' => 'date-time'],
             'date_gmt' => ['type' => 'string', 'nullable' => true, 'format' => 'date-time'],
             'slug'     => ['type' => 'string'],
-            'status'   => ['type' => 'string'],
+            'status'   => ['$ref' => CoreSchemas::POST_STATUS_WRITABLE],
             'password' => ['type' => 'string'],
             'template' => ['type' => 'string'],
         ];
@@ -458,8 +458,19 @@ class ManagedPostTypes
 
     /**
      * Derived from the controller that serves the route, so the two cannot
-     * disagree. {@see CoreCollectionParams} explains why this is not written out
-     * by hand any more.
+     * disagree. {@see CoreCollectionParams} explains why this is no longer
+     * written out by hand.
+     *
+     * The one thing done to the derived set is naming its `status` vocabulary.
+     * Core spells the enum out inline, which would reach a generated client as an
+     * anonymous union repeated at every site that mentions a status, so the enum
+     * is swapped for a reference to {@see CoreSchemas::POST_STATUS_FILTER}.
+     *
+     * This is not the hand-written override that used to sit here. That one
+     * replaced core's vocabulary with a weaker one and could fall behind in
+     * silence; this one preserves the set exactly and only gives it a name, which
+     * `DerivedParametersTest` pins by comparing the referenced enum against the
+     * controller's own.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -467,11 +478,9 @@ class ManagedPostTypes
     {
         $properties = CoreCollectionParams::forPostType($slug);
 
-        // KIZ-71 settles how `status` is described. Core declares it twice with
-        // different enums, its list enum carries every globally registered status
-        // including other plugins', and its default is a scalar on an array type.
-        // Until that is decided it keeps the declaration it has always had.
-        $properties['status'] = ['type' => 'array', 'items' => ['type' => 'string'], 'default' => ['publish']];
+        if (isset($properties['status']['items'])) {
+            $properties['status']['items'] = ['$ref' => CoreSchemas::POST_STATUS_FILTER];
+        }
 
         return $properties;
     }
