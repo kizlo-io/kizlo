@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\Email;
 
 use Kizlo\Modules\Email\EmailRepository;
+use Kizlo\Modules\Introspection\CoreSchemas;
 use WP_REST_Request;
 
 class EmailModule
@@ -18,40 +19,65 @@ class EmailModule
     {
 
         kizlo_register_route([
+            'id'        => 'email',
+            'operation' => 'send',
             'methods'   => 'POST',
-            'access'    => 'admin',
             'route'     => '/email/send',
-            'callback'  => [$this, 'sendEmailApiCallback'],
-            'args' => [
-                'to' => [
-                    'required'          => true,
-                    'description'       => 'Recipient address(es).',
-                    'validate_callback' => static function ($value): bool {
-                        $addresses = is_array($value) ? $value : [$value];
-                        foreach ($addresses as $address) {
-                            if (! is_string($address) || ! is_email($address)) {
-                                return false;
+            'summary'   => 'Send an email through WordPress',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'to' => [
+                        // A union rather than an array of strings, because the
+                        // sanitizer accepts a single address and wraps it.
+                        'required'          => true,
+                        'description'       => 'Recipient address, or a list of them.',
+                        'anyOf'             => [
+                            ['type' => 'string', 'format' => 'email'],
+                            ['type' => 'array', 'items' => ['type' => 'string', 'format' => 'email']],
+                        ],
+                        'validate_callback' => static function ($value): bool {
+                            $addresses = is_array($value) ? $value : [$value];
+                            foreach ($addresses as $address) {
+                                if (! is_string($address) || ! is_email($address)) {
+                                    return false;
+                                }
                             }
-                        }
-                        return true;
-                    },
-                    'sanitize_callback' => static fn($value): array => array_map('sanitize_email', is_array($value) ? $value : [$value]),
-                ],
-                'subject' => [
-                    'required'          => true,
-                    'type'              => 'string',
-                    'description'       => 'Email subject line.',
-                    'validate_callback' => static fn($v) => is_string($v) && $v !== '',
-                    'sanitize_callback' => 'sanitize_text_field',
-                ],
-                'body' => [
-                    'required'          => true,
-                    'type'              => 'string',
-                    'description'       => 'Email body. Plain text or HTML.',
-                    'validate_callback' => static fn($v) => is_string($v) && $v !== '',
-                    'sanitize_callback' => 'wp_kses_post',
+                            return true;
+                        },
+                        'sanitize_callback' => static fn($value): array => array_map('sanitize_email', is_array($value) ? $value : [$value]),
+                    ],
+                    'subject' => [
+                        'type'              => 'string',
+                        'required'          => true,
+                        'description'       => 'Email subject line.',
+                        'validate_callback' => static fn($v) => is_string($v) && $v !== '',
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                    'body' => [
+                        'type'              => 'string',
+                        'required'          => true,
+                        'description'       => 'Email body. Plain text or HTML.',
+                        'validate_callback' => static fn($v) => is_string($v) && $v !== '',
+                        'sanitize_callback' => 'wp_kses_post',
+                    ],
                 ],
             ],
+            'responses' => [
+                '200' => [
+                    'description' => 'The email was handed to WordPress.',
+                    'body'        => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'to'      => ['type' => 'array', 'required' => true, 'items' => ['type' => 'string', 'format' => 'email']],
+                            'subject' => ['type' => 'string', 'required' => true],
+                        ],
+                    ],
+                ],
+                '400' => ['description' => 'An address, the subject or the body was rejected.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+                '500' => ['description' => 'WordPress could not send the email.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+            'callback'  => [$this, 'sendEmailApiCallback'],
         ]);
     }
 

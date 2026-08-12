@@ -2,6 +2,10 @@
 
 namespace Kizlo\Modules\Introspection;
 
+use Kizlo\Modules\Comment\CommentSchemas;
+use Kizlo\Modules\Seo\SeoSchemas;
+use Kizlo\Modules\Settings\SettingsSchemas;
+use Kizlo\Modules\User\UserSchemas;
 use WP_REST_Posts_Controller;
 
 /**
@@ -12,6 +16,12 @@ use WP_REST_Posts_Controller;
  * `kizlo_ensure_media_data()`, {@see \Kizlo\Modules\PostType\PostTypeApi} and
  * {@see \Kizlo\Modules\Taxonomy\TaxonomyApi} — rather than designed against the
  * WordPress documentation.
+ *
+ * The per-module schema classes come in through here rather than through
+ * `kizlo_register_spec_schema()`, and for the same reason the rest of this class
+ * exists: core schemas have to be present whenever a route's input is translated,
+ * which is every REST request, while the public helper is a contribution channel
+ * whose entries only exist once the contributing plugin has loaded.
  *
  * There is no shared `kizlo.post` or `kizlo.term` base any more. Both were
  * hand-listed approximations of "the fields every managed type returns", and
@@ -39,21 +49,33 @@ class CoreSchemas
     /** @var array{writable: array<int, string>, filter: array<int, string>}|null */
     private static ?array $status = null;
 
+    /** @var array<string, array<string, mixed>>|null */
+    private static ?array $all = null;
+
     /**
+     * Memoized for the same reason the status vocabularies are, and because
+     * {@see Registry::schemaMap()} asks for this once per introspected route
+     * registration: every REST request builds it as many times as there are
+     * routes, and the answer cannot change between two of them.
+     *
      * @return array<string, array<string, mixed>>
      */
     public static function all(): array
     {
+        if (self::$all !== null) {
+            return self::$all;
+        }
+
         $status = self::statusVocabularies();
 
-        return [
+        return self::$all = [
             self::ERROR                => self::error(),
             self::MEDIA                => self::media(),
             self::SEO                  => self::seo(),
             self::POST_STATUS          => self::postStatus($status['filter']),
             self::POST_STATUS_WRITABLE => self::postStatusWritable($status['writable']),
             self::POST_STATUS_FILTER   => self::postStatusFilter($status['filter']),
-        ];
+        ] + SettingsSchemas::all() + SeoSchemas::all() + CommentSchemas::all() + UserSchemas::all();
     }
 
     /**
@@ -92,6 +114,7 @@ class CoreSchemas
     public static function flush(): void
     {
         self::$status = null;
+        self::$all    = null;
     }
 
     /**

@@ -25,6 +25,8 @@ class WooCommerceModule
 
     public function register(): void
     {
+        WooCommerceSchemas::register();
+
         add_filter('woocommerce_session_handler', [$this, 'maybeUseHeadlessSession']);
         add_filter('woocommerce_persistent_cart_enabled', [$this, 'maybeDisablePersistentCart']);
         add_filter('woocommerce_store_api_disable_nonce_check', [$this, 'maybeDisableNonceCheck']);
