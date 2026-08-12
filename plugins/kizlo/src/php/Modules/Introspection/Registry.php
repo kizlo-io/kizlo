@@ -160,8 +160,12 @@ class Registry
             $schemas[$id] = $schema;
         }
 
+        // Normalized on the way in, unlike schemaMap(), because a derived write
+        // schema carries the sanitizers core registers its own routes with. Those
+        // are PHP callables: the runtime map needs them so ArgTranslator can put
+        // them back on the route, and the document must never see them.
         foreach (ManagedContent::schemas() as $id => $schema) {
-            self::mergeSchema($schemas, $id, $schema, $errors);
+            self::mergeSchema($schemas, $id, SchemaNormalizer::normalize($schema), $errors);
         }
 
         // Contributed schemas are coerced before they are compared, so two

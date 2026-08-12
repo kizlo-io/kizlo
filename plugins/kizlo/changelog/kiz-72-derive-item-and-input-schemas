@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Derive managed post type and taxonomy item and input schemas from the WordPress controller, and pin responses to a single shape

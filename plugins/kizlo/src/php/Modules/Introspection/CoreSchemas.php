@@ -5,7 +5,7 @@ namespace Kizlo\Modules\Introspection;
 use WP_REST_Posts_Controller;
 
 /**
- * The base schemas everything else extends or references.
+ * The base schemas everything else references.
  *
  * These describe what the API actually returns today, so they are derived from
  * the code that builds those responses — {@see \Kizlo\Modules\Post\PostSchema},
@@ -13,16 +13,18 @@ use WP_REST_Posts_Controller;
  * {@see \Kizlo\Modules\Taxonomy\TaxonomyApi} — rather than designed against the
  * WordPress documentation.
  *
- * `kizlo.post` and `kizlo.term` carry only the fields present for every managed
- * type. Anything that depends on a post type's supports, a taxonomy's hierarchy
- * or configured custom fields is added per type by {@see ManagedContent}.
+ * There is no shared `kizlo.post` or `kizlo.term` base any more. Both were
+ * hand-listed approximations of "the fields every managed type returns", and
+ * once the per-type schemas derive from the controller the only honest way to
+ * keep them would be an intersection across whichever types happen to be managed
+ * — which would move for everyone the moment one non-public type is enabled,
+ * without any concrete type changing shape. Each managed type now carries its own
+ * complete set. {@see CoreItemSchema}
  */
 class CoreSchemas
 {
     public const ERROR  = 'kizlo.error';
     public const MEDIA  = 'kizlo.media';
-    public const POST   = 'kizlo.post';
-    public const TERM   = 'kizlo.term';
     public const SEO    = 'kizlo.seo';
 
     /** A status a post can be read back as. */
@@ -44,8 +46,6 @@ class CoreSchemas
         return [
             self::ERROR                => self::error(),
             self::MEDIA                => self::media(),
-            self::POST                 => self::post(),
-            self::TERM                 => self::term(),
             self::SEO                  => self::seo(),
             self::POST_STATUS          => self::postStatus($status['filter']),
             self::POST_STATUS_WRITABLE => self::postStatusWritable($status['writable']),
@@ -184,60 +184,6 @@ class CoreSchemas
                     ],
                 ],
                 'srcset'   => ['type' => 'string'],
-            ],
-        ];
-    }
-
-    /**
-     * The WordPress post fields present on every managed post type, in every
-     * context. Supports-dependent fields are added per type.
-     *
-     * @return array<string, mixed>
-     */
-    private static function post(): array
-    {
-        return [
-            'type'        => 'object',
-            'description' => 'Fields every Kizlo-managed post type returns, independent of its supports.',
-            'properties'  => [
-                'id'           => ['type' => 'integer', 'required' => true],
-                'date'         => ['type' => 'string', 'required' => true, 'nullable' => true, 'format' => 'date-time', 'description' => "The post's publication date in the site's timezone."],
-                'date_gmt'     => ['type' => 'string', 'required' => true, 'nullable' => true, 'format' => 'date-time'],
-                'guid'         => [
-                    'type'       => 'object',
-                    'required'   => true,
-                    'properties' => [
-                        'rendered' => ['type' => 'string', 'required' => true],
-                    ],
-                ],
-                'modified'     => ['type' => 'string', 'required' => true, 'format' => 'date-time'],
-                'modified_gmt' => ['type' => 'string', 'required' => true, 'format' => 'date-time'],
-                'slug'         => ['type' => 'string', 'required' => true],
-                'status'       => ['$ref' => self::POST_STATUS, 'required' => true],
-                'type'         => ['type' => 'string', 'required' => true],
-                'link'         => ['type' => 'string', 'required' => true, 'format' => 'uri'],
-                'template'     => ['type' => 'string', 'required' => true],
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function term(): array
-    {
-        return [
-            'type'        => 'object',
-            'description' => 'Fields every Kizlo-managed taxonomy returns. Hierarchical taxonomies add "parent".',
-            'properties'  => [
-                'id'          => ['type' => 'integer', 'required' => true],
-                'count'       => ['type' => 'integer', 'required' => true],
-                'description' => ['type' => 'string', 'required' => true],
-                'link'        => ['type' => 'string', 'required' => true, 'format' => 'uri'],
-                'name'        => ['type' => 'string', 'required' => true],
-                'slug'        => ['type' => 'string', 'required' => true],
-                'taxonomy'    => ['type' => 'string', 'required' => true],
-                'meta'        => ['type' => 'object', 'required' => true, 'additionalProperties' => true],
             ],
         ];
     }

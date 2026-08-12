@@ -5,6 +5,7 @@ namespace Kizlo\Modules\Taxonomy;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Terms_Controller;
+use Kizlo\Modules\Introspection\CoreItemSchema;
 use Kizlo\Modules\Introspection\ManagedTaxonomies;
 use Kizlo\Modules\Introspection\RouteRegistrar;
 
@@ -44,15 +45,15 @@ class TaxonomyApi
     {
         switch ($operation) {
             case 'list':
-                return fn(WP_REST_Request $request) => $this->list($slug, $request);
+                return fn(WP_REST_Request $request) => $this->list($slug, self::pinContext($request));
             case 'retrieve':
-                return fn(WP_REST_Request $request) => $this->retrieve($slug, $request->get_param('identifier'), $request);
+                return fn(WP_REST_Request $request) => $this->retrieve($slug, $request->get_param('identifier'), self::pinContext($request));
             case 'create':
-                return fn(WP_REST_Request $request) => $this->create($slug, $request);
+                return fn(WP_REST_Request $request) => $this->create($slug, self::pinContext($request));
             case 'update':
-                return fn(WP_REST_Request $request) => $this->update($slug, $request->get_param('identifier'), $request);
+                return fn(WP_REST_Request $request) => $this->update($slug, $request->get_param('identifier'), self::pinContext($request));
             case 'delete':
-                return fn(WP_REST_Request $request) => $this->delete($slug, $request->get_param('identifier'), $request);
+                return fn(WP_REST_Request $request) => $this->delete($slug, $request->get_param('identifier'), self::pinContext($request));
         }
 
         _doing_it_wrong(
@@ -62,6 +63,14 @@ class TaxonomyApi
         );
 
         return null;
+    }
+
+    /** @see \Kizlo\Modules\PostType\PostTypeApi::pinContext() for why this is forced rather than declared. */
+    private static function pinContext(WP_REST_Request $request): WP_REST_Request
+    {
+        $request->set_param('context', CoreItemSchema::CONTEXT);
+
+        return $request;
     }
 
     /**

@@ -16,11 +16,11 @@ class DocumentTest extends IntrospectionTestCase
         $this->assertSame(['hash', 'schemas', 'apis', 'diagnostics'], array_keys($document));
     }
 
-    public function test_the_five_core_schemas_ship_with_the_document(): void
+    public function test_the_core_schemas_ship_with_the_document(): void
     {
         $schemas = $this->document()['schemas'];
 
-        foreach (['kizlo.error', 'kizlo.media', 'kizlo.post', 'kizlo.term', 'kizlo.seo'] as $id) {
+        foreach (['kizlo.error', 'kizlo.media', 'kizlo.seo'] as $id) {
             $this->assertArrayHasKey($id, $schemas);
         }
     }

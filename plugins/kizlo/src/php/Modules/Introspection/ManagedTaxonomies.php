@@ -44,14 +44,14 @@ class ManagedTaxonomies
     {
         $schemas = [];
 
-        foreach (self::managed() as $slug => $object) {
+        foreach (array_keys(self::managed()) as $slug) {
             $fields = Utils::getSettings()->taxonomies->get($slug)->getCustomFields();
             $id     = self::apiId($slug);
 
-            $schemas["{$id}.list-item"]       = self::item($slug, $object, $fields, false);
-            $schemas["{$id}.item"]            = self::item($slug, $object, $fields, true);
-            $schemas["{$id}.create-input"]    = self::input($slug, $object, $fields, false);
-            $schemas["{$id}.update-input"]    = self::input($slug, $object, $fields, true);
+            $schemas["{$id}.list-item"]       = self::item($slug, $fields, false);
+            $schemas["{$id}.item"]            = self::item($slug, $fields, true);
+            $schemas["{$id}.create-input"]    = self::input($slug, $fields, false);
+            $schemas["{$id}.update-input"]    = self::input($slug, $fields, true);
             $schemas["{$id}.delete-response"] = self::deleteResponse($id);
         }
 
@@ -118,10 +118,7 @@ class ManagedTaxonomies
                 'summary'   => sprintf('Retrieve a single %s term', $slug),
                 'input'     => [
                     'type'       => 'object',
-                    'properties' => [
-                        'identifier' => self::identifier(),
-                        'context'    => self::context(),
-                    ],
+                    'properties' => ['identifier' => self::identifier()],
                 ],
                 'responses' => [
                     '200' => ['description' => 'The term.', 'body' => ['$ref' => "{$id}.item"]],
@@ -200,21 +197,20 @@ class ManagedTaxonomies
     // ============================================================
 
     /**
+     * Derived from `WP_REST_Terms_Controller::get_item_schema()`, so hierarchy
+     * still decides whether `parent` exists, but core decides it rather than this
+     * file. {@see CoreItemSchema} explains the derivation and the pinned context.
+     *
      * @param array<int, array<string, mixed>> $fields
      * @return array<string, mixed>
      */
-    private static function item(string $slug, WP_Taxonomy $object, array $fields, bool $single): array
+    private static function item(string $slug, array $fields, bool $single): array
     {
-        $properties = [];
-
-        if ($object->hierarchical) {
-            $properties['parent'] = ['type' => 'integer', 'required' => true];
-        }
+        $properties = CoreItemSchema::responseForTaxonomy($slug);
 
         $properties['kizlo'] = self::envelope($single);
 
         return [
-            '$extends'    => CoreSchemas::TERM,
             'type'        => 'object',
             'description' => $single
                 ? sprintf('A single "%s" term.', $slug)
@@ -264,21 +260,15 @@ class ManagedTaxonomies
     // ============================================================
 
     /**
+     * Derived through `get_endpoint_args_for_item_schema()`, which is where
+     * `name` being required on create and optional on update comes from.
+     *
      * @param array<int, array<string, mixed>> $fields
      * @return array<string, mixed>
      */
-    private static function input(string $slug, WP_Taxonomy $object, array $fields, bool $partial): array
+    private static function input(string $slug, array $fields, bool $partial): array
     {
-        $properties = [
-            'name'        => $partial ? ['type' => 'string'] : ['type' => 'string', 'required' => true],
-            'description' => ['type' => 'string'],
-            'slug'        => ['type' => 'string'],
-            'meta'        => ['type' => 'object', 'additionalProperties' => true],
-        ];
-
-        if ($object->hierarchical) {
-            $properties['parent'] = ['type' => 'integer'];
-        }
+        $properties = CoreItemSchema::inputForTaxonomy($slug, $partial);
 
         return [
             'type'        => 'object',
@@ -319,13 +309,5 @@ class ManagedTaxonomies
             'required'    => true,
             'description' => 'Numeric ID or slug. The route accepts either, so this is never narrowed to an integer.',
         ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function context(): array
-    {
-        return ['type' => 'string', 'enum' => ['view', 'embed', 'edit'], 'default' => 'view'];
     }
 }

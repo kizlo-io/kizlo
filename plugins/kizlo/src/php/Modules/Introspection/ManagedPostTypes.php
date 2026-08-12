@@ -17,10 +17,17 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettings;
  * which is no use when supports, hierarchy, connected taxonomies and custom
  * fields all differ per type, so it could enforce none of what is described here.
  *
- * What a type's schemas contain follows from its configuration: enabled supports
- * decide which WordPress fields exist, hierarchy decides whether `parent` does,
- * connected taxonomies add their own arrays, and configured custom fields merge
- * in at the response root exactly where the API puts them.
+ * What a type's schemas contain is read off the controller that serves it, not
+ * decided here: {@see CoreItemSchema} derives the response and the write surface
+ * the same way {@see CoreCollectionParams} derives the list. Kizlo adds three
+ * things on top, and only three. The `kizlo` envelope, which is its own. The
+ * configured custom fields, which merge in at the response root exactly where the
+ * API puts them. And a name for the `status` vocabulary, so a client gets one type
+ * rather than an anonymous enum at every site.
+ *
+ * Deciding supports and hierarchy here was the old way and it disagreed with
+ * core, which uses a fixed schema for `post`, `page` and `attachment` and ignores
+ * their registered supports entirely.
  */
 class ManagedPostTypes
 {
@@ -78,17 +85,17 @@ class ManagedPostTypes
     {
         $schemas = [];
 
-        foreach (self::managed() as $slug => $object) {
+        foreach (array_keys(self::managed()) as $slug) {
             $fields = Utils::getSettings()->postTypes->get($slug)->getCustomFields();
             $id     = self::apiId($slug);
 
-            $schemas["{$id}.list-item"]       = self::item($slug, $object, $fields, false);
-            $schemas["{$id}.item"]            = self::item($slug, $object, $fields, true);
+            $schemas["{$id}.list-item"]       = self::item($slug, $fields, false);
+            $schemas["{$id}.item"]            = self::item($slug, $fields, true);
             $schemas["{$id}.delete-response"] = self::deleteResponse($id);
 
             if (self::isWritable($slug)) {
-                $schemas["{$id}.create-input"] = self::input($slug, $object, $fields, false);
-                $schemas["{$id}.update-input"] = self::input($slug, $object, $fields, true);
+                $schemas["{$id}.create-input"] = self::input($slug, $fields, false);
+                $schemas["{$id}.update-input"] = self::input($slug, $fields, true);
             }
         }
 
@@ -157,7 +164,6 @@ class ManagedPostTypes
                 'type'       => 'object',
                 'properties' => [
                     'identifier' => self::identifier(),
-                    'context'    => self::context(),
                     'password'   => ['type' => 'string', 'description' => 'Password for a password-protected entry.'],
                 ],
             ],
@@ -241,72 +247,29 @@ class ManagedPostTypes
     // ============================================================
 
     /**
+     * Derived from the controller that serves the route. {@see CoreItemSchema}
+     * explains why this is no longer written out by hand, and why every field is
+     * required.
+     *
+     * The one thing done to the derived set is naming the `status` vocabulary,
+     * for the reason {@see listParameters()} gives: core spells the enum out
+     * inline, and a generated client would carry an anonymous copy of it at every
+     * site that mentions a status.
+     *
      * @param array<int, array<string, mixed>> $fields
      * @return array<string, mixed>
      */
-    private static function item(string $slug, WP_Post_Type $object, array $fields, bool $single): array
+    private static function item(string $slug, array $fields, bool $single): array
     {
-        $supports = PostTypeSettings::getSupports($slug);
+        $properties = CoreItemSchema::responseForPostType($slug);
 
-        $properties = [];
-
-        if ($supports['title']) {
-            $properties['title'] = self::rendered();
+        if (isset($properties['status'])) {
+            $properties['status'] = ['$ref' => CoreSchemas::POST_STATUS, 'required' => true];
         }
 
-        if ($supports['editor']) {
-            $properties['content'] = self::renderedProtected();
-        }
-
-        if ($supports['excerpt']) {
-            $properties['excerpt'] = self::renderedProtected();
-        }
-
-        if ($supports['author']) {
-            $properties['author'] = ['type' => 'integer', 'required' => true];
-        }
-
-        if ($supports['thumbnail']) {
-            $properties['featured_media'] = ['type' => 'integer', 'required' => true];
-        }
-
-        if ($supports['comments']) {
-            $properties['comment_status'] = ['type' => 'string', 'required' => true, 'enum' => ['open', 'closed']];
-            $properties['ping_status']    = ['type' => 'string', 'required' => true, 'enum' => ['open', 'closed']];
-        }
-
-        if ($supports['page-attributes']) {
-            $properties['menu_order'] = ['type' => 'integer', 'required' => true];
-        }
-
-        if ($supports['post-formats']) {
-            $properties['format'] = ['type' => 'string', 'required' => true];
-        }
-
-        if ($supports['custom-fields']) {
-            $properties['meta'] = ['type' => 'object', 'required' => true, 'additionalProperties' => true];
-        }
-
-        if ($object->hierarchical) {
-            $properties['parent'] = ['type' => 'integer', 'required' => true];
-        }
-
-        if ($slug === 'post') {
-            $properties['sticky'] = ['type' => 'boolean', 'required' => true];
-        }
-
-        foreach (self::taxonomies($slug) as $taxonomy) {
-            $properties[$taxonomy->rest_base ?: $taxonomy->name] = [
-                'type'     => 'array',
-                'required' => true,
-                'items'    => ['type' => 'integer'],
-            ];
-        }
-
-        $properties['kizlo'] = self::envelope($slug, $supports, $single);
+        $properties['kizlo'] = self::envelope($slug, $properties, $single);
 
         return [
-            '$extends'    => CoreSchemas::POST,
             'type'        => 'object',
             'description' => $single
                 ? sprintf('A single "%s" entry.', $slug)
@@ -324,27 +287,32 @@ class ManagedPostTypes
      * built only for a single entry, which is the one shape difference between a
      * list item and an item.
      *
-     * @param array<string, bool> $supports
+     * What the block carries follows the derived fields rather than the settings:
+     * `PostTypeExtension::extendBase()` reads the author off `$data['author']`,
+     * so the author summary exists exactly when the response has an author to
+     * read.
+     *
+     * @param array<string, array<string, mixed>> $properties The derived response fields.
      * @return array<string, mixed>
      */
-    private static function envelope(string $slug, array $supports, bool $single): array
+    private static function envelope(string $slug, array $properties, bool $single): array
     {
-        $properties = [
+        $block = [
             'url' => ['type' => 'string', 'required' => true, 'format' => 'uri', 'description' => 'The resolved frontend URL.'],
         ];
 
         $taxonomies = self::taxonomies($slug);
 
         if (isset($taxonomies['category'])) {
-            $properties['categories'] = self::termSummaries('Absent when the entry has no categories.');
+            $block['categories'] = self::termSummaries('Absent when the entry has no categories.');
         }
 
         if (isset($taxonomies['post_tag'])) {
-            $properties['tags'] = self::termSummaries('Absent when the entry has no tags.');
+            $block['tags'] = self::termSummaries('Absent when the entry has no tags.');
         }
 
-        if ($supports['author']) {
-            $properties['author'] = [
+        if (isset($properties['author'])) {
+            $block['author'] = [
                 'type'        => 'object',
                 'description' => 'Absent when the entry has no author.',
                 'properties'  => [
@@ -356,25 +324,25 @@ class ManagedPostTypes
             ];
         }
 
-        if ($supports['thumbnail']) {
-            $properties['featured_media'] = [
+        if (isset($properties['featured_media'])) {
+            $block['featured_media'] = [
                 '$ref'        => CoreSchemas::MEDIA,
                 'description' => 'Absent when the entry has no featured image.',
             ];
         }
 
         if ($single) {
-            $properties['seo'] = ['$ref' => CoreSchemas::SEO, 'required' => true];
+            $block['seo'] = ['$ref' => CoreSchemas::SEO, 'required' => true];
         }
 
-        $properties['extend'] = [
+        $block['extend'] = [
             'type'                 => 'object',
             'required'             => true,
             'additionalProperties' => true,
             'description'          => 'Whatever the kizlo_extend_post_type filters contributed.',
         ];
 
-        return ['type' => 'object', 'required' => true, 'properties' => $properties];
+        return ['type' => 'object', 'required' => true, 'properties' => $block];
     }
 
     // ============================================================
@@ -382,69 +350,19 @@ class ManagedPostTypes
     // ============================================================
 
     /**
+     * Derived from the same controller, through the same
+     * `get_endpoint_args_for_item_schema()` core registers its own write routes
+     * with, so a field is writable here exactly when it is writable there.
+     *
      * @param array<int, array<string, mixed>> $fields
      * @return array<string, mixed>
      */
-    private static function input(string $slug, WP_Post_Type $object, array $fields, bool $partial): array
+    private static function input(string $slug, array $fields, bool $partial): array
     {
-        $supports = PostTypeSettings::getSupports($slug);
+        $properties = CoreItemSchema::inputForPostType($slug, $partial);
 
-        $properties = [
-            'date'     => ['type' => 'string', 'nullable' => true, 'format' => 'date-time'],
-            'date_gmt' => ['type' => 'string', 'nullable' => true, 'format' => 'date-time'],
-            'slug'     => ['type' => 'string'],
-            'status'   => ['$ref' => CoreSchemas::POST_STATUS_WRITABLE],
-            'password' => ['type' => 'string'],
-            'template' => ['type' => 'string'],
-        ];
-
-        if ($supports['title']) {
-            $properties['title'] = self::writableText();
-        }
-
-        if ($supports['editor']) {
-            $properties['content'] = self::writableText();
-        }
-
-        if ($supports['excerpt']) {
-            $properties['excerpt'] = self::writableText();
-        }
-
-        if ($supports['author']) {
-            $properties['author'] = ['type' => 'integer'];
-        }
-
-        if ($supports['thumbnail']) {
-            $properties['featured_media'] = ['type' => 'integer', 'description' => 'Attachment ID.'];
-        }
-
-        if ($supports['comments']) {
-            $properties['comment_status'] = ['type' => 'string', 'enum' => ['open', 'closed']];
-            $properties['ping_status']    = ['type' => 'string', 'enum' => ['open', 'closed']];
-        }
-
-        if ($supports['page-attributes']) {
-            $properties['menu_order'] = ['type' => 'integer'];
-        }
-
-        if ($supports['post-formats']) {
-            $properties['format'] = ['type' => 'string'];
-        }
-
-        if ($supports['custom-fields']) {
-            $properties['meta'] = ['type' => 'object', 'additionalProperties' => true];
-        }
-
-        if ($object->hierarchical) {
-            $properties['parent'] = ['type' => 'integer'];
-        }
-
-        if ($slug === 'post') {
-            $properties['sticky'] = ['type' => 'boolean'];
-        }
-
-        foreach (self::taxonomies($slug) as $taxonomy) {
-            $properties[$taxonomy->rest_base ?: $taxonomy->name] = ['type' => 'array', 'items' => ['type' => 'integer']];
+        if (isset($properties['status'])) {
+            $properties['status'] = ['$ref' => CoreSchemas::POST_STATUS_WRITABLE];
         }
 
         return [
@@ -514,57 +432,6 @@ class ManagedPostTypes
             'type'        => 'string',
             'required'    => true,
             'description' => 'Numeric ID or slug. The route accepts either, so this is never narrowed to an integer.',
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function context(): array
-    {
-        return ['type' => 'string', 'enum' => ['view', 'embed', 'edit'], 'default' => 'view'];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function rendered(): array
-    {
-        return [
-            'type'       => 'object',
-            'required'   => true,
-            'properties' => ['rendered' => ['type' => 'string', 'required' => true]],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function renderedProtected(): array
-    {
-        return [
-            'type'       => 'object',
-            'required'   => true,
-            'properties' => [
-                'rendered'  => ['type' => 'string', 'required' => true],
-                'protected' => ['type' => 'boolean', 'required' => true],
-            ],
-        ];
-    }
-
-    /**
-     * WordPress disables argument validation on these fields, so both a plain
-     * string and the `{ raw }` object form are accepted.
-     *
-     * @return array<string, mixed>
-     */
-    private static function writableText(): array
-    {
-        return [
-            'anyOf' => [
-                ['type' => 'string'],
-                ['type' => 'object', 'properties' => ['raw' => ['type' => 'string', 'required' => true]]],
-            ],
         ];
     }
 
