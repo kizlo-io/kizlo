@@ -9,22 +9,83 @@ use WPCF7_ContactForm;
 
 class Cf7Module
 {
+    private const RESULT = 'cf7.submission-result';
+
+    /**
+     * The Kizlo error envelope, by ID: this plugin talks to Kizlo through the
+     * public functions rather than its classes.
+     */
+    private const ERROR = 'kizlo.error';
+
     public function register(): void
     {
+        kizlo_register_spec_schema(self::RESULT, self::result());
+
         kizlo_register_route([
+            'id'        => 'cf7.forms',
+            'operation' => 'submit',
             'methods'   => 'POST',
             'route'     => kizlo_route('/cf7/:form_id'),
-            'callback'  => [$this, 'handle_submission'],
-            'args'      => [
-                'form_id' => [
-                    'description'       => 'The ID of the Contact Form 7 form.',
-                    'type'              => 'integer',
-                    'required'          => true,
-                    'sanitize_callback' => 'absint',
-                    'validate_callback' => [$this, 'validate_form_id'],
+            'summary'   => 'Submit a Contact Form 7 form',
+
+            // The fields are the form's own, named in the form's markup, so the
+            // body is open by definition. Only the form itself can say what it
+            // accepts, and it says so by rejecting a submission.
+            'input'     => [
+                'type'                 => 'object',
+                'additionalProperties' => true,
+                'properties'           => [
+                    'form_id' => [
+                        'description'       => 'The ID of the Contact Form 7 form.',
+                        'type'              => 'integer',
+                        'required'          => true,
+                        'sanitize_callback' => 'absint',
+                        'validate_callback' => [$this, 'validate_form_id'],
+                    ],
                 ],
             ],
+            'responses' => [
+                '200' => ['description' => 'The submission result, including a validation failure.', 'body' => ['$ref' => self::RESULT]],
+                '404' => ['description' => 'No form has that ID.', 'body' => ['$ref' => self::ERROR]],
+                '503' => ['description' => 'Contact Form 7 is not active.', 'body' => ['$ref' => self::ERROR]],
+            ],
+            'callback'  => [$this, 'handle_submission'],
         ]);
+    }
+
+    /**
+     * What a submission answers with.
+     *
+     * A rejected submission is a 200 with a `validation_failed` status, because
+     * that is Contact Form 7's own result rather than a transport error.
+     *
+     * @return array<string, mixed>
+     */
+    private static function result(): array
+    {
+        return [
+            'type'        => 'object',
+            'description' => 'The result Contact Form 7 returned for a submission.',
+            'properties'  => [
+                'status'         => [
+                    'type'        => 'string',
+                    'required'    => true,
+                    'description' => 'Contact Form 7\'s status, for example "mail_sent", "validation_failed" or "mail_failed".',
+                ],
+                'message'        => ['type' => 'string', 'required' => true, 'description' => 'The message configured on the form for this status.'],
+                'invalid_fields' => [
+                    'type'     => 'array',
+                    'required' => true,
+                    'items'    => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'field'   => ['type' => 'string', 'required' => true],
+                            'message' => ['type' => 'string', 'required' => true],
+                        ],
+                    ],
+                ],
+            ],
+        ];
     }
 
     public function validate_form_id(int $form_id): true|WP_Error

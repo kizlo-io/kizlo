@@ -25,6 +25,13 @@ class SpecStore
     /** @var array<int, array{location: array<string, string>, message: string}> */
     private static array $errors = [];
 
+    /**
+     * What the plugin itself registered, captured the first time a test resets.
+     *
+     * @var array{schemas: array<int, array{id: string, schema: array<string, mixed>}>, routes: array<int, array<string, mixed>>, trusted: array<string, true>}|null
+     */
+    private static ?array $baseline = null;
+
     private static bool $hooked = false;
 
     /**
@@ -84,17 +91,32 @@ class SpecStore
     }
 
     /**
-     * Test seam: the store is process-global, and the collection filters are
-     * dropped when WordPress restores its hooks between tests, so the "already
-     * hooked" flag has to go with them.
+     * Test seam: drop everything a test registered, keeping what the plugin
+     * registered at load.
+     *
+     * Emptying the store outright is what this used to do, and it was only
+     * harmless while nothing but tests contributed through it. Now that the
+     * plugin's own routes arrive this way, and arrive once at load, emptying the
+     * store would delete them for the rest of the process and leave every later
+     * test building a document for a plugin that appears to serve nothing.
+     *
+     * The baseline is captured on the first call, which is the first test's
+     * setUp: the plugin has finished loading and no test has registered yet. The
+     * filters are re-armed on the way out, because WordPress restores its hooks
+     * between tests and would otherwise leave the baseline in the store with
+     * nothing to publish it.
      */
     public static function reset(): void
     {
-        self::$schemas = [];
-        self::$routes  = [];
-        self::$trusted = [];
+        self::$baseline ??= ['schemas' => self::$schemas, 'routes' => self::$routes, 'trusted' => self::$trusted];
+
+        self::$schemas = self::$baseline['schemas'];
+        self::$routes  = self::$baseline['routes'];
+        self::$trusted = self::$baseline['trusted'];
         self::$errors  = [];
         self::$hooked  = false;
+
+        self::hook();
     }
 
     /**

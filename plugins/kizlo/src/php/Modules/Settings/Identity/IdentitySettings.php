@@ -13,7 +13,8 @@ class IdentitySettings extends SettingsAbstract
     protected const IDENTITY_TYPE_PERSON = 'person';
     protected const IDENTITY_TYPE_ORGANIZATION = 'organization';
     protected const IDENTITY_TYPE_DEFAULT = 'organization';
-    protected const IDENTITY_TYPES = [self::IDENTITY_TYPE_PERSON, self::IDENTITY_TYPE_ORGANIZATION];
+    /** Public so the settings contract enumerates the same two values this validates against. */
+    public const IDENTITY_TYPES = [self::IDENTITY_TYPE_PERSON, self::IDENTITY_TYPE_ORGANIZATION];
 
     protected array $data = [
         'type' => self::IDENTITY_TYPE_DEFAULT,

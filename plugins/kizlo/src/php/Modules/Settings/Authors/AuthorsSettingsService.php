@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Settings\Authors;
 
+use Kizlo\Modules\Introspection\CoreSchemas;
+use Kizlo\Modules\Settings\SettingsSchemas;
 use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -22,9 +24,20 @@ class AuthorsSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'methods'  => 'PUT',
-            'route'    => '/settings/authors',
-            'callback' => function (WP_REST_Request $request) {
+            'id'        => 'settings.authors',
+            'operation' => 'update',
+            'methods'   => 'PUT',
+            'route'     => '/settings/authors',
+            'summary'   => 'Update the author archive settings',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => SettingsSchemas::optionalProperties(SettingsSchemas::AUTHORS),
+            ],
+            'responses' => [
+                '200' => ['description' => 'The saved author settings.', 'body' => ['$ref' => SettingsSchemas::AUTHORS]],
+                '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+            'callback'  => function (WP_REST_Request $request) {
                 $settings = AuthorsSettings::load();
                 $settings->setData($request->get_json_params());
                 $settings->save();

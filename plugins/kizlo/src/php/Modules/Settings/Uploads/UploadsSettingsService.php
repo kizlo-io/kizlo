@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Settings\Uploads;
 
+use Kizlo\Modules\Introspection\CoreSchemas;
+use Kizlo\Modules\Settings\SettingsSchemas;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -21,9 +23,20 @@ class UploadsSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'methods'  => 'PUT',
-            'route'    => '/settings/uploads',
-            'callback' => function (WP_REST_Request $request) {
+            'id'        => 'settings.uploads',
+            'operation' => 'update',
+            'methods'   => 'PUT',
+            'route'     => '/settings/uploads',
+            'summary'   => 'Update the allowed upload types',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => SettingsSchemas::optionalProperties(SettingsSchemas::UPLOADS),
+            ],
+            'responses' => [
+                '200' => ['description' => 'The saved upload settings.', 'body' => ['$ref' => SettingsSchemas::UPLOADS]],
+                '400' => ['description' => 'An extension or MIME type was rejected.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+            'callback'  => function (WP_REST_Request $request) {
                 $data = $request->get_json_params();
 
                 $settings = UploadsSettings::load();

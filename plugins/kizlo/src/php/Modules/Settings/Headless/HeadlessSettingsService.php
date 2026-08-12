@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Settings\Headless;
 
+use Kizlo\Modules\Introspection\CoreSchemas;
+use Kizlo\Modules\Settings\SettingsSchemas;
 use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -22,9 +24,20 @@ class HeadlessSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'methods'  => 'PUT',
-            'route'    => '/settings/headless',
-            'callback' => function (WP_REST_Request $request) {
+            'id'        => 'settings.headless',
+            'operation' => 'update',
+            'methods'   => 'PUT',
+            'route'     => '/settings/headless',
+            'summary'   => 'Update the headless settings',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => SettingsSchemas::optionalProperties(SettingsSchemas::HEADLESS),
+            ],
+            'responses' => [
+                '200' => ['description' => 'The saved headless settings.', 'body' => ['$ref' => SettingsSchemas::HEADLESS]],
+                '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+            'callback'  => function (WP_REST_Request $request) {
                 $settings = HeadlessSettings::load();
                 $settings->setData($request->get_json_params())->save();
 

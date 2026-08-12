@@ -2,7 +2,8 @@
 
 namespace Kizlo\Modules\Settings\Site;
 
-use Kizlo\Modules\Settings\Settings;
+use Kizlo\Modules\Introspection\CoreSchemas;
+use Kizlo\Modules\Settings\SettingsSchemas;
 use Kizlo\Modules\Webhook\Webhook;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -23,9 +24,31 @@ class SiteSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'methods'  => 'PUT',
-            'route'    => '/settings/site',
-            'callback' => function (WP_REST_Request $request) {
+            'id'        => 'settings.site',
+            'operation' => 'update',
+            'methods'   => 'PUT',
+            'route'     => '/settings/site',
+            'summary'   => 'Update the site settings',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'url'                       => ['type' => 'string', 'nullable' => true, 'format' => 'uri'],
+                    'backend_url'               => ['type' => 'string', 'nullable' => true, 'format' => 'uri'],
+                    'secret'                    => ['type' => 'string', 'nullable' => true],
+                    'name'                      => ['type' => 'string', 'nullable' => true],
+                    'alternate_name'            => ['type' => 'string', 'nullable' => true],
+                    'tagline'                   => ['type' => 'string', 'nullable' => true],
+                    'title_separator'           => ['type' => 'string', 'enum' => SiteSettings::TITLE_SEPARATORS],
+                    'fallback_image'            => ['type' => 'integer', 'nullable' => true, 'description' => 'Attachment ID.'],
+                    'search_action_structure'   => ['type' => 'string', 'nullable' => true],
+                    'discourage_search_engines' => ['type' => 'boolean'],
+                ],
+            ],
+            'responses' => [
+                '200' => ['description' => 'The saved site settings.', 'body' => ['$ref' => SettingsSchemas::SITE]],
+                '400' => ['description' => 'A URL, media ID or separator was rejected.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+            'callback'  => function (WP_REST_Request $request) {
                 $settings = SiteSettings::load();
                 $settings->setData($request->get_json_params());
                 $settings->save();

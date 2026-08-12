@@ -17,6 +17,16 @@ namespace Kizlo\Modules\Introspection;
 class Registry
 {
     /**
+     * Every introspected route resolves its `$ref`s against this while its
+     * arguments are built, so a request with forty of them asked for it forty
+     * times and rebuilt it each time. Nothing can contribute between two of
+     * those calls: registration is over by `rest_api_init`.
+     *
+     * @var array<string, array<string, mixed>>|null
+     */
+    private static ?array $schemaMap = null;
+
+    /**
      * The registered schema map, unvalidated.
      *
      * Runtime arg translation needs the same map the document is built from, but
@@ -28,6 +38,10 @@ class Registry
      */
     public static function schemaMap(): array
     {
+        if (self::$schemaMap !== null) {
+            return self::$schemaMap;
+        }
+
         $schemas = CoreSchemas::all() + ManagedContent::schemas();
 
         /** @var array<int, mixed> $contributed */
@@ -42,7 +56,16 @@ class Registry
             }
         }
 
-        return $schemas;
+        return self::$schemaMap = $schemas;
+    }
+
+    /**
+     * Cleared by {@see ManagedContent::flush()}, which is what makes a rebuild
+     * mean something.
+     */
+    public static function flush(): void
+    {
+        self::$schemaMap = null;
     }
 
     /**

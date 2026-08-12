@@ -79,9 +79,20 @@ class SettingsModule
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'methods'  => 'GET',
-            'route'    => '/settings',
-            'callback' => function (WP_REST_Request $request) {
+            'id'        => 'settings',
+            'operation' => 'retrieve',
+            'methods'   => 'GET',
+            'route'     => '/settings',
+            'summary'   => 'Retrieve every settings section',
+
+            // The internal nav flag is not declared on purpose. Undeclared
+            // parameters still reach the handler, so the admin keeps working
+            // while the published contract stays the one SDK callers use.
+            'input'     => ['type' => 'object'],
+            'responses' => [
+                '200' => ['description' => 'Every settings section.', 'body' => ['$ref' => SettingsSchemas::SETTINGS]],
+            ],
+            'callback'  => function (WP_REST_Request $request) {
                 return new WP_REST_Response($this->toResponse($request->get_param(self::INTERNAL_QUERY_FLAG) !== null));
             },
         ]);

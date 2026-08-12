@@ -27,60 +27,66 @@ class CommentSubmission
     public function register(): void
     {
         kizlo_register_route([
-            'methods'  => 'POST',
-            'route'    => '/comments',
-            'callback' => [$this, 'submit'],
-            'args'     => [
-                'post_id' => [
-                    'required'          => true,
-                    'type'              => 'integer',
-                    'validate_callback' => static fn($v) => is_numeric($v) && (int) $v > 0,
-                    'sanitize_callback' => 'absint',
-                ],
-                'content' => [
-                    'required'          => true,
-                    'type'              => 'string',
-                    'validate_callback' => static fn($v) => is_string($v) && trim($v) !== '',
-                    'sanitize_callback' => 'wp_kses_post',
-                ],
-                'parent' => [
-                    'required'          => false,
-                    'type'              => 'integer',
-                    'default'           => 0,
-                    'sanitize_callback' => 'absint',
-                ],
-                'user_id' => [
-                    'required'          => false,
-                    'type'              => 'integer',
-                    'sanitize_callback' => 'absint',
-                ],
-                'author_name' => [
-                    'required'          => false,
-                    'type'              => 'string',
-                    'sanitize_callback' => 'sanitize_text_field',
-                ],
-                'author_email' => [
-                    'required'          => false,
-                    'type'              => 'string',
-                    'sanitize_callback' => 'sanitize_email',
-                ],
-                'author_url' => [
-                    'required'          => false,
-                    'type'              => 'string',
-                    'sanitize_callback' => 'esc_url_raw',
-                ],
-                'author_ip' => [
-                    'required'          => true,
-                    'type'              => 'string',
-                    'validate_callback' => static fn($v) => is_string($v) && filter_var($v, FILTER_VALIDATE_IP) !== false,
-                    'sanitize_callback' => 'sanitize_text_field',
-                ],
-                'user_agent' => [
-                    'required'          => true,
-                    'type'              => 'string',
-                    'sanitize_callback' => 'sanitize_text_field',
+            'id'        => 'comments',
+            'operation' => 'create',
+            'methods'   => 'POST',
+            'route'     => '/comments',
+            'summary'   => 'Submit a comment through the native pipeline',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'post_id' => [
+                        'type'              => 'integer',
+                        'required'          => true,
+                        'validate_callback' => static fn($v) => is_numeric($v) && (int) $v > 0,
+                        'sanitize_callback' => 'absint',
+                    ],
+                    'content' => [
+                        'type'              => 'string',
+                        'required'          => true,
+                        'validate_callback' => static fn($v) => is_string($v) && trim($v) !== '',
+                        'sanitize_callback' => 'wp_kses_post',
+                    ],
+                    'parent' => [
+                        'type'              => 'integer',
+                        'default'           => 0,
+                        'description'       => 'The comment being replied to.',
+                        'sanitize_callback' => 'absint',
+                    ],
+                    'user_id' => [
+                        'type'              => 'integer',
+                        'description'       => 'The commenting WordPress user. Omitted for a guest.',
+                        'sanitize_callback' => 'absint',
+                    ],
+                    'author_name' => [
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                    'author_email' => [
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_email',
+                    ],
+                    'author_url' => [
+                        'type'              => 'string',
+                        'sanitize_callback' => 'esc_url_raw',
+                    ],
+                    'author_ip' => [
+                        'type'              => 'string',
+                        'required'          => true,
+                        'description'       => 'The end user\'s IP, forwarded so moderation and spam filters see the real client.',
+                        'validate_callback' => static fn($v) => is_string($v) && filter_var($v, FILTER_VALIDATE_IP) !== false,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                    'user_agent' => [
+                        'type'              => 'string',
+                        'required'          => true,
+                        'description'       => 'The end user\'s user agent, forwarded for the same reason.',
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
                 ],
             ],
+            'responses' => CommentSchemas::submitResponses(),
+            'callback'  => [$this, 'submit'],
         ]);
     }
 

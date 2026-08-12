@@ -6,6 +6,7 @@ use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
+use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 
 /**
  * Headless cart REST API — kept intentionally tiny.
@@ -24,9 +25,20 @@ class CartController
     public function register(): void
     {
         kizlo_register_route([
-            'methods'  => 'POST',
-            'route'    => '/cart/merge',
-            'callback' => [$this, 'mergeCart'],
+            'id'        => 'woocommerce.cart',
+            'operation' => 'merge',
+            'methods'   => 'POST',
+            'route'     => '/cart/merge',
+            'summary'   => 'Merge a guest cart into the signed-in user\'s cart',
+
+            // The guest cart is named by the X-Kizlo-Guest-Token header rather
+            // than the body, so there is nothing to declare here.
+            'input'     => ['type' => 'object'],
+            'responses' => [
+                '200' => ['description' => 'The merged cart.', 'body' => ['$ref' => WooCommerceSchemas::CART]],
+                '400' => ['description' => 'The X-Kizlo-Guest-Token header was missing, or named no cart.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+            ],
+            'callback'  => [$this, 'mergeCart'],
         ]);
     }
 

@@ -8,6 +8,7 @@ use WC_Product;
 use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\WooCommerce\Modules\Product\ProductModule;
+use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 
 class ProductController
 {
@@ -16,62 +17,94 @@ class ProductController
     public function register(): void
     {
         kizlo_register_route([
+            'id'        => 'woocommerce.products',
+            'operation' => 'list_mixed',
             'methods'   => 'GET',
-            'access'    => 'admin',
             'route'     => '/products/mixed',
+            'summary'   => 'List products and variations in one call',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'items' => [
+                        'type'        => 'string',
+                        'required'    => true,
+                        'description' => 'JSON-encoded array of { product_id?, variation_id? } objects. A string because this is a GET.',
+                    ],
+                ],
+            ],
+            'responses' => [
+                '200' => [
+                    'description' => 'One entry per requested item, in the order asked for.',
+                    'body'        => ['type' => 'array', 'items' => ['$ref' => WooCommerceSchemas::PRODUCT]],
+                ],
+                '400' => ['description' => '"items" was missing, unparseable, or an entry named neither ID.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                '404' => ['description' => 'A requested product or variation does not exist.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+            ],
             'callback'  => [$this, 'listMixedProductApiCallback'],
-            'args' => [
-                'items' => [
-                    'required'    => true,
-                    'type'        => 'string',
-                    'description' => 'JSON-encoded array of { product_id?, variation_id? } objects.',
-                ],
-            ],
         ]);
 
         kizlo_register_route([
+            'id'        => 'woocommerce.products',
+            'operation' => 'preview',
             'methods'   => 'GET',
-            'access'    => 'admin',
             'route'     => '/products/preview',
-            'callback'  => [$this, 'getProductPreviewApiCallback'],
-            'args'      => [
-                'slug' => [
-                    'required'          => true,
-                    'type'              => 'string',
-                    'sanitize_callback' => 'sanitize_title',
-                ],
-                'preview_nonce' => [
-                    'required' => true,
-                    'type'     => 'string',
+            'summary'   => 'Retrieve an unpublished product for preview',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'slug' => [
+                        'type'              => 'string',
+                        'required'          => true,
+                        'sanitize_callback' => 'sanitize_title',
+                    ],
+                    'preview_nonce' => [
+                        'type'        => 'string',
+                        'required'    => true,
+                        'description' => 'The preview nonce WordPress issued for the draft.',
+                    ],
                 ],
             ],
+            'responses' => [
+                '200' => ['description' => 'The product.', 'body' => ['$ref' => WooCommerceSchemas::PRODUCT]],
+                '404' => ['description' => 'No product has that slug.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+            ],
+            'callback'  => [$this, 'getProductPreviewApiCallback'],
         ]);
 
         kizlo_register_route([
+            'id'        => 'woocommerce.products',
+            'operation' => 'review_exists',
             'methods'   => 'POST',
-            'access'    => 'admin',
             'route'     => '/products/reviews/exists',
-            'callback'  => [$this, 'getReviewExistApiCallback'],
-            'args' => [
-                'user_id' => [
-                    'description'       => 'The WooCommerce user ID.',
-                    'type'              => 'integer',
-                    'required'          => true,
-                    'sanitize_callback' => 'absint',
-                    'validate_callback' => static function ($value): bool {
-                        return is_numeric($value) && $value > 0;
-                    },
-                ],
-                'product_id' => [
-                    'description'       => 'The WooCommerce product ID.',
-                    'type'              => 'integer',
-                    'required'          => true,
-                    'sanitize_callback' => 'absint',
-                    'validate_callback' => static function ($value): bool {
-                        return is_numeric($value) && $value > 0;
-                    },
+            'summary'   => 'Check whether a user has reviewed a product',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'user_id' => [
+                        'description'       => 'The WooCommerce user ID.',
+                        'type'              => 'integer',
+                        'required'          => true,
+                        'sanitize_callback' => 'absint',
+                        'validate_callback' => static function ($value): bool {
+                            return is_numeric($value) && $value > 0;
+                        },
+                    ],
+                    'product_id' => [
+                        'description'       => 'The WooCommerce product ID.',
+                        'type'              => 'integer',
+                        'required'          => true,
+                        'sanitize_callback' => 'absint',
+                        'validate_callback' => static function ($value): bool {
+                            return is_numeric($value) && $value > 0;
+                        },
+                    ],
                 ],
             ],
+            'responses' => [
+                '200' => ['description' => 'Whether an approved review exists.', 'body' => ['$ref' => WooCommerceSchemas::REVIEW_EXISTS]],
+                '400' => ['description' => 'Invalid product or user ID.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+            ],
+            'callback'  => [$this, 'getReviewExistApiCallback'],
         ]);
 
         kizlo_register_route_interceptor([

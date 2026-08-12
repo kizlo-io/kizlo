@@ -75,6 +75,22 @@ final class CoreItemSchema
     }
 
     /**
+     * The same derivation for a route that serves a core controller directly.
+     *
+     * The comment and user routes hand their work to core's own controller and
+     * return what it prepares, so the fields they return are the controller's
+     * fields and nothing else describes them. `$context` is a parameter because
+     * those routes are not managed content: the managed routes pin `edit` before
+     * the controller runs, and a route that pins something else has to say so.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function responseForController(WP_REST_Controller $controller, string $route, string $context = self::CONTEXT): array
+    {
+        return self::$memo[sprintf('controller:%s:%s', $route, $context)] ??= self::response($controller, $route, $context);
+    }
+
+    /**
      * @return array<string, array<string, mixed>>
      */
     public static function inputForPostType(string $slug, bool $partial): array
@@ -96,6 +112,17 @@ final class CoreItemSchema
             $partial,
             sprintf('/taxonomies/%s', $slug),
         );
+    }
+
+    /**
+     * The write surface of a route that serves a core controller directly, taken
+     * from the arguments core registers its own write route with.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function inputForController(WP_REST_Controller $controller, bool $partial, string $route): array
+    {
+        return self::$memo[sprintf('controller:%s:%s', $route, $partial ? 'update' : 'create')] ??= self::input($controller, $partial, $route);
     }
 
     /**
@@ -123,13 +150,13 @@ final class CoreItemSchema
      *
      * @return array<string, array<string, mixed>>
      */
-    private static function response(WP_REST_Controller $controller, string $route): array
+    private static function response(WP_REST_Controller $controller, string $route, string $context = self::CONTEXT): array
     {
         $schema     = $controller->get_item_schema();
         $properties = is_array($schema['properties'] ?? null) ? $schema['properties'] : [];
 
         $translated = CoreSchemaTranslator::properties(
-            self::inContext($properties),
+            self::inContext($properties, $context),
             static function (string $name) use ($route): void {
                 SpecStore::addError(
                     ['path' => $route, 'keyword' => $name],
@@ -263,7 +290,7 @@ final class CoreItemSchema
      * @param array<array-key, mixed> $properties
      * @return array<string, mixed>
      */
-    private static function inContext(array $properties): array
+    private static function inContext(array $properties, string $context = self::CONTEXT): array
     {
         $kept = [];
 
@@ -272,14 +299,14 @@ final class CoreItemSchema
                 continue;
             }
 
-            $context = $property['context'] ?? null;
+            $declared = $property['context'] ?? null;
 
-            if (is_array($context) && !in_array(self::CONTEXT, $context, true)) {
+            if (is_array($declared) && !in_array($context, $declared, true)) {
                 continue;
             }
 
             if (isset($property['properties']) && is_array($property['properties'])) {
-                $property['properties'] = self::inContext($property['properties']);
+                $property['properties'] = self::inContext($property['properties'], $context);
             }
 
             $kept[$name] = $property;

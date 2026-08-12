@@ -7,54 +7,143 @@ use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Users_Controller;
+use Kizlo\Modules\Introspection\CoreItemSchema;
+use Kizlo\Modules\Introspection\CoreSchemas;
 
 class UserApi
 {
-    private const ALLOWED_FIELDS = ['id', 'email', 'username'];
+    private const ALLOWED_FIELDS = UserSchemas::FIELDS;
 
+    /**
+     * One route, addressed by ID, email or username, and three operations on it.
+     *
+     * They were one registration answering three methods, which the contract
+     * cannot describe: a read, a write and a delete return different things and
+     * take different bodies, and a generated client would have had one method
+     * for all three. WordPress merges handlers registered against the same
+     * route, so the runtime is unchanged.
+     */
     public function register()
     {
+        $route = kizlo_route('/users/:field/:value');
+
         kizlo_register_route([
-            'methods'  => ['GET', 'POST', 'DELETE'],
-            'route'    => kizlo_route('/users/:field/:value'),
-            'callback' => function (WP_REST_Request $request) {
-                $field  = $request->get_param('field');
-                $value = urldecode($request->get_param('value'));
-                $method = $request->get_method();
-
-                if (!in_array($field, self::ALLOWED_FIELDS, true)) {
-                    return new WP_Error(
-                        'invalid_field',
-                        sprintf(__('Invalid field "%s". Allowed fields: id, email, username.'), $field),
-                        ['status' => 400]
-                    );
-                }
-
-                if ($field === 'id') {
-                    $userId = (int) $value;
-                } else {
-                    $user = $this->getUserByField($field, $value);
-
-                    if (is_wp_error($user)) {
-                        return $user;
-                    }
-
-                    $userId = $user->ID;
-                }
-
-                $controller = new WP_REST_Users_Controller();
-                $getRequest = new WP_REST_Request('GET');
-                $getRequest->set_param('id', $userId);
-                $getRequest->set_param('context', 'edit');
-
-                return match ($method) {
-                    'GET'    => $controller->get_item($getRequest),
-                    'POST'   => $this->updateUser($userId, $request),
-                    'DELETE' => $this->deleteUser($userId, ($request->get_json_params() ?: [])['reassign'] ?? null),
-                    default  => new WP_Error('invalid_method', __('Method not allowed.'), ['status' => 405]),
-                };
-            }
+            'id'        => 'users',
+            'operation' => 'retrieve',
+            'methods'   => 'GET',
+            'route'     => $route,
+            'summary'   => 'Retrieve a user by ID, email address or username',
+            'input'     => ['type' => 'object', 'properties' => UserSchemas::identifier()],
+            'responses' => self::responses(),
+            'callback'  => fn(WP_REST_Request $request) => $this->resolve(
+                $request,
+                fn(int $userId) => $this->readUser($userId),
+            ),
         ]);
+
+        kizlo_register_route([
+            'id'        => 'users',
+            'operation' => 'update',
+            'methods'   => 'POST',
+            'route'     => $route,
+            'summary'   => 'Update a user',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => UserSchemas::identifier() + CoreItemSchema::inputForController(
+                    new WP_REST_Users_Controller(),
+                    true,
+                    '/users',
+                ),
+            ],
+            'responses' => self::responses(),
+            'callback'  => fn(WP_REST_Request $request) => $this->resolve(
+                $request,
+                fn(int $userId) => $this->updateUser($userId, $request),
+            ),
+        ]);
+
+        kizlo_register_route([
+            'id'        => 'users',
+            'operation' => 'delete',
+            'methods'   => 'DELETE',
+            'route'     => $route,
+            'summary'   => 'Delete a user',
+            'input'     => [
+                'type'       => 'object',
+                'properties' => UserSchemas::identifier() + [
+                    'reassign' => [
+                        'type'        => 'integer',
+                        'nullable'    => true,
+                        'description' => 'User to reassign the deleted account\'s content to. Omitted deletes the content with it.',
+                    ],
+                ],
+            ],
+            'responses' => self::responses('The deleted user, as it was before deletion.'),
+            'callback'  => fn(WP_REST_Request $request) => $this->resolve(
+                $request,
+                fn(int $userId) => $this->deleteUser($userId, ($request->get_json_params() ?: [])['reassign'] ?? null),
+            ),
+        ]);
+    }
+
+    /**
+     * @return array<array-key, array<string, mixed>>
+     */
+    private static function responses(string $description = 'The user.'): array
+    {
+        return [
+            '200' => ['description' => $description, 'body' => ['$ref' => UserSchemas::USER]],
+            '400' => ['description' => 'Unknown field.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            '403' => ['description' => 'The account is the one the request authenticated as.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            '404' => ['description' => 'No user matches the field and value.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+        ];
+    }
+
+    /**
+     * Turn the addressed field and value into a user ID, then run the operation.
+     *
+     * @param callable(int): (WP_REST_Response|WP_Error) $operation
+     */
+    private function resolve(WP_REST_Request $request, callable $operation): WP_REST_Response|WP_Error
+    {
+        $field = (string) $request->get_param('field');
+        $value = urldecode((string) $request->get_param('value'));
+
+        if (!in_array($field, self::ALLOWED_FIELDS, true)) {
+            return new WP_Error(
+                'invalid_field',
+                sprintf(__('Invalid field "%s". Allowed fields: id, email, username.'), $field),
+                ['status' => 400]
+            );
+        }
+
+        if ($field === 'id') {
+            return $operation((int) $value);
+        }
+
+        $user = $this->getUserByField($field, $value);
+
+        if (is_wp_error($user)) {
+            return $user;
+        }
+
+        return $operation($user->ID);
+    }
+
+    /**
+     * Read through core's controller with the context pinned, so the response
+     * carries every field it can produce rather than the narrower set a missing
+     * `context` parameter would have selected.
+     */
+    private function readUser(int $userId): WP_REST_Response|WP_Error
+    {
+        $controller = new WP_REST_Users_Controller();
+        $request    = new WP_REST_Request('GET');
+
+        $request->set_param('id', $userId);
+        $request->set_param('context', CoreItemSchema::CONTEXT);
+
+        return $controller->get_item($request);
     }
 
     public function getUserByField(string $field, string $value): WP_User|WP_Error
@@ -87,7 +176,10 @@ class UserApi
     public function updateUser(int $userId, WP_REST_Request $request): WP_REST_Response|WP_Error
     {
         $controller = new WP_REST_Users_Controller();
+
         $request->set_param('id', $userId);
+        $request->set_param('context', CoreItemSchema::CONTEXT);
+
         return $controller->update_item($request);
     }
 
@@ -107,6 +199,7 @@ class UserApi
         $request->set_param('id', $userId);
         $request->set_param('force', true);
         $request->set_param('reassign', $reassignTo);
+        $request->set_param('context', CoreItemSchema::CONTEXT);
 
         $result = $controller->delete_item($request);
 
@@ -133,7 +226,7 @@ class UserApi
 
         $controller = new WP_REST_Users_Controller();
         $user_request = new WP_REST_Request('GET');
-        $user_request->set_param('context', 'edit');
+        $user_request->set_param('context', CoreItemSchema::CONTEXT);
 
         $data = $controller->prepare_item_for_response($user, $user_request);
 
