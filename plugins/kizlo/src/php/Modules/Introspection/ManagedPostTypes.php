@@ -4,6 +4,7 @@ namespace Kizlo\Modules\Introspection;
 
 use WP_Post_Type;
 use WP_Taxonomy;
+use WP_REST_Attachments_Controller;
 use Kizlo\Support\Utils;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 
@@ -19,11 +20,19 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettings;
  *
  * What a type's schemas contain is read off the controller that serves it, not
  * decided here: {@see CoreItemSchema} derives the response and the write surface
- * the same way {@see CoreCollectionParams} derives the list. Kizlo adds three
- * things on top, and only three. The `kizlo` envelope, which is its own. The
- * configured custom fields, which merge in at the response root exactly where the
- * API puts them. And a name for the `status` vocabulary, so a client gets one type
- * rather than an anonymous enum at every site.
+ * the same way {@see CoreCollectionParams} derives the list, and {@see CoreControllers}
+ * decides which controller that is. Kizlo adds three things on top, and only
+ * three. The `kizlo` envelope, which is its own. The configured custom fields,
+ * which merge in at the response root exactly where the API puts them. And a name
+ * for the `status` vocabulary, so a client gets one type rather than an anonymous
+ * enum at every site.
+ *
+ * The five operations are described for every managed type. `attachment` used to
+ * be listed as read-only here, which was true of the route rather than of the
+ * resource: it was served through a controller that ignores `$_FILES`, so a create
+ * would have written a post row with no file. It is served through the attachments
+ * controller now, so what is left of that distinction is the shape of the create
+ * body, which {@see createInput()} describes.
  *
  * Deciding supports and hierarchy here was the old way and it disagreed with
  * core, which uses a fixed schema for `post`, `page` and `attachment` and ignores
@@ -31,21 +40,6 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettings;
  */
 class ManagedPostTypes
 {
-    /**
-     * Managed post types that can be read through `/post-types/` but not written.
-     *
-     * `attachment` is a Kizlo-included built-in like `post` and `page`, so it is
-     * described. But {@see \Kizlo\Modules\PostType\PostTypeApi} serves it through
-     * `WP_REST_Posts_Controller`, which knows nothing about `$_FILES` — an
-     * attachment created that way is a row with no file behind it. Listing,
-     * retrieving and deleting all work, so those are described and `create` and
-     * `update` are not, and neither is registered. Uploads belong on the
-     * WordPress media route.
-     *
-     * @var array<int, string>
-     */
-    private const READ_ONLY = ['attachment'];
-
     /**
      * Kizlo-managed post types that are actually callable.
      *
@@ -73,11 +67,6 @@ class ManagedPostTypes
         return $managed;
     }
 
-    public static function isWritable(string $slug): bool
-    {
-        return !in_array($slug, self::READ_ONLY, true);
-    }
-
     /**
      * @return array<string, array<string, mixed>>
      */
@@ -92,11 +81,8 @@ class ManagedPostTypes
             $schemas["{$id}.list-item"]       = self::item($slug, $fields, false);
             $schemas["{$id}.item"]            = self::item($slug, $fields, true);
             $schemas["{$id}.delete-response"] = self::deleteResponse($id);
-
-            if (self::isWritable($slug)) {
-                $schemas["{$id}.create-input"] = self::input($slug, $fields, false);
-                $schemas["{$id}.update-input"] = self::input($slug, $fields, true);
-            }
+            $schemas["{$id}.create-input"]    = self::input($slug, $fields, false);
+            $schemas["{$id}.update-input"]    = self::input($slug, $fields, true);
         }
 
         return $schemas;
@@ -173,42 +159,44 @@ class ManagedPostTypes
             ],
         ];
 
-        if (self::isWritable($slug)) {
-            $routes['create'] = [
-                'id'        => $id,
-                'operation' => 'create',
-                'namespace' => KIZLO_API_NAMESPACE,
-                'route'     => $collection,
-                'methods'   => ['POST'],
-                'summary'   => sprintf('Create a %s entry', $slug),
-                'input'     => ['$extends' => "{$id}.create-input", 'type' => 'object', 'content_type' => Spec::JSON_CONTENT_TYPE],
-                'responses' => [
-                    '201' => ['description' => 'The created entry.', 'body' => ['$ref' => "{$id}.item"]],
-                    '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                    '404' => ['description' => 'Post type not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                ],
-            ];
+        $routes['create'] = [
+            'id'        => $id,
+            'operation' => 'create',
+            'namespace' => KIZLO_API_NAMESPACE,
+            'route'     => $collection,
+            'methods'   => ['POST'],
+            'summary'   => sprintf('Create a %s entry', $slug),
+            'input'     => self::createInput($slug, $id),
+            'responses' => [
+                '201' => ['description' => 'The created entry.', 'body' => ['$ref' => "{$id}.item"]],
+                '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+                '404' => ['description' => 'Post type not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+        ];
 
-            $routes['update'] = [
-                'id'        => $id,
-                'operation' => 'update',
-                'namespace' => KIZLO_API_NAMESPACE,
-                'route'     => $single,
-                'methods'   => ['PATCH'],
-                'summary'   => sprintf('Update a %s entry', $slug),
-                'input'     => [
-                    '$extends'     => "{$id}.update-input",
-                    'type'         => 'object',
-                    'content_type' => Spec::JSON_CONTENT_TYPE,
-                    'properties'   => ['identifier' => self::identifier()],
-                ],
-                'responses' => [
-                    '200' => ['description' => 'The updated entry.', 'body' => ['$ref' => "{$id}.item"]],
-                    '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                    '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                ],
-            ];
-        }
+        $routes['update'] = [
+            'id'        => $id,
+            'operation' => 'update',
+            'namespace' => KIZLO_API_NAMESPACE,
+            'route'     => $single,
+            'methods'   => ['PATCH'],
+            'summary'   => sprintf('Update a %s entry', $slug),
+
+            // JSON even for an upload type. There is no way to replace the binary
+            // through PATCH and WordPress does not offer one either: editing an
+            // image is the separate `/media/<id>/edit` route.
+            'input'     => [
+                '$extends'     => "{$id}.update-input",
+                'type'         => 'object',
+                'content_type' => Spec::JSON_CONTENT_TYPE,
+                'properties'   => ['identifier' => self::identifier()],
+            ],
+            'responses' => [
+                '200' => ['description' => 'The updated entry.', 'body' => ['$ref' => "{$id}.item"]],
+                '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+                '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+        ];
 
         $routes['delete'] = [
             'id'        => $id,
@@ -362,7 +350,7 @@ class ManagedPostTypes
         $properties = CoreItemSchema::inputForPostType($slug, $partial);
 
         if (isset($properties['status'])) {
-            $properties['status'] = ['$ref' => CoreSchemas::POST_STATUS_WRITABLE];
+            $properties['status'] = self::named($properties['status'], 'writable', CoreSchemas::POST_STATUS_WRITABLE);
         }
 
         return [
@@ -372,6 +360,62 @@ class ManagedPostTypes
                 : sprintf('A new "%s" entry. Required custom fields must be present.', $slug),
             'properties'  => $properties + CustomFieldSchema::inputProperties($fields, $partial),
         ];
+    }
+
+    /**
+     * The operation input for a create, which is where a body that is not JSON has
+     * to be declared.
+     *
+     * An upload type takes a multipart body carrying the binary in a `file` part,
+     * because that is what `WP_REST_Attachments_Controller` reads: `get_file_params()`
+     * looks in `$_FILES`, which no JSON body can populate. Describing this create
+     * as JSON would be a fresh lie in place of the old one, where the operation was
+     * left out of the contract altogether.
+     *
+     * The `file` property is declared here rather than in the `create-input`
+     * schema, and it has to be: {@see Registry} cleans a registered schema with no
+     * multipart context, so a `file` inside one is rejected as a type only legal
+     * under a multipart body. This is the same place `update` declares its
+     * `identifier`, for the same reason — it belongs to the operation rather than
+     * to the resource.
+     *
+     * {@see ArgTranslator} then drops it before registration, so WordPress
+     * validates everything except the upload and the controller answers
+     * `rest_upload_no_data` when the part is missing.
+     *
+     * @return array<string, mixed>
+     */
+    private static function createInput(string $slug, string $id): array
+    {
+        $input = ['$extends' => "{$id}.create-input", 'type' => 'object'];
+
+        if (!self::uploads($slug)) {
+            return $input + ['content_type' => Spec::JSON_CONTENT_TYPE];
+        }
+
+        return $input + [
+            'content_type' => Spec::MULTIPART_CONTENT_TYPE,
+            'properties'   => [
+                'file' => [
+                    'type'        => 'file',
+                    'required'    => true,
+                    'description' => 'The file to upload, sent as the "file" part of the multipart body. Every other property is sent as a part of the same body rather than as JSON.',
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Whether the route takes an upload, asked of the controller that serves it
+     * rather than of the slug.
+     *
+     * `attachment` is the type core registers this way, but the question is really
+     * "does the controller read `$_FILES`", and a post type another plugin
+     * registers with an attachments controller answers yes on the same terms.
+     */
+    private static function uploads(string $slug): bool
+    {
+        return CoreControllers::forPostType($slug) instanceof WP_REST_Attachments_Controller;
     }
 
     /**
@@ -396,11 +440,44 @@ class ManagedPostTypes
     {
         $properties = CoreCollectionParams::forPostType($slug);
 
-        if (isset($properties['status']['items'])) {
-            $properties['status']['items'] = ['$ref' => CoreSchemas::POST_STATUS_FILTER];
+        if (isset($properties['status']['items']) && is_array($properties['status']['items'])) {
+            $properties['status']['items'] = self::named($properties['status']['items'], 'filter', CoreSchemas::POST_STATUS_FILTER);
         }
 
         return $properties;
+    }
+
+    /**
+     * Name a derived vocabulary, but only while it is still the shared one.
+     *
+     * The status schemas are shared because the vocabularies are global:
+     * `register_post_status()` takes no post type. The list filter is the one place
+     * that stops being true, and core is what breaks it —
+     * `WP_REST_Attachments_Controller::get_collection_params()` narrows the enum to
+     * `inherit`, `private` and `trash`, because those are the only statuses an
+     * attachment is ever stored with. Referencing the shared schema there would
+     * republish the whole vocabulary on a route that rejects almost all of it,
+     * which is worse than the anonymous enum the reference exists to avoid: a
+     * generated client would offer values guaranteed to 400.
+     *
+     * So a type that agrees gets the name, and a type that does not keeps core's
+     * own enum inline. The comparison is the guard as well as the decision — a
+     * shared schema drifting from the controller stops being referenced rather
+     * than quietly starting to lie.
+     *
+     * @param array<string, mixed> $property
+     * @param 'writable'|'filter'  $vocabulary
+     * @return array<string, mixed>
+     */
+    private static function named(array $property, string $vocabulary, string $schema): array
+    {
+        $enum = $property['enum'] ?? null;
+
+        if (!is_array($enum) || array_values($enum) !== array_values(CoreSchemas::statusVocabularies()[$vocabulary])) {
+            return $property;
+        }
+
+        return ['$ref' => $schema];
     }
 
     // ============================================================

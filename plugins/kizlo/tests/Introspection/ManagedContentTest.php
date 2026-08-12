@@ -37,22 +37,49 @@ class ManagedContentTest extends IntrospectionTestCase
         $this->assertArrayHasKey('taxonomies.post_tag', $apis);
     }
 
-    public function test_attachments_are_described_for_reading_but_not_for_writing(): void
+    /**
+     * The create that used to be missing. It was left out because the route was
+     * served by a controller that ignores `$_FILES`, so the operation would have
+     * described a create that produced a post row with no file behind it.
+     *
+     * Describing it as JSON would have been the same defect wearing a contract: a
+     * body that cannot carry a file, on the one operation that exists to carry
+     * one. So the operation declares the multipart body the attachments controller
+     * actually reads.
+     */
+    public function test_an_upload_type_declares_a_multipart_create_carrying_the_file(): void
     {
-        // A Kizlo-included built-in like post and page, so it belongs in the
-        // contract. But PostTypeApi serves it through WP_REST_Posts_Controller,
-        // which never looks at $_FILES, so a create here would produce a row with
-        // no file. Reads and deletes work.
-        $document = $this->document();
+        $create = $this->document()['apis']['post-types.attachment']['paths']['/post-types/attachment']['create'];
 
-        $paths = $document['apis']['post-types.attachment']['paths'];
+        $this->assertSame('multipart/form-data', $create['input']['content_type']);
+        $this->assertSame('post-types.attachment.create-input', $create['input']['$extends']);
 
-        $this->assertSame(['list'], array_keys($paths['/post-types/attachment']));
-        $this->assertSame(['delete', 'retrieve'], array_keys($paths['/post-types/attachment/{identifier}']));
+        $file = $create['input']['properties']['file'];
 
-        $this->assertArrayHasKey('post-types.attachment.item', $document['schemas']);
-        $this->assertArrayNotHasKey('post-types.attachment.create-input', $document['schemas']);
-        $this->assertArrayNotHasKey('post-types.attachment.update-input', $document['schemas']);
+        $this->assertSame('file', $file['type']);
+        $this->assertTrue($file['required']);
+    }
+
+    /**
+     * Update stays JSON and carries no file. There is no way to replace the binary
+     * through PATCH, and WordPress does not offer one either: editing an image is
+     * the separate `/media/<id>/edit` route.
+     */
+    public function test_an_upload_type_updates_through_json_without_a_file(): void
+    {
+        $update = $this->document()['apis']['post-types.attachment']['paths']['/post-types/attachment/{identifier}']['update'];
+
+        $this->assertSame('application/json', $update['input']['content_type']);
+        $this->assertArrayNotHasKey('file', $update['input']['properties']);
+    }
+
+    public function test_an_ordinary_post_type_creates_through_json(): void
+    {
+        // The multipart body follows the controller, not every create.
+        $create = $this->document()['apis']['post-types.post']['paths']['/post-types/post']['create'];
+
+        $this->assertSame('application/json', $create['input']['content_type']);
+        $this->assertArrayNotHasKey('properties', $create['input']);
     }
 
     public function test_an_ordinary_post_type_keeps_its_write_operations(): void

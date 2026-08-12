@@ -4,15 +4,13 @@ namespace Kizlo\Modules\Introspection;
 
 use WP_REST_Controller;
 use WP_REST_Server;
-use WP_REST_Posts_Controller;
-use WP_REST_Terms_Controller;
 
 /**
  * What a managed route returns, and what it accepts, read off the controller.
  *
  * {@see CoreCollectionParams} did this for the list. This is the same argument
- * either side of it: `WP_REST_Posts_Controller` decides both, through
- * `get_item_schema()` for the response and `get_endpoint_args_for_item_schema()`
+ * either side of it: the controller {@see CoreControllers} names decides both,
+ * through `get_item_schema()` for the response and `get_endpoint_args_for_item_schema()`
  * for the write, so describing either by hand is a second list nothing
  * reconciles. That fork had already opened. `class_list` had been returned since
  * WordPress 6.8 and was described nowhere, `format` was a bare string where core
@@ -60,7 +58,7 @@ final class CoreItemSchema
     public static function responseForPostType(string $slug): array
     {
         return self::$memo['post_type:' . $slug] ??= self::response(
-            new WP_REST_Posts_Controller($slug),
+            CoreControllers::forPostType($slug),
             sprintf('/post-types/%s', $slug),
         );
     }
@@ -71,7 +69,7 @@ final class CoreItemSchema
     public static function responseForTaxonomy(string $slug): array
     {
         return self::$memo['taxonomy:' . $slug] ??= self::response(
-            new WP_REST_Terms_Controller($slug),
+            CoreControllers::forTaxonomy($slug),
             sprintf('/taxonomies/%s', $slug),
         );
     }
@@ -82,7 +80,7 @@ final class CoreItemSchema
     public static function inputForPostType(string $slug, bool $partial): array
     {
         return self::$memo[sprintf('post_type:%s:%s', $slug, $partial ? 'update' : 'create')] ??= self::input(
-            new WP_REST_Posts_Controller($slug),
+            CoreControllers::forPostType($slug),
             $partial,
             sprintf('/post-types/%s', $slug),
         );
@@ -94,7 +92,7 @@ final class CoreItemSchema
     public static function inputForTaxonomy(string $slug, bool $partial): array
     {
         return self::$memo[sprintf('taxonomy:%s:%s', $slug, $partial ? 'update' : 'create')] ??= self::input(
-            new WP_REST_Terms_Controller($slug),
+            CoreControllers::forTaxonomy($slug),
             $partial,
             sprintf('/taxonomies/%s', $slug),
         );

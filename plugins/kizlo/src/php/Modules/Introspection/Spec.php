@@ -25,9 +25,12 @@ final class Spec
 
     public const JSON_CONTENT_TYPE = 'application/json';
 
+    /** The only request body a `file` property is legal in. */
+    public const MULTIPART_CONTENT_TYPE = 'multipart/form-data';
+
     public const REQUEST_CONTENT_TYPES = [
-        'application/json',
-        'multipart/form-data',
+        self::JSON_CONTENT_TYPE,
+        self::MULTIPART_CONTENT_TYPE,
         'application/x-www-form-urlencoded',
     ];
 

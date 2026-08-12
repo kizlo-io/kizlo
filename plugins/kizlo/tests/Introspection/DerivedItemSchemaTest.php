@@ -4,8 +4,8 @@ namespace Kizlo\Tests\Introspection;
 
 use WP_REST_Request;
 use WP_REST_Server;
-use WP_REST_Posts_Controller;
 use WP_REST_Terms_Controller;
+use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\CoreItemSchema;
 use Kizlo\Modules\Introspection\CoreSchemas;
 
@@ -68,7 +68,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         unset($described['kizlo']);
 
         $this->assertSame(
-            $this->sorted(array_keys((new WP_REST_Posts_Controller($slug))->get_item_schema()['properties'])),
+            $this->sorted(array_keys(CoreControllers::forPostType($slug)->get_item_schema()['properties'])),
             $this->sorted(array_keys($described)),
         );
     }
@@ -78,11 +78,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_every_field_the_posts_controller_accepts_is_described(string $slug): void
     {
-        if (!in_array($slug, ['post', 'page'], true)) {
-            $this->markTestSkipped('attachment is read-only through the managed routes.');
-        }
-
-        $controller = new WP_REST_Posts_Controller($slug);
+        $controller = CoreControllers::forPostType($slug);
 
         foreach ([WP_REST_Server::CREATABLE => 'create', WP_REST_Server::EDITABLE => 'update'] as $method => $operation) {
             $this->assertSame(
@@ -103,6 +99,24 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
             'page'       => ['page'],
             'attachment' => ['attachment'],
         ];
+    }
+
+    /**
+     * The fields that only exist because the controller does. They come from
+     * `WP_REST_Attachments_Controller`, they are not driven by the registered
+     * supports, and none of them was described while the route was served through
+     * the posts controller.
+     */
+    public function test_an_upload_type_describes_the_fields_its_own_controller_adds(): void
+    {
+        $described = $this->itemProperties('post-types.attachment.item');
+
+        foreach (['source_url', 'media_details', 'media_type', 'mime_type', 'alt_text', 'caption', 'description', 'post', 'missing_image_sizes'] as $field) {
+            $this->assertArrayHasKey($field, $described, $field);
+        }
+
+        // Core drops this one for attachments, so the contract does too.
+        $this->assertArrayNotHasKey('password', $described);
     }
 
     public function test_every_field_the_terms_controller_returns_is_described(): void

@@ -36,6 +36,9 @@ class CoreSchemas
     /** A status a list can be filtered by. */
     public const POST_STATUS_FILTER = 'kizlo.post-status-filter';
 
+    /** @var array{writable: array<int, string>, filter: array<int, string>}|null */
+    private static ?array $status = null;
+
     /**
      * @return array<string, array<string, mixed>>
      */
@@ -64,16 +67,38 @@ class CoreSchemas
      * hand-written fork {@see CoreCollectionParams} exists to end. Both are taken
      * verbatim, plugin-registered statuses included.
      *
-     * Both are global. `register_post_status()` takes no post type, and every
-     * managed type reports the same two enums, which {@see \Kizlo\Tests\Introspection\PostStatusTest}
-     * pins so that a plugin filtering one type's schema cannot go unnoticed.
+     * Both are global as vocabularies: `register_post_status()` takes no post type,
+     * so a status registered anywhere is a status everywhere, and every managed
+     * type reports the same writable enum. {@see \Kizlo\Tests\Introspection\PostStatusTest}
+     * pins that, so a plugin filtering one type's schema cannot go unnoticed.
+     *
+     * What a given controller lets you *filter* by is not global, and core is what
+     * makes it so: the attachments controller narrows its list enum to the three
+     * statuses an attachment is ever stored with. Public because
+     * {@see ManagedPostTypes::named()} compares against these before referring a
+     * property to the shared schema, and refers only while the two still agree.
      *
      * @return array{writable: array<int, string>, filter: array<int, string>}
      */
-    private static function statusVocabularies(): array
+    public static function statusVocabularies(): array
     {
-        // Not memoized: WP_REST_Posts_Controller caches its own schema, so a
-        // status registered after the first call would never reach a later build.
+        // Memoized for the same build rather than for the process: a controller
+        // caches its own item schema, so a status registered after the first call
+        // would never reach a later build. ManagedContent::flush() is what makes a
+        // rebuild mean something, and it clears this with everything else derived.
+        return self::$status ??= self::readStatusVocabularies();
+    }
+
+    public static function flush(): void
+    {
+        self::$status = null;
+    }
+
+    /**
+     * @return array{writable: array<int, string>, filter: array<int, string>}
+     */
+    private static function readStatusVocabularies(): array
+    {
         $controller = new WP_REST_Posts_Controller('post');
 
         return [
