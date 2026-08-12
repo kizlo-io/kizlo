@@ -1,9 +1,9 @@
 ---
-name: linear-issue
+name: workflow
 description: Takes a Linear issue from first read to open PR under this repo's branch, changelog, commit, and PR conventions. Use when the user hands over a Linear issue to pick up or continue, e.g. "do KIZ-70", "pick up KIZ-82", "implement this issue", or pastes a linear.app issue URL.
 ---
 
-# linear-issue, take an issue from Linear to open PR
+# Workflow, take an issue from Linear to open PR
 
 Input is an issue key (`KIZ-70`) or a `linear.app` URL; ask if neither is given. One team, `Kizlo`, key `KIZ`.
 
