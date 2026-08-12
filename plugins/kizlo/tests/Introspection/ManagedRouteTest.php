@@ -251,17 +251,18 @@ class ManagedRouteTest extends IntrospectionTestCase
         $this->assertArrayHasKey('/kizlo/v1/taxonomies/category', $this->server->get_routes());
     }
 
-    public function test_attachments_are_readable_but_not_writable(): void
+    public function test_an_upload_type_is_writable_like_any_other(): void
     {
-        // The contract has said this all along. Now the routes agree: a create
-        // through WP_REST_Posts_Controller would have made a row with no file.
+        // The collection was GET-only, because the route was served through a
+        // controller that ignores $_FILES and a create there would have made a row
+        // with no file. The controller reads uploads now, so the operations that
+        // were withheld are registered like any other type's.
         $this->boot();
 
         $routes = $this->server->get_routes();
 
-        $this->assertSame(['GET'], $this->methodsOf($routes['/kizlo/v1/post-types/attachment']));
-        $this->assertArrayHasKey('/kizlo/v1/post-types/post', $routes);
-        $this->assertContains('POST', $this->methodsOf($routes['/kizlo/v1/post-types/post']));
+        $this->assertSame(['GET', 'POST'], $this->methodsOf($routes['/kizlo/v1/post-types/attachment']));
+        $this->assertContains('PATCH', $this->methodsOf($routes['/kizlo/v1/post-types/attachment/(?P<identifier>[a-zA-Z0-9_.%+-]+)']));
     }
 
     public function test_an_identifier_may_still_be_a_slug(): void

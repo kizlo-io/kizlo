@@ -4,7 +4,7 @@ namespace Kizlo\Modules\PostType;
 
 use WP_Error;
 use WP_REST_Request;
-use WP_REST_Posts_Controller;
+use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\CoreItemSchema;
 use Kizlo\Modules\Introspection\ManagedPostTypes;
 use Kizlo\Modules\Introspection\RouteRegistrar;
@@ -111,7 +111,7 @@ class PostTypeApi
      */
     private function list(string $key, WP_REST_Request $request): mixed
     {
-        $response = (new WP_REST_Posts_Controller($key))->get_items($request);
+        $response = CoreControllers::forPostType($key)->get_items($request);
 
         if (is_wp_error($response)) return $response;
 
@@ -133,7 +133,7 @@ class PostTypeApi
 
         $request->set_param('id', $id);
 
-        $controller = new WP_REST_Posts_Controller($key);
+        $controller = CoreControllers::forPostType($key);
         $response   = $controller->get_item($request);
 
         if (is_wp_error($response)) return $response;
@@ -144,9 +144,15 @@ class PostTypeApi
         return $response;
     }
 
+    /**
+     * An upload arrives here as an ordinary create. `WP_REST_Attachments_Controller`
+     * reads `$_FILES` through `get_file_params()`, and WordPress populates that on
+     * every REST request in `rest_api_loaded()` rather than only on core routes, so
+     * a managed route needs no plumbing of its own for the file to be there.
+     */
     private function create(string $key, WP_REST_Request $request): mixed
     {
-        $controller = new WP_REST_Posts_Controller($key);
+        $controller = CoreControllers::forPostType($key);
         $response   = $controller->create_item($request);
 
         if (is_wp_error($response)) return $response;
@@ -166,7 +172,7 @@ class PostTypeApi
 
         $request->set_param('id', $id);
 
-        $controller = new WP_REST_Posts_Controller($key);
+        $controller = CoreControllers::forPostType($key);
         $response   = $controller->update_item($request);
 
         if (is_wp_error($response)) return $response;
@@ -192,7 +198,7 @@ class PostTypeApi
 
         $request->set_param('id', $id);
 
-        $controller = new WP_REST_Posts_Controller($key);
+        $controller = CoreControllers::forPostType($key);
         return $controller->delete_item($request);
     }
 

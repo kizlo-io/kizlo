@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Attachment uploads through the managed post type route, which now creates a real file instead of an empty record

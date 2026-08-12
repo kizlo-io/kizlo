@@ -5,6 +5,7 @@ namespace Kizlo\Modules\Taxonomy;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Terms_Controller;
+use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\CoreItemSchema;
 use Kizlo\Modules\Introspection\ManagedTaxonomies;
 use Kizlo\Modules\Introspection\RouteRegistrar;
@@ -80,7 +81,7 @@ class TaxonomyApi
      */
     private function list(string $taxonomy, WP_REST_Request $request): mixed
     {
-        return (new WP_REST_Terms_Controller($taxonomy))->get_items($request);
+        return CoreControllers::forTaxonomy($taxonomy)->get_items($request);
     }
 
     private function retrieve(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
@@ -92,12 +93,12 @@ class TaxonomyApi
 
         $request->set_param('id', $id);
 
-        return (new WP_REST_Terms_Controller($taxonomy))->get_item($request);
+        return CoreControllers::forTaxonomy($taxonomy)->get_item($request);
     }
 
     private function create(string $taxonomy, WP_REST_Request $request): mixed
     {
-        return (new WP_REST_Terms_Controller($taxonomy))->create_item($request);
+        return CoreControllers::forTaxonomy($taxonomy)->create_item($request);
     }
 
     private function update(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
@@ -109,7 +110,7 @@ class TaxonomyApi
 
         $request->set_param('id', $id);
 
-        return (new WP_REST_Terms_Controller($taxonomy))->update_item($request);
+        return CoreControllers::forTaxonomy($taxonomy)->update_item($request);
     }
 
     /**
@@ -126,7 +127,7 @@ class TaxonomyApi
 
         $request->set_param('id', $id);
 
-        return (new WP_REST_Terms_Controller($taxonomy))->delete_item($request);
+        return CoreControllers::forTaxonomy($taxonomy)->delete_item($request);
     }
 
     private function resolve_id(string $identifier, string $taxonomy): ?int

@@ -5,6 +5,8 @@ namespace Kizlo\Tests\Introspection;
 use WP_REST_Request;
 use WP_REST_Server;
 use WP_REST_Posts_Controller;
+use WP_REST_Attachments_Controller;
+use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\CoreSchemas;
 use Kizlo\Modules\Introspection\ManagedContent;
 use Kizlo\Modules\Introspection\ManagedPostTypes;
@@ -106,22 +108,48 @@ class PostStatusTest extends IntrospectionTestCase
     }
 
     /**
-     * A shared schema is only correct while the vocabularies stay global. They do
-     * today, because `register_post_status()` takes no post type, but a plugin
-     * filtering one type's schema would break the assumption silently, and the
-     * fix would be per-type schemas rather than a wider shared one.
+     * A shared schema is only correct while the vocabulary stays global. The
+     * writable one does, because `register_post_status()` takes no post type, and
+     * a plugin filtering a single type's item schema would break that silently —
+     * the fix then being per-type schemas rather than a wider shared one.
      */
-    public function test_every_managed_type_reports_the_same_vocabularies(): void
+    public function test_every_managed_type_writes_from_the_same_vocabulary(): void
     {
         $writable = $this->vocabulary(CoreSchemas::POST_STATUS_WRITABLE);
-        $filter   = $this->vocabulary(CoreSchemas::POST_STATUS_FILTER);
 
         foreach (array_keys(ManagedPostTypes::managed()) as $slug) {
-            $controller = new WP_REST_Posts_Controller($slug);
-
-            $this->assertSame($writable, $controller->get_item_schema()['properties']['status']['enum'], $slug);
-            $this->assertSame($filter, $controller->get_collection_params()['status']['items']['enum'], $slug);
+            $this->assertSame(
+                $writable,
+                CoreControllers::forPostType($slug)->get_item_schema()['properties']['status']['enum'],
+                $slug,
+            );
         }
+    }
+
+    /**
+     * What a list can be filtered by is not global, and core is what makes it so:
+     * the attachments controller narrows the enum to the three statuses an
+     * attachment is ever stored with.
+     *
+     * So the shared schema is referenced only by the types that still agree with
+     * it, and a type core narrows keeps its own enum inline. Referring anyway
+     * would publish the whole vocabulary on a route that rejects almost all of it,
+     * which is worse than the anonymous enum the reference exists to avoid: a
+     * generated client would offer values guaranteed to 400.
+     */
+    public function test_a_narrowed_filter_vocabulary_is_described_rather_than_shared(): void
+    {
+        $status = $this->document()['apis']['post-types.attachment']['paths']['/post-types/attachment']['list']['input']['properties']['status'];
+
+        $this->assertArrayNotHasKey('$ref', $status['items']);
+        $this->assertSame(
+            (new WP_REST_Attachments_Controller('attachment'))->get_collection_params()['status']['items']['enum'],
+            $status['items']['enum'],
+        );
+
+        // Attachments are stored with `inherit`, which is why core defaults to it
+        // and why the derivation has to follow the controller rather than the type.
+        $this->assertSame('inherit', $status['default']);
     }
 
     /**

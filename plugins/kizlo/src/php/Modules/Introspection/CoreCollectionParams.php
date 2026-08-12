@@ -2,9 +2,6 @@
 
 namespace Kizlo\Modules\Introspection;
 
-use WP_REST_Posts_Controller;
-use WP_REST_Terms_Controller;
-
 /**
  * The list parameters a managed route actually honours.
  *
@@ -54,7 +51,7 @@ final class CoreCollectionParams
     public static function forPostType(string $slug): array
     {
         return self::$memo['post_type:' . $slug] ??= self::translate(
-            (new WP_REST_Posts_Controller($slug))->get_collection_params(),
+            CoreControllers::forPostType($slug)->get_collection_params(),
             sprintf('/post-types/%s', $slug),
         );
     }
@@ -65,7 +62,7 @@ final class CoreCollectionParams
     public static function forTaxonomy(string $slug): array
     {
         return self::$memo['taxonomy:' . $slug] ??= self::translate(
-            (new WP_REST_Terms_Controller($slug))->get_collection_params(),
+            CoreControllers::forTaxonomy($slug)->get_collection_params(),
             sprintf('/taxonomies/%s', $slug),
         );
     }

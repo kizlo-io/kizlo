@@ -140,7 +140,7 @@ class OperationValidator
         unset($schema['content_type']);
 
         $cleaned = (new SchemaValidator($this->resolver, $this->diagnostics))->clean($schema, $location, 'input', [
-            'file' => $contentType === 'multipart/form-data',
+            'file' => $contentType === Spec::MULTIPART_CONTENT_TYPE,
         ]);
 
         if ($cleaned === null) {

@@ -44,5 +44,6 @@ class ManagedContent
 
         CoreCollectionParams::flush();
         CoreItemSchema::flush();
+        CoreSchemas::flush();
     }
 }
