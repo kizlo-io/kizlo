@@ -5,6 +5,7 @@ namespace Kizlo\Modules\PostType;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Posts_Controller;
+use Kizlo\Modules\Introspection\CoreItemSchema;
 use Kizlo\Modules\Introspection\ManagedPostTypes;
 use Kizlo\Modules\Introspection\RouteRegistrar;
 
@@ -61,15 +62,15 @@ class PostTypeApi
     {
         switch ($operation) {
             case 'list':
-                return fn(WP_REST_Request $request) => $this->list($slug, $request);
+                return fn(WP_REST_Request $request) => $this->list($slug, self::pinContext($request));
             case 'retrieve':
-                return fn(WP_REST_Request $request) => $this->retrieve($slug, $request->get_param('identifier'), $request);
+                return fn(WP_REST_Request $request) => $this->retrieve($slug, $request->get_param('identifier'), self::pinContext($request));
             case 'create':
-                return fn(WP_REST_Request $request) => $this->create($slug, $request);
+                return fn(WP_REST_Request $request) => $this->create($slug, self::pinContext($request));
             case 'update':
-                return fn(WP_REST_Request $request) => $this->update($slug, $request->get_param('identifier'), $request);
+                return fn(WP_REST_Request $request) => $this->update($slug, $request->get_param('identifier'), self::pinContext($request));
             case 'delete':
-                return fn(WP_REST_Request $request) => $this->delete($slug, $request->get_param('identifier'), $request);
+                return fn(WP_REST_Request $request) => $this->delete($slug, $request->get_param('identifier'), self::pinContext($request));
         }
 
         _doing_it_wrong(
@@ -79,6 +80,28 @@ class PostTypeApi
         );
 
         return null;
+    }
+
+    /**
+     * Force the context every managed route runs in.
+     *
+     * `context` decides which fields a controller returns, which makes it a
+     * request parameter that changes a response type. The contract cannot say
+     * that and a generated client cannot use it, so Kizlo does not offer the
+     * choice: `edit` is the widest context, and pinning it means every response
+     * is the one shape {@see \Kizlo\Modules\Introspection\CoreItemSchema} derives.
+     *
+     * Overwritten rather than left undeclared, because `WP_REST_Request` reads
+     * query parameters it never registered and both controllers fall back to
+     * `$request['context']`. Removing it from the route arguments alone would
+     * have left `?context=view` reshaping the response with nothing describing
+     * it, which is the defect the derivation exists to end.
+     */
+    private static function pinContext(WP_REST_Request $request): WP_REST_Request
+    {
+        $request->set_param('context', CoreItemSchema::CONTEXT);
+
+        return $request;
     }
 
     /**

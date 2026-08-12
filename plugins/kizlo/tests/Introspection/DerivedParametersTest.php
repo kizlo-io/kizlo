@@ -40,7 +40,7 @@ class DerivedParametersTest extends IntrospectionTestCase
     public function test_every_parameter_the_posts_controller_honours_is_described(): void
     {
         $this->assertSame(
-            $this->sorted(array_keys((new WP_REST_Posts_Controller('post'))->get_collection_params())),
+            $this->honoured((new WP_REST_Posts_Controller('post'))->get_collection_params()),
             $this->sorted(array_keys($this->listProperties('post-types.post', '/post-types/post'))),
         );
     }
@@ -48,7 +48,7 @@ class DerivedParametersTest extends IntrospectionTestCase
     public function test_every_parameter_the_terms_controller_honours_is_described(): void
     {
         $this->assertSame(
-            $this->sorted(array_keys((new WP_REST_Terms_Controller('category'))->get_collection_params())),
+            $this->honoured((new WP_REST_Terms_Controller('category'))->get_collection_params()),
             $this->sorted(array_keys($this->listProperties('taxonomies.category', '/taxonomies/category'))),
         );
     }
@@ -61,7 +61,7 @@ class DerivedParametersTest extends IntrospectionTestCase
     public function test_the_described_surface_follows_the_post_type(): void
     {
         $this->assertSame(
-            $this->sorted(array_keys((new WP_REST_Posts_Controller('page'))->get_collection_params())),
+            $this->honoured((new WP_REST_Posts_Controller('page'))->get_collection_params()),
             $this->sorted(array_keys($this->listProperties('post-types.page', '/post-types/page'))),
         );
     }
@@ -368,6 +368,23 @@ class DerivedParametersTest extends IntrospectionTestCase
         }
 
         $this->fail('The filter describes no object form.');
+    }
+
+    /**
+     * The parameter names a managed list is expected to describe.
+     *
+     * `context` is the one thing the derivation drops, and it is dropped from the
+     * route as well rather than only from the contract, so this is not the fork
+     * reopening. {@see ContextTest}
+     *
+     * @param array<string, mixed> $params
+     * @return array<int, string>
+     */
+    private function honoured(array $params): array
+    {
+        unset($params['context']);
+
+        return $this->sorted(array_keys($params));
     }
 
     /**

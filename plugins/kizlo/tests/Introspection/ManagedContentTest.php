@@ -221,22 +221,37 @@ class ManagedContentTest extends IntrospectionTestCase
         // rather than an optional field competing with it.
         $schemas = $this->document()['schemas'];
 
-        foreach (['kizlo.media', 'kizlo.post', 'post-types.post.item', 'post-types.post.create-input', 'taxonomies.category.item'] as $id) {
+        foreach (['kizlo.media', 'post-types.post.item', 'post-types.post.create-input', 'taxonomies.category.item'] as $id) {
             $this->assertArrayNotHasKey('title', $schemas[$id], sprintf('%s should not name its own type.', $id));
         }
     }
 
-    public function test_both_list_and_single_extend_the_shared_post_schema(): void
+    /**
+     * There is no shared `kizlo.post` or `kizlo.term` base any more, and the two
+     * facts are one fact: a schema derived per type carries its own complete set,
+     * so nothing is left over to share.
+     *
+     * The base was a hand-listed guess at the fields common to every managed type.
+     * Deriving it honestly would mean intersecting whatever types are managed,
+     * which would change the shared type for everyone as soon as one non-public
+     * post type was enabled, while no concrete type changed shape at all.
+     */
+    public function test_a_managed_schema_carries_its_own_complete_field_set(): void
     {
         $schemas = $this->document()['schemas'];
 
-        $this->assertSame('kizlo.post', $schemas['post-types.post.item']['$extends']);
-        $this->assertSame('kizlo.post', $schemas['post-types.post.list-item']['$extends']);
-    }
+        foreach (['post-types.post.item', 'post-types.post.list-item', 'taxonomies.category.item'] as $id) {
+            $this->assertArrayNotHasKey('$extends', $schemas[$id], sprintf('%s should inherit nothing.', $id));
+        }
 
-    public function test_terms_extend_the_shared_term_schema(): void
-    {
-        $this->assertSame('kizlo.term', $this->document()['schemas']['taxonomies.category.item']['$extends']);
+        foreach (['kizlo.post', 'kizlo.term'] as $id) {
+            $this->assertArrayNotHasKey($id, $schemas);
+        }
+
+        // The fields the base used to hold are on the type itself now.
+        foreach (['id', 'date', 'slug', 'status', 'type', 'link', 'template'] as $field) {
+            $this->assertArrayHasKey($field, $schemas['post-types.post.item']['properties']);
+        }
     }
 
     // ============================================================
