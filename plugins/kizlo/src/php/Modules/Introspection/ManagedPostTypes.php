@@ -129,6 +129,7 @@ class ManagedPostTypes
             'method'    => 'GET',
             'summary'   => sprintf('List %s entries', $slug),
             'input'     => ['type' => 'object', 'properties' => self::listParameters($slug)],
+            'errors'    => self::listErrors(),
             'responses' => [
                 '200' => [
                     'description' => 'A page of entries.',
@@ -153,6 +154,7 @@ class ManagedPostTypes
                     'password'   => ['type' => 'string', 'description' => 'Password for a password-protected entry.'],
                 ],
             ],
+            'errors'    => self::retrieveErrors(),
             'responses' => [
                 '200' => ['description' => 'The entry.', 'body' => ['$ref' => "{$id}.item"]],
                 '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
@@ -167,6 +169,7 @@ class ManagedPostTypes
             'method'    => 'POST',
             'summary'   => sprintf('Create a %s entry', $slug),
             'input'     => self::createInput($slug, $id),
+            'errors'    => self::createErrors($slug),
             'responses' => [
                 '201' => ['description' => 'The created entry.', 'body' => ['$ref' => "{$id}.item"]],
                 '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
@@ -191,6 +194,7 @@ class ManagedPostTypes
                 'content_type' => Spec::JSON_CONTENT_TYPE,
                 'properties'   => ['identifier' => self::identifier()],
             ],
+            'errors'    => self::updateErrors(),
             'responses' => [
                 '200' => ['description' => 'The updated entry.', 'body' => ['$ref' => "{$id}.item"]],
                 '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
@@ -216,6 +220,7 @@ class ManagedPostTypes
                     ],
                 ],
             ],
+            'errors'    => self::deleteErrors(),
             'responses' => [
                 '200' => ['description' => 'The trashed entry, or the deletion result when forced.', 'body' => ['$ref' => "{$id}.delete-response"]],
                 '404' => ['description' => 'Entry not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
@@ -223,6 +228,97 @@ class ManagedPostTypes
         ];
 
         return $routes;
+    }
+
+    /** @return array<int, string> */
+    private static function listErrors(): array
+    {
+        return [
+            'invalid_post_type',
+            'rest_forbidden_context',
+            'rest_forbidden_status',
+            'rest_no_search_term_defined',
+            'rest_orderby_include_missing_include',
+            'rest_post_invalid_page_number',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function retrieveErrors(): array
+    {
+        return [
+            'invalid_post_type',
+            'post_type_not_found',
+            'rest_forbidden_context',
+            'rest_post_incorrect_password',
+            'rest_post_invalid_id',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function createErrors(string $slug): array
+    {
+        $errors = [
+            'invalid_post_type',
+            'kizlo_custom_fields_invalid',
+            'rest_cannot_assign_sticky',
+            'rest_cannot_assign_term',
+            'rest_cannot_create',
+            'rest_cannot_edit_others',
+            'rest_cannot_publish',
+            'rest_invalid_author',
+            'rest_invalid_featured_media',
+            'rest_invalid_field',
+            'rest_post_exists',
+            'rest_post_invalid_id',
+        ];
+
+        if (!self::uploads($slug)) {
+            return $errors;
+        }
+
+        return array_merge($errors, [
+            'rest_upload_file_error',
+            'rest_upload_hash_mismatch',
+            'rest_upload_image_type',
+            'rest_upload_no_data',
+            'rest_upload_sideload_error',
+            'rest_upload_unknown_error',
+            'rest_upload_user_quota_exceeded',
+        ]);
+    }
+
+    /** @return array<int, string> */
+    private static function updateErrors(): array
+    {
+        return [
+            'invalid_post_type',
+            'kizlo_custom_fields_invalid',
+            'post_type_not_found',
+            'rest_cannot_assign_sticky',
+            'rest_cannot_assign_term',
+            'rest_cannot_edit',
+            'rest_cannot_edit_others',
+            'rest_cannot_publish',
+            'rest_invalid_author',
+            'rest_invalid_featured_media',
+            'rest_invalid_field',
+            'rest_post_invalid_id',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function deleteErrors(): array
+    {
+        return [
+            'invalid_post_type',
+            'post_type_not_found',
+            'rest_already_trashed',
+            'rest_cannot_delete',
+            'rest_post_invalid_id',
+            'rest_trash_not_supported',
+            'rest_user_cannot_delete_post',
+        ];
     }
 
     public static function apiId(string $slug): string

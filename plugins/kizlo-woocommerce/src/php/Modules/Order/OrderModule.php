@@ -52,6 +52,10 @@ class OrderModule
                     ],
                 ],
             ],
+            'errors'    => [
+                'kizlo_order_not_found',
+                'kizlo_stock_already_reduced',
+            ],
             'responses' => [
                 '200' => ['description' => 'The stock was adjusted.', 'body' => ['$ref' => WooCommerceSchemas::STOCK_RESULT]],
                 '404' => ['description' => 'Order not found.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],

@@ -27,6 +27,47 @@ kizlo_register_route(array $args): void
 A `route` is required. Omitting it triggers `_doing_it_wrong`, and the route is skipped. The callback is wrapped so a
 thrown `InvalidArgumentException` becomes a `400 invalid_param` response automatically.
 
+## Introspection contract
+
+Set `id` to publish the route in `GET /kizlo/v1/introspect`:
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | API ID that groups related operations. |
+| `operation` | `string` | Operation name, such as `list`, `retrieve`, `create`, `update`, or `delete`. |
+| `input` | `array` | Request schema. Top-level properties become route arguments. |
+| `errors` | `string[]` | Handler-specific WordPress error codes the operation can return. |
+| `responses` | `array` | Status-keyed response contracts for success and error responses. |
+| `summary` | `string` | Optional short operation summary. |
+| `description` | `string` | Optional operation description. |
+| `deprecated` | `bool` | Optional deprecation marker. |
+
+`errors` belongs to the operation, not an individual response. Declare each handler-specific code once as a
+non-empty string. Kizlo sorts the published list and adds the shared authentication, permission, argument-validation,
+and callback-wrapper codes automatically. An operation with errors must include a non-2xx JSON response whose body is
+`kizlo.error`.
+
+```php
+kizlo_register_route([
+    'id'        => 'orders',
+    'operation' => 'retrieve',
+    'route'     => kizlo_route('/orders/:id'),
+    'method'    => WP_REST_Server::READABLE,
+    'callback'  => [$controller, 'retrieve'],
+    'input'     => [
+        'type'       => 'object',
+        'properties' => [
+            'id' => ['type' => 'integer', 'required' => true],
+        ],
+    ],
+    'errors'    => ['order_not_found'],
+    'responses' => [
+        '200' => ['body' => ['$ref' => 'orders.order']],
+        '404' => ['body' => ['$ref' => 'kizlo.error']],
+    ],
+]);
+```
+
 ## Returns
 
 `void`. The route is registered on `rest_api_init`, served at `/wp-json/kizlo/v1<route>`.

@@ -44,6 +44,10 @@ class Cf7Module
                     ],
                 ],
             ],
+            'errors'    => [
+                'cf7_form_not_found',
+                'cf7_not_active',
+            ],
             'responses' => [
                 '200' => ['description' => 'The submission result, including a validation failure.', 'body' => ['$ref' => self::RESULT]],
                 '404' => ['description' => 'No form has that ID.', 'body' => ['$ref' => self::ERROR]],

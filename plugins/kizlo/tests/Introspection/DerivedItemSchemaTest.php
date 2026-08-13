@@ -494,7 +494,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_the_emitted_document_carries_no_callables(): void
     {
-        $this->assertStringNotContainsString('callback', (string) wp_json_encode($this->document()));
+        $this->assertStringNotContainsString('"callback":', (string) wp_json_encode($this->document()));
     }
 
     // ============================================================

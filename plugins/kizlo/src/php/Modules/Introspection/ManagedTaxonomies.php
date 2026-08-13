@@ -97,6 +97,7 @@ class ManagedTaxonomies
                 'content_type' => Spec::JSON_CONTENT_TYPE,
                 'properties'   => ['identifier' => self::identifier()],
             ],
+            'errors'    => self::updateErrors(),
             'responses' => [
                 '200' => ['description' => 'The updated term.', 'body' => ['$ref' => "{$id}.item"]],
                 '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
@@ -116,6 +117,7 @@ class ManagedTaxonomies
                 // cannot disagree. {@see CoreCollectionParams} explains why this
                 // is no longer written out by hand.
                 'input'     => ['type' => 'object', 'properties' => CoreCollectionParams::forTaxonomy($slug)],
+                'errors'    => self::listErrors(),
                 'responses' => [
                     '200' => [
                         'description' => 'A page of terms.',
@@ -137,6 +139,7 @@ class ManagedTaxonomies
                     'type'       => 'object',
                     'properties' => ['identifier' => self::identifier()],
                 ],
+                'errors'    => self::retrieveErrors(),
                 'responses' => [
                     '200' => ['description' => 'The term.', 'body' => ['$ref' => "{$id}.item"]],
                     '404' => ['description' => 'Term not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
@@ -151,6 +154,7 @@ class ManagedTaxonomies
                 'method'    => 'POST',
                 'summary'   => sprintf('Create a %s term', $slug),
                 'input'     => ['$extends' => "{$id}.create-input", 'type' => 'object', 'content_type' => Spec::JSON_CONTENT_TYPE],
+                'errors'    => self::createErrors(),
                 'responses' => [
                     '201' => ['description' => 'The created term.', 'body' => ['$ref' => "{$id}.item"]],
                     '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
@@ -186,11 +190,70 @@ class ManagedTaxonomies
                         ],
                     ],
                 ],
+                'errors'    => self::deleteErrors(),
                 'responses' => [
                     '200' => ['description' => 'The deletion result.', 'body' => ['$ref' => "{$id}.delete-response"]],
                     '404' => ['description' => 'Term not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
                 ],
             ],
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function listErrors(): array
+    {
+        return [
+            'invalid_taxonomy',
+            'rest_forbidden_context',
+            'rest_post_invalid_page_number',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function retrieveErrors(): array
+    {
+        return [
+            'invalid_taxonomy',
+            'rest_forbidden_context',
+            'rest_term_invalid',
+            'term_not_found',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function createErrors(): array
+    {
+        return [
+            'invalid_taxonomy',
+            'kizlo_custom_fields_invalid',
+            'rest_cannot_create',
+            'rest_taxonomy_not_hierarchical',
+            'rest_term_invalid',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function updateErrors(): array
+    {
+        return [
+            'invalid_taxonomy',
+            'kizlo_custom_fields_invalid',
+            'rest_cannot_update',
+            'rest_taxonomy_not_hierarchical',
+            'rest_term_invalid',
+            'term_not_found',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function deleteErrors(): array
+    {
+        return [
+            'invalid_taxonomy',
+            'rest_cannot_delete',
+            'rest_term_invalid',
+            'rest_trash_not_supported',
+            'term_not_found',
         ];
     }
 

@@ -417,7 +417,7 @@ class Registry
                     'path'      => (string) $operation['path'],
                     'operation' => (string) $operation['operation'],
                 ],
-                'Declared twice with a different method, input or responses; use separate operations.',
+                'Declared twice with a different method, input, errors or responses; use separate operations.',
             );
         }
     }

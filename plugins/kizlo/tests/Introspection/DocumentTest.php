@@ -28,7 +28,7 @@ class DocumentTest extends IntrospectionTestCase
         }
     }
 
-    public function test_schema_ids_api_ids_paths_operations_and_responses_are_sorted(): void
+    public function test_schema_ids_api_ids_paths_operations_errors_and_responses_are_sorted(): void
     {
         kizlo_register_spec_schema('zeta.thing', ['type' => 'object', 'properties' => []]);
         kizlo_register_spec_schema('alpha.thing', ['type' => 'object', 'properties' => []]);
@@ -39,6 +39,7 @@ class DocumentTest extends IntrospectionTestCase
             'route'     => '/beta',
             'operation' => 'retrieve',
             'method'    => 'POST',
+            'errors'    => ['zeta_error', 'alpha_error'],
             'responses' => ['500' => ['body' => ['$ref' => 'kizlo.error']], '200' => ['body' => ['type' => 'string']]],
         ]));
         kizlo_register_spec_route($this->operation(['id' => 'alpha.api', 'route' => '/alpha']));
@@ -54,6 +55,7 @@ class DocumentTest extends IntrospectionTestCase
 
         $operation = $document['apis']['alpha.api']['paths']['/beta']['retrieve'];
         $this->assertSame('POST', $operation['method']);
+        $this->assertSame(['alpha_error', 'zeta_error'], $operation['errors']);
         // PHP coerces numeric array keys to integers; JSON encoding turns them back
         // into the string object keys the contract specifies.
         $this->assertSame(['200', '500'], array_map('strval', array_keys($operation['responses'])));
@@ -128,7 +130,7 @@ class DocumentTest extends IntrospectionTestCase
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
 
         $this->assertSame(
-            ['method', 'summary', 'description', 'deprecated', 'input', 'responses'],
+            ['method', 'summary', 'description', 'deprecated', 'errors', 'input', 'responses'],
             array_keys($operation),
         );
         $this->assertSame('acme/v1', $this->document()['apis']['acme.widgets']['namespace']);
@@ -140,7 +142,8 @@ class DocumentTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
 
-        $this->assertSame(['method', 'input', 'responses'], array_keys($operation));
+        $this->assertSame(['method', 'errors', 'input', 'responses'], array_keys($operation));
+        $this->assertSame([], $operation['errors']);
     }
 
     /**

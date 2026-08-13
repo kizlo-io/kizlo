@@ -104,7 +104,7 @@ class IntrospectEndpointTest extends IntrospectionTestCase
 
         $encoded = (string) wp_json_encode($this->get()->get_data());
 
-        foreach (['callback', 'permission_callback', 'Closure', 'WP_REST_Posts_Controller'] as $needle) {
+        foreach (['"callback":', '"permission_callback":', 'Closure', 'WP_REST_Posts_Controller'] as $needle) {
             $this->assertStringNotContainsString($needle, $encoded);
         }
     }

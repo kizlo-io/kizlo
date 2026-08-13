@@ -63,6 +63,7 @@ class EmailModule
                     ],
                 ],
             ],
+            'errors'    => ['kizlo_email_failed'],
             'responses' => [
                 '200' => [
                     'description' => 'The email was handed to WordPress.',

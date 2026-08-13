@@ -34,7 +34,16 @@ class ManagedContent
      */
     public static function routes(): array
     {
-        return self::$routes ??= array_merge(ManagedPostTypes::routes(), ManagedTaxonomies::routes());
+        if (self::$routes !== null) {
+            return self::$routes;
+        }
+
+        $routes = array_merge(ManagedPostTypes::routes(), ManagedTaxonomies::routes());
+
+        return self::$routes = array_map(
+            static fn(array $route): array => OperationErrors::withShared($route),
+            $routes,
+        );
     }
 
     public static function flush(): void

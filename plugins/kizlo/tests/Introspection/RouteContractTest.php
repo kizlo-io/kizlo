@@ -384,6 +384,113 @@ class RouteContractTest extends IntrospectionTestCase
     }
 
     // ============================================================
+    // ERRORS
+    // ============================================================
+
+    public function test_operation_errors_are_sorted_before_emission(): void
+    {
+        kizlo_register_spec_route($this->operation([
+            'errors'    => ['widget_unavailable', 'invalid_widget'],
+            'responses' => [
+                '200' => ['body' => ['type' => 'string']],
+                '400' => ['body' => ['$ref' => 'kizlo.error']],
+            ],
+        ]));
+
+        $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
+
+        $this->assertSame(['invalid_widget', 'widget_unavailable'], $operation['errors']);
+    }
+
+    public function test_duplicate_operation_errors_fail_introspection(): void
+    {
+        kizlo_register_spec_route($this->operation([
+            'errors'    => ['invalid_widget', 'invalid_widget'],
+            'responses' => [
+                '200' => ['body' => ['type' => 'string']],
+                '400' => ['body' => ['$ref' => 'kizlo.error']],
+            ],
+        ]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'declared more than once');
+    }
+
+    /**
+     * @dataProvider invalidErrorsProvider
+     */
+    public function test_operation_errors_must_be_a_list_of_non_empty_strings(mixed $errors): void
+    {
+        kizlo_register_spec_route($this->operation([
+            'errors'    => $errors,
+            'responses' => [
+                '200' => ['body' => ['type' => 'string']],
+                '400' => ['body' => ['$ref' => 'kizlo.error']],
+            ],
+        ]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'non-empty string');
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function invalidErrorsProvider(): array
+    {
+        return [
+            'not an array'   => ['invalid_widget'],
+            'not a list'     => [['code' => 'invalid_widget']],
+            'empty code'     => [['']],
+            'whitespace code' => [['   ']],
+            'non-string code' => [[400]],
+        ];
+    }
+
+    public function test_operation_errors_need_a_non_success_json_error_response(): void
+    {
+        kizlo_register_spec_route($this->operation(['errors' => ['invalid_widget']]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'must declare a non-2xx JSON response');
+    }
+
+    public function test_operation_errors_need_the_wordpress_error_envelope(): void
+    {
+        kizlo_register_spec_route($this->operation([
+            'errors'    => ['invalid_widget'],
+            'responses' => [
+                '200' => ['body' => ['type' => 'string']],
+                '400' => ['body' => ['type' => 'string']],
+            ],
+        ]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'using the "kizlo.error" body');
+    }
+
+    public function test_operation_errors_need_a_json_error_response(): void
+    {
+        kizlo_register_spec_route($this->operation([
+            'errors'    => ['invalid_widget'],
+            'responses' => [
+                '200' => ['body' => ['type' => 'string']],
+                '400' => ['content_type' => 'text/plain', 'body' => ['type' => 'string']],
+            ],
+        ]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'must declare a non-2xx JSON response');
+    }
+
+    public function test_errors_cannot_be_declared_on_an_individual_response(): void
+    {
+        kizlo_register_spec_route($this->operation([
+            'responses' => [
+                '200' => ['body' => ['type' => 'string']],
+                '400' => ['errors' => ['invalid_widget'], 'body' => ['$ref' => 'kizlo.error']],
+            ],
+        ]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'belongs to the operation');
+    }
+
+    // ============================================================
     // MERGING AND CONFLICTS
     // ============================================================
 
@@ -402,7 +509,7 @@ class RouteContractTest extends IntrospectionTestCase
             'responses' => ['200' => ['body' => ['type' => 'string']]],
         ]));
 
-        $this->assertErrorContains($this->errors(), 'Declared twice with a different method, input or responses');
+        $this->assertErrorContains($this->errors(), 'Declared twice with a different method, input, errors or responses');
     }
 
     public function test_an_operation_name_is_unique_across_the_whole_api(): void
