@@ -15,6 +15,16 @@ use stdClass;
 class Document
 {
     /**
+     * The vocabulary and semantics understood by contract consumers.
+     *
+     * Change this only when an introspection document becomes incompatible,
+     * such as when a field is removed or changes meaning. Compatible additions
+     * keep the current version. This is independent of the plugin version sent
+     * in `X-Kizlo-Version`.
+     */
+    public const VERSION = '1.0';
+
+    /**
      * Keys whose value is a map. An empty PHP array encodes as `[]`, which would
      * hand the generator a list where it expects an object, so empty maps become
      * real JSON objects.
@@ -35,9 +45,12 @@ class Document
     public static function finalize(array $document): array
     {
         /** @var array<string, mixed> $normalized */
-        $normalized = self::normalize($document, null);
+        $normalized = self::normalize(['version' => self::VERSION] + $document, null);
 
-        return ['hash' => self::hash($normalized)] + $normalized;
+        return [
+            'version' => self::VERSION,
+            'hash'    => self::hash($normalized),
+        ] + $normalized;
     }
 
     /**

@@ -78,7 +78,8 @@ class IntrospectEndpointTest extends IntrospectionTestCase
         $response = $this->get();
 
         $this->assertSame(200, $response->get_status());
-        $this->assertSame(['hash', 'schemas', 'apis', 'diagnostics'], array_keys($response->get_data()));
+        $this->assertSame('1.0', $response->get_data()['version']);
+        $this->assertSame(['version', 'hash', 'schemas', 'apis', 'diagnostics'], array_keys($response->get_data()));
     }
 
     public function test_the_plugin_version_header_is_stamped(): void

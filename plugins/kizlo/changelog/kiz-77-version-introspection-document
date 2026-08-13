@@ -1,0 +1,4 @@
+Significance: patch
+Type: added
+
+Include a format version in every introspection document
