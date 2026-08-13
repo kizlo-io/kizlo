@@ -26,7 +26,7 @@ class AuthorsSettingsService
         kizlo_register_route([
             'id'        => 'settings.authors',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/authors',
             'summary'   => 'Update the author archive settings',
             'input'     => [

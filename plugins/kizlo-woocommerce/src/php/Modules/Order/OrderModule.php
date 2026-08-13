@@ -25,7 +25,7 @@ class OrderModule
         kizlo_register_route([
             'id'        => 'woocommerce.orders',
             'operation' => 'manage_stock',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => '/orders/(?P<order_id>\d+)/stock',
             'summary'   => 'Reduce or increase the stock an order holds',
             'input'     => [

@@ -68,7 +68,7 @@ class PostTypeSettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'create',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => '/settings/post_types',
             'summary'   => 'Register a Kizlo-owned post type',
             'input'     => DefinitionSchemas::createInput(SettingsSchemas::POST_TYPE_DEFINITION),
@@ -86,7 +86,7 @@ class PostTypeSettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => $single,
             'summary'   => 'Update a post type',
 
@@ -108,7 +108,7 @@ class PostTypeSettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'activate',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/activate',
             'summary'   => 'Register a Kizlo-owned post type with WordPress',
             'input'     => DefinitionSchemas::slugInput(),
@@ -121,7 +121,7 @@ class PostTypeSettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'deactivate',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/deactivate',
             'summary'   => 'Unregister a Kizlo-owned post type, keeping its entries',
             'input'     => DefinitionSchemas::slugInput(),
@@ -134,7 +134,7 @@ class PostTypeSettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'delete',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/delete',
             'summary'   => 'Delete a Kizlo-owned post type',
             'input'     => DefinitionSchemas::deleteInput(),
@@ -151,7 +151,7 @@ class PostTypeSettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'process_delete',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/delete/process',
             'summary'   => 'Delete the next batch of entries',
             'input'     => DefinitionSchemas::slugInput(),
@@ -164,7 +164,7 @@ class PostTypeSettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'retry_delete',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/delete/retry',
             'summary'   => 'Requeue the entries that failed to delete',
             'input'     => DefinitionSchemas::slugInput(),

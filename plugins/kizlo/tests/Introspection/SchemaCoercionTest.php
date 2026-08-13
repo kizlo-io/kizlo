@@ -90,7 +90,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
             'id'        => 'acme.widgets',
             'operation' => 'create',
             'route'     => '/widgets',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'callback'  => static fn() => ['ok' => true],
             'input'     => [
                 'type'       => 'object',
@@ -153,7 +153,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
             'id'        => 'acme.widgets',
             'operation' => 'create',
             'route'     => '/widgets',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'callback'  => static fn() => ['ok' => true],
             'input'     => [
                 'type'       => 'object',
@@ -192,7 +192,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
             'id'        => 'acme.widgets',
             'operation' => 'create',
             'route'     => '/widgets',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'callback'  => static fn() => ['ok' => true],
             'input'     => [
                 'type'       => 'object',

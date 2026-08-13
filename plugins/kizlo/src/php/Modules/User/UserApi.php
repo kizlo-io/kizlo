@@ -30,7 +30,7 @@ class UserApi
         kizlo_register_route([
             'id'        => 'users',
             'operation' => 'retrieve',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => $route,
             'summary'   => 'Retrieve a user by ID, email address or username',
             'input'     => ['type' => 'object', 'properties' => UserSchemas::identifier()],
@@ -44,7 +44,7 @@ class UserApi
         kizlo_register_route([
             'id'        => 'users',
             'operation' => 'update',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $route,
             'summary'   => 'Update a user',
             'input'     => [
@@ -65,7 +65,7 @@ class UserApi
         kizlo_register_route([
             'id'        => 'users',
             'operation' => 'delete',
-            'methods'   => 'DELETE',
+            'method'    => 'DELETE',
             'route'     => $route,
             'summary'   => 'Delete a user',
             'input'     => [

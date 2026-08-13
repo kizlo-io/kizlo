@@ -26,7 +26,7 @@ class SiteSettingsService
         kizlo_register_route([
             'id'        => 'settings.site',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/site',
             'summary'   => 'Update the site settings',
             'input'     => [

@@ -26,7 +26,7 @@ class CrawlingSettingsService
         kizlo_register_route([
             'id'        => 'settings.crawling',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/crawling',
             'summary'   => 'Update the robots.txt settings',
             'input'     => [

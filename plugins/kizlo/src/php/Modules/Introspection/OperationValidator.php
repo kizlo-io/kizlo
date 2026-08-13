@@ -59,7 +59,7 @@ class OperationValidator
             return null;
         }
 
-        if (!$this->checkMethods($operation, $location)) {
+        if (!$this->checkMethod($operation, $location)) {
             return null;
         }
 
@@ -85,18 +85,23 @@ class OperationValidator
      * @param array<string, mixed>  $operation
      * @param array<string, string> $location
      */
-    private function checkMethods(array $operation, array $location): bool
+    private function checkMethod(array $operation, array $location): bool
     {
-        if ($operation['methods'] === []) {
-            $this->diagnostics->error($location + ['keyword' => 'methods'], 'At least one HTTP method is required.');
+        $method = $operation['method'];
+
+        if (is_array($method)) {
+            $this->diagnostics->error($location + ['keyword' => 'method'], '"method" must be one HTTP method string; arrays are not supported.');
             return false;
         }
 
-        foreach ($operation['methods'] as $method) {
-            if (!in_array($method, Spec::METHODS, true)) {
-                $this->diagnostics->error($location + ['keyword' => 'methods'], sprintf('Unknown HTTP method "%s".', $method));
-                return false;
-            }
+        if (!is_string($method) || $method === '') {
+            $this->diagnostics->error($location + ['keyword' => 'method'], 'One HTTP method is required.');
+            return false;
+        }
+
+        if (!in_array($method, Spec::METHODS, true)) {
+            $this->diagnostics->error($location + ['keyword' => 'method'], sprintf('Unknown HTTP method "%s".', $method));
+            return false;
         }
 
         return true;
@@ -117,7 +122,7 @@ class OperationValidator
         }
 
         $contentType = $input['content_type'] ?? null;
-        $hasBody     = OperationNormalizer::hasRequestBody($operation['methods']);
+        $hasBody     = OperationNormalizer::hasRequestBody($operation['method']);
 
         if ($contentType !== null && !$hasBody) {
             $this->diagnostics->warning(

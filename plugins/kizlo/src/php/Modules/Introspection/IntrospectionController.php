@@ -32,7 +32,7 @@ class IntrospectionController
     public function register(): void
     {
         kizlo_register_route([
-            'methods'  => ['GET'],
+            'method'   => 'GET',
             'route'    => '/introspect',
             'callback' => [$this, 'handle'],
         ]);

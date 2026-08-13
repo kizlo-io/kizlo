@@ -81,7 +81,7 @@ class SettingsModule
         kizlo_register_route([
             'id'        => 'settings',
             'operation' => 'retrieve',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => '/settings',
             'summary'   => 'Retrieve every settings section',
 

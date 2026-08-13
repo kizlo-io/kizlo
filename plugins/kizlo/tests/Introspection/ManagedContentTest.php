@@ -219,11 +219,14 @@ class ManagedContentTest extends IntrospectionTestCase
         $this->assertSame(['$ref' => 'post-types.post.list-item'], $list['responses'][200]['body']['items']);
     }
 
-    public function test_a_taxonomy_update_accepts_both_put_and_patch(): void
+    public function test_a_taxonomy_names_put_and_patch_as_separate_operations(): void
     {
-        $update = $this->document()['apis']['taxonomies.category']['paths']['/taxonomies/category/{identifier}']['update'];
+        $operations = $this->document()['apis']['taxonomies.category']['paths']['/taxonomies/category/{identifier}'];
 
-        $this->assertSame(['PATCH', 'PUT'], $update['methods']);
+        $this->assertSame('PATCH', $operations['update']['method']);
+        $this->assertSame('PUT', $operations['replace']['method']);
+        $this->assertSame($operations['update']['input'], $operations['replace']['input']);
+        $this->assertSame($operations['update']['responses'], $operations['replace']['responses']);
     }
 
     // ============================================================

@@ -56,7 +56,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
             'id'        => 'acme.widgets',
             'operation' => 'create',
             'route'     => '/widgets',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'callback'  => static fn(WP_REST_Request $request) => ['received' => $request->get_param('customer_id')],
             'input'     => [
                 'type'       => 'object',
@@ -93,7 +93,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
     {
         kizlo_register_route([
             'route'    => '/legacy',
-            'methods'  => ['GET'],
+            'method'   => 'GET',
             'callback' => static fn() => ['ok' => true],
         ]);
 
@@ -103,13 +103,29 @@ class RuntimeRouteTest extends IntrospectionTestCase
         $this->assertArrayNotHasKey('acme.widgets', $this->document()['apis']);
     }
 
+    public function test_a_runtime_route_rejects_an_array_method(): void
+    {
+        $this->setExpectedIncorrectUsage('kizlo_register_route');
+
+        kizlo_register_route([
+            'route'    => '/array-method',
+            'method'   => ['GET'],
+            'callback' => static fn() => ['ok' => true],
+        ]);
+
+        $this->boot();
+
+        $this->assertArrayNotHasKey('/kizlo/v1/array-method', $this->server->get_routes());
+        $this->assertErrorContains($this->errors(), 'arrays are not supported');
+    }
+
     public function test_a_runtime_route_contributes_the_same_shape_as_a_standalone_spec(): void
     {
         $this->registerWidgets();
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create'];
 
-        $this->assertSame(['POST'], $operation['methods']);
+        $this->assertSame('POST', $operation['method']);
         $this->assertSame('Created.', $operation['responses'][201]['description']);
         $this->assertSame('application/json', $operation['input']['content_type']);
     }

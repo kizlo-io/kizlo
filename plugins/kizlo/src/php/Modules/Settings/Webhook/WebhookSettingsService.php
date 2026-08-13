@@ -26,7 +26,7 @@ class WebhookSettingsService
         kizlo_register_route([
             'id'        => 'settings.webhook',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/webhook',
             'summary'   => 'Update the webhook settings',
 

@@ -194,7 +194,7 @@ class IntrospectEndpointTest extends IntrospectionTestCase
         ]);
         kizlo_register_spec_route($this->operation([
             'operation' => 'create',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'responses' => ['404' => ['body' => ['$ref' => 'kizlo.error']]],
         ]));
 
@@ -216,7 +216,7 @@ class IntrospectEndpointTest extends IntrospectionTestCase
 
         kizlo_register_route([
             'route'    => '/healthy',
-            'methods'  => ['GET'],
+            'method'   => 'GET',
             'callback' => static fn() => ['ok' => true],
         ]);
         kizlo_register_spec_route($this->operation(['responses' => []]));

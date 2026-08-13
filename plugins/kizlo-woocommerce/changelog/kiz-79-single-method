@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Declare each WooCommerce introspection operation with one scalar HTTP method

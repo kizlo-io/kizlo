@@ -5,7 +5,7 @@ namespace Kizlo\Modules\Introspection;
 /**
  * Turns a flat route declaration into the canonical operation the registry stores.
  *
- * Purely mechanical: uppercase methods, normalize the path, apply content-type
+ * Purely mechanical: uppercase the method, normalize the path, apply content-type
  * defaults, drop the runtime-only callbacks. Nothing here rejects anything —
  * a malformed declaration still normalizes to something shaped, so that
  * {@see OperationValidator} can report every problem at once instead of the
@@ -25,7 +25,7 @@ class OperationNormalizer
         $route  = is_string($raw['route'] ?? null) ? $raw['route'] : '';
         $parsed = PathNormalizer::normalize($route);
 
-        $methods = self::methods($raw['methods'] ?? null);
+        $method = self::method($raw['method'] ?? null);
 
         $operation = [
             'api_id'          => is_string($raw['id'] ?? null) ? $raw['id'] : '',
@@ -35,8 +35,8 @@ class OperationNormalizer
             'path_parameters' => $parsed['parameters'],
             'path_errors'     => $parsed['errors'],
             'operation'       => is_string($raw['operation'] ?? null) ? $raw['operation'] : '',
-            'methods'         => $methods,
-            'input'           => self::input($raw['input'] ?? null, $methods),
+            'method'          => $method,
+            'input'           => self::input($raw['input'] ?? null, $method),
             'responses'       => self::responses($raw['responses'] ?? null),
         ];
 
@@ -62,7 +62,7 @@ class OperationNormalizer
      */
     public static function toDocument(array $operation): array
     {
-        $document = ['methods' => $operation['methods']];
+        $document = ['method' => $operation['method']];
 
         foreach (['summary', 'description', 'deprecated'] as $key) {
             if (isset($operation[$key])) {
@@ -76,52 +76,16 @@ class OperationNormalizer
         return $document;
     }
 
-    /**
-     * The comparison key for merging: two registrations of the same operation may
-     * union their methods only when everything else about them is identical.
-     *
-     * @param array<string, mixed> $operation
-     * @return array<string, mixed>
-     */
-    public static function mergeSignature(array $operation): array
+    private static function method(mixed $raw): mixed
     {
-        $signature = self::toDocument($operation);
-        unset($signature['methods']);
-
-        return $signature;
+        return is_string($raw) ? strtoupper(trim($raw)) : $raw;
     }
 
     /**
-     * @return array<int, string>
-     */
-    private static function methods(mixed $raw): array
-    {
-        if (is_string($raw)) {
-            $raw = array_map('trim', explode(',', $raw));
-        }
-
-        if (!is_array($raw)) {
-            return [];
-        }
-
-        $methods = [];
-        foreach ($raw as $method) {
-            if (is_string($method) && $method !== '') {
-                $methods[] = strtoupper($method);
-            }
-        }
-
-        $methods = array_values(array_unique($methods));
-        sort($methods);
-
-        return $methods;
-    }
-
-    /**
-     * @param array<int, string> $methods
+     * @param mixed $method
      * @return array<string, mixed>
      */
-    private static function input(mixed $raw, array $methods): array
+    private static function input(mixed $raw, mixed $method): array
     {
         if (!is_array($raw)) {
             return ['type' => 'object', 'properties' => []];
@@ -133,19 +97,16 @@ class OperationNormalizer
             $input = ['type' => 'object'] + $input;
         }
 
-        if (self::hasRequestBody($methods) && !isset($input['content_type'])) {
+        if (self::hasRequestBody($method) && !isset($input['content_type'])) {
             $input['content_type'] = Spec::JSON_CONTENT_TYPE;
         }
 
         return $input;
     }
 
-    /**
-     * @param array<int, string> $methods
-     */
-    public static function hasRequestBody(array $methods): bool
+    public static function hasRequestBody(mixed $method): bool
     {
-        return array_intersect($methods, self::BODY_METHODS) !== [];
+        return is_string($method) && in_array($method, self::BODY_METHODS, true);
     }
 
     /**

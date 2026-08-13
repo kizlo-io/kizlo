@@ -63,7 +63,7 @@ class TaxonomySettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'create',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => '/settings/taxonomies',
             'summary'   => 'Register a Kizlo-owned taxonomy',
             'input'     => DefinitionSchemas::createInput(SettingsSchemas::TAXONOMY_DEFINITION),
@@ -81,7 +81,7 @@ class TaxonomySettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => $single,
             'summary'   => 'Update a taxonomy',
             'input'     => DefinitionSchemas::updateInput(
@@ -99,7 +99,7 @@ class TaxonomySettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'activate',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/activate',
             'summary'   => 'Register a Kizlo-owned taxonomy with WordPress',
             'input'     => DefinitionSchemas::slugInput(),
@@ -112,7 +112,7 @@ class TaxonomySettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'deactivate',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/deactivate',
             'summary'   => 'Unregister a Kizlo-owned taxonomy, keeping its terms',
             'input'     => DefinitionSchemas::slugInput(),
@@ -125,7 +125,7 @@ class TaxonomySettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'delete',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/delete',
             'summary'   => 'Delete a Kizlo-owned taxonomy',
             'input'     => DefinitionSchemas::deleteInput(),
@@ -142,7 +142,7 @@ class TaxonomySettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'process_delete',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/delete/process',
             'summary'   => 'Delete the next batch of terms',
             'input'     => DefinitionSchemas::slugInput(),
@@ -155,7 +155,7 @@ class TaxonomySettingsService
         kizlo_register_route([
             'id'        => self::API_ID,
             'operation' => 'retry_delete',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => $single . '/delete/retry',
             'summary'   => 'Requeue the terms that failed to delete',
             'input'     => DefinitionSchemas::slugInput(),

@@ -7,6 +7,10 @@ description: Register an admin-only REST endpoint under the Kizlo namespace.
 attaches a permission check requiring the `manage_options` capability, so the route is reachable only by
 authenticated administrators. Call it from your plugin. It's a global, so no import is needed.
 
+`method` accepts one HTTP method string. Arrays and the plural `methods` key are rejected. When a declaration opts
+into introspection with `id`, one operation becomes one generated client method. Register a separately named
+operation for each method when one path supports several methods.
+
 ## Parameters
 
 ```php
@@ -16,7 +20,7 @@ kizlo_register_route(array $args): void
 | Key | Type | Description |
 | --- | --- | --- |
 | `route` | `string` | **Required.** Route pattern, e.g. `/forms/(?P<id>\d+)`. Build one from `:param` syntax with [`kizlo_route`](#route-patterns). |
-| `methods` | `string\|string[]` | HTTP method(s). Use `WP_REST_Server` constants (`READABLE`, `CREATABLE`, …). |
+| `method` | `string` | One HTTP method. Use a single-method `WP_REST_Server` constant such as `READABLE` or `CREATABLE`. |
 | `callback` | `callable` | Handler receiving a `WP_REST_Request`, returning a `WP_REST_Response` or `WP_Error`. |
 | `args` | `array` | Optional per-parameter validation/sanitization rules, passed through to `register_rest_route`. |
 
@@ -32,7 +36,7 @@ thrown `InvalidArgumentException` becomes a `400 invalid_param` response automat
 ```php title="wp-content/plugins/your-plugin/forms.php"
 kizlo_register_route([
     'route'    => '/forms/(?P<id>\d+)',
-    'methods'  => WP_REST_Server::READABLE,
+    'method'   => WP_REST_Server::READABLE,
     'callback' => function (WP_REST_Request $request): WP_REST_Response {
         return new WP_REST_Response(['id' => $request->get_param('id')]);
     },
@@ -57,7 +61,7 @@ kizlo_route('/cf7/submit/:form_id');
 
 kizlo_register_route([
     'route'    => kizlo_route('/forms/:id/fields/:field_id'),
-    'methods'  => WP_REST_Server::READABLE,
+    'method'   => WP_REST_Server::READABLE,
     'callback' => $handler,
 ]);
 ```

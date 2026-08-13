@@ -103,7 +103,7 @@ function kizlo_route_match(string $route, WP_REST_Request $request): bool
  *
  * @param array $args {
  *     @type string          $route       Required. Route pattern, e.g. kizlo_route('/orders/:id').
- *     @type string|string[] $methods     Required. HTTP method(s).
+ *     @type string          $method      Required. One HTTP method. Arrays are not supported.
  *     @type callable        $callback    Required. Handler receiving WP_REST_Request.
  *     @type array           $args        Optional. Legacy per-parameter rules. Not used with `input`.
  *
@@ -121,7 +121,7 @@ function kizlo_route_match(string $route, WP_REST_Request $request): bool
  *     'id'        => 'orders',
  *     'operation' => 'create',
  *     'route'     => '/orders',
- *     'methods'   => ['POST'],
+ *     'method'    => 'POST',
  *     'callback'  => [$controller, 'create'],
  *     'input'     => [
  *         'type'       => 'object',
@@ -162,7 +162,7 @@ function kizlo_register_route(array $args): void
  *     'operation' => 'list',
  *     'namespace' => 'wc/v3',
  *     'route'     => '/orders',
- *     'methods'   => ['GET'],
+ *     'method'    => 'GET',
  *     'input'     => [
  *         'type'       => 'object',
  *         'properties' => ['page' => ['type' => 'integer', 'minimum' => 1]],
@@ -189,7 +189,7 @@ function kizlo_register_spec_route(array $args): void
  * `kizlo.*`, `post-types.*` and `taxonomies.*` prefixes belong to core and are
  * rejected from outside this plugin.
  *
- * Always write '$ref' and '$extends' in single quotes — in double quotes PHP
+ * Always write '$ref' and '$extends' in single quotes. In double quotes PHP
  * interpolates them to an empty string.
  *
  * @since 1.0.0

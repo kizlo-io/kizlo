@@ -27,7 +27,7 @@ class CartController
         kizlo_register_route([
             'id'        => 'woocommerce.cart',
             'operation' => 'merge',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => '/cart/merge',
             'summary'   => 'Merge a guest cart into the signed-in user\'s cart',
 
