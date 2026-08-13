@@ -110,6 +110,7 @@ function kizlo_route_match(string $route, WP_REST_Request $request): bool
  *     @type string          $id          Optional. API ID that groups this route's operations.
  *     @type string          $operation   Operation name. Prefer list|retrieve|create|update|delete.
  *     @type array           $input       Request schema. Top-level properties become route arguments.
+ *     @type string[]        $errors      Handler-specific WordPress error codes for the operation.
  *     @type array           $responses   Status-keyed response contracts.
  *     @type string          $summary     Optional.
  *     @type string          $description Optional.
@@ -129,8 +130,12 @@ function kizlo_route_match(string $route, WP_REST_Request $request): bool
  *             'customer_id' => ['type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint'],
  *         ],
  *     ],
+ *     'errors'    => [
+ *         'order_not_found',
+ *     ],
  *     'responses' => [
  *         '201' => ['description' => 'Order created.', 'body' => ['$ref' => 'orders.order']],
+ *         '404' => ['description' => 'Order not found.', 'body' => ['$ref' => 'kizlo.error']],
  *     ],
  * ]);
  *

@@ -24,7 +24,7 @@ use WP_REST_Request;
 class RouteRegistrar
 {
     /** Fields that describe the contract rather than the WordPress route. */
-    private const SPEC_KEYS = ['id', 'operation', 'namespace', 'method', 'input', 'responses', 'summary', 'description', 'deprecated'];
+    private const SPEC_KEYS = ['id', 'operation', 'namespace', 'method', 'input', 'errors', 'responses', 'summary', 'description', 'deprecated'];
 
     /**
      * @param array<string, mixed> $args
@@ -53,7 +53,7 @@ class RouteRegistrar
             return;
         }
 
-        $declaration = self::declaration($args, KIZLO_API_NAMESPACE);
+        $declaration = OperationErrors::withShared(self::declaration($args, KIZLO_API_NAMESPACE));
         $input       = is_array($args['input'] ?? null) ? $args['input'] : [];
 
         if (isset($args['args'])) {
@@ -204,6 +204,7 @@ class RouteRegistrar
             'route'     => $args['route'] ?? '',
             'method'    => $args['method'] ?? null,
             'input'     => is_array($args['input'] ?? null) ? SchemaNormalizer::normalize($args['input']) : [],
+            'errors'    => $args['errors'] ?? [],
             'responses' => $args['responses'] ?? [],
         ];
 

@@ -34,9 +34,18 @@ class CartController
             // The guest cart is named by the X-Kizlo-Guest-Token header rather
             // than the body, so there is nothing to declare here.
             'input'     => ['type' => 'object'],
+            'errors'    => [
+                'kizlo_guest_cart_not_found',
+                'kizlo_invalid_guest_token',
+                'kizlo_missing_guest_token',
+                'kizlo_session_unavailable',
+                'kizlo_user_required',
+            ],
             'responses' => [
                 '200' => ['description' => 'The merged cart.', 'body' => ['$ref' => WooCommerceSchemas::CART]],
                 '400' => ['description' => 'The X-Kizlo-Guest-Token header was missing, or named no cart.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                '404' => ['description' => 'The guest cart was not found.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                '500' => ['description' => 'The headless session handler was unavailable.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
             ],
             'callback'  => [$this, 'mergeCart'],
         ]);

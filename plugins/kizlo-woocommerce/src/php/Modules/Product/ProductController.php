@@ -32,6 +32,12 @@ class ProductController
                     ],
                 ],
             ],
+            'errors'    => [
+                'invalid_item',
+                'invalid_items',
+                'product_not_found',
+                'variation_not_found',
+            ],
             'responses' => [
                 '200' => [
                     'description' => 'One entry per requested item, in the order asked for.',
@@ -63,6 +69,10 @@ class ProductController
                         'description' => 'The preview nonce WordPress issued for the draft.',
                     ],
                 ],
+            ],
+            'errors'    => [
+                'not_found',
+                'woocommerce_rest_product_invalid_id',
             ],
             'responses' => [
                 '200' => ['description' => 'The product.', 'body' => ['$ref' => WooCommerceSchemas::PRODUCT]],
@@ -100,6 +110,7 @@ class ProductController
                     ],
                 ],
             ],
+            'errors'    => ['invalid_params'],
             'responses' => [
                 '200' => ['description' => 'Whether an approved review exists.', 'body' => ['$ref' => WooCommerceSchemas::REVIEW_EXISTS]],
                 '400' => ['description' => 'Invalid product or user ID.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],

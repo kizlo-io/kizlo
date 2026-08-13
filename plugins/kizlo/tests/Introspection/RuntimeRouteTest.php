@@ -5,6 +5,7 @@ namespace Kizlo\Tests\Introspection;
 use WP_REST_Request;
 use WP_REST_Server;
 use Kizlo\Modules\Introspection\ArgTranslator;
+use Kizlo\Modules\Introspection\OperationErrors;
 
 /**
  * `kizlo_register_route()` doing both of its jobs at once: registering a working
@@ -130,6 +131,27 @@ class RuntimeRouteTest extends IntrospectionTestCase
         $this->assertSame('application/json', $operation['input']['content_type']);
     }
 
+    public function test_a_runtime_route_adds_shared_errors_and_responses(): void
+    {
+        $this->registerWidgets(['errors' => ['widget_rejected']]);
+
+        $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create'];
+        $expected  = array_merge(OperationErrors::SHARED, ['widget_rejected']);
+        sort($expected, SORT_STRING);
+
+        $this->assertSame($expected, $operation['errors']);
+        $this->assertSame(['201', '400', '401', '403'], array_map('strval', array_keys($operation['responses'])));
+        $this->assertSame('kizlo.error', $operation['responses'][401]['body']['$ref']);
+        $this->assertSame('kizlo.error', $operation['responses'][403]['body']['$ref']);
+    }
+
+    public function test_declaring_a_shared_error_again_is_a_duplicate(): void
+    {
+        $this->registerWidgets(['errors' => ['invalid_param']]);
+
+        $this->assertErrorContains($this->errors(), 'declared more than once');
+    }
+
     // ============================================================
     // INPUT DRIVES WORDPRESS VALIDATION
     // ============================================================
@@ -173,8 +195,8 @@ class RuntimeRouteTest extends IntrospectionTestCase
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create'];
         $encoded   = (string) wp_json_encode($operation);
 
-        $this->assertStringNotContainsString('sanitize_callback', $encoded);
-        $this->assertStringNotContainsString('callback', $encoded);
+        $this->assertStringNotContainsString('"sanitize_callback":', $encoded);
+        $this->assertStringNotContainsString('"callback":', $encoded);
     }
 
     public function test_an_introspected_route_rejects_a_duplicate_args_array(): void

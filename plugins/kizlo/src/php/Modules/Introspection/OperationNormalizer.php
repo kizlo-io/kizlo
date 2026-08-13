@@ -37,6 +37,7 @@ class OperationNormalizer
             'operation'       => is_string($raw['operation'] ?? null) ? $raw['operation'] : '',
             'method'          => $method,
             'input'           => self::input($raw['input'] ?? null, $method),
+            'errors'          => $raw['errors'] ?? [],
             'responses'       => self::responses($raw['responses'] ?? null),
         ];
 
@@ -70,6 +71,7 @@ class OperationNormalizer
             }
         }
 
+        $document['errors']    = $operation['errors'];
         $document['input']     = $operation['input'];
         $document['responses'] = $operation['responses'];
 
@@ -145,6 +147,12 @@ class OperationNormalizer
                 $normalized['headers'] = is_array($response['headers'])
                     ? SchemaNormalizer::normalize($response['headers'])
                     : $response['headers'];
+            }
+
+            // Kept only so the validator can explain that error codes belong to
+            // the operation. It never survives into a valid document.
+            if (array_key_exists('errors', $response)) {
+                $normalized['errors'] = $response['errors'];
             }
 
             if ($hasBody) {

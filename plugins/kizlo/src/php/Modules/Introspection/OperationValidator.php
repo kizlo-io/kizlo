@@ -75,7 +75,14 @@ class OperationValidator
             return null;
         }
 
+        $errors = $this->cleanErrors($operation['errors'], $responses, $location);
+
+        if ($errors === null) {
+            return null;
+        }
+
         $operation['input']     = $input;
+        $operation['errors']    = $errors;
         $operation['responses'] = $responses;
 
         return $operation;
@@ -272,6 +279,14 @@ class OperationValidator
         $contentType = $response['content_type'] ?? null;
         $hasBody     = array_key_exists('body', $response);
 
+        if (array_key_exists('errors', $response)) {
+            $this->diagnostics->error(
+                $location + ['pointer' => $pointer, 'keyword' => 'errors'],
+                '"errors" belongs to the operation, not an individual response.',
+            );
+            return null;
+        }
+
         if ($contentType !== null && !in_array($contentType, Spec::RESPONSE_CONTENT_TYPES, true)) {
             $this->diagnostics->error(
                 $location + ['pointer' => $pointer, 'keyword' => 'content_type'],
@@ -342,5 +357,70 @@ class OperationValidator
         }
 
         return true;
+    }
+
+    /**
+     * @param array<string, mixed>  $responses
+     * @param array<string, string> $location
+     * @return array<int, string>|null
+     */
+    private function cleanErrors(mixed $errors, array $responses, array $location): ?array
+    {
+        if (!is_array($errors) || !array_is_list($errors)) {
+            $this->diagnostics->error($location + ['keyword' => 'errors'], '"errors" must be a list of non-empty strings.');
+            return null;
+        }
+
+        $seen = [];
+
+        foreach ($errors as $code) {
+            if (!is_string($code) || trim($code) === '') {
+                $this->diagnostics->error($location + ['keyword' => 'errors'], 'Every entry in "errors" must be a non-empty string.');
+                return null;
+            }
+
+            if (isset($seen[$code])) {
+                $this->diagnostics->error($location + ['keyword' => 'errors'], sprintf('Error code "%s" is declared more than once.', $code));
+                return null;
+            }
+
+            $seen[$code] = true;
+        }
+
+        if ($errors !== [] && !$this->hasWordPressErrorResponse($responses)) {
+            $this->diagnostics->error(
+                $location + ['keyword' => 'errors'],
+                'An operation with "errors" must declare a non-2xx JSON response using the "kizlo.error" body.',
+            );
+            return null;
+        }
+
+        sort($errors, SORT_STRING);
+
+        return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $responses
+     */
+    private function hasWordPressErrorResponse(array $responses): bool
+    {
+        foreach ($responses as $status => $response) {
+            if ($status === 'default' || Spec::isSuccessStatus((string) $status) || !is_array($response)) {
+                continue;
+            }
+
+            if (($response['content_type'] ?? null) !== Spec::JSON_CONTENT_TYPE) {
+                continue;
+            }
+
+            $body = $response['body'] ?? null;
+
+            if (is_array($body) && ($body['$ref'] ?? null) === CoreSchemas::ERROR) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

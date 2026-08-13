@@ -3,6 +3,7 @@
 namespace Kizlo\Tests\Introspection;
 
 use Kizlo\Modules\Introspection\PathNormalizer;
+use Kizlo\Modules\Introspection\OperationErrors;
 use Kizlo\Modules\Introspection\Spec;
 
 /**
@@ -71,6 +72,44 @@ class PluginRouteTest extends IntrospectionTestCase
 
                 $this->assertArrayHasKey('body', $response, sprintf('%s answers %s with an undescribed body.', $name, $status));
             }
+        }
+    }
+
+    public function test_every_described_operation_carries_the_shared_runtime_errors(): void
+    {
+        foreach ($this->operations() as $name => $operation) {
+            $missing = array_diff(OperationErrors::SHARED, $operation['errors']);
+
+            $this->assertSame([], $missing, sprintf('%s omits shared runtime errors.', $name));
+        }
+    }
+
+    public function test_every_described_operations_errors_are_sorted_and_unique(): void
+    {
+        foreach ($this->operations() as $name => $operation) {
+            $errors = $operation['errors'];
+            $sorted = $errors;
+            sort($sorted, SORT_STRING);
+
+            $this->assertSame($sorted, $errors, sprintf('%s has non-deterministic errors.', $name));
+            $this->assertSame(array_values(array_unique($errors)), $errors, sprintf('%s repeats an error.', $name));
+        }
+    }
+
+    public function test_handler_specific_errors_are_declared_on_existing_operations(): void
+    {
+        $operations = $this->operations();
+        $expected   = [
+            'comments /comments (create)'                         => 'kizlo_invalid_user',
+            'email /email/send (send)'                            => 'kizlo_email_failed',
+            'post-types.post /post-types/post (create)'           => 'rest_cannot_create',
+            'taxonomies.category /taxonomies/category/{identifier} (update)' => 'rest_cannot_update',
+            'users /users/{field}/{value} (delete)'               => 'cannot_delete_self',
+        ];
+
+        foreach ($expected as $operation => $code) {
+            $this->assertArrayHasKey($operation, $operations);
+            $this->assertContains($code, $operations[$operation]['errors'], sprintf('%s omits %s.', $operation, $code));
         }
     }
 

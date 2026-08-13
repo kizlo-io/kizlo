@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Publish operation-level WordPress error codes in the introspection contract

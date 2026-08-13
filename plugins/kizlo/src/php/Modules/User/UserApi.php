@@ -34,6 +34,7 @@ class UserApi
             'route'     => $route,
             'summary'   => 'Retrieve a user by ID, email address or username',
             'input'     => ['type' => 'object', 'properties' => UserSchemas::identifier()],
+            'errors'    => self::retrieveErrors(),
             'responses' => self::responses(),
             'callback'  => fn(WP_REST_Request $request) => $this->resolve(
                 $request,
@@ -55,6 +56,7 @@ class UserApi
                     '/users',
                 ),
             ],
+            'errors'    => self::updateErrors(),
             'responses' => self::responses(),
             'callback'  => fn(WP_REST_Request $request) => $this->resolve(
                 $request,
@@ -78,6 +80,7 @@ class UserApi
                     ],
                 ],
             ],
+            'errors'    => self::deleteErrors(),
             'responses' => self::responses('The deleted user, as it was before deletion.'),
             'callback'  => fn(WP_REST_Request $request) => $this->resolve(
                 $request,
@@ -97,6 +100,45 @@ class UserApi
             '403' => ['description' => 'The account is the one the request authenticated as.', 'body' => ['$ref' => CoreSchemas::ERROR]],
             '404' => ['description' => 'No user matches the field and value.', 'body' => ['$ref' => CoreSchemas::ERROR]],
         ];
+    }
+
+    /** @return array<int, string> */
+    private static function retrieveErrors(): array
+    {
+        return [
+            'invalid_field',
+            'rest_forbidden_context',
+            'rest_user_cannot_view',
+            'rest_user_invalid_id',
+            'user_not_found',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function updateErrors(): array
+    {
+        return array_merge(self::retrieveErrors(), [
+            'rest_cannot_edit',
+            'rest_cannot_edit_roles',
+            'rest_user_invalid_argument',
+            'rest_user_invalid_email',
+            'rest_user_invalid_password',
+            'rest_user_invalid_role',
+            'rest_user_invalid_slug',
+            'rest_user_invalid_username',
+        ]);
+    }
+
+    /** @return array<int, string> */
+    private static function deleteErrors(): array
+    {
+        return array_merge(self::retrieveErrors(), [
+            'cannot_delete_self',
+            'rest_cannot_delete',
+            'rest_trash_not_supported',
+            'rest_user_cannot_delete',
+            'rest_user_invalid_reassign',
+        ]);
     }
 
     /**
