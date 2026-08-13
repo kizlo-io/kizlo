@@ -26,7 +26,7 @@ class IdentitySettingsService
         kizlo_register_route([
             'id'        => 'settings.identity',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/identity',
             'summary'   => 'Update the site identity',
             'input'     => [

@@ -86,6 +86,23 @@ class ManagedTaxonomies
         $id         = self::apiId($slug);
         $collection = sprintf('/taxonomies/%s', $slug);
         $single     = kizlo_route(sprintf('/taxonomies/%s/:identifier', $slug));
+        $write      = [
+            'id'        => $id,
+            'namespace' => KIZLO_API_NAMESPACE,
+            'route'     => $single,
+            'summary'   => sprintf('Update a %s term', $slug),
+            'input'     => [
+                '$extends'     => "{$id}.update-input",
+                'type'         => 'object',
+                'content_type' => Spec::JSON_CONTENT_TYPE,
+                'properties'   => ['identifier' => self::identifier()],
+            ],
+            'responses' => [
+                '200' => ['description' => 'The updated term.', 'body' => ['$ref' => "{$id}.item"]],
+                '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+                '404' => ['description' => 'Term not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            ],
+        ];
 
         return [
             'list' => [
@@ -93,7 +110,7 @@ class ManagedTaxonomies
                 'operation' => 'list',
                 'namespace' => KIZLO_API_NAMESPACE,
                 'route'     => $collection,
-                'methods'   => ['GET'],
+                'method'    => 'GET',
                 'summary'   => sprintf('List %s terms', $slug),
                 // Derived from the controller that serves the route, so the two
                 // cannot disagree. {@see CoreCollectionParams} explains why this
@@ -114,7 +131,7 @@ class ManagedTaxonomies
                 'operation' => 'retrieve',
                 'namespace' => KIZLO_API_NAMESPACE,
                 'route'     => $single,
-                'methods'   => ['GET'],
+                'method'    => 'GET',
                 'summary'   => sprintf('Retrieve a single %s term', $slug),
                 'input'     => [
                     'type'       => 'object',
@@ -131,7 +148,7 @@ class ManagedTaxonomies
                 'operation' => 'create',
                 'namespace' => KIZLO_API_NAMESPACE,
                 'route'     => $collection,
-                'methods'   => ['POST'],
+                'method'    => 'POST',
                 'summary'   => sprintf('Create a %s term', $slug),
                 'input'     => ['$extends' => "{$id}.create-input", 'type' => 'object', 'content_type' => Spec::JSON_CONTENT_TYPE],
                 'responses' => [
@@ -142,31 +159,21 @@ class ManagedTaxonomies
             ],
 
             'update' => [
-                'id'        => $id,
                 'operation' => 'update',
-                'namespace' => KIZLO_API_NAMESPACE,
-                'route'     => $single,
-                'methods'   => ['PUT', 'PATCH'],
-                'summary'   => sprintf('Update a %s term', $slug),
-                'input'     => [
-                    '$extends'     => "{$id}.update-input",
-                    'type'         => 'object',
-                    'content_type' => Spec::JSON_CONTENT_TYPE,
-                    'properties'   => ['identifier' => self::identifier()],
-                ],
-                'responses' => [
-                    '200' => ['description' => 'The updated term.', 'body' => ['$ref' => "{$id}.item"]],
-                    '400' => ['description' => 'Invalid request.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                    '404' => ['description' => 'Term not found.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-                ],
-            ],
+                'method'    => 'PATCH',
+            ] + $write,
+
+            'replace' => [
+                'operation' => 'replace',
+                'method'    => 'PUT',
+            ] + $write,
 
             'delete' => [
                 'id'        => $id,
                 'operation' => 'delete',
                 'namespace' => KIZLO_API_NAMESPACE,
                 'route'     => $single,
-                'methods'   => ['DELETE'],
+                'method'    => 'DELETE',
                 'summary'   => sprintf('Delete a %s term', $slug),
                 'input'     => [
                     'type'       => 'object',

@@ -26,7 +26,7 @@ class HeadlessSettingsService
         kizlo_register_route([
             'id'        => 'settings.headless',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/headless',
             'summary'   => 'Update the headless settings',
             'input'     => [

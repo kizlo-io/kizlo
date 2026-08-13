@@ -25,7 +25,7 @@ class UploadsSettingsService
         kizlo_register_route([
             'id'        => 'settings.uploads',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/uploads',
             'summary'   => 'Update the allowed upload types',
             'input'     => [

@@ -29,7 +29,7 @@ class CommentSubmission
         kizlo_register_route([
             'id'        => 'comments',
             'operation' => 'create',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => '/comments',
             'summary'   => 'Submit a comment through the native pipeline',
             'input'     => [

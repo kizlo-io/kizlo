@@ -3,6 +3,7 @@
 namespace Kizlo\Tests\Introspection;
 
 use Kizlo\Modules\Introspection\PathNormalizer;
+use Kizlo\Modules\Introspection\Spec;
 
 /**
  * Every route this plugin serves is in the contract, and says something.
@@ -49,6 +50,14 @@ class PluginRouteTest extends IntrospectionTestCase
             $success  = array_filter($statuses, static fn(string $status): bool => str_starts_with($status, '2'));
 
             $this->assertNotSame([], $success, sprintf('%s declares no 2xx response.', $name));
+        }
+    }
+
+    public function test_every_described_operation_declares_one_http_method(): void
+    {
+        foreach ($this->operations() as $name => $operation) {
+            $this->assertIsString($operation['method'], sprintf('%s must declare one HTTP method.', $name));
+            $this->assertContains($operation['method'], Spec::METHODS);
         }
     }
 

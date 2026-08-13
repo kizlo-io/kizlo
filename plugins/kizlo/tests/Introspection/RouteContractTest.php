@@ -3,7 +3,7 @@
 namespace Kizlo\Tests\Introspection;
 
 /**
- * The route half of the contract: identifiers, paths, methods, content types,
+ * The route half of the contract: identifiers, paths, method, content types,
  * responses, and how repeated registrations merge or conflict.
  */
 class RouteContractTest extends IntrospectionTestCase
@@ -89,7 +89,7 @@ class RouteContractTest extends IntrospectionTestCase
     }
 
     // ============================================================
-    // IDENTIFIERS AND METHODS
+    // IDENTIFIERS AND METHOD
     // ============================================================
 
     public function test_an_operation_name_must_be_lowercase_snake_case(): void
@@ -101,26 +101,74 @@ class RouteContractTest extends IntrospectionTestCase
 
     public function test_a_non_crud_snake_case_operation_name_is_allowed(): void
     {
-        kizlo_register_spec_route($this->operation(['operation' => 'bulk_archive', 'methods' => ['POST']]));
+        kizlo_register_spec_route($this->operation(['operation' => 'bulk_archive', 'method' => 'POST']));
 
         $paths = $this->document()['apis']['acme.widgets']['paths'];
 
         $this->assertArrayHasKey('bulk_archive', $paths['/widgets']);
     }
 
-    public function test_methods_are_uppercased_and_sorted(): void
+    public function test_a_method_is_uppercased(): void
     {
-        kizlo_register_spec_route($this->operation(['operation' => 'update', 'methods' => ['put', 'patch']]));
+        kizlo_register_spec_route($this->operation(['operation' => 'update', 'method' => 'put']));
 
-        $this->assertSame(
-            ['PATCH', 'PUT'],
-            $this->document()['apis']['acme.widgets']['paths']['/widgets']['update']['methods'],
-        );
+        $this->assertSame('PUT', $this->document()['apis']['acme.widgets']['paths']['/widgets']['update']['method']);
+    }
+
+    public function test_a_method_is_required(): void
+    {
+        $this->setExpectedIncorrectUsage('kizlo_register_spec_route');
+
+        kizlo_register_spec_route($this->operation(['method' => null]));
+
+        $this->assertErrorContains($this->widgetErrors(), '"method" is required');
+    }
+
+    public function test_the_plural_methods_key_is_rejected(): void
+    {
+        $this->setExpectedIncorrectUsage('kizlo_register_spec_route');
+
+        $operation = $this->operation();
+        unset($operation['method']);
+        $operation['methods'] = ['GET'];
+
+        kizlo_register_spec_route($operation);
+
+        $this->assertErrorContains($this->widgetErrors(), '"methods" is not supported');
+    }
+
+    public function test_a_method_cannot_be_an_array(): void
+    {
+        $this->setExpectedIncorrectUsage('kizlo_register_spec_route');
+
+        foreach ([['GET'], ['GET', 'POST']] as $methods) {
+            kizlo_register_spec_route($this->operation([
+                'operation' => sprintf('array_%d', count($methods)),
+                'method'    => $methods,
+            ]));
+        }
+
+        $errors = $this->widgetErrors();
+
+        $this->assertCount(2, $errors);
+        $this->assertErrorContains($errors, 'arrays are not supported');
+    }
+
+    public function test_a_contributed_method_cannot_be_an_array(): void
+    {
+        add_filter('kizlo_introspection_routes', function (array $routes): array {
+            $routes[] = $this->operation(['method' => ['GET']]);
+            return $routes;
+        });
+
+        $this->assertErrorContains($this->widgetErrors(), 'arrays are not supported');
     }
 
     public function test_an_unknown_http_method_fails_introspection(): void
     {
-        kizlo_register_spec_route($this->operation(['methods' => ['FETCH']]));
+        $this->setExpectedIncorrectUsage('kizlo_register_spec_route');
+
+        kizlo_register_spec_route($this->operation(['method' => 'FETCH']));
 
         $this->assertErrorContains($this->widgetErrors(), 'Unknown HTTP method "FETCH"');
     }
@@ -148,7 +196,7 @@ class RouteContractTest extends IntrospectionTestCase
     {
         kizlo_register_spec_route($this->operation([
             'operation' => 'create',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'responses' => ['201' => ['body' => ['type' => 'string']]],
         ]));
 
@@ -179,7 +227,7 @@ class RouteContractTest extends IntrospectionTestCase
     {
         kizlo_register_spec_route($this->operation([
             'operation' => 'create',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'input'     => ['type' => 'object', 'content_type' => 'application/yaml', 'properties' => []],
             'responses' => ['201' => ['body' => ['type' => 'string']]],
         ]));
@@ -191,7 +239,7 @@ class RouteContractTest extends IntrospectionTestCase
     {
         kizlo_register_spec_route($this->operation([
             'operation' => 'create',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'input'     => [
                 'type'         => 'object',
                 'content_type' => 'multipart/form-data',
@@ -207,7 +255,7 @@ class RouteContractTest extends IntrospectionTestCase
     {
         kizlo_register_spec_route($this->operation([
             'operation' => 'create',
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'input'     => ['type' => 'object', 'properties' => ['upload' => ['type' => 'file']]],
             'responses' => ['201' => ['body' => ['type' => 'string']]],
         ]));
@@ -270,7 +318,7 @@ class RouteContractTest extends IntrospectionTestCase
     {
         kizlo_register_spec_route($this->operation([
             'operation' => 'delete',
-            'methods'   => ['DELETE'],
+            'method'    => 'DELETE',
             'responses' => ['204' => ['description' => 'Deleted.']],
         ]));
 
@@ -339,15 +387,12 @@ class RouteContractTest extends IntrospectionTestCase
     // MERGING AND CONFLICTS
     // ============================================================
 
-    public function test_identical_operations_merge_their_methods(): void
+    public function test_identical_operations_merge(): void
     {
-        kizlo_register_spec_route($this->operation(['operation' => 'update', 'methods' => ['PUT']]));
-        kizlo_register_spec_route($this->operation(['operation' => 'update', 'methods' => ['PATCH']]));
+        kizlo_register_spec_route($this->operation(['operation' => 'update', 'method' => 'PUT']));
+        kizlo_register_spec_route($this->operation(['operation' => 'update', 'method' => 'PUT']));
 
-        $this->assertSame(
-            ['PATCH', 'PUT'],
-            $this->document()['apis']['acme.widgets']['paths']['/widgets']['update']['methods'],
-        );
+        $this->assertSame('PUT', $this->document()['apis']['acme.widgets']['paths']['/widgets']['update']['method']);
     }
 
     public function test_the_same_operation_declared_twice_differently_fails(): void
@@ -357,7 +402,7 @@ class RouteContractTest extends IntrospectionTestCase
             'responses' => ['200' => ['body' => ['type' => 'string']]],
         ]));
 
-        $this->assertErrorContains($this->errors(), 'Declared twice with different input or responses');
+        $this->assertErrorContains($this->errors(), 'Declared twice with a different method, input or responses');
     }
 
     public function test_an_operation_name_is_unique_across_the_whole_api(): void
@@ -384,12 +429,12 @@ class RouteContractTest extends IntrospectionTestCase
         $this->assertArrayHasKey('list', $apis['acme.gadgets']['paths']['/gadgets']);
     }
 
-    public function test_an_operation_split_across_registrations_is_not_a_name_collision(): void
+    public function test_one_operation_name_cannot_be_split_across_methods(): void
     {
-        kizlo_register_spec_route($this->operation(['operation' => 'update', 'methods' => ['PUT']]));
-        kizlo_register_spec_route($this->operation(['operation' => 'update', 'methods' => ['PATCH']]));
+        kizlo_register_spec_route($this->operation(['operation' => 'update', 'method' => 'PUT']));
+        kizlo_register_spec_route($this->operation(['operation' => 'update', 'method' => 'PATCH']));
 
-        $this->assertSame([], $this->errors(), 'Merging one operation must not look like a duplicate name.');
+        $this->assertErrorContains($this->errors(), 'Declared twice with a different method');
     }
 
     public function test_two_operations_cannot_claim_the_same_method_on_one_path(): void

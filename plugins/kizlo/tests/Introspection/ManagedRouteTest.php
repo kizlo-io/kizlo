@@ -299,9 +299,7 @@ class ManagedRouteTest extends IntrospectionTestCase
 
             foreach ($api['paths'] as $path => $operations) {
                 foreach ($operations as $operation) {
-                    foreach ($operation['methods'] as $method) {
-                        $described[$path][] = $method;
-                    }
+                    $described[$path][] = $operation['method'];
                 }
             }
         }

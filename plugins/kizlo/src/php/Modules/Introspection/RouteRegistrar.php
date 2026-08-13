@@ -24,7 +24,7 @@ use WP_REST_Request;
 class RouteRegistrar
 {
     /** Fields that describe the contract rather than the WordPress route. */
-    private const SPEC_KEYS = ['id', 'operation', 'namespace', 'input', 'responses', 'summary', 'description', 'deprecated'];
+    private const SPEC_KEYS = ['id', 'operation', 'namespace', 'method', 'input', 'responses', 'summary', 'description', 'deprecated'];
 
     /**
      * @param array<string, mixed> $args
@@ -37,6 +37,14 @@ class RouteRegistrar
             _doing_it_wrong('kizlo_register_route', '"route" is required.', '1.0.0');
             return;
         }
+
+        $method = self::method($args, 'kizlo_register_route', isset($args['id']) ? ['api_id' => (string) $args['id']] : []);
+
+        if ($method === null) {
+            return;
+        }
+
+        $args['method'] = $method;
 
         $describes = isset($args['id']);
 
@@ -88,7 +96,7 @@ class RouteRegistrar
 
         self::registerEndpoint(
             $route,
-            self::routeArgs(['methods' => $declaration['methods'] ?? [], 'callback' => $callback]),
+            self::routeArgs(['method' => $declaration['method'] ?? null, 'callback' => $callback]),
             $input,
         );
     }
@@ -127,6 +135,14 @@ class RouteRegistrar
                 );
             }
         }
+
+        $method = self::method($args, 'kizlo_register_spec_route', ['api_id' => $id]);
+
+        if ($method === null) {
+            return;
+        }
+
+        $args['method'] = $method;
 
         $input = is_array($args['input'] ?? null) ? $args['input'] : [];
 
@@ -186,7 +202,7 @@ class RouteRegistrar
             'operation' => $args['operation'] ?? '',
             'namespace' => $namespace,
             'route'     => $args['route'] ?? '',
-            'methods'   => $args['methods'] ?? [],
+            'method'    => $args['method'] ?? null,
             'input'     => is_array($args['input'] ?? null) ? SchemaNormalizer::normalize($args['input']) : [],
             'responses' => $args['responses'] ?? [],
         ];
@@ -207,6 +223,7 @@ class RouteRegistrar
     private static function routeArgs(array $args): array
     {
         $routeArgs = array_diff_key($args, array_flip(array_merge(['route'], self::SPEC_KEYS)));
+        $routeArgs['methods'] = $args['method'] ?? '';
 
         $routeArgs['permission_callback'] = static function () {
             if (! current_user_can('manage_options')) {
@@ -230,6 +247,54 @@ class RouteRegistrar
         };
 
         return $routeArgs;
+    }
+
+    /**
+     * One public declaration becomes one operation and one generated method.
+     * WordPress's plural `methods` key exists only after this boundary.
+     *
+     * @param array<string, mixed>  $args
+     * @param array<string, string> $location
+     */
+    private static function method(array $args, string $function, array $location): ?string
+    {
+        if (array_key_exists('methods', $args)) {
+            self::fail(
+                $function,
+                $location + ['keyword' => 'methods'],
+                '"methods" is not supported; declare one HTTP method with "method".',
+            );
+            return null;
+        }
+
+        $method = $args['method'] ?? null;
+
+        if (is_array($method)) {
+            self::fail(
+                $function,
+                $location + ['keyword' => 'method'],
+                '"method" must be one HTTP method string; arrays are not supported.',
+            );
+            return null;
+        }
+
+        if (!is_string($method) || trim($method) === '') {
+            self::fail($function, $location + ['keyword' => 'method'], '"method" is required.');
+            return null;
+        }
+
+        $method = strtoupper(trim($method));
+
+        if (!in_array($method, Spec::METHODS, true)) {
+            self::fail(
+                $function,
+                $location + ['keyword' => 'method'],
+                sprintf('Unknown HTTP method "%s".', $method),
+            );
+            return null;
+        }
+
+        return $method;
     }
 
     /**

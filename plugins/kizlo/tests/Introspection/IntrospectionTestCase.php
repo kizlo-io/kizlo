@@ -161,7 +161,7 @@ abstract class IntrospectionTestCase extends SeoTestCase
             'operation' => 'list',
             'namespace' => 'acme/v1',
             'route'     => '/widgets',
-            'methods'   => ['GET'],
+            'method'    => 'GET',
             'input'     => ['type' => 'object', 'properties' => []],
             'responses' => ['200' => ['body' => ['type' => 'array', 'items' => ['type' => 'string']]]],
         ], $overrides);

@@ -25,7 +25,7 @@ class SeoModule
         kizlo_register_route([
             'id'        => 'seo.robots',
             'operation' => 'retrieve',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => '/seo/robots',
             'summary'   => 'Retrieve the robots.txt directives',
             'input'     => ['type' => 'object'],
@@ -38,7 +38,7 @@ class SeoModule
         kizlo_register_route([
             'id'        => 'seo.homepage',
             'operation' => 'retrieve',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => '/seo/homepage',
             'summary'   => 'Retrieve the homepage SEO',
             'input'     => ['type' => 'object'],
@@ -51,7 +51,7 @@ class SeoModule
         kizlo_register_route([
             'id'        => 'seo.sitemaps',
             'operation' => 'list',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => '/seo/sitemaps',
             'summary'   => 'List the sitemap collections',
             'input'     => ['type' => 'object'],
@@ -67,7 +67,7 @@ class SeoModule
         kizlo_register_route([
             'id'        => 'seo.sitemaps',
             'operation' => 'list_urls',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => kizlo_route('/seo/sitemaps/:type/:key'),
             'summary'   => 'List one collection page of URLs',
             'input'     => [
@@ -91,7 +91,7 @@ class SeoModule
         kizlo_register_route([
             'id'        => 'seo.sitemaps',
             'operation' => 'retrieve',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => kizlo_route('/seo/sitemaps/:type'),
             'summary'   => 'Retrieve the index, or a collection that has no key',
 

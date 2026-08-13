@@ -42,7 +42,7 @@ class BrandSettingsService
         kizlo_register_route([
             'id'        => 'settings.brand',
             'operation' => 'update',
-            'methods'   => 'PUT',
+            'method'    => 'PUT',
             'route'     => '/settings/brand',
             'summary'   => 'Update the brand settings',
             'input'     => $this->input(),

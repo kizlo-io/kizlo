@@ -52,6 +52,7 @@ class TaxonomyApi
             case 'create':
                 return fn(WP_REST_Request $request) => $this->create($slug, self::pinContext($request));
             case 'update':
+            case 'replace':
                 return fn(WP_REST_Request $request) => $this->update($slug, $request->get_param('identifier'), self::pinContext($request));
             case 'delete':
                 return fn(WP_REST_Request $request) => $this->delete($slug, $request->get_param('identifier'), self::pinContext($request));

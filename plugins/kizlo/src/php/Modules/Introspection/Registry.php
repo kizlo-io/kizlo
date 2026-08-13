@@ -341,6 +341,14 @@ class Registry
                 'operation' => (string) $operation['operation'],
             ];
 
+            if (!is_string($operation['method']) || !in_array($operation['method'], Spec::METHODS, true)) {
+                // Method validation owns this diagnostic. An invalid operation
+                // must not reserve a name or route that makes a valid operation
+                // look like the collision.
+                $kept[$key] = $operation;
+                continue;
+            }
+
             $nameKey = implode("\0", [$operation['api_id'], $operation['operation']]);
 
             if (isset($names[$nameKey])) {
@@ -353,37 +361,32 @@ class Registry
 
             $clash = false;
 
-            foreach ($operation['methods'] as $method) {
-                $methodKey = implode("\0", [$operation['api_id'], $operation['path'], $method]);
-                $routeKey  = implode("\0", [$operation['namespace'], $operation['path'], $method]);
+            $method    = $operation['method'];
+            $methodKey = implode("\0", [$operation['api_id'], $operation['path'], $method]);
+            $routeKey  = implode("\0", [$operation['namespace'], $operation['path'], $method]);
 
-                if (isset($methods[$methodKey])) {
-                    $errors->error(
-                        $location + ['keyword' => 'methods'],
-                        sprintf('"%s" is already handled by the "%s" operation on this path.', $method, $methods[$methodKey]),
-                    );
-                    $clash = true;
-                    break;
-                }
+            if (isset($methods[$methodKey])) {
+                $errors->error(
+                    $location + ['keyword' => 'method'],
+                    sprintf('"%s" is already handled by the "%s" operation on this path.', $method, $methods[$methodKey]),
+                );
+                $clash = true;
+            }
 
-                if (isset($routes[$routeKey]) && $routes[$routeKey] !== $operation['api_id']) {
-                    $errors->error(
-                        $location + ['keyword' => 'route'],
-                        sprintf('"%s %s" in "%s" is already described by the "%s" API.', $method, (string) $operation['path'], (string) $operation['namespace'], $routes[$routeKey]),
-                    );
-                    $clash = true;
-                    break;
-                }
+            if (isset($routes[$routeKey]) && $routes[$routeKey] !== $operation['api_id']) {
+                $errors->error(
+                    $location + ['keyword' => 'route'],
+                    sprintf('"%s %s" in "%s" is already described by the "%s" API.', $method, (string) $operation['path'], (string) $operation['namespace'], $routes[$routeKey]),
+                );
+                $clash = true;
             }
 
             if ($clash) {
                 continue;
             }
 
-            foreach ($operation['methods'] as $method) {
-                $methods[implode("\0", [$operation['api_id'], $operation['path'], $method])]  = (string) $operation['operation'];
-                $routes[implode("\0", [$operation['namespace'], $operation['path'], $method])] = (string) $operation['api_id'];
-            }
+            $methods[$methodKey] = (string) $operation['operation'];
+            $routes[$routeKey]   = (string) $operation['api_id'];
 
             $names[$nameKey] = (string) $operation['path'];
             $kept[$key]      = $operation;
@@ -407,22 +410,16 @@ class Registry
 
         $existing = $grouped[$key];
 
-        if (Document::encode(OperationNormalizer::mergeSignature($existing)) !== Document::encode(OperationNormalizer::mergeSignature($operation))) {
+        if (Document::encode(OperationNormalizer::toDocument($existing)) !== Document::encode(OperationNormalizer::toDocument($operation))) {
             $errors->error(
                 [
                     'api_id'    => (string) $operation['api_id'],
                     'path'      => (string) $operation['path'],
                     'operation' => (string) $operation['operation'],
                 ],
-                'Declared twice with different input or responses; use separate operations.',
+                'Declared twice with a different method, input or responses; use separate operations.',
             );
-            return;
         }
-
-        $methods = array_values(array_unique(array_merge($existing['methods'], $operation['methods'])));
-        sort($methods);
-
-        $grouped[$key]['methods'] = $methods;
     }
 
     // ============================================================

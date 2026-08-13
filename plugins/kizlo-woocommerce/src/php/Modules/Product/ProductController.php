@@ -19,7 +19,7 @@ class ProductController
         kizlo_register_route([
             'id'        => 'woocommerce.products',
             'operation' => 'list_mixed',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => '/products/mixed',
             'summary'   => 'List products and variations in one call',
             'input'     => [
@@ -46,7 +46,7 @@ class ProductController
         kizlo_register_route([
             'id'        => 'woocommerce.products',
             'operation' => 'preview',
-            'methods'   => 'GET',
+            'method'    => 'GET',
             'route'     => '/products/preview',
             'summary'   => 'Retrieve an unpublished product for preview',
             'input'     => [
@@ -74,7 +74,7 @@ class ProductController
         kizlo_register_route([
             'id'        => 'woocommerce.products',
             'operation' => 'review_exists',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => '/products/reviews/exists',
             'summary'   => 'Check whether a user has reviewed a product',
             'input'     => [
@@ -109,7 +109,7 @@ class ProductController
 
         kizlo_register_route_interceptor([
             'route' => '/wc/store/v1/products/collection-data',
-            'methods' => 'GET',
+            'method' => 'GET',
             'callback' => function (WP_REST_Request $request, WP_REST_Response | WP_Error $response) {
                 $response->set_data($this->product->extendCollection($response->get_data()));
                 return $response;

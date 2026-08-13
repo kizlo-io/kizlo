@@ -21,7 +21,7 @@ class EmailModule
         kizlo_register_route([
             'id'        => 'email',
             'operation' => 'send',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => '/email/send',
             'summary'   => 'Send an email through WordPress',
             'input'     => [

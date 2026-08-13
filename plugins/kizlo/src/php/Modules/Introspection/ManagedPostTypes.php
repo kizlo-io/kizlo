@@ -126,7 +126,7 @@ class ManagedPostTypes
             'operation' => 'list',
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $collection,
-            'methods'   => ['GET'],
+            'method'    => 'GET',
             'summary'   => sprintf('List %s entries', $slug),
             'input'     => ['type' => 'object', 'properties' => self::listParameters($slug)],
             'responses' => [
@@ -144,7 +144,7 @@ class ManagedPostTypes
             'operation' => 'retrieve',
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $single,
-            'methods'   => ['GET'],
+            'method'    => 'GET',
             'summary'   => sprintf('Retrieve a single %s entry', $slug),
             'input'     => [
                 'type'       => 'object',
@@ -164,7 +164,7 @@ class ManagedPostTypes
             'operation' => 'create',
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $collection,
-            'methods'   => ['POST'],
+            'method'    => 'POST',
             'summary'   => sprintf('Create a %s entry', $slug),
             'input'     => self::createInput($slug, $id),
             'responses' => [
@@ -179,7 +179,7 @@ class ManagedPostTypes
             'operation' => 'update',
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $single,
-            'methods'   => ['PATCH'],
+            'method'    => 'PATCH',
             'summary'   => sprintf('Update a %s entry', $slug),
 
             // JSON even for an upload type. There is no way to replace the binary
@@ -203,7 +203,7 @@ class ManagedPostTypes
             'operation' => 'delete',
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $single,
-            'methods'   => ['DELETE'],
+            'method'    => 'DELETE',
             'summary'   => sprintf('Delete a %s entry', $slug),
             'input'     => [
                 'type'       => 'object',

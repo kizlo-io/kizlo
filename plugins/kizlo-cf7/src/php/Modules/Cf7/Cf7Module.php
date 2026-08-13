@@ -24,7 +24,7 @@ class Cf7Module
         kizlo_register_route([
             'id'        => 'cf7.forms',
             'operation' => 'submit',
-            'methods'   => 'POST',
+            'method'    => 'POST',
             'route'     => kizlo_route('/cf7/:form_id'),
             'summary'   => 'Submit a Contact Form 7 form',
 
