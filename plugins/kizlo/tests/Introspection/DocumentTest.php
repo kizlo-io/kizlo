@@ -2,6 +2,8 @@
 
 namespace Kizlo\Tests\Introspection;
 
+use Kizlo\Modules\Introspection\Document;
+
 /**
  * The emitted document: what it contains, how it is ordered, and that identical
  * configuration hashes identically.
@@ -12,8 +14,9 @@ class DocumentTest extends IntrospectionTestCase
     {
         $document = $this->document();
 
+        $this->assertSame('1.0', $document['version']);
         $this->assertStringStartsWith('sha256:', $document['hash']);
-        $this->assertSame(['hash', 'schemas', 'apis', 'diagnostics'], array_keys($document));
+        $this->assertSame(['version', 'hash', 'schemas', 'apis', 'diagnostics'], array_keys($document));
     }
 
     public function test_the_core_schemas_ship_with_the_document(): void
@@ -91,6 +94,14 @@ class DocumentTest extends IntrospectionTestCase
         kizlo_register_spec_schema('acme.other', ['type' => 'object', 'properties' => []]);
 
         $this->assertNotSame($before, $this->document()['hash']);
+    }
+
+    public function test_changing_the_format_version_changes_the_hash(): void
+    {
+        $document = $this->document();
+        $changed  = ['version' => '2.0'] + $document;
+
+        $this->assertNotSame($document['hash'], Document::hash($changed));
     }
 
     public function test_the_hash_covers_the_document_without_itself(): void
