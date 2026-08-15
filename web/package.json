@@ -3,13 +3,14 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"build": "pnpm docs:sitemap && dotenv -e ../.env -- next build",
-		"dev": "pnpm docs:sitemap && dotenv -e ../.env -- next dev --webpack",
-		"start": "dotenv -e ../.env -- next start",
+		"build": "pnpm docs:sitemap && pnpm withEnv -- next build",
+		"dev": "pnpm docs:sitemap && pnpm withEnv -- next dev --webpack",
+		"start": "pnpm withEnv -- next start",
 		"docs:sitemap": "node scripts/generate-docs-sitemap.mjs",
 		"postinstall": "fumadocs-mdx",
 		"typecheck": "pnpm docs:sitemap && fumadocs-mdx && next typegen && tsc --noEmit",
-		"clean": "git clean -xdf .cache .turbo .kizlo .next .source dist node_modules"
+		"clean": "git clean -xdf .cache .turbo .kizlo .next .source dist node_modules",
+		"withEnv": "dotenv -e ../.env"
 	},
 	"dependencies": {
 		"@paper-design/shaders-react": "^0.0.76",

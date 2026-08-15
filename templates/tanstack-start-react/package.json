@@ -4,10 +4,11 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev:template": "dotenv -e ../../.env -- vite dev",
-		"build": "dotenv -e ../../.env -- vite build",
+		"dev:template": "pnpm withEnv -- vite dev",
+		"build": "pnpm withEnv -- vite build",
 		"typecheck": "tsr generate && tsc --noEmit",
-		"clean": "git clean -xdf .cache .turbo .kizlo .output .nitro .tanstack dist node_modules"
+		"clean": "git clean -xdf .cache .turbo .kizlo .output .nitro .tanstack dist node_modules",
+		"withEnv": "dotenv -e ../../.env"
 	},
 	"dependencies": {
 		"@tanstack/react-router": "catalog:",

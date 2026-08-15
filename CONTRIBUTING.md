@@ -28,10 +28,11 @@ No env is needed to build the packages or run the `kizlo dev` / `kizlo test`
 stacks. What reads env is the apps: `web/` (a live Kizlo server) and the
 templates, when you build or run one.
 
-They all read **the root `.env`, and only that one**. Every app's `build` and
-dev script loads it through `dotenv-cli`, so the WordPress connection is written
-once and `pnpm kizlo dev up` keeps it current. Don't add a `.env` under `web/` or
-a template — nothing reads it, and a stale copy is how the connection silently
+They all read **the root `.env`, and only that one**. Each app has a `withEnv`
+script that loads it through `dotenv-cli`, and its `build`, dev and `start`
+scripts run through that, so the WordPress connection is written once and
+`pnpm kizlo dev up` keeps it current. Don't add a `.env` under `web/` or a
+template — nothing reads it, and a stale copy is how the connection silently
 drifts. The per-framework API URLs (`NEXT_PUBLIC_`, `PUBLIC_`, `VITE_`) live in
 that same file; the names differ, so they don't collide.
 
