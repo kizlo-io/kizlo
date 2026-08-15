@@ -1,7 +1,8 @@
-import type { Media } from "@kizlo/shared"
 import { describe, expect, test } from "vitest"
 import type { BrandSettings } from "../settings/service.interface"
 import { resolveIcons } from "./icons"
+
+type Media = NonNullable<BrandSettings["favicon"]>
 
 function media(mime: string, src = `https://cdn.test/${mime.replace("/", "-")}`, size?: { width: number; height: number }): Media {
 	return { id: 1, name: "", alt: "", src, mime, ...size }

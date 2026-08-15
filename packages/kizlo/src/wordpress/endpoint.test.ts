@@ -71,6 +71,19 @@ describe("createWordPressClient", () => {
 		expect(signal?.aborted).toBe(true)
 	})
 
+	test("sends per-call headers without letting them reach the request the definition owns", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
+		vi.stubGlobal("fetch", fetch)
+
+		await client().books.retrieve({ identifier: "dune" }, { headers: { "X-Kizlo-Guest-Token": "t_1", "X-Kizlo-User-Id": "7" } })
+
+		const sent = fetch.mock.calls[0]?.[1]?.headers as Record<string, string>
+		expect(sent["X-Kizlo-Guest-Token"]).toBe("t_1")
+		expect(sent["X-Kizlo-User-Id"]).toBe("7")
+		// The headers ride along; the route they ride to is still the definition's.
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune?context=edit")
+	})
+
 	test("falls through to transport methods the tree does not define", async () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }))
 		vi.stubGlobal("fetch", fetch)

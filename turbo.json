@@ -45,5 +45,7 @@
 		}
 	},
 	"concurrency": "20",
+	"//": "Every app reads the root `.env` through dotenv-cli, so its contents are a build input rather than an environment Turbo can hash.",
+	"globalDependencies": [".env"],
 	"globalPassThroughEnv": ["NODE_ENV", "CI", "VERCEL", "VERCEL_ENV", "VERCEL_URL", "NEXT_RUNTIME", "npm_lifecycle_event"]
 }

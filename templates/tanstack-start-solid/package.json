@@ -4,8 +4,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev:template": "vite dev",
-		"build": "vite build",
+		"dev:template": "dotenv -e ../../.env -- vite dev",
+		"build": "dotenv -e ../../.env -- vite build",
 		"typecheck": "tsr generate && tsc --noEmit",
 		"clean": "git clean -xdf .cache .turbo .kizlo .output .nitro .tanstack dist node_modules"
 	},
@@ -20,6 +20,7 @@
 		"@tanstack/router-plugin": "catalog:",
 		"@tooling/typescript": "workspace:*",
 		"@types/node": "catalog:",
+		"dotenv-cli": "catalog:",
 		"typescript": "catalog:",
 		"vite": "catalog:",
 		"vite-plugin-solid": "catalog:"

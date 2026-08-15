@@ -4,9 +4,9 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev:template": "next dev --webpack",
-		"build": "next build",
-		"start": "next start",
+		"dev:template": "dotenv -e ../../.env -- next dev --webpack",
+		"build": "dotenv -e ../../.env -- next build",
+		"start": "dotenv -e ../../.env -- next start",
 		"typecheck": "tsc --noEmit",
 		"clean": "git clean -xdf .cache .turbo .kizlo .next .source dist node_modules"
 	},
@@ -21,6 +21,7 @@
 		"@types/node": "catalog:",
 		"@types/react": "catalog:react19",
 		"@types/react-dom": "catalog:react19",
+		"dotenv-cli": "catalog:",
 		"typescript": "catalog:"
 	}
 }
