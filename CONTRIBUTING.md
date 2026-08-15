@@ -25,12 +25,22 @@ pnpm install
 ```
 
 No env is needed to build the packages or run the `kizlo dev` / `kizlo test`
-stacks. The only thing that reads env is the `web/` app (a live Kizlo server).
-If you're working on it locally, copy its template and fill in the values:
+stacks. What reads env is the apps: `web/` (a live Kizlo server) and the
+templates, when you build or run one.
+
+They all read **the root `.env`, and only that one**. Every app's `build` and
+dev script loads it through `dotenv-cli`, so the WordPress connection is written
+once and `pnpm kizlo dev up` keeps it current. Don't add a `.env` under `web/` or
+a template — nothing reads it, and a stale copy is how the connection silently
+drifts. The per-framework API URLs (`NEXT_PUBLIC_`, `PUBLIC_`, `VITE_`) live in
+that same file; the names differ, so they don't collide.
 
 ```bash
-cp web/.env.example web/.env   # only to run the web app locally
+cp web/.env.example .env   # then fill in the values, or let `kizlo dev up` write them
 ```
+
+Each template keeps its own complete `.env.example`, because that file is what a
+scaffolded project starts from and a standalone project has no root to read.
 
 CI doesn't build `web/` — the deployed site is built by Vercel on every PR.
 
