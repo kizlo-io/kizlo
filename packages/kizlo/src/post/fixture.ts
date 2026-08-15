@@ -1,4 +1,5 @@
 import { defineFixture, type SeedContext } from "../cli/wp/types"
+import { WP_CORE_BASE } from "../wordpress"
 
 interface SeedPost {
 	slug: string
@@ -18,16 +19,22 @@ const POSTS: SeedPost[] = [
 ]
 
 async function upsertPost(ctx: SeedContext, post: SeedPost): Promise<number> {
-	const existing = await ctx.service.posts.list({ slug: post.slug, per_page: 1 })
+	const existing = await ctx.service.get<Array<{ id: number }>, string>("/posts", {
+		base: WP_CORE_BASE,
+		searchParams: { slug: post.slug, per_page: 1 },
+	})
 	if (existing.error) throw existing.error
-	if (existing.data.items[0]) return existing.data.items[0].id
+	if (existing.data[0]) return existing.data[0].id
 
-	const created = await ctx.service.posts.create({
-		slug: post.slug,
-		title: post.title,
-		content: post.content,
-		status: "publish",
-		author: ctx.adminId,
+	const created = await ctx.service.post<{ id: number }, string>("/posts", {
+		base: WP_CORE_BASE,
+		body: {
+			slug: post.slug,
+			title: post.title,
+			content: post.content,
+			status: "publish",
+			author: ctx.adminId,
+		},
 	})
 	if (created.error) throw created.error
 	return created.data.id
@@ -35,17 +42,23 @@ async function upsertPost(ctx: SeedContext, post: SeedPost): Promise<number> {
 
 async function seedComments(ctx: SeedContext, postId: number, comments: SeedPost["comments"]): Promise<void> {
 	if (!comments?.length) return
-	const existing = await ctx.service.comments.list({ post: postId, per_page: 1 })
+	const existing = await ctx.service.get<unknown[], string>("/comments", {
+		base: WP_CORE_BASE,
+		searchParams: { post: postId, per_page: 1 },
+	})
 	if (existing.error) throw existing.error
-	if (existing.data.items.length > 0) return
+	if (existing.data.length > 0) return
 
 	for (const comment of comments) {
-		const created = await ctx.service.comments.create({
-			post: postId,
-			content: comment.content,
-			author_name: comment.author,
-			author_email: comment.email,
-			status: "approve",
+		const created = await ctx.service.post<unknown, string>("/comments", {
+			base: WP_CORE_BASE,
+			body: {
+				post: postId,
+				content: comment.content,
+				author_name: comment.author,
+				author_email: comment.email,
+				status: "approve",
+			},
 		})
 		if (created.error) throw created.error
 	}

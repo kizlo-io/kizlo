@@ -79,6 +79,16 @@ export interface KizloGlobalConfig {
 	 */
 	name?: string
 
+	/**
+	 * Directory to write the WordPress client into, as `<wordpressClientDir>/wordpress.ts`. For a package or
+	 * workspace that ships procedures but no Kizlo server: there is no router to build a contract from,
+	 * yet those procedures still call the generated tree, so they need the client on its own.
+	 *
+	 * Independent of `dir`. An app leaves this unset and gets its client inside `dir` alongside the
+	 * contract; set both only if a project is somehow each of those things at once.
+	 */
+	wordpressClientDir?: string
+
 	/** Local WordPress and contract watcher run by `kizlo dev`. */
 	dev?: KizloDevConfig
 

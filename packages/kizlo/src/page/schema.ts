@@ -2,7 +2,21 @@ import { arrayable, lenient, Media, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import { WP_PAGE_ORDER_BYES, WP_PAGE_STATUSES } from "../wordpress/page/types"
+
+const WP_PAGE_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
+const WP_PAGE_ORDER_BYES = [
+	"author",
+	"date",
+	"id",
+	"include",
+	"modified",
+	"parent",
+	"relevance",
+	"slug",
+	"include_slugs",
+	"title",
+	"menu_order",
+] as const
 
 export const PageStatus = z.enum(WP_PAGE_STATUSES).exclude(["trash"])
 export type PageStatus = z.infer<typeof PageStatus>

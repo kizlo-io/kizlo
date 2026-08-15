@@ -1,11 +1,11 @@
-import type { WordPressService, WP_CommonErrorCode } from "../wordpress"
+import type { WordPressTransport, WP_CommonErrorCode } from "../wordpress"
 import { WP_KIZLO_BASE } from "../wordpress"
 import type { EmailSendParams } from "./service.interface"
 
 export class EmailService {
-	private readonly wordpress: WordPressService
+	private readonly wordpress: WordPressTransport
 
-	constructor(wordpress: WordPressService) {
+	constructor(wordpress: WordPressTransport) {
 		this.wordpress = wordpress
 	}
 

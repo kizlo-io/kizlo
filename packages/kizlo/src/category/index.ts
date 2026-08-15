@@ -1,10 +1,9 @@
+import { normalizeArrayableValue } from "@kizlo/shared"
 import { parseIdentifier } from "../shared/identifier"
 import { createProcedure } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
-import { getTaxonomyService } from "../taxonomy/service"
 import { GET_CATEGORY_ERROR_MAP, LIST_CATEGORY_ERROR_MAP } from "./error"
 import { Category, CategoryList, ListCategoryInput, RetrieveCategoryInput } from "./schema"
-import type { WPK_Category } from "./types"
 import { deserializeCategory } from "./utils"
 
 export const CATEGORY_ROUTER_MAP = {
@@ -18,12 +17,10 @@ export const CATEGORY_ROUTER_MAP = {
 			errors: GET_CATEGORY_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const taxonomy = getTaxonomyService<WPK_Category>("category", context.wordpress)
-
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.CATEGORY_NOT_FOUND()
 
-			const response = await taxonomy.get(identifier)
+			const response = await context.wordpress.taxonomies.category.retrieve({ identifier: String(identifier.value) })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_taxonomy":
@@ -51,21 +48,18 @@ export const CATEGORY_ROUTER_MAP = {
 			errors: LIST_CATEGORY_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const taxonomy = getTaxonomyService<WPK_Category>("category", context.wordpress)
-
-			const response = await taxonomy.list({
-				context: "edit",
+			const response = await context.wordpress.taxonomies.category.list({
 				page: input.query?.page,
 				per_page: input.query?.perPage,
 				search: input.query?.search,
-				exclude: input.query?.exclude,
-				include: input.query?.include,
+				exclude: normalizeArrayableValue(input.query?.exclude),
+				include: normalizeArrayableValue(input.query?.include),
 				order: input.query?.order,
 				orderby: input.query?.orderBy,
 				hide_empty: input.query?.hideEmpty,
 				parent: input.query?.parent,
 				post: input.query?.post,
-				slug: input.query?.slug,
+				slug: normalizeArrayableValue(input.query?.slug),
 			})
 
 			if (response.error) {

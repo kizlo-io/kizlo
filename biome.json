@@ -11,6 +11,8 @@
 			"**",
 			"!!**/tooling/typescript",
 			"!!**/generated",
+			"!!wordpress.ts",
+			"!!**/.kizlo",
 			"!!**/.changeset",
 			"!!**/*.php",
 			"!!**/src/php",

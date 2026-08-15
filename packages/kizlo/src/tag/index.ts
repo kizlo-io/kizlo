@@ -1,10 +1,9 @@
+import { normalizeArrayableValue } from "@kizlo/shared"
 import { parseIdentifier } from "../shared/identifier"
 import { createProcedure } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
-import { getTaxonomyService } from "../taxonomy/service"
 import { GET_TAG_ERROR_MAP, LIST_TAG_ERROR_MAP } from "./error"
 import { ListTagInput, RetrieveTagInput, Tag, TagList } from "./schema"
-import type { WPK_Tag } from "./types"
 import { deserializeTag } from "./utils"
 
 export const TAG_ROUTER_MAP = {
@@ -18,12 +17,10 @@ export const TAG_ROUTER_MAP = {
 			errors: GET_TAG_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const taxonomy = getTaxonomyService<WPK_Tag>("post_tag", context.wordpress)
-
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.TAG_NOT_FOUND()
 
-			const response = await taxonomy.get(identifier)
+			const response = await context.wordpress.taxonomies.postTag.retrieve({ identifier: String(identifier.value) })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_taxonomy":
@@ -51,20 +48,17 @@ export const TAG_ROUTER_MAP = {
 			errors: LIST_TAG_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const taxonomy = getTaxonomyService<WPK_Tag>("post_tag", context.wordpress)
-
-			const response = await taxonomy.list({
-				context: "edit",
+			const response = await context.wordpress.taxonomies.postTag.list({
 				page: input.query?.page,
 				per_page: input.query?.perPage,
 				search: input.query?.search,
-				exclude: input.query?.exclude,
-				include: input.query?.include,
+				exclude: normalizeArrayableValue(input.query?.exclude),
+				include: normalizeArrayableValue(input.query?.include),
 				order: input.query?.order,
 				orderby: input.query?.orderBy,
 				hide_empty: input.query?.hideEmpty,
 				post: input.query?.post,
-				slug: input.query?.slug,
+				slug: normalizeArrayableValue(input.query?.slug),
 			})
 
 			if (response.error) {

@@ -104,7 +104,7 @@ test("deserializeSeo coalesces a partially populated article block", () => {
 })
 
 test("renderJsonLd serializes a populated graph and skips an empty one", () => {
-	expect(renderJsonLd(minimalSeo().schema)).toBeNull()
+	expect(renderJsonLd(deserializeSeo(minimalSeo()).schema)).toBeNull()
 
 	const schema = { "@context": "https://schema.org" as const, "@graph": [{ "@type": "Article", headline: "Hello" }] }
 	expect(renderJsonLd(schema)).toBe(JSON.stringify(schema))

@@ -1,7 +1,22 @@
 import { arrayable, type LiteralUnion, lenient, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { ListMetadata, ListOrder } from "../shared/schema"
-import { WP_MENU_ITEM_ORDER_BYES, WP_MENU_ITEM_TARGETS, WP_MENU_ITEM_TAX_RELATIONS } from "../wordpress/menu/items/types"
+
+const WP_MENU_ITEM_TARGETS = ["_blank", ""] as const
+const WP_MENU_ITEM_ORDER_BYES = [
+	"author",
+	"date",
+	"id",
+	"include",
+	"modified",
+	"parent",
+	"relevance",
+	"slug",
+	"include_slugs",
+	"title",
+	"menu_order",
+] as const
+const WP_MENU_ITEM_TAX_RELATIONS = ["AND", "OR"] as const
 
 export const MENU_TYPES = ["page", "post", "category", "tag", "product", "product_cat", "product_tag", "custom"] as const
 export type MenuType = LiteralUnion<(typeof MENU_TYPES)[number], string>

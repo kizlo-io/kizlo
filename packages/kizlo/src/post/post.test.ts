@@ -1,33 +1,36 @@
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test"
-import { WordPressService } from "../wordpress"
+import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test/harness"
+import { WordPressTransport, WP_CORE_BASE } from "../wordpress"
 import { Post, PostList } from "./schema"
 
 let kizlo: KizloTestInstance
-let adminWp: WordPressService
+let adminWp: WordPressTransport
 let draftId = 0
 const DRAFT_SLUG = "draft-gating-check"
 
 beforeAll(async () => {
 	kizlo = getKizloTestInstance()
 	const creds = getTestCredentials()
-	adminWp = new WordPressService({
+	adminWp = new WordPressTransport({
 		credentials: { url: creds.url, username: creds.users.admin.username, password: creds.users.admin.applicationPassword },
 	})
 	// Provision an unpublished post to exercise draft gating and list exclusion, then clean it up.
-	const created = await adminWp.posts.create({
-		slug: DRAFT_SLUG,
-		title: "Draft Gating Check",
-		content: "Unpublished.",
-		status: "draft",
-		author: creds.users.admin.id,
+	const created = await adminWp.post<{ id: number }, string>("/posts", {
+		base: WP_CORE_BASE,
+		body: {
+			slug: DRAFT_SLUG,
+			title: "Draft Gating Check",
+			content: "Unpublished.",
+			status: "draft",
+			author: creds.users.admin.id,
+		},
 	})
 	if (created.error) throw created.error
 	draftId = created.data.id
 })
 
 afterAll(async () => {
-	if (draftId) await adminWp.posts.delete({ id: draftId, force: true })
+	if (draftId) await adminWp.delete(`/posts/${draftId}`, { base: WP_CORE_BASE, searchParams: { force: true } })
 })
 
 test("posts.list returns posts conforming to PostList", async () => {

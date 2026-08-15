@@ -17,7 +17,7 @@ pnpm-debug.log*
 .env
 .env.production
 
-# kizlo working dir (local WordPress install, test credentials, compose overrides, staged imports)
+# kizlo working dir (local WordPress install, test credentials, compose overrides, staged imports, contract cache)
 .kizlo/
 
 # macOS-specific files

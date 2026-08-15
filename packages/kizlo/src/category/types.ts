@@ -1,16 +1,7 @@
-import type { WPK_Seo } from "../seo/types"
-import type { WP_Category } from "../wordpress"
+import type { WP_EndpointData } from "../wordpress"
 
-/**
- * The `kizlo` enrichment block injected by the plugin's `TermExtension`. `url`
- * (the resolver-built term archive link) rides on every response; `seo` is only
- * present on single-term fetches, never on list items.
- */
-export interface WPK_CategoryEnrichment {
-	url?: string
-	seo?: WPK_Seo
-}
+/** A category term, exactly as the project's generated WordPress client describes it. */
+export type WPK_Category = WP_EndpointData<"taxonomies.category.retrieve">
 
-export interface WPK_Category extends WP_Category {
-	kizlo: WPK_CategoryEnrichment
-}
+/** A category as it appears in a list response — the same term, without the resolved SEO block. */
+export type WPK_CategoryListItem = WP_EndpointData<"taxonomies.category.list">[number]

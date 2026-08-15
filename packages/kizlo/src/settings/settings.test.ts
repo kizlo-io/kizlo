@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { getKizloTestInstance, type KizloTestInstance } from "../test"
+import { getKizloTestInstance, type KizloTestInstance } from "../test/harness"
 import type { Settings } from "./service.interface"
 
 let kizlo: KizloTestInstance

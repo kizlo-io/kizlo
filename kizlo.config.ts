@@ -3,18 +3,15 @@ import { woocommerce } from "@kizlo/woocommerce/test"
 import { defineConfig } from "kizlo/config"
 import { coreFixtures, defineFixture } from "kizlo/test"
 
+const fixtures = [
+	...coreFixtures,
+	defineFixture({ name: "kizlo-core", plugins: [{ path: "plugins/kizlo" }] }),
+	woocommerce({ plugins: ["woocommerce", { path: "plugins/kizlo-woocommerce" }] }),
+	cf7({ plugins: ["contact-form-7", { path: "plugins/kizlo-cf7" }] }),
+]
+
 export default defineConfig({
-	dev: {
-		local: true,
-		fixtures: [defineFixture({ name: "kizlo-core", plugins: [{ path: "plugins/kizlo" }] })],
-	},
-	test: {
-		local: true,
-		fixtures: [
-			defineFixture({ name: "kizlo-core", plugins: [{ path: "plugins/kizlo" }] }),
-			...coreFixtures,
-			woocommerce({ plugins: ["woocommerce", { path: "plugins/kizlo-woocommerce" }] }),
-			cf7({ plugins: ["contact-form-7", { path: "plugins/kizlo-cf7" }] }),
-		],
-	},
+	wordpressClientDir: ".",
+	dev: { local: true, fixtures },
+	test: { local: true, fixtures },
 })

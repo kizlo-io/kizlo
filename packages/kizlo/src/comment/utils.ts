@@ -1,7 +1,14 @@
 import type { Comment } from "./schema"
 import type { WPK_Comment } from "./types"
 
-export function deserializeComment(data: WPK_Comment): Comment {
+/**
+ * Map a WordPress comment onto the public shape. Returns `null` when the commented post is gone —
+ * the contract types it nullable, and a comment with no post has nothing to point a reader at.
+ */
+export function deserializeComment(data: WPK_Comment): Comment | null {
+	const post = data.kizlo.post
+	if (!post) return null
+
 	return {
 		id: data.id,
 		author: data.kizlo.author
@@ -22,17 +29,17 @@ export function deserializeComment(data: WPK_Comment): Comment {
 		isApproved: data.status === "approved",
 		parentId: data.parent,
 		post: {
-			id: data.kizlo.post.id,
-			image: data.kizlo.post.featured_image
+			id: post.id,
+			image: post.featured_image?.url
 				? {
-						id: data.kizlo.post.featured_image.id,
-						alt: data.kizlo.post.featured_image.alt,
-						src: data.kizlo.post.featured_image.url,
+						id: post.featured_image.id,
+						alt: post.featured_image.alt,
+						src: post.featured_image.url,
 						name: "",
 					}
 				: null,
-			title: data.kizlo.post.title,
-			slug: data.kizlo.post.slug,
+			title: post.title,
+			slug: post.slug,
 		},
 		postedAt: new Date(data.date).getTime(),
 		replyCount: data.kizlo.reply_count,

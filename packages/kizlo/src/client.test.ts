@@ -1,5 +1,5 @@
 import { beforeAll, expect, test } from "vitest"
-import { getKizloClientTestInstance, getKizloTestInstance, type KizloClientTestInstance } from "./test"
+import { getKizloClientTestInstance, getKizloTestInstance, type KizloClientTestInstance } from "./test/harness"
 
 let instance: KizloClientTestInstance
 

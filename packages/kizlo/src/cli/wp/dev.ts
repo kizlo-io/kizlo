@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto"
 import { existsSync } from "node:fs"
 import { networkInterfaces } from "node:os"
 import { join } from "node:path"
-import { WordPressService } from "../../wordpress"
+import { WordPressTransport } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
 import { createAdminAppPassword, seedUsers } from "./bootstrap"
 import { DEFAULT_PLUGINS, TEST_ADMIN } from "./constants"
@@ -70,7 +70,7 @@ async function seedDevFixtures(cfg: ResolvedDevConfig, url: string): Promise<num
 	const userId = await seedUsers()
 	const adminId = Number(await wpCli(["user", "get", TEST_ADMIN.username, "--field=ID"]))
 	const password = await createAdminAppPassword("kizlo-dev-seed")
-	const service = new WordPressService({ credentials: { url, username: TEST_ADMIN.username, password } })
+	const service = new WordPressTransport({ credentials: { url, username: TEST_ADMIN.username, password } })
 	const ctx: SeedContext = { service, adminId, userId }
 
 	let seeded = 0

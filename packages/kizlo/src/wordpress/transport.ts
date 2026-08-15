@@ -8,27 +8,18 @@ import {
 	tryCatch,
 	tryCatchSync,
 } from "@kizlo/shared"
-import { CategoryService } from "./category/service"
-import { CommentService } from "./comment/service"
 import { SAFE_REQUEST_TIMEOUT, UNEXPECTED_BODY_SNIPPET_LENGTH, WP_AUTH_HEADER_KEY, WP_AUTH_TYPE } from "./constants"
 import { WP_Error } from "./error"
-import { MenuService } from "./menu/service"
-import { PageService } from "./page/service"
-import { PostService } from "./post/service"
-import { TagService } from "./tag/service"
-import type { WordPressCredentials, WP_List, WP_ListMetadata, WP_RequestInput, WP_Result } from "./types"
-import { UserService } from "./user/service"
+import type { WordPressCredentials, WP_List, WP_ListMetadata, WP_RequestContentType, WP_RequestInput, WP_Result } from "./types"
 import { isWordPressResourceError } from "./utils"
 
-export class WordPressService {
-	public readonly users = new UserService(this)
-	public readonly comments = new CommentService(this)
-	public readonly categories = new CategoryService(this)
-	public readonly posts = new PostService(this)
-	public readonly pages = new PageService(this)
-	public readonly tags = new TagService(this)
-	public readonly menus = new MenuService(this)
+export interface WordPressTransportOptions {
+	credentials: WordPressCredentials
+	timeout?: Duration
+	onResponse?: (headers: Headers) => void
+}
 
+export class WordPressTransport {
 	private readonly siteBase: string
 	private readonly authHeader: string
 	private readonly defaultTimeout: Duration
@@ -36,7 +27,7 @@ export class WordPressService {
 	 * per-response signals (e.g. the plugin version header) without threading them through every method. */
 	private readonly onResponse?: (headers: Headers) => void
 
-	constructor(context: { credentials: WordPressCredentials; timeout?: Duration; onResponse?: (headers: Headers) => void }) {
+	constructor(context: WordPressTransportOptions) {
 		const credentialBytes = new TextEncoder().encode(`${context.credentials.username}:${context.credentials.password}`)
 		let binary = ""
 		for (const byte of credentialBytes) binary += String.fromCharCode(byte)
@@ -156,22 +147,34 @@ export class WordPressService {
 
 		this.onResponse?.(response.headers)
 
-		const [readErr, text] = await tryCatch(response.text())
-
-		if (readErr) {
+		const expectedContentType = input.responseContentTypes?.[String(response.status)] ?? input.responseContentTypes?.default
+		const contentType =
+			response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() || expectedContentType || "application/json"
+		let body: Blob | string
+		try {
+			body = contentType === "application/octet-stream" ? await response.blob() : await response.text()
+		} catch (error) {
 			return {
 				data: null,
 				status: response.status,
 				headers: response.headers,
-				error: new WP_Error<TCode>({ code: "unknown_error", message: readErr.message }),
+				error: new WP_Error<TCode>({ code: "unknown_error", message: error instanceof Error ? error.message : String(error) }),
 			}
 		}
 
-		if (response.ok && text.trim() === "") {
+		if (response.ok && typeof body === "string" && body.trim() === "") {
 			return { data: null as TData, status: response.status, headers: response.headers, error: null }
 		}
 
-		const [parseErr, data] = tryCatchSync<TData>(() => JSON.parse(text))
+		let parseErr: Error | null = null
+		let data: TData
+		if (contentType === "application/json" || contentType.endsWith("+json")) {
+			const parsed = tryCatchSync<TData>(() => JSON.parse(body as string))
+			parseErr = parsed[0]
+			data = parsed[1] as TData
+		} else {
+			data = body as TData
+		}
 
 		if (!response.ok) {
 			if (isWordPressResourceError<TCode>(data)) {
@@ -187,7 +190,7 @@ export class WordPressService {
 				data: null,
 				status: response.status,
 				headers: response.headers,
-				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.snippet(text) }),
+				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.snippet(String(body)) }),
 			}
 		}
 
@@ -196,7 +199,7 @@ export class WordPressService {
 				data: null,
 				status: response.status,
 				headers: response.headers,
-				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.snippet(text) }),
+				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.snippet(String(body)) }),
 			}
 		}
 
@@ -213,24 +216,60 @@ export class WordPressService {
 
 		if (!url.searchParams.has("context")) url.searchParams.set("context", "edit")
 
-		const isFormData = input.body instanceof FormData
+		const body = this.serializeBody(input.body, input.requestContentType)
+		const isFormData = body instanceof FormData
 
 		const headers: Record<string, string> = {
-			...(!isFormData && { "Content-Type": "application/json" }),
+			...(body !== undefined && !isFormData && { "Content-Type": input.requestContentType ?? "application/json" }),
 			...input.headers,
 			[WP_AUTH_HEADER_KEY]: this.authHeader,
 		}
 
-		const hasBody = input.method !== "GET" && input.method !== "DELETE"
+		const hasBody = !["GET", "DELETE", "HEAD", "OPTIONS"].includes(input.method)
 
 		return tryCatch(
 			fetch(url.toString(), {
 				headers,
 				method: input.method,
 				signal: this.resolveSignal(input),
-				...(hasBody && input.body ? { body: isFormData ? (input.body as FormData) : JSON.stringify(input.body) } : {}),
+				...(hasBody && body !== undefined ? { body } : {}),
 			}),
 		)
+	}
+
+	private serializeBody(body: unknown, contentType: WP_RequestContentType | undefined): BodyInit | undefined {
+		if (body === undefined || body === null) return undefined
+		if (body instanceof FormData || body instanceof URLSearchParams || typeof body === "string" || body instanceof Blob) return body
+		if (contentType === "multipart/form-data") {
+			const form = new FormData()
+			this.appendFormData(form, "", body)
+			return form
+		}
+		if (contentType === "application/x-www-form-urlencoded") {
+			return new URLSearchParams(stringifyQueryString(body as SearchParamsLike))
+		}
+		return JSON.stringify(body)
+	}
+
+	private appendFormData(form: FormData, prefix: string, value: unknown): void {
+		if (value === undefined || value === null) return
+		if (value instanceof Blob) {
+			form.append(prefix, value)
+			return
+		}
+		if (Array.isArray(value)) {
+			value.forEach((item, index) => {
+				this.appendFormData(form, `${prefix}[${index}]`, item)
+			})
+			return
+		}
+		if (typeof value === "object") {
+			for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+				this.appendFormData(form, prefix ? `${prefix}[${key}]` : key, child)
+			}
+			return
+		}
+		form.append(prefix, String(value))
 	}
 
 	private resolveSignal(input: WP_RequestInput): AbortSignal {

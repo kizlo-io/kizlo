@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
-import { CONTRACT_BARREL } from "../daemon/generate"
+import { CONTRACT_BARREL, WORDPRESS_STUB } from "../daemon/generate"
 import type { ScaffoldContext, ScaffoldFile } from "../presets"
 import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode, resolvePatchTargetPath } from "../presets/patch"
 import { type PatchEntry, resolvePatch, type TemplateConfig } from "../presets/template"
@@ -88,6 +88,7 @@ export function writeGeneratedContract(cwd: string, serverDirRel: string): void 
 	const generatedDirRel = path.join(serverDirRel, "generated")
 	writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")
 	writeFileIfAbsent(path.join(cwd, generatedDirRel, "index.ts"), CONTRACT_BARREL)
+	writeFileIfAbsent(path.join(cwd, generatedDirRel, "wordpress.ts"), WORDPRESS_STUB)
 }
 
 /**
