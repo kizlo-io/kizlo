@@ -4,11 +4,12 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev:template": "astro dev",
-		"build": "astro build",
-		"preview": "astro preview",
+		"dev:template": "pnpm withEnv -- astro dev",
+		"build": "pnpm withEnv -- astro build",
+		"preview": "pnpm withEnv -- astro preview",
 		"typecheck": "astro check",
-		"clean": "git clean -xdf .cache .turbo .kizlo .astro dist node_modules"
+		"clean": "git clean -xdf .cache .turbo .kizlo .astro dist node_modules",
+		"withEnv": "dotenv -e ../../.env"
 	},
 	"dependencies": {
 		"@astrojs/node": "catalog:",
@@ -18,6 +19,7 @@
 	"devDependencies": {
 		"@astrojs/check": "^0.9.9",
 		"@tooling/typescript": "workspace:*",
+		"dotenv-cli": "catalog:",
 		"typescript": "catalog:"
 	}
 }

@@ -1,20 +1,15 @@
-import type { WordPressTransport, WP_CommonErrorCode } from "../wordpress"
-import { WP_KIZLO_BASE } from "../wordpress"
+import type { ActiveWordPressClient } from "../wordpress"
 import type { EmailSendParams } from "./service.interface"
 
 export class EmailService {
-	private readonly wordpress: WordPressTransport
+	private readonly wordpress: ActiveWordPressClient
 
-	constructor(wordpress: WordPressTransport) {
+	constructor(wordpress: ActiveWordPressClient) {
 		this.wordpress = wordpress
 	}
 
 	public async send(params: EmailSendParams): Promise<void> {
-		const { data, error } = await this.wordpress.post<{ success: boolean }, WP_CommonErrorCode>("/email/send", {
-			body: params,
-			base: WP_KIZLO_BASE,
-		})
+		const { error } = await this.wordpress.email.send(params)
 		if (error) throw error
-		if (!data?.success) throw new Error("Failed to send email")
 	}
 }

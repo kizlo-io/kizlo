@@ -4,11 +4,12 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev:template": "next dev --webpack",
-		"build": "next build",
-		"start": "next start",
+		"dev:template": "pnpm withEnv -- next dev --webpack",
+		"build": "pnpm withEnv -- next build",
+		"start": "pnpm withEnv -- next start",
 		"typecheck": "tsc --noEmit",
-		"clean": "git clean -xdf .cache .turbo .kizlo .next .source dist node_modules"
+		"clean": "git clean -xdf .cache .turbo .kizlo .next .source dist node_modules",
+		"withEnv": "dotenv -e ../../.env"
 	},
 	"dependencies": {
 		"kizlo": "workspace:*",
@@ -21,6 +22,7 @@
 		"@types/node": "catalog:",
 		"@types/react": "catalog:react19",
 		"@types/react-dom": "catalog:react19",
+		"dotenv-cli": "catalog:",
 		"typescript": "catalog:"
 	}
 }

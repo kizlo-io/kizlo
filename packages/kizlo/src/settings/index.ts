@@ -1,7 +1,6 @@
 import type { ProcedureContext } from "../context"
 import { createProcedure, type ProcedureErrors, schemaType } from "../shared/procedure"
 import type { WP_Result } from "../wordpress"
-import type { SettingsService } from "./service"
 import type {
 	AuthorsSettings,
 	AuthorsSettingsInput,
@@ -24,11 +23,13 @@ import type {
 	WebhookSettingsInput,
 } from "./service.interface"
 
-type SettingsUpdate<TData> =
-	Awaited<ReturnType<SettingsService["updateSite"]>> extends WP_Result<unknown, infer TCode> ? WP_Result<TData, TCode> : never
-
 /** Shared error handling for every settings write: `invalid_param` → 400, `rest_forbidden` → 403, anything else → 500. */
-function resolveUpdate<TData>(response: SettingsUpdate<TData>, context: ProcedureContext, errors: ProcedureErrors, label: string): TData {
+function resolveUpdate<TData>(
+	response: WP_Result<TData, string>,
+	context: ProcedureContext,
+	errors: ProcedureErrors,
+	label: string,
+): TData {
 	if (response.error) {
 		switch (response.error.code) {
 			case "invalid_param":

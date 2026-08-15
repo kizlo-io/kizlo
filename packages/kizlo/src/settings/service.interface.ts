@@ -32,7 +32,11 @@ export type {
 
 export type SiteSettingsInput = Partial<Omit<SiteSettings, "fallback_image"> & { fallback_image: number | null }>
 
-export type BrandSettingsInput = Partial<Record<keyof BrandSettings, number | null>>
+/** Every brand slot is an attachment id apart from the colours, which are written as authored. */
+export type BrandSettingsInput = Partial<
+	Record<keyof Omit<BrandSettings, "theme_color" | "theme_color_dark" | "background_color">, number | null> &
+		Pick<BrandSettings, "theme_color" | "theme_color_dark" | "background_color">
+>
 
 export type WebhookSettingsInput = Partial<WebhookSettings>
 
@@ -42,8 +46,8 @@ export type OrganizationSettingsInput = Partial<Omit<OrganizationSettings, "logo
 
 export type IdentitySettingsInput = Partial<{
 	type: IdentitySettings["type"]
-	person: PersonSettingsInput | null
-	organization: OrganizationSettingsInput | null
+	person: PersonSettingsInput
+	organization: OrganizationSettingsInput
 }>
 
 export type AuthorsSettingsInput = Partial<AuthorsSettings>

@@ -1,82 +1,66 @@
-import type { WordPressTransport } from "../wordpress"
-import { WP_KIZLO_BASE } from "../wordpress"
+import type { ActiveWordPressClient, WP_EndpointResult } from "../wordpress"
 import type {
-	AuthorsSettings,
 	AuthorsSettingsInput,
-	BrandSettings,
 	BrandSettingsInput,
-	CrawlingSettings,
 	CrawlingSettingsInput,
-	HeadlessSettings,
 	HeadlessSettingsInput,
-	IdentitySettings,
 	IdentitySettingsInput,
-	PostTypeSettings,
 	PostTypeSettingsInput,
-	Settings,
-	SiteSettings,
 	SiteSettingsInput,
-	TaxonomySettings,
 	TaxonomySettingsInput,
-	UploadsSettings,
 	UploadsSettingsInput,
-	WebhookSettings,
 	WebhookSettingsInput,
 } from "./service.interface"
 
 export class SettingsService {
-	private readonly wordpress: WordPressTransport
+	private readonly wordpress: ActiveWordPressClient
 
-	constructor(wordpress: WordPressTransport) {
+	constructor(wordpress: ActiveWordPressClient) {
 		this.wordpress = wordpress
 	}
 
 	/** Fetch every Kizlo settings section in one response. */
-	public async get() {
-		return this.wordpress.get<Settings>("/settings", { base: WP_KIZLO_BASE })
+	public async get(): Promise<WP_EndpointResult<"settings.retrieve">> {
+		return this.wordpress.settings.retrieve()
 	}
 
-	public async updateSite(input: SiteSettingsInput) {
-		return this.update<SiteSettings>("/settings/site", input)
+	public async updateSite(input: SiteSettingsInput): Promise<WP_EndpointResult<"settings.site.update">> {
+		return this.wordpress.settings.site.update(input)
 	}
 
-	public async updateBrand(input: BrandSettingsInput) {
-		return this.update<BrandSettings>("/settings/brand", input)
+	public async updateBrand(input: BrandSettingsInput): Promise<WP_EndpointResult<"settings.brand.update">> {
+		return this.wordpress.settings.brand.update(input)
 	}
 
-	public async updateWebhook(input: WebhookSettingsInput) {
-		return this.update<WebhookSettings>("/settings/webhook", input)
+	public async updateWebhook(input: WebhookSettingsInput): Promise<WP_EndpointResult<"settings.webhook.update">> {
+		return this.wordpress.settings.webhook.update(input)
 	}
 
-	public async updateIdentity(input: IdentitySettingsInput) {
-		return this.update<IdentitySettings>("/settings/identity", input)
+	public async updateIdentity(input: IdentitySettingsInput): Promise<WP_EndpointResult<"settings.identity.update">> {
+		return this.wordpress.settings.identity.update(input)
 	}
 
-	public async updateAuthors(input: AuthorsSettingsInput) {
-		return this.update<AuthorsSettings>("/settings/authors", input)
+	public async updateAuthors(input: AuthorsSettingsInput): Promise<WP_EndpointResult<"settings.authors.update">> {
+		return this.wordpress.settings.authors.update(input)
 	}
 
-	public async updateCrawling(input: CrawlingSettingsInput) {
-		return this.update<CrawlingSettings>("/settings/crawling", input)
+	public async updateCrawling(input: CrawlingSettingsInput): Promise<WP_EndpointResult<"settings.crawling.update">> {
+		return this.wordpress.settings.crawling.update(input)
 	}
 
-	public async updateUploads(input: UploadsSettingsInput) {
-		return this.update<UploadsSettings>("/settings/uploads", input)
+	public async updateUploads(input: UploadsSettingsInput): Promise<WP_EndpointResult<"settings.uploads.update">> {
+		return this.wordpress.settings.uploads.update(input)
 	}
 
-	public async updateHeadless(input: HeadlessSettingsInput) {
-		return this.update<HeadlessSettings>("/settings/headless", input)
+	public async updateHeadless(input: HeadlessSettingsInput): Promise<WP_EndpointResult<"settings.headless.update">> {
+		return this.wordpress.settings.headless.update(input)
 	}
 
-	public async updatePostType(key: string, input: PostTypeSettingsInput) {
-		return this.update<PostTypeSettings>(`/settings/post_types/${key}`, input)
+	public async updatePostType(key: string, input: PostTypeSettingsInput): Promise<WP_EndpointResult<"settings.postTypes.update">> {
+		return this.wordpress.settings.postTypes.update({ ...input, slug: key })
 	}
 
-	public async updateTaxonomy(key: string, input: TaxonomySettingsInput) {
-		return this.update<TaxonomySettings>(`/settings/taxonomies/${key}`, input)
-	}
-
-	private async update<TData>(path: string, body: unknown) {
-		return this.wordpress.put<TData, "invalid_param">(path, { base: WP_KIZLO_BASE, body })
+	public async updateTaxonomy(key: string, input: TaxonomySettingsInput): Promise<WP_EndpointResult<"settings.taxonomies.update">> {
+		return this.wordpress.settings.taxonomies.update({ ...input, slug: key })
 	}
 }

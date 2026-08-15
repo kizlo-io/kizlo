@@ -1,7 +1,6 @@
 import type { Schema, SchemaInput } from "@kizlo/shared"
-import { createExtension, createProcedure, KizloError, schemaType, WP_KIZLO_BASE } from "kizlo"
+import { createExtension, createProcedure, KizloError, schemaType } from "kizlo"
 import { CaptchaInput, type SubmitFormResult } from "./schema"
-import type { WP_SubmitCF7Data } from "./types"
 
 export interface ContactFormSevenOptions {
 	id: number
@@ -36,9 +35,9 @@ export function contactFormSeven<TId extends string, TOptions extends ContactFor
 								throw new KizloError("BAD_REQUEST", { message: "Invalid form data", data: formResult.issues })
 							}
 
-							const response = await context.wordpress.post<WP_SubmitCF7Data>(`/cf7/${options.id}`, {
-								body: formResult.value as Record<string, unknown>,
-								base: WP_KIZLO_BASE,
+							const response = await context.wordpress.cf7.forms.submit({
+								...(formResult.value as Record<string, unknown>),
+								form_id: options.id,
 							})
 							if (response.error) throw response.error
 

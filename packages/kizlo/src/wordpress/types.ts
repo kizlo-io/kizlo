@@ -15,8 +15,13 @@ export interface WP_Endpoint<TInput, TResult> extends WP_EndpointDefinition {
 	readonly result?: TResult
 }
 
-/** Per-call overrides. The definition describes the endpoint, these describe this one invocation. */
-export type WP_CallOptions = Pick<WP_RequestInput, "signal" | "timeout">
+/**
+ * Per-call overrides. The definition describes the endpoint, these describe this one invocation:
+ * what the caller knows only at the moment of calling. Headers belong here rather than on the
+ * definition because a request can carry per-caller state (a guest cart token, the caller's geo)
+ * that the route it travels to has no way to declare.
+ */
+export type WP_CallOptions = Pick<WP_RequestInput, "signal" | "timeout" | "headers">
 
 /**
  * The callable shape of an endpoint tree: every definition leaf becomes the request it runs. `any`
@@ -62,22 +67,48 @@ type WP_EndpointAtPath<TClient, TPath extends string> = TPath extends `${infer T
 		? TClient[TPath]
 		: never
 
+type WP_EndpointCallResult<TEndpoint> =
+	IsAny<TEndpoint> extends true ? any : TEndpoint extends (input: never) => Promise<infer TResult> ? TResult : never
+
+/**
+ * `never` is short-circuited rather than let through: every type is assignable to it, so an
+ * unresolved path would otherwise match the `{ data: infer TData }` branch and infer `unknown`,
+ * turning a misspelt path into a loose type instead of a missing one.
+ */
 type WP_EndpointSuccessData<TEndpoint> =
 	IsAny<TEndpoint> extends true
 		? any
-		: TEndpoint extends (input: never) => Promise<infer TResult>
-			? Extract<TResult, { error: null }> extends { data: infer TData }
+		: [TEndpoint] extends [never]
+			? never
+			: Extract<WP_EndpointCallResult<TEndpoint>, { error: null }> extends { data: infer TData }
 				? TData
 				: never
-			: never
 
 /**
  * The success payload of a generated endpoint, addressed by the dotted path the client nests it
- * under. Kizlo's own modules use this instead of re-declaring WordPress shapes by hand — and
- * it resolves against whichever client is compiling, so it stays well-formed in a project that has
+ * under. Kizlo's own modules use this instead of re-declaring WordPress shapes by hand, and it
+ * resolves against whichever client is compiling, so it stays well-formed in a project that has
  * not generated one yet (`any`) or whose WordPress does not serve the endpoint (`never`).
  */
 export type WP_EndpointData<TPath extends string> = WP_EndpointSuccessData<WP_EndpointAtPath<ActiveWordPressClient, TPath>>
+
+/**
+ * Everything a generated endpoint resolves to, success and failure alike, addressed the same way.
+ * {@link WP_EndpointData} is the success payload on its own; this is what a signature that has to
+ * name the whole result uses, so a service can publish its return type without the project's
+ * generated module leaking into the package's own declarations.
+ */
+export type WP_EndpointResult<TPath extends string> = WP_EndpointCallResult<WP_EndpointAtPath<ActiveWordPressClient, TPath>>
+
+type WP_EndpointCallInput<TEndpoint> =
+	IsAny<TEndpoint> extends true ? any : TEndpoint extends (...args: infer TArguments) => unknown ? Exclude<TArguments[0], undefined> : never
+
+/**
+ * What a generated endpoint accepts, addressed the same way as {@link WP_EndpointData}. Kizlo's own
+ * modules name their WordPress payloads with this rather than restating them, so an input can only
+ * drift from the route it is sent to by the route itself changing.
+ */
+export type WP_EndpointInput<TPath extends string> = WP_EndpointCallInput<WP_EndpointAtPath<ActiveWordPressClient, TPath>>
 
 export type WP_CommonErrorCode =
 	| "rest_invalid_param"

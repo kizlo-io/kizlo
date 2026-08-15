@@ -80,8 +80,8 @@ export class Context {
 		// The generated endpoints are inert data, so the client is the pair: the tree overlaid on the
 		// transport it runs against. The cast hands back whatever shape that project's `wordpress.ts` declares.
 		this.wordpress = createWordPressClient(transport, config.wordpressEndpoints ?? {}) as ActiveWordPressClient
-		this.settings = new SettingsService(transport)
-		this.email = new EmailService(transport)
+		this.settings = new SettingsService(this.wordpress)
+		this.email = new EmailService(this.wordpress)
 		this.logger = this.createLogger()
 	}
 

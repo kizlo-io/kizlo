@@ -1,5 +1,5 @@
-import type { BrandSettings, Settings } from "@kizlo/shared"
 import { describe, expect, test } from "vitest"
+import type { BrandSettings, Settings } from "../settings/service.interface"
 import { buildWebManifest } from "./manifest"
 
 const EMPTY_BRAND: BrandSettings = {

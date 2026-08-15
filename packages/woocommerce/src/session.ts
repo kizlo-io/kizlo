@@ -1,6 +1,6 @@
 import { type Duration, random, seconds, timestampSec, tryCatch } from "@kizlo/shared"
 import { jwtVerify, SignJWT } from "jose"
-import { type ConnInfo, createMiddleware, KizloError, WP_KIZLO_BASE } from "kizlo"
+import { type ConnInfo, createMiddleware, KizloError } from "kizlo"
 
 interface TokenPayload {
 	sub: string
@@ -75,10 +75,10 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 			const [err, data] = await tryCatch(verifyToken(foundToken, context.config.siteSecret))
 
 			if (!err) {
-				const response = await context.wordpress.post("/cart/merge", {
-					base: WP_KIZLO_BASE,
-					headers: getCartHeaders({ userId: auth.id, token: data.sub, connInfo }),
-				})
+				const response = await context.wordpress.woocommerce.cart.merge(
+					{},
+					{ headers: getCartHeaders({ userId: auth.id, token: data.sub, connInfo }) },
+				)
 				if (response.error) context.logger.error("CART_MERGE_FAILED", response.error)
 			}
 

@@ -15,6 +15,10 @@ export interface SocialProfile {
 	platform: string
 }
 
+/** The separators WordPress will accept between a title and the site name. Mirrors `SiteSettings::TITLE_SEPARATORS`. */
+export const TITLE_SEPARATORS = ["-", "—", ":", "·", "•", "*", "⋆", "|", "~", "«", "»", ">", "<"] as const
+export type TitleSeparator = (typeof TITLE_SEPARATORS)[number]
+
 export interface SiteSettings {
 	url: string | null
 	backend_url: string | null
@@ -22,7 +26,7 @@ export interface SiteSettings {
 	name: string | null
 	alternate_name: string | null
 	tagline: string | null
-	title_separator: string
+	title_separator: TitleSeparator
 	fallback_image: Media | null
 	search_action_structure: string | null
 	discourage_search_engines: boolean
@@ -54,7 +58,7 @@ export interface OrganizationFounder {
 }
 
 export interface OrganizationSettings {
-	name: string
+	name: string | null
 	alternate_name: string | null
 	slogan: string | null
 	description: string | null
@@ -94,7 +98,8 @@ export interface BaseContentSettings {
 	search_engine_visibility: boolean | null
 	webpage_type: string
 	article_type: string | null
-	breadcrumbs: (string | number)[]
+	/** Term or page IDs, with `__parent__` standing in for the item's own parent. */
+	breadcrumbs: (number | "__parent__")[]
 }
 
 export interface AuthorsSettings extends Omit<BaseContentSettings, "webpage_type" | "article_type"> {
@@ -180,7 +185,8 @@ export interface PostTypeSettings extends BaseContentSettings {
 	name: string
 	slug: string
 	hierarchical: boolean
-	seo_enabled: boolean
+	/** Null until the post type or taxonomy has been given an explicit setting. */
+	seo_enabled: boolean | null
 	pathname_structure: string | null
 	comment_action_structure: string | null
 	rest_api_enabled: boolean
@@ -200,7 +206,8 @@ export interface TaxonomySettings extends Omit<BaseContentSettings, "webpage_typ
 	name: string
 	slug: string
 	hierarchical: boolean
-	seo_enabled: boolean
+	/** Null until the post type or taxonomy has been given an explicit setting. */
+	seo_enabled: boolean | null
 	pathname_structure: string | null
 	rest_api_enabled: boolean
 	internal: boolean
