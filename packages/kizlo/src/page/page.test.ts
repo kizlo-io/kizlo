@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test"
-import { WordPressService } from "../wordpress"
+import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test/harness"
+import { WordPressTransport, WP_CORE_BASE } from "../wordpress"
 import { Page, PageList } from "./schema"
 
 let kizlo: KizloTestInstance
-let adminWp: WordPressService
+let adminWp: WordPressTransport
 let publishedId = 0
 let draftId = 0
 const PUBLISHED_SLUG = "about-test-page"
@@ -13,35 +13,41 @@ const DRAFT_SLUG = "draft-page-gating-check"
 beforeAll(async () => {
 	kizlo = getKizloTestInstance()
 	const creds = getTestCredentials()
-	adminWp = new WordPressService({
+	adminWp = new WordPressTransport({
 		credentials: { url: creds.url, username: creds.users.admin.username, password: creds.users.admin.applicationPassword },
 	})
 
 	// Self-provision a published page to read, plus an unpublished one to exercise draft gating and list exclusion.
-	const published = await adminWp.pages.create({
-		slug: PUBLISHED_SLUG,
-		title: "About Test Page",
-		content: "First seeded page.",
-		status: "publish",
-		author: creds.users.admin.id,
+	const published = await adminWp.post<{ id: number }, string>("/pages", {
+		base: WP_CORE_BASE,
+		body: {
+			slug: PUBLISHED_SLUG,
+			title: "About Test Page",
+			content: "First seeded page.",
+			status: "publish",
+			author: creds.users.admin.id,
+		},
 	})
 	if (published.error) throw published.error
 	publishedId = published.data.id
 
-	const draft = await adminWp.pages.create({
-		slug: DRAFT_SLUG,
-		title: "Draft Page Gating Check",
-		content: "Unpublished.",
-		status: "draft",
-		author: creds.users.admin.id,
+	const draft = await adminWp.post<{ id: number }, string>("/pages", {
+		base: WP_CORE_BASE,
+		body: {
+			slug: DRAFT_SLUG,
+			title: "Draft Page Gating Check",
+			content: "Unpublished.",
+			status: "draft",
+			author: creds.users.admin.id,
+		},
 	})
 	if (draft.error) throw draft.error
 	draftId = draft.data.id
 })
 
 afterAll(async () => {
-	if (publishedId) await adminWp.pages.delete({ id: publishedId, force: true })
-	if (draftId) await adminWp.pages.delete({ id: draftId, force: true })
+	if (publishedId) await adminWp.delete(`/pages/${publishedId}`, { base: WP_CORE_BASE, searchParams: { force: true } })
+	if (draftId) await adminWp.delete(`/pages/${draftId}`, { base: WP_CORE_BASE, searchParams: { force: true } })
 })
 
 test("pages.list returns pages conforming to PageList", async () => {

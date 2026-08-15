@@ -1,10 +1,10 @@
 import { stringifiedMetaRecord } from "@kizlo/shared"
 import { createProcedure } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
-import type { WP_MenuItem } from "../wordpress"
 import { LIST_MENU_ITEM_ERROR_MAP } from "./errors"
 import { ListMenuInput, MenuGroupItemList, MenuItemList } from "./schema"
-import { buildMenuGroupItem, deserializeListMenuInput, extractPath } from "./utils"
+import type { WPK_MenuItem } from "./types"
+import { buildMenuGroupItem, deserializeListMenuInput, extractPath, listMenuItems } from "./utils"
 
 export const MENU_ROUTER_MAP = {
 	items: {
@@ -18,7 +18,8 @@ export const MENU_ROUTER_MAP = {
 				errors: LIST_MENU_ITEM_ERROR_MAP,
 			},
 			async ({ context, errors, input }) => {
-				const response = await context.wordpress.menus.items.list(deserializeListMenuInput(input.query))
+				const searchParams = deserializeListMenuInput(input.query)
+				const response = await listMenuItems(context.wordpress, searchParams)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -35,7 +36,7 @@ export const MENU_ROUTER_MAP = {
 				}
 
 				return {
-					items: response.data.items.map((item) => ({
+					items: response.data.map((item) => ({
 						id: item.id,
 						parent: item.parent === 0 ? null : item.parent,
 						type: item.object,
@@ -51,7 +52,9 @@ export const MENU_ROUTER_MAP = {
 						invalid: item.invalid,
 						meta: stringifiedMetaRecord(item.meta ?? {}),
 					})),
-					meta: deserializeListMetadata(response.data.meta),
+					meta: deserializeListMetadata(
+						context.wordpress.resolveList({ data: response.data, headers: response.headers, searchParams }).meta,
+					),
 				}
 			},
 		),
@@ -66,7 +69,8 @@ export const MENU_ROUTER_MAP = {
 				output: MenuGroupItemList,
 			},
 			async ({ context, errors, input }) => {
-				const response = await context.wordpress.menus.items.list(deserializeListMenuInput(input.query))
+				const searchParams = deserializeListMenuInput(input.query)
+				const response = await listMenuItems(context.wordpress, searchParams)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -82,19 +86,21 @@ export const MENU_ROUTER_MAP = {
 					}
 				}
 
-				const itemMap = new Map<number, WP_MenuItem>()
+				const itemMap = new Map<number, WPK_MenuItem>()
 
-				response.data.items.forEach((item) => {
+				response.data.forEach((item) => {
 					itemMap.set(item.id, item)
 				})
 
-				const rootItems = response.data.items
+				const rootItems = response.data
 					.filter((item) => item.parent === 0 || !itemMap.has(item.parent))
 					.sort((a, b) => a.menu_order - b.menu_order)
 
 				return {
-					meta: deserializeListMetadata(response.data.meta),
-					items: rootItems.map((rootItem) => buildMenuGroupItem(rootItem, response.data.items)),
+					meta: deserializeListMetadata(
+						context.wordpress.resolveList({ data: response.data, headers: response.headers, searchParams }).meta,
+					),
+					items: rootItems.map((rootItem) => buildMenuGroupItem(rootItem, response.data)),
 				}
 			},
 		),

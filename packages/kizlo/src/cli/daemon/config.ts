@@ -3,7 +3,7 @@ import path from "node:path"
 import z from "zod/v4"
 import type { KizloGlobalConfig } from "../../config"
 import { detectPackageManager, type PackageManager } from "../utils"
-import { LOCAL_DIR_REL } from "../wp/constants"
+import { LOCAL_DIR_REL, WORDPRESS_META_REL } from "../wp/constants"
 import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
 import { importIgnoringVirtualModules } from "./jiti"
@@ -19,6 +19,7 @@ const configSchema = z.object({
 	dir: z.string().optional(),
 	alias: z.string().optional(),
 	name: z.string().optional(),
+	wordpressClientDir: z.string().optional(),
 	dev: z
 		.object({
 			local: z.boolean().optional(),
@@ -50,6 +51,9 @@ export interface ResolvedConfig {
 	generatedDir: string
 	contractPath: string
 	barrelPath: string
+	wordpressPath: string
+	/** Fetch cache, under `.kizlo/` rather than the generated dir: it is local state, not an artifact. */
+	wordpressMetaPath: string
 }
 
 export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
@@ -102,7 +106,18 @@ export async function resolveConfig(cwd: string, flags?: { dir?: string }): Prom
 		generatedDir,
 		contractPath: path.join(generatedDir, "contract.json"),
 		barrelPath: path.join(generatedDir, "index.ts"),
+		wordpressPath: path.join(generatedDir, "wordpress.ts"),
+		wordpressMetaPath: WORDPRESS_META_REL,
 	}
+}
+
+/**
+ * The directory `wordpress.ts` is written to for a workspace with no Kizlo server, from `wordpressClientDir`
+ * in `kizlo.config.*`. Resolved on its own rather than through {@link resolveConfig}, which describes a
+ * server layout and returns nothing without `dir` — the two are independent.
+ */
+export async function resolveWordPressClientDir(cwd: string): Promise<string | undefined> {
+	return (await loadConfigFile(cwd))?.wordpressClientDir
 }
 
 /**

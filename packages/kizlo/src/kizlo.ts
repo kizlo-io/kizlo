@@ -36,6 +36,7 @@ export interface KizloConfig<TExts extends readonly AnyExtension[]> {
 	connect: KizloConnect
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
+	wordpressEndpoints?: object
 }
 
 export interface ServiceAdapters {
@@ -66,6 +67,7 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 			adapters: config.adapters,
 			siteSecret: config.siteSecret,
 			credentials: config.credentials,
+			wordpressEndpoints: config.wordpressEndpoints,
 		})
 
 		this.router = Object.assign(Object.assign({}, { ...extensions.router, ...ROUTER_MAP }), {
@@ -184,11 +186,12 @@ export interface CreateKizloOptions<TExts extends readonly AnyExtension[] = []> 
 	/** Service adapters: auth, captcha, geo, logger, and cookies. */
 	adapters?: ServiceAdapters
 	/**
-	 * WordPress connection. Each credential falls back to a connect-selected env var: with the default
-	 * `"remote"` connect to `KIZLO_WP_URL` / `KIZLO_WP_USERNAME` / `KIZLO_WP_APP_PASSWORD`,
-	 * and with the `"local"` connect to their `KIZLO_LOCAL_WP_*` counterparts.
+	 * The generated endpoints to run against WordPress, plus the connection to run them on. Pass the
+	 * `endpoints` export of your generated barrel. Each credential falls back to a connect-selected
+	 * env var: with the default `"remote"` connect to `KIZLO_WP_URL` / `KIZLO_WP_USERNAME` /
+	 * `KIZLO_WP_APP_PASSWORD`, and with the `"local"` connect to their `KIZLO_LOCAL_WP_*` counterparts.
 	 */
-	wordpress?: { credentials?: Partial<WordPressCredentials> }
+	wordpress?: { endpoints?: object; credentials?: Partial<WordPressCredentials> }
 }
 
 /**
@@ -205,7 +208,7 @@ function requireEnv(name: string, env: EnvReader): string {
 	if (value) return value
 	// Contract generation imports this module only for the router's exported shape, which no env
 	// value affects. A placeholder lets the import complete; a real request never runs in this mode.
-	if (process.env[CONTRACT_GENERATION_ENV]) return `__kizlo_contract_generation__:${name}`
+	if (process.env[CONTRACT_GENERATION_ENV]) return ""
 	throw new KizloError("MISSING_ENV_VARIABLE", { message: `Please define ${name} in your .env file.` })
 }
 
@@ -232,6 +235,23 @@ function connectEnvKeys(connect: KizloConnect) {
 	}
 }
 
+export function resolveWordPressConnection(
+	options: Pick<CreateKizloOptions, "connect" | "wordpress"> | undefined,
+	env: EnvReader = processEnvReader,
+): { connect: KizloConnect; credentials: WordPressCredentials } {
+	const credentials = options?.wordpress?.credentials
+	const connect = resolveConnect(options?.connect, env)
+	const keys = connectEnvKeys(connect)
+	return {
+		connect,
+		credentials: {
+			url: credentials?.url ?? requireEnv(keys.url, env),
+			username: credentials?.username ?? requireEnv(keys.username, env),
+			password: credentials?.password ?? requireEnv(keys.password, env),
+		},
+	}
+}
+
 /**
  * Resolves a full `KizloConfig` from options and the environment. Shared by the
  * base `createKizlo` and each framework factory — the single place env values
@@ -242,8 +262,7 @@ export function resolveKizloConfig<TExts extends readonly AnyExtension[]>(
 	defaults: { baseUrlEnvKey: string; adapters?: ServiceAdapters; env?: EnvReader },
 ): KizloConfig<TExts> {
 	const env = defaults.env ?? processEnvReader
-	const credentials = options?.wordpress?.credentials
-	const connect = resolveConnect(options?.connect, env)
+	const { connect, credentials } = resolveWordPressConnection(options, env)
 	const keys = connectEnvKeys(connect)
 	return {
 		baseUrl: options?.baseUrl ?? requireEnv(defaults.baseUrlEnvKey, env),
@@ -252,11 +271,8 @@ export function resolveKizloConfig<TExts extends readonly AnyExtension[]>(
 		connect,
 		extensions: options?.extensions,
 		adapters: { ...defaults.adapters, ...options?.adapters },
-		credentials: {
-			url: credentials?.url ?? requireEnv(keys.url, env),
-			username: credentials?.username ?? requireEnv(keys.username, env),
-			password: credentials?.password ?? requireEnv(keys.password, env),
-		},
+		credentials,
+		wordpressEndpoints: options?.wordpress?.endpoints,
 	}
 }
 

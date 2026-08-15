@@ -1,35 +1,8 @@
-import type { WP_Comment } from "../wordpress"
+import type { WP_EndpointData } from "../wordpress"
 
-export interface WPK_Comment extends WP_Comment {
-	kizlo: {
-		author: {
-			id: number
-			name: string
-			slug: string
-			avatar_url?: string
-		} | null
-		post: {
-			id: number
-			slug: string
-			title: string
-			featured_image: {
-				id: number
-				url: string
-				alt: string
-			} | null
-		}
-		reply_count: number
-	}
-}
-
-export interface WPK_CreateCommentInput {
-	post_id: number
-	content: string
-	parent?: number
-	user_id?: number
-	author_name?: string
-	author_email?: string
-	author_url?: string
-	author_ip: string
-	user_agent: string
-}
+/**
+ * A comment, exactly as the project's generated WordPress client describes it. The `kizlo`
+ * enrichment block the plugin adds rides on the core `wp/v2/comments` responses too, so the read
+ * procedures — whose routes core owns, and which therefore have no generated operation — share it.
+ */
+export type WPK_Comment = WP_EndpointData<"comments.create">

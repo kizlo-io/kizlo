@@ -1,11 +1,10 @@
-import { getPostTypeService } from "../post-type/service"
+import { normalizeArrayableValue } from "@kizlo/shared"
 import { compare } from "../shared/crypto"
 import { parseIdentifier } from "../shared/identifier"
 import { createProcedure } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
 import { GET_POST_ERROR_MAP, LIST_POST_ERROR_MAP } from "./error"
 import { ListPostInput, Post, PostList, RetrievePostInput } from "./schema"
-import type { WPK_Post } from "./types"
 import { deserializePost } from "./utils"
 
 export const POST_ROUTER_MAP = {
@@ -20,13 +19,11 @@ export const POST_ROUTER_MAP = {
 			errors: GET_POST_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const postType = getPostTypeService<WPK_Post>("post", context.wordpress)
-
 			if (input.query?.previewToken) {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.POST_NOT_FOUND()
 
-				const response = await postType.get({ type: "id", value: result.id })
+				const response = await context.wordpress.postTypes.post.retrieve({ identifier: String(result.id) })
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -49,7 +46,7 @@ export const POST_ROUTER_MAP = {
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.POST_NOT_FOUND()
 
-			const response = await postType.get(identifier)
+			const response = await context.wordpress.postTypes.post.retrieve({ identifier: String(identifier.value) })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_post_type":
@@ -91,37 +88,34 @@ export const POST_ROUTER_MAP = {
 		},
 		async ({ input, context, errors }) => {
 			const q = input.query
-			const postType = getPostTypeService<WPK_Post>("post", context.wordpress)
-
 			// Drop an orderby WP would reject for a missing companion param, so the list degrades instead of 400ing.
 			const orderby =
 				(q?.orderby === "relevance" && !q?.search) || (q?.orderby === "include" && q?.include === undefined) ? undefined : q?.orderby
 
-			const response = await postType.list({
-				context: "edit",
-				status: "publish",
-				after: input.query?.after,
-				author: input.query?.author,
-				author_exclude: input.query?.authorExclude,
-				before: input.query?.before,
-				modified_after: input.query?.modifiedAfter,
-				modified_before: input.query?.modifiedBefore,
-				categories: input.query?.categories,
-				categories_exclude: input.query?.categoriesExclude,
-				exclude: input.query?.exclude,
-				include: input.query?.include,
-				offset: input.query?.offset,
-				order: input.query?.order,
+			const response = await context.wordpress.postTypes.post.list({
+				status: ["publish"],
+				after: q?.after,
+				author: normalizeArrayableValue(q?.author),
+				author_exclude: normalizeArrayableValue(q?.authorExclude),
+				before: q?.before,
+				modified_after: q?.modifiedAfter,
+				modified_before: q?.modifiedBefore,
+				categories: normalizeArrayableValue(q?.categories),
+				categories_exclude: normalizeArrayableValue(q?.categoriesExclude),
+				exclude: normalizeArrayableValue(q?.exclude),
+				include: normalizeArrayableValue(q?.include),
+				offset: q?.offset,
+				order: q?.order,
 				orderby,
-				page: input.query?.page,
-				per_page: input.query?.perPage,
-				search: input.query?.search,
-				search_columns: input.query?.searchColumns,
-				slug: input.query?.slug,
-				sticky: input.query?.sticky,
-				tags: input.query?.tags,
-				tags_exclude: input.query?.tagsExclude,
-				tax_relation: input.query?.taxRelation,
+				page: q?.page,
+				per_page: q?.perPage,
+				search: q?.search,
+				search_columns: q?.searchColumns,
+				slug: normalizeArrayableValue(q?.slug),
+				sticky: q?.sticky,
+				tags: normalizeArrayableValue(q?.tags),
+				tags_exclude: normalizeArrayableValue(q?.tagsExclude),
+				tax_relation: q?.taxRelation,
 			})
 
 			if (response.error) {

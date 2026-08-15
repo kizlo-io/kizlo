@@ -1,52 +1,7 @@
-export interface WPK_Seo {
-	head: {
-		title: string
-		canonical: string
-		robots: {
-			index: string
-			follow: string
-			"max-snippet": string
-			"max-image-preview": string
-			"max-video-preview": string
-		}
-		og: {
-			locale: string
-			type: string
-			title: string
-			url: string
-			site_name: string
-			description?: string
-			image?: {
-				url: string
-				width: number | null
-				height: number | null
-				type: string | null
-				alt: string | null
-			}
-		}
-		twitter: {
-			card: "summary" | "summary_large_image"
-			title: string
-			site: string | null
-			creator: string | null
-			description?: string
-			image?: string
-			image_alt?: string
-		}
-		article: {
-			published_time?: string
-			modified_time?: string
-			author?: string
-			author_url?: string
-			section?: string
-			tags?: string[]
-		} | null
-	}
-	schema: {
-		"@context": "https://schema.org"
-		"@graph": Record<string, unknown>[]
-	}
-}
+import type { WP_EndpointData } from "../wordpress"
+
+/** The resolved SEO block, exactly as the project's generated WordPress client describes it. */
+export type WPK_Seo = WP_EndpointData<"seo.homepage.retrieve">
 
 export type WPK_SitemapContentType = "post_type" | "taxonomy" | "author"
 

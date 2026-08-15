@@ -1,6 +1,7 @@
-import type { WPK_PostEnrichment } from "../post-type/service.interface"
-import type { WP_Page } from "../wordpress"
+import type { WP_EndpointData } from "../wordpress"
 
-export interface WPK_Page extends WP_Page {
-	kizlo: WPK_PostEnrichment
-}
+/** A page entry, exactly as the project's generated WordPress client describes it. */
+export type WPK_Page = WP_EndpointData<"postTypes.page.retrieve">
+
+/** A page as it appears in a list response — the same entry, without the resolved SEO block. */
+export type WPK_PageListItem = WP_EndpointData<"postTypes.page.list">[number]

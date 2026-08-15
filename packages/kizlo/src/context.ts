@@ -17,13 +17,14 @@ import type { ServiceAdapters } from "./kizlo"
 import { SettingsService } from "./settings/service"
 import { compare, hmac } from "./shared/crypto"
 import { PreviewTokenData, type PreviewTokenPayload } from "./shared/schema"
-import type { WordPressCredentials } from "./wordpress"
-import { WordPressService } from "./wordpress"
+import type { ActiveWordPressClient, WordPressCredentials } from "./wordpress"
+import { createWordPressClient, WordPressTransport } from "./wordpress"
 
 export interface ContextConfig {
 	siteSecret: string
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
+	wordpressEndpoints?: object
 }
 
 export type AuthUserFn = () => Promise<AuthUser | null>
@@ -44,7 +45,7 @@ export interface ProcedureContext {
 	/** The configured logger adapter. */
 	logger: Logger
 	/** Typed WordPress REST client. */
-	wordpress: WordPressService
+	wordpress: ActiveWordPressClient
 	/** Kizlo settings client. */
 	settings: SettingsService
 	/** Transactional email client. */
@@ -68,15 +69,19 @@ export interface ProcedureContext {
 export class Context {
 	private readonly config: ContextConfig
 	private readonly logger: Logger
-	private readonly wordpress: WordPressService
+	private readonly wordpress: ActiveWordPressClient
 	private readonly settings: SettingsService
 	private readonly email: EmailService
 
 	constructor(config: ContextConfig) {
 		this.config = config
-		this.wordpress = new WordPressService({ ...config, onResponse: (headers) => this.warnIfPluginOutdated(headers) })
-		this.settings = new SettingsService(this.wordpress)
-		this.email = new EmailService(this.wordpress)
+		const options = { credentials: config.credentials, onResponse: (headers: Headers) => this.warnIfPluginOutdated(headers) }
+		const transport = new WordPressTransport(options)
+		// The generated endpoints are inert data, so the client is the pair: the tree overlaid on the
+		// transport it runs against. The cast hands back whatever shape that project's `wordpress.ts` declares.
+		this.wordpress = createWordPressClient(transport, config.wordpressEndpoints ?? {}) as ActiveWordPressClient
+		this.settings = new SettingsService(transport)
+		this.email = new EmailService(transport)
 		this.logger = this.createLogger()
 	}
 

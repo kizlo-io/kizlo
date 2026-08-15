@@ -1,8 +1,10 @@
 import { stringifiedMetaRecord } from "@kizlo/shared"
-import type { WP_MenuItem, WP_MenuItemListInput } from "../wordpress"
+import type { WordPressTransport, WP_Result } from "../wordpress"
+import { WP_CORE_BASE } from "../wordpress"
 import type { ListMenuInputOut, MenuGroupItem } from "./schema"
+import type { WPK_MenuItem, WPK_MenuItemListInput } from "./types"
 
-export function deserializeListMenuInput(input?: ListMenuInputOut): WP_MenuItemListInput {
+export function deserializeListMenuInput(input?: ListMenuInputOut): WPK_MenuItemListInput {
 	// Drop an orderby WP would reject for a missing companion param, so the list degrades instead of 400ing.
 	const orderby =
 		(input?.orderby === "relevance" && !input?.search) ||
@@ -33,6 +35,13 @@ export function deserializeListMenuInput(input?: ListMenuInputOut): WP_MenuItemL
 	}
 }
 
+export async function listMenuItems(
+	wordpress: WordPressTransport,
+	input: WPK_MenuItemListInput,
+): Promise<WP_Result<WPK_MenuItem[], string>> {
+	return wordpress.get<WPK_MenuItem[], string>("/menu-items", { base: WP_CORE_BASE, searchParams: input })
+}
+
 /**
  * The `href` a headless frontend links to. WP builds a non-custom item's `url` as an absolute same-site
  * URL, so we return its full pathname; a custom item's `url` is passed through as authored (a relative
@@ -57,7 +66,7 @@ export function extractPath(url: string, isCustom: boolean): string {
 	return trimmed
 }
 
-export function buildMenuGroupItem(wpItem: WP_MenuItem, items: WP_MenuItem[]): MenuGroupItem {
+export function buildMenuGroupItem(wpItem: WPK_MenuItem, items: WPK_MenuItem[]): MenuGroupItem {
 	const children = items
 		.filter((item) => item.parent === wpItem.id)
 		.sort((a, b) => a.menu_order - b.menu_order)

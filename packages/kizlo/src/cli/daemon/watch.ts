@@ -1,7 +1,10 @@
 import path from "node:path"
 import { FSWatcher } from "chokidar"
-import { type ResolvedConfig, resolveConfig } from "./config"
-import { generateOnce } from "./generate"
+import { resolveWordPressConnection } from "../../kizlo"
+import type { WordPressCredentials } from "../../wordpress/types"
+import { loadEnvFiles } from "../utils"
+import { type ResolvedConfig, resolveConfig, resolveWordPressClientDir } from "./config"
+import { generateOnce, generateWordPressOnce, generateWorkspaceClientOnce } from "./generate"
 import { acquire, isLocked, lockPath, release } from "./lock"
 import { log } from "./logger"
 
@@ -13,9 +16,9 @@ function debounce<T extends (...args: never[]) => Promise<void>>(fn: T, delay: n
 	}) as T
 }
 
-async function regenerate(cfg: ResolvedConfig): Promise<void> {
+async function regenerate(cfg: ResolvedConfig, credentials: WordPressCredentials): Promise<void> {
 	try {
-		const ok = await generateOnce(cfg)
+		const ok = await generateOnce(cfg, credentials)
 		if (ok) log.success("Contract updated")
 		else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
 	} catch (error) {
@@ -24,19 +27,49 @@ async function regenerate(cfg: ResolvedConfig): Promise<void> {
 }
 
 /** Watches the server directory and regenerates the contract on change. */
-async function watch(cfg: ResolvedConfig): Promise<FSWatcher> {
+async function watch(cfg: ResolvedConfig, credentials: WordPressCredentials): Promise<FSWatcher> {
 	const watcher = new FSWatcher({
 		persistent: true,
 		ignoreInitial: true,
 		ignored: path.resolve(cfg.cwd, cfg.generatedDir),
 	})
 
-	const onChange = debounce(() => regenerate(cfg), 300)
+	const onChange = debounce(() => regenerate(cfg, credentials), 300)
 
 	watcher.add(path.resolve(cfg.cwd, cfg.serverDir))
 	watcher.on("all", () => void onChange())
 
 	return watcher
+}
+
+/**
+ * Poll WordPress for route changes. `cfg` covers an app's client next to its contract; `wordpressClientDir`
+ * covers a workspace that has only the client. A project has one or the other, but both are polled on
+ * the same timer so the plugin's PHP changing is picked up either way.
+ */
+function refreshWordPress(
+	cwd: string,
+	cfg: ResolvedConfig | undefined,
+	wordpressClientDir: string | undefined,
+	credentials: WordPressCredentials,
+): NodeJS.Timeout {
+	let refreshing = false
+	const timer = setInterval(async () => {
+		if (refreshing) return
+		refreshing = true
+		try {
+			if (cfg && (await generateWordPressOnce(cfg, { credentials })) === "generated") log.success("WordPress service updated")
+			if (wordpressClientDir && (await generateWorkspaceClientOnce(cwd, wordpressClientDir, { credentials })) === "generated") {
+				log.success("WordPress client updated")
+			}
+		} catch (error) {
+			log.error("Failed to update the WordPress service:", error)
+		} finally {
+			refreshing = false
+		}
+	}, 3_000)
+	timer.unref()
+	return timer
 }
 
 /**
@@ -55,26 +88,47 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 	}
 
 	const cfg = await resolveConfig(cwd, { dir: opts?.dir })
-	if (!cfg) {
+	const wordpressClientDir = await resolveWordPressClientDir(cwd)
+	if (!cfg && !wordpressClientDir) {
 		log.info("skipping the contract generation.")
 		return undefined
 	}
 	acquire(lock)
 
-	try {
-		const ok = await generateOnce(cfg)
-		if (ok) log.success("Contract generated")
-		else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
-	} catch (error) {
-		log.error("Failed to generate the Kizlo contract:", error)
+	// Credentials come from the environment and cannot change while the dev server runs, so they are
+	// resolved once here rather than on every regeneration.
+	loadEnvFiles(cwd)
+	const { credentials } = resolveWordPressConnection(undefined)
+
+	if (wordpressClientDir) {
+		try {
+			if ((await generateWorkspaceClientOnce(cwd, wordpressClientDir, { credentials })) === "generated") {
+				log.success("WordPress client generated")
+			}
+		} catch (error) {
+			log.error("Failed to generate the WordPress client:", error)
+		}
 	}
 
-	const watcher = await watch(cfg)
+	if (cfg) {
+		try {
+			const ok = await generateOnce(cfg, credentials)
+			if (ok) log.success("Contract generated")
+			else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
+		} catch (error) {
+			log.error("Failed to generate the Kizlo contract:", error)
+		}
+	}
+
+	// Only a server has sources worth watching; a workspace with just the client rides the poll below.
+	const watcher = cfg ? await watch(cfg, credentials) : undefined
+	const wordpressRefresh = refreshWordPress(cwd, cfg, wordpressClientDir, credentials)
 	let stopped = false
 	return () => {
 		if (stopped) return
 		stopped = true
 		release(lock)
-		void watcher.close()
+		clearInterval(wordpressRefresh)
+		void watcher?.close()
 	}
 }

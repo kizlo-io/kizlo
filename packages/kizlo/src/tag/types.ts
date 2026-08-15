@@ -1,16 +1,7 @@
-import type { WPK_Seo } from "../seo/types"
-import type { WP_Tag } from "../wordpress"
+import type { WP_EndpointData } from "../wordpress"
 
-/**
- * The `kizlo` enrichment block injected by the plugin's `TermExtension`. `url`
- * (the resolver-built term archive link) rides on every response; `seo` is only
- * present on single-term fetches, never on list items.
- */
-export interface WPK_TagEnrichment {
-	url?: string
-	seo?: WPK_Seo
-}
+/** A tag term, exactly as the project's generated WordPress client describes it. */
+export type WPK_Tag = WP_EndpointData<"taxonomies.postTag.retrieve">
 
-export interface WPK_Tag extends WP_Tag {
-	kizlo: WPK_TagEnrichment
-}
+/** A tag as it appears in a list response — the same term, without the resolved SEO block. */
+export type WPK_TagListItem = WP_EndpointData<"taxonomies.postTag.list">[number]

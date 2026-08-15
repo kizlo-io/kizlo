@@ -1,4 +1,4 @@
-import type { WordPressService } from "../../wordpress"
+import type { WordPressTransport } from "../../wordpress"
 
 interface BaseTestUser {
 	id: number
@@ -41,7 +41,7 @@ export interface TestCredentials {
 
 /** Handed to each `Fixture` so it can create its world over REST (or wp-cli). */
 export interface SeedContext {
-	service: WordPressService
+	service: WordPressTransport
 	adminId: number
 	userId: number
 }

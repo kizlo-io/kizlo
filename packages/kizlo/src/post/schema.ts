@@ -2,7 +2,11 @@ import { arrayable, BooleanLike, lenient, Media, Metadata, NumberLike } from "@k
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import { WP_POST_FORMATS, WP_POST_ORDER_BYES, WP_POST_STATUSES, WP_POST_TAX_RELATIONS } from "../wordpress/post/types"
+
+const WP_POST_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
+const WP_POST_FORMATS = ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"] as const
+const WP_POST_ORDER_BYES = ["author", "date", "id", "include", "modified", "parent", "relevance", "slug", "include_slugs", "title"] as const
+const WP_POST_TAX_RELATIONS = ["AND", "OR"] as const
 
 export const PostTypeFormat = z.enum(WP_POST_FORMATS)
 export type PostTypeFormat = z.infer<typeof PostTypeFormat>

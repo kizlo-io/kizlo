@@ -1,16 +1,9 @@
 import { createProcedure } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
-import type {
-	WP_CommentCreateErrorCode,
-	WP_CommentListErrorCode,
-	WP_CommentListInput,
-	WP_CommentRetrieveErrorCode,
-	WP_CommentRetrieveInput,
-} from "../wordpress"
-import { WP_CORE_BASE, WP_KIZLO_BASE } from "../wordpress"
+import { WP_CORE_BASE } from "../wordpress"
 import { GET_COMMENT_ERROR_MAP, LIST_COMMENT_ERROR_MAP, SUBMIT_COMMENT_ERROR_MAP } from "./errors"
 import { Comment, CommentList, GetCommentInput, ListCommentInput, SubmitCommentInput } from "./schema"
-import type { WPK_Comment, WPK_CreateCommentInput } from "./types"
+import type { WPK_Comment } from "./types"
 import { deserializeComment } from "./utils"
 
 export const COMMENT_ROUTER_MAP = {
@@ -25,9 +18,9 @@ export const COMMENT_ROUTER_MAP = {
 			output: Comment,
 		},
 		async ({ context, errors, input }) => {
-			const response = await context.wordpress.get<WPK_Comment, WP_CommentRetrieveErrorCode>(`/comments/${input.params.id}`, {
+			const response = await context.wordpress.get<WPK_Comment, string>(`/comments/${input.params.id}`, {
 				base: WP_CORE_BASE,
-				searchParams: { password: input.query?.password } satisfies Omit<WP_CommentRetrieveInput, "id">,
+				searchParams: { password: input.query?.password },
 			})
 			if (response.error) {
 				switch (response.error.code) {
@@ -45,7 +38,10 @@ export const COMMENT_ROUTER_MAP = {
 				}
 			}
 
-			return deserializeComment(response.data)
+			const comment = deserializeComment(response.data)
+			if (!comment) throw errors.COMMENT_NOT_FOUND()
+
+			return comment
 		},
 	),
 
@@ -59,7 +55,7 @@ export const COMMENT_ROUTER_MAP = {
 			output: CommentList,
 		},
 		async ({ context, errors, input }) => {
-			const response = await context.wordpress.get<WPK_Comment[], WP_CommentListErrorCode>(`/comments`, {
+			const response = await context.wordpress.get<WPK_Comment[], string>(`/comments`, {
 				base: WP_CORE_BASE,
 				searchParams: {
 					context: "edit",
@@ -79,7 +75,7 @@ export const COMMENT_ROUTER_MAP = {
 					per_page: input.query?.perPage,
 					post: input.query?.post,
 					search: input.query?.search,
-				} satisfies WP_CommentListInput,
+				},
 			})
 			if (response.error) {
 				switch (response.error.code) {
@@ -104,7 +100,13 @@ export const COMMENT_ROUTER_MAP = {
 				searchParams: input.query,
 			})
 
-			return { items: list.items.map(deserializeComment), meta: deserializeListMetadata(list.meta) }
+			// A comment whose post is gone has nothing to link to, so it drops out of the list.
+			const items = list.items.flatMap((item) => {
+				const comment = deserializeComment(item)
+				return comment ? [comment] : []
+			})
+
+			return { items, meta: deserializeListMetadata(list.meta) }
 		},
 	),
 
@@ -130,44 +132,57 @@ export const COMMENT_ROUTER_MAP = {
 				if (!valid) throw errors.COMMENT_CAPTCHA_INVALID()
 			}
 
-			const response = await context.wordpress.post<WPK_Comment, WP_CommentCreateErrorCode>(`/comments`, {
-				body: {
-					user_id: user?.id,
-					author_ip: connInfo.ip,
-					user_agent: connInfo.userAgent,
-					content: input.body.content,
-					post_id: input.body.postId,
-					author_email: input.body.authorEmail,
-					author_name: input.body.authorName,
-					author_url: input.body.authorUrl,
-					parent: input.body.parentId,
-				} satisfies WPK_CreateCommentInput,
-				base: WP_KIZLO_BASE,
+			const response = await context.wordpress.comments.create({
+				user_id: user?.id,
+				author_ip: connInfo.ip,
+				user_agent: connInfo.userAgent,
+				content: input.body.content,
+				post_id: input.body.postId,
+				author_email: input.body.authorEmail,
+				author_name: input.body.authorName,
+				author_url: input.body.authorUrl,
+				parent: input.body.parentId,
 			})
 			if (response.error) {
 				switch (response.error.code) {
-					case "rest_comment_author_data_required": {
+					case "require_name_email": {
 						throw errors.COMMENT_NAME_EMAIL_REQUIRED()
 					}
-					case "rest_comment_author_invalid":
-					case "rest_comment_invalid_author": {
+					case "require_valid_email": {
+						throw errors.COMMENT_INVALID_EMAIL()
+					}
+					case "kizlo_invalid_user": {
 						throw errors.COMMENT_USER_NOT_FOUND()
 					}
-					case "rest_comment_content_invalid": {
+					case "require_valid_comment": {
 						throw errors.COMMENT_EMPTY_CONTENT()
 					}
-					case "rest_comment_login_required": {
+					case "not_logged_in": {
 						throw errors.COMMENT_LOGIN_REQUIRED()
 					}
-					case "rest_comment_closed": {
+					case "comment_closed": {
 						throw errors.COMMENT_CLOSED()
 					}
-					case "rest_cannot_read_post":
-					case "rest_comment_draft_post":
-					case "rest_comment_invalid_post_id":
-					case "rest_comment_not_supported_post_type":
-					case "rest_comment_trash_post": {
+					case "comment_id_not_found":
+					case "comment_on_draft":
+					case "comment_on_password_protected":
+					case "comment_on_trash": {
 						throw errors.COMMENT_ID_NOT_FOUND()
+					}
+					case "comment_author_column_length":
+					case "comment_author_email_column_length":
+					case "comment_author_url_column_length":
+					case "comment_content_column_length": {
+						throw errors.COMMENT_FIELD_TOO_LONG()
+					}
+					case "comment_duplicate": {
+						throw errors.COMMENT_DUPLICATE()
+					}
+					case "comment_flood": {
+						throw errors.COMMENT_RATE_LIMITED()
+					}
+					case "comment_reply_to_unapproved_comment": {
+						throw errors.COMMENT_PARENT_UNAPPROVED()
 					}
 					default:
 						context.logger.error("Submit comment unhandled error", response.error, { code: response.error.code })
@@ -175,7 +190,13 @@ export const COMMENT_ROUTER_MAP = {
 				}
 			}
 
-			return deserializeComment(response.data)
+			const comment = deserializeComment(response.data)
+			if (!comment) {
+				context.logger.error("Submitted comment resolved to no post", undefined, { commentId: response.data.id })
+				throw errors.INTERNAL_SERVER_ERROR()
+			}
+
+			return comment
 		},
 	),
 }

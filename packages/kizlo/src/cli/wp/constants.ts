@@ -32,6 +32,16 @@ export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config
 export const CREDENTIALS_REL = ".kizlo/test.json"
 
 /**
+ * ETag of the last introspection fetch, relative to the config root. It lives in the gitignored
+ * working dir rather than next to the generated files on purpose: it describes one machine's last
+ * fetch, so a fresh clone has to regenerate rather than trust a cache it never populated.
+ */
+export const WORDPRESS_META_REL = ".kizlo/wordpress.meta.json"
+
+/** Same, for the standalone client written by `wordpressClientDir`. Separate so the two never share one ETag. */
+export const WORDPRESS_CLIENT_META_REL = ".kizlo/wordpress.client.meta.json"
+
+/**
  * Fixed folder the local WordPress install lives in, relative to the config root. The whole install
  * (core, themes, uploads, plugins) is bind-mounted here; `kizlo dev reset` wipes it. It sits under
  * `.kizlo/` — the single gitignored working dir — so there's no folder to choose or configure.

@@ -2,7 +2,8 @@ import { arrayable, BooleanLike, lenient, Metadata, NumberLike } from "@kizlo/sh
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import { WP_TAG_ORDER_BYS } from "../wordpress/tag/types"
+
+const WP_TAG_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs", "term_group", "description", "count"] as const
 
 // ====================================================
 // TAG

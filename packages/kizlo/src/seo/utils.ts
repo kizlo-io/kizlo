@@ -42,7 +42,8 @@ export function deserializeSeo(data: WPK_Seo): Seo {
 				title: data.head.twitter.title,
 			},
 		},
-		schema: data.schema,
+		// WordPress types `@context` as a plain string; the public schema pins the one value it holds.
+		schema: { "@context": "https://schema.org", "@graph": data.schema["@graph"] },
 	}
 }
 

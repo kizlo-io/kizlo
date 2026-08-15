@@ -1,3 +1,4 @@
+import { endpoints } from "../../../../wordpress"
 import { geoMock } from "../adapters/geo"
 import { consoleLog } from "../adapters/logger"
 import { getTestCredentials } from "../cli/wp/utils"
@@ -25,6 +26,7 @@ export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>
 			username: creds.users.admin.username,
 			password: creds.users.admin.applicationPassword,
 		},
+		wordpressEndpoints: endpoints,
 		adapters: {
 			geo: geoMock(),
 			auth: testAuthAdapter(toTestUser(creds.users.user)),

@@ -8,8 +8,9 @@ export const base: Fallback = {
 				label: "Kizlo server instance",
 				relPath: ctx.serverEntryPath,
 				contents: `import { createKizlo } from "kizlo"
+import { endpoints } from "./generated"
 
-export const { router, client, context, handler } = createKizlo()
+export const { router, client, context, handler } = createKizlo({ wordpress: { endpoints } })
 `,
 			},
 			{ label: "Browser client", relPath: ctx.clientPath, contents: clientEntry(ctx) },

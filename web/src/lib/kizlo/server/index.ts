@@ -1,8 +1,10 @@
 import { consoleLog, createEventHandler, createExtension, createMiddleware, createProcedure } from "kizlo"
 import { createKizlo } from "kizlo/nextjs/server"
 import z from "zod"
+import { endpoints } from "./generated"
 
 export const { router, client, context, handler } = createKizlo({
+	wordpress: { endpoints },
 	adapters: { logger: consoleLog() },
 	extensions: [
 		createExtension({
@@ -32,6 +34,7 @@ export const { router, client, context, handler } = createKizlo({
 								],
 							},
 							({ context, input, errors }) => {
+								void context.wordpress.postTypes.post.retrieve({ identifier: "", password: "" })
 								return { val: "" }
 							},
 						),

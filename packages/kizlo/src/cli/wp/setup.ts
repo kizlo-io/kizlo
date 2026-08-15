@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
-import { WordPressService } from "../../wordpress"
+import { WordPressTransport } from "../../wordpress"
 import { type BootstrapConfig, bootstrapWp } from "./bootstrap"
 import type { SeedContext } from "./types"
 import { credentialsPath } from "./utils"
@@ -14,7 +14,7 @@ import { credentialsPath } from "./utils"
 export async function runSeeds(config: BootstrapConfig): Promise<() => Promise<void>> {
 	const boot = await bootstrapWp(config)
 
-	const service = new WordPressService({
+	const service = new WordPressTransport({
 		credentials: {
 			url: boot.url,
 			username: boot.users.admin.username,

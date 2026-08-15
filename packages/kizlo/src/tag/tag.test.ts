@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test"
-import { WordPressService } from "../wordpress"
+import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test/harness"
+import { WordPressTransport, WP_CORE_BASE } from "../wordpress"
 import { Tag, TagList } from "./schema"
 
 let kizlo: KizloTestInstance
-let adminWp: WordPressService
+let adminWp: WordPressTransport
 let tagId = 0
 let bareTagId = 0
 const TAG_SLUG = "tag-api-check"
@@ -15,21 +15,27 @@ const BARE_SLUG = "tag-api-bare"
 beforeAll(async () => {
 	kizlo = getKizloTestInstance()
 	const creds = getTestCredentials()
-	adminWp = new WordPressService({
+	adminWp = new WordPressTransport({
 		credentials: { url: creds.url, username: creds.users.admin.username, password: creds.users.admin.applicationPassword },
 	})
-	const created = await adminWp.tags.create({ slug: TAG_SLUG, name: TAG_NAME, description: "Seeded tag." })
+	const created = await adminWp.post<{ id: number }, string>("/tags", {
+		base: WP_CORE_BASE,
+		body: { slug: TAG_SLUG, name: TAG_NAME, description: "Seeded tag." },
+	})
 	if (created.error) throw created.error
 	tagId = created.data.id
 
-	const bare = await adminWp.tags.create({ slug: BARE_SLUG, name: "Tag API Bare" })
+	const bare = await adminWp.post<{ id: number }, string>("/tags", {
+		base: WP_CORE_BASE,
+		body: { slug: BARE_SLUG, name: "Tag API Bare" },
+	})
 	if (bare.error) throw bare.error
 	bareTagId = bare.data.id
 })
 
 afterAll(async () => {
-	if (tagId) await adminWp.tags.delete({ id: tagId, force: true })
-	if (bareTagId) await adminWp.tags.delete({ id: bareTagId, force: true })
+	if (tagId) await adminWp.delete(`/tags/${tagId}`, { base: WP_CORE_BASE, searchParams: { force: true } })
+	if (bareTagId) await adminWp.delete(`/tags/${bareTagId}`, { base: WP_CORE_BASE, searchParams: { force: true } })
 })
 
 test("tags.list returns tags conforming to TagList", async () => {

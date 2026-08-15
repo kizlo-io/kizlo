@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test"
-import { WordPressService } from "../wordpress"
+import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test/harness"
+import { WordPressTransport, WP_CORE_BASE } from "../wordpress"
 import { Category, CategoryList } from "./schema"
 
 let kizlo: KizloTestInstance
-let adminWp: WordPressService
+let adminWp: WordPressTransport
 let categoryId = 0
 let childId = 0
 const CATEGORY_SLUG = "category-api-check"
@@ -14,22 +14,28 @@ const CHILD_SLUG = "category-api-child"
 beforeAll(async () => {
 	kizlo = getKizloTestInstance()
 	const creds = getTestCredentials()
-	adminWp = new WordPressService({
+	adminWp = new WordPressTransport({
 		credentials: { url: creds.url, username: creds.users.admin.username, password: creds.users.admin.applicationPassword },
 	})
 	// A top-level category plus a child, so the parent reshape (0 -> null vs a real id) and the parent filter are exercised.
-	const created = await adminWp.categories.create({ slug: CATEGORY_SLUG, name: CATEGORY_NAME, description: "Seeded category." })
+	const created = await adminWp.post<{ id: number }, string>("/categories", {
+		base: WP_CORE_BASE,
+		body: { slug: CATEGORY_SLUG, name: CATEGORY_NAME, description: "Seeded category." },
+	})
 	if (created.error) throw created.error
 	categoryId = created.data.id
 
-	const child = await adminWp.categories.create({ slug: CHILD_SLUG, name: "Category API Child", parent: categoryId })
+	const child = await adminWp.post<{ id: number }, string>("/categories", {
+		base: WP_CORE_BASE,
+		body: { slug: CHILD_SLUG, name: "Category API Child", parent: categoryId },
+	})
 	if (child.error) throw child.error
 	childId = child.data.id
 })
 
 afterAll(async () => {
-	if (childId) await adminWp.categories.delete({ id: childId, force: true })
-	if (categoryId) await adminWp.categories.delete({ id: categoryId, force: true })
+	if (childId) await adminWp.delete(`/categories/${childId}`, { base: WP_CORE_BASE, searchParams: { force: true } })
+	if (categoryId) await adminWp.delete(`/categories/${categoryId}`, { base: WP_CORE_BASE, searchParams: { force: true } })
 })
 
 test("categories.list returns categories conforming to CategoryList", async () => {

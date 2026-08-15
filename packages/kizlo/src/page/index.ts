@@ -1,11 +1,10 @@
-import { getPostTypeService } from "../post-type/service"
+import { normalizeArrayableValue } from "@kizlo/shared"
 import { compare } from "../shared/crypto"
 import { parseIdentifier } from "../shared/identifier"
 import { createProcedure } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
 import { GET_PAGE_ERROR_MAP, LIST_PAGE_ERROR_MAP } from "./error"
 import { ListPageInput, Page, PageList, RetrievePageInput } from "./schema"
-import type { WPK_Page } from "./types"
 import { deserializePage } from "./utils"
 
 export const PAGE_ROUTER_MAP = {
@@ -20,13 +19,11 @@ export const PAGE_ROUTER_MAP = {
 			errors: GET_PAGE_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const postType = getPostTypeService<WPK_Page>("page", context.wordpress)
-
 			if (input.query?.previewToken) {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.PAGE_NOT_FOUND()
 
-				const response = await postType.get({ type: "id", value: result.id })
+				const response = await context.wordpress.postTypes.page.retrieve({ identifier: String(result.id) })
 				if (response.error) {
 					switch (response.error.code) {
 						case "invalid_post_type":
@@ -48,7 +45,7 @@ export const PAGE_ROUTER_MAP = {
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.PAGE_NOT_FOUND()
 
-			const response = await postType.get(identifier)
+			const response = await context.wordpress.postTypes.page.retrieve({ identifier: String(identifier.value) })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_post_type":
@@ -90,34 +87,31 @@ export const PAGE_ROUTER_MAP = {
 		},
 		async ({ input, context, errors }) => {
 			const q = input.query
-			const postType = getPostTypeService<WPK_Page>("page", context.wordpress)
-
 			// Drop an orderby WP would reject for a missing companion param, so the list degrades instead of 400ing.
 			const orderby =
 				(q?.orderby === "relevance" && !q?.search) || (q?.orderby === "include" && q?.include === undefined) ? undefined : q?.orderby
 
-			const response = await postType.list({
-				context: "edit",
-				status: "publish",
-				after: input.query?.after,
-				author: input.query?.author,
-				author_exclude: input.query?.authorExclude,
-				before: input.query?.before,
-				modified_after: input.query?.modifiedAfter,
-				modified_before: input.query?.modifiedBefore,
-				exclude: input.query?.exclude,
-				include: input.query?.include,
-				menu_order: input.query?.menuOrder,
-				offset: input.query?.offset,
-				order: input.query?.order,
+			const response = await context.wordpress.postTypes.page.list({
+				status: ["publish"],
+				after: q?.after,
+				author: normalizeArrayableValue(q?.author),
+				author_exclude: normalizeArrayableValue(q?.authorExclude),
+				before: q?.before,
+				modified_after: q?.modifiedAfter,
+				modified_before: q?.modifiedBefore,
+				exclude: normalizeArrayableValue(q?.exclude),
+				include: normalizeArrayableValue(q?.include),
+				menu_order: q?.menuOrder,
+				offset: q?.offset,
+				order: q?.order,
 				orderby,
-				page: input.query?.page,
-				parent: input.query?.parent,
-				parent_exclude: input.query?.parentExclude,
-				per_page: input.query?.perPage,
-				search: input.query?.search,
-				search_columns: input.query?.searchColumns,
-				slug: input.query?.slug,
+				page: q?.page,
+				parent: normalizeArrayableValue(q?.parent),
+				parent_exclude: normalizeArrayableValue(q?.parentExclude),
+				per_page: q?.perPage,
+				search: q?.search,
+				search_columns: q?.searchColumns,
+				slug: normalizeArrayableValue(q?.slug),
 			})
 
 			if (response.error) {

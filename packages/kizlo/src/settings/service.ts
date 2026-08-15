@@ -1,4 +1,4 @@
-import type { WordPressService } from "../wordpress"
+import type { WordPressTransport } from "../wordpress"
 import { WP_KIZLO_BASE } from "../wordpress"
 import type {
 	AuthorsSettings,
@@ -25,9 +25,9 @@ import type {
 } from "./service.interface"
 
 export class SettingsService {
-	private readonly wordpress: WordPressService
+	private readonly wordpress: WordPressTransport
 
-	constructor(wordpress: WordPressService) {
+	constructor(wordpress: WordPressTransport) {
 		this.wordpress = wordpress
 	}
 
