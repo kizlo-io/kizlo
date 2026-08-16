@@ -4,7 +4,7 @@ import { deserializeListMetadata } from "../shared/serialize"
 import { LIST_MENU_ITEM_ERROR_MAP } from "./errors"
 import { ListMenuInput, MenuGroupItemList, MenuItemList } from "./schema"
 import type { WPK_MenuItem } from "./types"
-import { buildMenuGroupItem, deserializeListMenuInput, extractPath, listMenuItems } from "./utils"
+import { buildMenuGroupItem, deserializeListMenuInput, extractPath } from "./utils"
 
 export const MENU_ROUTER_MAP = {
 	items: {
@@ -19,7 +19,7 @@ export const MENU_ROUTER_MAP = {
 			},
 			async ({ context, errors, input }) => {
 				const searchParams = deserializeListMenuInput(input.query)
-				const response = await listMenuItems(context.wordpress, searchParams)
+				const response = await context.wordpress.menuItems.list(searchParams)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -35,8 +35,12 @@ export const MENU_ROUTER_MAP = {
 					}
 				}
 
+				// Named rather than mapped straight off `response.data`, so the callbacks below stay
+				// contextually typed in a project whose generated tree is still the empty stub.
+				const found: WPK_MenuItem[] = response.data
+
 				return {
-					items: response.data.map((item) => ({
+					items: found.map((item) => ({
 						id: item.id,
 						parent: item.parent === 0 ? null : item.parent,
 						type: item.object,
@@ -52,9 +56,7 @@ export const MENU_ROUTER_MAP = {
 						invalid: item.invalid,
 						meta: stringifiedMetaRecord(item.meta ?? {}),
 					})),
-					meta: deserializeListMetadata(
-						context.wordpress.resolveList({ data: response.data, headers: response.headers, searchParams }).meta,
-					),
+					meta: deserializeListMetadata(context.wordpress.resolveList({ data: found, headers: response.headers, searchParams }).meta),
 				}
 			},
 		),
@@ -70,7 +72,7 @@ export const MENU_ROUTER_MAP = {
 			},
 			async ({ context, errors, input }) => {
 				const searchParams = deserializeListMenuInput(input.query)
-				const response = await listMenuItems(context.wordpress, searchParams)
+				const response = await context.wordpress.menuItems.list(searchParams)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -86,21 +88,18 @@ export const MENU_ROUTER_MAP = {
 					}
 				}
 
+				const found: WPK_MenuItem[] = response.data
 				const itemMap = new Map<number, WPK_MenuItem>()
 
-				response.data.forEach((item) => {
+				found.forEach((item) => {
 					itemMap.set(item.id, item)
 				})
 
-				const rootItems = response.data
-					.filter((item) => item.parent === 0 || !itemMap.has(item.parent))
-					.sort((a, b) => a.menu_order - b.menu_order)
+				const rootItems = found.filter((item) => item.parent === 0 || !itemMap.has(item.parent)).sort((a, b) => a.menu_order - b.menu_order)
 
 				return {
-					meta: deserializeListMetadata(
-						context.wordpress.resolveList({ data: response.data, headers: response.headers, searchParams }).meta,
-					),
-					items: rootItems.map((rootItem) => buildMenuGroupItem(rootItem, response.data)),
+					meta: deserializeListMetadata(context.wordpress.resolveList({ data: found, headers: response.headers, searchParams }).meta),
+					items: rootItems.map((rootItem) => buildMenuGroupItem(rootItem, found)),
 				}
 			},
 		),

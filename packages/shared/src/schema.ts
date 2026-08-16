@@ -16,6 +16,24 @@ import z from "zod/v4"
 export const arrayable = <T extends z.ZodTypeAny>(schema: T) => z.union([schema, z.array(schema)])
 
 /**
+ * Collapse an {@link arrayable} value to the array form, which is what a WordPress route that
+ * takes a list declares. `arrayable` widens on the way in so a caller can pass one value; this
+ * narrows on the way out so the request matches the shape the route describes.
+ *
+ * `undefined` is preserved rather than becoming `[]`, because an absent filter and a filter that
+ * matches nothing are different requests.
+ *
+ * @example
+ * listed(4)         // → [4]
+ * listed([4, 7])    // → [4, 7]
+ * listed(undefined) // → undefined
+ */
+export function listed<T>(value: T | T[] | undefined): T[] | undefined {
+	if (value === undefined) return undefined
+	return Array.isArray(value) ? value : [value]
+}
+
+/**
  * Wrap an optional field so an invalid value is dropped (parsed to `undefined`)
  * instead of throwing. Intended for lenient read surfaces such as list-query
  * filters, where a bad value should degrade gracefully rather than 400. Do not

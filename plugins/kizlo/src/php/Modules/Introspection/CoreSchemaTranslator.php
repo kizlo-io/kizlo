@@ -173,8 +173,8 @@ final class CoreSchemaTranslator
             if (!$union && count($members) === 1) {
                 $schema['type'] = $members[0];
             } elseif (!$union && $members !== []) {
-                $schema['anyOf'] = array_map(static fn(string $member): array => ['type' => $member], $members);
-                $union           = true;
+                $schema = self::union($schema, $members);
+                $union  = true;
             }
         }
 
@@ -191,6 +191,55 @@ final class CoreSchemaTranslator
         if (!is_string($type) || !in_array($type, Spec::TYPES, true)) {
             return null;
         }
+
+        return $schema;
+    }
+
+    /**
+     * Spell a type list as a union, keeping each member's structure with it.
+     *
+     * A shape keyword sits beside the type list rather than inside it, because
+     * WordPress has nowhere else to put it: `nav_menu_item.title` is
+     * `['string', 'object']` with one `properties` block for the object half. Emit
+     * the members as bare types and that block is orphaned — a sibling of a union,
+     * which the contract has no reading for, so the generator emits an object with
+     * no fields and the described response loses `title.rendered` entirely.
+     *
+     * So each keyword goes to the member it can mean something for. A keyword no
+     * member claims is left where it was, to be reported rather than deleted.
+     *
+     * @param array<string, mixed> $schema
+     * @param array<int, string>   $members
+     * @return array<string, mixed>
+     */
+    private static function union(array $schema, array $members): array
+    {
+        $shape = [
+            'object' => ['properties', 'patternProperties', 'additionalProperties'],
+            'array'  => ['items'],
+        ];
+
+        $branches = [];
+        $claimed  = [];
+
+        foreach ($members as $member) {
+            $branch = ['type' => $member];
+
+            foreach ($shape[$member] ?? [] as $keyword) {
+                if (array_key_exists($keyword, $schema)) {
+                    $branch[$keyword]  = $schema[$keyword];
+                    $claimed[$keyword] = true;
+                }
+            }
+
+            $branches[] = $branch;
+        }
+
+        foreach (array_keys($claimed) as $keyword) {
+            unset($schema[$keyword]);
+        }
+
+        $schema['anyOf'] = $branches;
 
         return $schema;
     }

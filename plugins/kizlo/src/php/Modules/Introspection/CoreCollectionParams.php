@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Introspection;
 
+use WP_REST_Controller;
+
 /**
  * The list parameters a managed route actually honours.
  *
@@ -65,6 +67,21 @@ final class CoreCollectionParams
             CoreControllers::forTaxonomy($slug)->get_collection_params(),
             sprintf('/taxonomies/%s', $slug),
         );
+    }
+
+    /**
+     * The same derivation for a list this plugin describes but does not serve.
+     *
+     * The argument is unchanged: `get_collection_params()` is what the controller
+     * builds its `$registered` set from, so it is the only complete answer to what
+     * the list accepts. That a core route rather than a managed one is being
+     * described changes nothing about where the answer comes from.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function forController(WP_REST_Controller $controller, string $route): array
+    {
+        return self::$memo['controller:' . $route] ??= self::translate($controller->get_collection_params(), $route);
     }
 
     /**

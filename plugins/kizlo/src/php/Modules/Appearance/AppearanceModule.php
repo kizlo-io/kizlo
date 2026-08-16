@@ -18,6 +18,9 @@ class AppearanceModule
     public function register(): void
     {
         add_filter('rest_prepare_nav_menu_item', [$this, 'prepareMenuItemCallback'], PHP_INT_MAX, 2);
+
+        // See CommentModule::register() for why this waits for `rest_api_init`.
+        add_action('rest_api_init', [MenuRoutes::class, 'register']);
     }
 
     public function prepareMenuItemCallback(WP_REST_Response | WP_Error $response, object $menu_item): WP_REST_Response | WP_Error

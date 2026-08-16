@@ -3,6 +3,7 @@
 namespace Kizlo\Tests\Introspection;
 
 use Kizlo\Modules\Introspection\Document;
+use Kizlo\Modules\Introspection\OperationErrors;
 
 /**
  * The emitted document: what it contains, how it is ordered, and that identical
@@ -55,10 +56,12 @@ class DocumentTest extends IntrospectionTestCase
 
         $operation = $document['apis']['alpha.api']['paths']['/beta']['retrieve'];
         $this->assertSame('POST', $operation['method']);
-        $this->assertSame(['alpha_error', 'zeta_error'], $operation['errors']);
+        // The guard codes every described route inherits sort in with the declared ones.
+        $this->assertSame(['alpha_error', ...OperationErrors::GUARD, 'zeta_error'], $operation['errors']);
         // PHP coerces numeric array keys to integers; JSON encoding turns them back
-        // into the string object keys the contract specifies.
-        $this->assertSame(['200', '500'], array_map('strval', array_keys($operation['responses'])));
+        // into the string object keys the contract specifies. 400, 401 and 403 are
+        // the envelopes that ride along with the inherited guard errors.
+        $this->assertSame(['200', '400', '401', '403', '500'], array_map('strval', array_keys($operation['responses'])));
     }
 
     public function test_object_properties_keep_their_declared_order(): void
@@ -142,8 +145,10 @@ class DocumentTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
 
+        // `summary`, `description` and `deprecated` stay out; `errors` is never empty,
+        // because what sits in front of the route applies whether or not it says so.
         $this->assertSame(['method', 'errors', 'input', 'responses'], array_keys($operation));
-        $this->assertSame([], $operation['errors']);
+        $this->assertSame(OperationErrors::GUARD, $operation['errors']);
     }
 
     /**

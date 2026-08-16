@@ -1,9 +1,8 @@
+import { listed } from "@kizlo/shared"
 import { createProcedure } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
-import { WP_CORE_BASE } from "../wordpress"
 import { GET_COMMENT_ERROR_MAP, LIST_COMMENT_ERROR_MAP, SUBMIT_COMMENT_ERROR_MAP } from "./errors"
 import { Comment, CommentList, GetCommentInput, ListCommentInput, SubmitCommentInput } from "./schema"
-import type { WPK_Comment } from "./types"
 import { deserializeComment } from "./utils"
 
 export const COMMENT_ROUTER_MAP = {
@@ -18,9 +17,9 @@ export const COMMENT_ROUTER_MAP = {
 			output: Comment,
 		},
 		async ({ context, errors, input }) => {
-			const response = await context.wordpress.get<WPK_Comment, string>(`/comments/${input.params.id}`, {
-				base: WP_CORE_BASE,
-				searchParams: { password: input.query?.password },
+			const response = await context.wordpress.comments.retrieve({
+				id: input.params.id,
+				password: input.query?.password,
 			})
 			if (response.error) {
 				switch (response.error.code) {
@@ -55,28 +54,26 @@ export const COMMENT_ROUTER_MAP = {
 			output: CommentList,
 		},
 		async ({ context, errors, input }) => {
-			const response = await context.wordpress.get<WPK_Comment[], string>(`/comments`, {
-				base: WP_CORE_BASE,
-				searchParams: {
-					context: "edit",
-					after: input.query?.after,
-					author: input.query?.author,
-					author_exclude: input.query?.authorExclude,
-					before: input.query?.before,
-					exclude: input.query?.exclude,
-					include: input.query?.include,
-					offset: input.query?.offset,
-					order: input.query?.order,
-					orderby: input.query?.orderby,
-					page: input.query?.page,
-					parent: input.query?.parent,
-					parent_exclude: input.query?.parentExclude,
-					password: input.query?.password,
-					per_page: input.query?.perPage,
-					post: input.query?.post,
-					search: input.query?.search,
-				},
-			})
+			const searchParams = {
+				after: input.query?.after,
+				author: listed(input.query?.author),
+				author_exclude: listed(input.query?.authorExclude),
+				before: input.query?.before,
+				exclude: listed(input.query?.exclude),
+				include: listed(input.query?.include),
+				offset: input.query?.offset,
+				order: input.query?.order,
+				orderby: input.query?.orderby,
+				page: input.query?.page,
+				parent: listed(input.query?.parent),
+				parent_exclude: listed(input.query?.parentExclude),
+				password: input.query?.password,
+				per_page: input.query?.perPage,
+				post: listed(input.query?.post),
+				search: input.query?.search,
+			}
+
+			const response = await context.wordpress.comments.list(searchParams)
 			if (response.error) {
 				switch (response.error.code) {
 					case "rest_cannot_read":
@@ -94,11 +91,7 @@ export const COMMENT_ROUTER_MAP = {
 				}
 			}
 
-			const list = context.wordpress.resolveList({
-				data: response.data,
-				headers: response.headers,
-				searchParams: input.query,
-			})
+			const list = context.wordpress.resolveList({ data: response.data, headers: response.headers, searchParams })
 
 			// A comment whose post is gone has nothing to link to, so it drops out of the list.
 			const items = list.items.flatMap((item) => {
@@ -132,7 +125,7 @@ export const COMMENT_ROUTER_MAP = {
 				if (!valid) throw errors.COMMENT_CAPTCHA_INVALID()
 			}
 
-			const response = await context.wordpress.comments.create({
+			const response = await context.wordpress.kizlo.comments.create({
 				user_id: user?.id,
 				author_ip: connInfo.ip,
 				user_agent: connInfo.userAgent,

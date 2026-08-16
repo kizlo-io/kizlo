@@ -2,6 +2,8 @@
 
 namespace Kizlo\Tests\Introspection;
 
+use Kizlo\Modules\Introspection\OperationErrors;
+
 /**
  * The route half of the contract: identifiers, paths, method, content types,
  * responses, and how repeated registrations merge or conflict.
@@ -399,7 +401,11 @@ class RouteContractTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
 
-        $this->assertSame(['invalid_widget', 'widget_unavailable'], $operation['errors']);
+        // Sorted as one list with the inherited guard codes, not the declared ones first.
+        $this->assertSame(
+            ['invalid_widget', ...OperationErrors::GUARD, 'widget_unavailable'],
+            $operation['errors'],
+        );
     }
 
     public function test_duplicate_operation_errors_fail_introspection(): void
@@ -445,37 +451,68 @@ class RouteContractTest extends IntrospectionTestCase
         ];
     }
 
-    public function test_operation_errors_need_a_non_success_json_error_response(): void
+    /**
+     * Registering through the public helper can no longer trip this rule, because
+     * {@see OperationErrors} supplies the envelope for the guard errors it adds and
+     * that envelope satisfies it. The filter is the path that still can: a plugin
+     * contributing to `kizlo_introspection_routes` directly builds its own
+     * declaration and inherits nothing.
+     */
+    public function test_a_contributed_operation_with_errors_needs_a_non_success_json_error_response(): void
     {
-        kizlo_register_spec_route($this->operation(['errors' => ['invalid_widget']]));
+        add_filter('kizlo_introspection_routes', function (array $routes): array {
+            $routes[] = $this->operation(['errors' => ['invalid_widget']]);
+            return $routes;
+        });
 
         $this->assertErrorContains($this->widgetErrors(), 'must declare a non-2xx JSON response');
     }
 
-    public function test_operation_errors_need_the_wordpress_error_envelope(): void
+    public function test_a_contributed_operation_with_errors_needs_the_wordpress_error_envelope(): void
     {
-        kizlo_register_spec_route($this->operation([
-            'errors'    => ['invalid_widget'],
-            'responses' => [
-                '200' => ['body' => ['type' => 'string']],
-                '400' => ['body' => ['type' => 'string']],
-            ],
-        ]));
+        add_filter('kizlo_introspection_routes', function (array $routes): array {
+            $routes[] = $this->operation([
+                'errors'    => ['invalid_widget'],
+                'responses' => [
+                    '200' => ['body' => ['type' => 'string']],
+                    '400' => ['body' => ['type' => 'string']],
+                ],
+            ]);
+            return $routes;
+        });
 
         $this->assertErrorContains($this->widgetErrors(), 'using the "kizlo.error" body');
     }
 
-    public function test_operation_errors_need_a_json_error_response(): void
+    public function test_a_contributed_operation_with_errors_needs_a_json_error_response(): void
     {
-        kizlo_register_spec_route($this->operation([
-            'errors'    => ['invalid_widget'],
-            'responses' => [
-                '200' => ['body' => ['type' => 'string']],
-                '400' => ['content_type' => 'text/plain', 'body' => ['type' => 'string']],
-            ],
-        ]));
+        add_filter('kizlo_introspection_routes', function (array $routes): array {
+            $routes[] = $this->operation([
+                'errors'    => ['invalid_widget'],
+                'responses' => [
+                    '200' => ['body' => ['type' => 'string']],
+                    '400' => ['content_type' => 'text/plain', 'body' => ['type' => 'string']],
+                ],
+            ]);
+            return $routes;
+        });
 
         $this->assertErrorContains($this->widgetErrors(), 'must declare a non-2xx JSON response');
+    }
+
+    /**
+     * The other half of the rule above: a route registered through the helper is
+     * given what it needs, so naming an error is enough on its own.
+     */
+    public function test_a_registered_spec_route_is_given_the_error_envelope_it_needs(): void
+    {
+        kizlo_register_spec_route($this->operation(['errors' => ['invalid_widget']]));
+
+        $responses = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list']['responses'];
+
+        $this->assertSame([], $this->errors());
+        $this->assertSame(['$ref' => 'kizlo.error'], $responses['401']['body']);
+        $this->assertSame(['$ref' => 'kizlo.error'], $responses['403']['body']);
     }
 
     public function test_errors_cannot_be_declared_on_an_individual_response(): void

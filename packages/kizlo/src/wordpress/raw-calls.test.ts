@@ -32,13 +32,11 @@ function isExempt(file: string): boolean {
 }
 
 /**
- * The routes still called raw, listed exactly. Every one is a native WordPress or WooCommerce route
- * the plugin has yet to describe; each drops off as its spec lands. A call this list does not name
- * fails the test, so the only way to add one is to say so here.
+ * The routes still called raw, listed exactly. Every one is a native WooCommerce route the plugin
+ * has yet to describe; each drops off as its spec lands. A call this list does not name fails the
+ * test, so the only way to add one is to say so here.
  */
 const ALLOWED: Record<string, string[]> = {
-	"packages/kizlo/src/comment/index.ts": ["/comments", "/comments/*"],
-	"packages/kizlo/src/menu/utils.ts": ["/menu-items"],
 	"packages/woocommerce/src/cart/index.ts": [
 		"/cart",
 		"/cart/add-item",
