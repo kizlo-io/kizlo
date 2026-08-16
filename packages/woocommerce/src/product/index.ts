@@ -1,14 +1,6 @@
-import { createProcedure, deserializeListMetadata, WC_CORE_BASE, WC_STORE_BASE } from "kizlo"
+import { createProcedure, deserializeListMetadata } from "kizlo"
 import { GET_PRODUCT_ERROR_MAP, LIST_PRODUCT_ERROR_MAP } from "./error"
 import { ListProductInput, Product, ProductFilters, ProductList, RetrieveProductFiltersInput, RetrieveProductInput } from "./schema"
-import type { WCK_Product, WCSK_Product, WCSK_ProductCollectionData } from "./types"
-import type { WC_ProductListErrorCode, WC_ProductRetrieveErrorCode } from "./types.wc"
-import type {
-	WCS_ProductCollectionDataErrorCode,
-	WCS_ProductCollectionDataInput,
-	WCS_ProductsListErrorCode,
-	WCS_ProductsListInput,
-} from "./types.wcs"
 import { deserializeProduct, deserializeProductFilters, deserializeStoreProduct, serializeProductListInput } from "./utils"
 
 export const PRODUCT_ROUTER = {
@@ -26,9 +18,7 @@ export const PRODUCT_ROUTER = {
 			if (input.query?.previewToken) {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.PRODUCT_NOT_FOUND()
-				const response = await context.wordpress.get<WCK_Product, WC_ProductRetrieveErrorCode>(`/products/${result.id}`, {
-					base: WC_CORE_BASE,
-				})
+				const response = await context.wordpress.woocommerce.products.retrieve({ id: Number(result.id) })
 				if (response.error) {
 					switch (response.error.code) {
 						case "woocommerce_rest_product_invalid_id":
@@ -40,10 +30,7 @@ export const PRODUCT_ROUTER = {
 				}
 				return deserializeProduct(response.data)
 			}
-			const response = await context.wordpress.get<WCK_Product[], WC_ProductListErrorCode>("/products", {
-				searchParams: { slug: input.params.identifier },
-				base: WC_CORE_BASE,
-			})
+			const response = await context.wordpress.woocommerce.products.list({ slug: String(input.params.identifier) })
 			if (response.error) {
 				switch (response.error.code) {
 					default:
@@ -70,10 +57,7 @@ export const PRODUCT_ROUTER = {
 		},
 		async ({ context, input, errors }) => {
 			const searchParams = serializeProductListInput(input.query)
-			const response = await context.wordpress.get<WCSK_Product[], WCS_ProductsListErrorCode>("/products", {
-				base: WC_STORE_BASE,
-				searchParams: { ...searchParams } satisfies WCS_ProductsListInput,
-			})
+			const response = await context.wordpress.woocommerce.store.products.list(searchParams)
 			if (response.error) {
 				switch (response.error.code) {
 					default:
@@ -102,23 +86,17 @@ export const PRODUCT_ROUTER = {
 		},
 		async ({ context, errors, input }) => {
 			const searchParams = serializeProductListInput(input.query)
-			const response = await context.wordpress.get<WCSK_ProductCollectionData, WCS_ProductCollectionDataErrorCode>(
-				"/products/collection-data",
-				{
-					base: WC_STORE_BASE,
-					searchParams: {
-						...searchParams,
-						calculate_price_range: true,
-						calculate_rating_counts: input.query?.ratingFilters,
-						calculate_taxonomy_counts: input.query?.taxonomyFilters,
-						calculate_stock_status_counts: input.query?.stockStatusFilters,
-						calculate_attribute_counts: input.query?.attributeFilters?.map((item) => ({
-							taxonomy: item.taxonomy,
-							query_type: item.queryType,
-						})),
-					} satisfies WCS_ProductCollectionDataInput,
-				},
-			)
+			const response = await context.wordpress.woocommerce.store.products.collection_data({
+				...searchParams,
+				calculate_price_range: true,
+				calculate_rating_counts: input.query?.ratingFilters,
+				calculate_taxonomy_counts: input.query?.taxonomyFilters,
+				calculate_stock_status_counts: input.query?.stockStatusFilters,
+				calculate_attribute_counts: input.query?.attributeFilters?.map((item) => ({
+					taxonomy: item.taxonomy,
+					query_type: item.queryType,
+				})),
+			})
 			if (response.error) {
 				switch (response.error.code) {
 					default:

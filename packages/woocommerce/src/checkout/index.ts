@@ -1,18 +1,8 @@
-import { createProcedure, WC_STORE_BASE } from "kizlo"
+import { createProcedure } from "kizlo"
 import { sessionMiddleware } from "../session"
 import { CONFIRM_CHECKOUT_ERROR_MAP, GET_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERROR_MAP, UPDATE_CHECKOUT_ERROR_MAP } from "./error"
 import { Checkout, ConfirmCheckoutInput, RetryCheckoutInput, UpdateCheckoutInput } from "./schema"
-import type {
-	WCS_Checkout,
-	WCS_CheckoutGetErrorCode,
-	WCS_CheckoutOrderProcessErrorCode,
-	WCS_CheckoutOrderProcessInput,
-	WCS_CheckoutProcessErrorCode,
-	WCS_CheckoutProcessInput,
-	WCS_CheckoutUpdateErrorCode,
-	WCS_CheckoutUpdateInput,
-} from "./types.wcs"
-import { deserializeCheckout } from "./utils"
+import { deserializeCheckout, gateway, serializeAddress } from "./utils"
 
 export const CHECKOUT_ROUTER = {
 	get: createProcedure(
@@ -25,10 +15,7 @@ export const CHECKOUT_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, errors }) => {
-			const response = await context.wordpress.get<WCS_Checkout, WCS_CheckoutGetErrorCode>("/checkout", {
-				base: WC_STORE_BASE,
-				headers: context.sessionHeaders,
-			})
+			const response = await context.wordpress.woocommerce.store.checkout.get({}, { headers: context.sessionHeaders })
 			if (response.error) {
 				switch (response.error.code) {
 					case "woocommerce_rest_checkout_missing_order":
@@ -54,16 +41,15 @@ export const CHECKOUT_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input, errors }) => {
-			const response = await context.wordpress.put<WCS_Checkout, WCS_CheckoutUpdateErrorCode>("/checkout", {
-				base: WC_STORE_BASE,
-				body: {
+			const response = await context.wordpress.woocommerce.store.checkout.update(
+				{
 					order_notes: input.body.customerNote,
-					payment_method: input.body.paymentMethod,
+					payment_method: gateway(input.body.paymentMethod),
 					additional_fields: input.body.additionalFields,
 					__experimental_calc_totals: input.body.recalculateTotals,
-				} satisfies WCS_CheckoutUpdateInput,
-				headers: context.sessionHeaders,
-			})
+				},
+				{ headers: context.sessionHeaders },
+			)
 			if (response.error) {
 				switch (response.error.code) {
 					case "woocommerce_rest_cart_coupon_error":
@@ -103,10 +89,7 @@ export const CHECKOUT_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input, errors }) => {
-			const checkoutResponse = await context.wordpress.get<WCS_Checkout, WCS_CheckoutGetErrorCode>("/checkout", {
-				base: WC_STORE_BASE,
-				headers: context.sessionHeaders,
-			})
+			const checkoutResponse = await context.wordpress.woocommerce.store.checkout.get({}, { headers: context.sessionHeaders })
 			if (checkoutResponse.error) {
 				switch (checkoutResponse.error.code) {
 					case "woocommerce_rest_checkout_missing_order":
@@ -119,9 +102,8 @@ export const CHECKOUT_ROUTER = {
 				}
 			}
 
-			const confirmResponse = await context.wordpress.post<WCS_Checkout, WCS_CheckoutProcessErrorCode>("/checkout", {
-				base: WC_STORE_BASE,
-				body: {
+			const confirmResponse = await context.wordpress.woocommerce.store.checkout.process(
+				{
 					payment_data: input.body.paymentData,
 					customer_password: input.body.customerPassword,
 					customer_note: checkoutResponse.data.customer_note,
@@ -130,9 +112,9 @@ export const CHECKOUT_ROUTER = {
 					billing_address: checkoutResponse.data.billing_address,
 					shipping_address: checkoutResponse.data.shipping_address,
 					additional_fields: checkoutResponse.data.additional_fields,
-				} satisfies WCS_CheckoutProcessInput,
-				headers: context.sessionHeaders,
-			})
+				},
+				{ headers: context.sessionHeaders },
+			)
 			if (confirmResponse.error) {
 				switch (confirmResponse.error.code) {
 					case "woocommerce_rest_invalid_address":
@@ -193,19 +175,18 @@ export const CHECKOUT_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input, errors }) => {
-			const response = await context.wordpress.post<WCS_Checkout, WCS_CheckoutOrderProcessErrorCode>(`/checkout/${input.params.orderId}`, {
-				base: WC_STORE_BASE,
-				body: {
+			const response = await context.wordpress.woocommerce.store.checkout.process_order(
+				{
 					key: input.body.key,
 					id: input.params.orderId,
 					payment_data: input.body.paymentData,
 					billing_email: input.body.billingEmail,
-					payment_method: input.body.paymentMethod,
-					billing_address: input.body.billingAddress ?? {},
-					shipping_address: input.body.shippingAddress ?? {},
-				} satisfies WCS_CheckoutOrderProcessInput,
-				headers: context.sessionHeaders,
-			})
+					payment_method: gateway(input.body.paymentMethod),
+					billing_address: { ...serializeAddress(input.body.billingAddress), email: input.body.billingAddress?.email ?? "" },
+					shipping_address: serializeAddress(input.body.shippingAddress),
+				},
+				{ headers: context.sessionHeaders },
+			)
 			if (response.error) {
 				switch (response.error.code) {
 					case "woocommerce_rest_invalid_billing_email":

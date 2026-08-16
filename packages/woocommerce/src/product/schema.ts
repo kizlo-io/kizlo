@@ -6,7 +6,7 @@ export const SWATCH_TYPES = ["text", "color", "image"] as const
 export const SwatchType = z.enum(SWATCH_TYPES)
 export type SwatchType = z.infer<typeof SwatchType>
 
-const PRODUCT_TYPES = ["simple", "grouped", "external", "variable", "variation"] as const
+export const PRODUCT_TYPES = ["simple", "grouped", "external", "variable", "variation"] as const
 export const ProductType = z.enum(PRODUCT_TYPES)
 export type ProductType = z.infer<typeof ProductType>
 
@@ -34,7 +34,8 @@ export type ProductAttributeTermRef = z.infer<typeof ProductAttributeTermRef>
 export const ProductAttributeRef = z.object({
 	id: z.number(),
 	name: z.string(),
-	taxonomy: z.string(),
+	/** Null for a custom attribute, which is defined on the product rather than as a taxonomy. */
+	taxonomy: z.string().nullable(),
 	hasVariations: z.boolean(),
 	terms: z.array(ProductAttributeTermRef),
 })

@@ -32,25 +32,14 @@ function isExempt(file: string): boolean {
 }
 
 /**
- * The routes still called raw, listed exactly. Every one is a native WooCommerce route the plugin
- * has yet to describe; each drops off as its spec lands. A call this list does not name fails the
- * test, so the only way to add one is to say so here.
+ * The routes still called raw, listed exactly. A call this list does not name fails the test, so the
+ * only way to add one is to say so here.
+ *
+ * It is empty, and the intent is that it stays that way. It held the WooCommerce Store API and REST
+ * v3 routes while the plugin had yet to describe them, and each dropped off as its spec landed.
+ * Every route a framework-owned router or service reaches for now has a generated endpoint.
  */
-const ALLOWED: Record<string, string[]> = {
-	"packages/woocommerce/src/cart/index.ts": [
-		"/cart",
-		"/cart/add-item",
-		"/cart/apply-coupon",
-		"/cart/remove-coupon",
-		"/cart/remove-item",
-		"/cart/select-shipping-rate",
-		"/cart/update-customer",
-		"/cart/update-item",
-	],
-	"packages/woocommerce/src/checkout/index.ts": ["/checkout", "/checkout", "/checkout", "/checkout", "/checkout/*"],
-	"packages/woocommerce/src/customer/index.ts": ["/customers/*"],
-	"packages/woocommerce/src/product/index.ts": ["/products", "/products", "/products/*", "/products/collection-data"],
-}
+const ALLOWED: Record<string, string[]> = {}
 
 function sourceFiles(directory: string): string[] {
 	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

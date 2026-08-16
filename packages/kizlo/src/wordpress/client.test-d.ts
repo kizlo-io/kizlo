@@ -162,6 +162,131 @@ describe("described WordPress core routes", () => {
 	})
 })
 
+/**
+ * The WooCommerce routes the plugin describes and WooCommerce serves. Asserted against this repo's
+ * generated `wordpress.ts` the same way the core block above is, so a WooCommerce release that moves
+ * one of these shapes fails here rather than inside the extension that calls it.
+ */
+describe("described WooCommerce routes", () => {
+	const wordpress = null as unknown as ActiveWordPressClient
+
+	it("carries the session headers on a cart call without putting them in the input", async () => {
+		expectTypeOf(await wordpress.woocommerce.store.cart.get({}, { headers: { "X-Kizlo-Guest-Token": "t_1" } })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.get">
+		>()
+		// @ts-expect-error the cart is named by a header, so the operation takes no parameters
+		await wordpress.woocommerce.store.cart.get({ guest_token: "t_1" })
+	})
+
+	it("types each cart mutation with the arguments WooCommerce registered", async () => {
+		expectTypeOf(await wordpress.woocommerce.store.cart.add_item({ id: 4, quantity: 2, variation: [] })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.add_item">
+		>()
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.cart.update_item">>().toHaveProperty("key")
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.cart.apply_coupon">>().toHaveProperty("code")
+		// @ts-expect-error remove-item takes the item key, never the product ID
+		await wordpress.woocommerce.store.cart.remove_item({ id: 4 })
+		// Every cart route answers with the whole cart, which is what lets one deserializer serve them all.
+		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.add_item">>().toEqualTypeOf<WP_EndpointData<"woocommerce.store.cart.get">>()
+	})
+
+	it("types the product filters the storefront actually sends", async () => {
+		expectTypeOf(
+			await wordpress.woocommerce.store.products.list({ per_page: 12, stock_status: ["instock"], rating: [4, 5] }),
+		).toEqualTypeOf<WP_EndpointResult<"woocommerce.store.products.list">>()
+		// @ts-expect-error only the stock statuses WooCommerce publishes
+		await wordpress.woocommerce.store.products.list({ stock_status: ["nonsense"] })
+		// @ts-expect-error `context` is undeclared, so no caller can reshape the response
+		await wordpress.woocommerce.store.products.list({ context: "edit" })
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.products.collection_data">>().toHaveProperty("calculate_price_range")
+	})
+
+	it("carries the pagination headers resolveList reads off a product page", () => {
+		type Success = Extract<WP_EndpointResult<"woocommerce.store.products.list">, { error: null }>
+
+		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-Total")
+		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-TotalPages")
+	})
+
+	it("separates updating a checkout from submitting one", () => {
+		// WooCommerce honours this without registering it, so it is described by hand or not at all.
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.checkout.update">>().toHaveProperty("__experimental_calc_totals")
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.checkout.process">>().toHaveProperty("payment_data")
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.checkout.update">>().not.toHaveProperty("payment_data")
+		// Returned by both checkout responses and declared by neither.
+		expectTypeOf<WP_EndpointData<"woocommerce.store.checkout.get">>().toHaveProperty("__experimentalCart")
+	})
+
+	it("substitutes the order into the path a retry is paid on", async () => {
+		const order = { id: 12, key: "wc_order_x", billing_address: {} as never, shipping_address: {} as never }
+
+		expectTypeOf(await wordpress.woocommerce.store.checkout.process_order(order)).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.checkout.process_order">
+		>()
+		// @ts-expect-error WooCommerce matches digits only on this route
+		await wordpress.woocommerce.store.checkout.process_order({ ...order, id: "12" })
+		// @ts-expect-error the order is required, since it is the path
+		await wordpress.woocommerce.store.checkout.process_order({ key: "wc_order_x" })
+	})
+
+	it("reaches the REST v3 routes the Store API has no answer for", async () => {
+		expectTypeOf(await wordpress.woocommerce.products.retrieve({ id: 4 })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.products.retrieve">
+		>()
+		expectTypeOf(await wordpress.woocommerce.customers.retrieve({ id: 2 })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.customers.retrieve">
+		>()
+		// The slug lookup is why the list is described at all.
+		expectTypeOf<WP_EndpointInput<"woocommerce.products.list">>().toHaveProperty("slug")
+		// Both product shapes carry what this plugin adds, in the place each API puts it.
+		expectTypeOf<WP_EndpointData<"woocommerce.products.retrieve">>().toHaveProperty("kizlo")
+		expectTypeOf<WP_EndpointData<"woocommerce.store.products.list">[number]["extensions"]>().toHaveProperty("kizlo")
+	})
+
+	it("types the writes from the arguments WooCommerce registers, not from the item schema", async () => {
+		expectTypeOf(await wordpress.woocommerce.products.create({ name: "Thing", regular_price: "10" })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.products.create">
+		>()
+		expectTypeOf(await wordpress.woocommerce.customers.update({ id: 2, first_name: "Ada" })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.customers.update">
+		>()
+		// `readonly` properties are dropped on the way in, so a create cannot set them.
+		expectTypeOf<WP_EndpointInput<"woocommerce.products.create">>().not.toHaveProperty("id")
+		expectTypeOf<WP_EndpointInput<"woocommerce.products.create">>().not.toHaveProperty("permalink")
+		// @ts-expect-error only the statuses WooCommerce publishes
+		await wordpress.woocommerce.products.create({ status: "nonsense" })
+	})
+
+	it("declares the delete arguments each resource actually takes", async () => {
+		expectTypeOf<WP_EndpointInput<"woocommerce.products.delete">>().toHaveProperty("force")
+		// Customers are users, which are not trashable, so a delete also reassigns their posts.
+		expectTypeOf<WP_EndpointInput<"woocommerce.customers.delete">>().toHaveProperty("reassign")
+		expectTypeOf<WP_EndpointInput<"woocommerce.products.delete">>().not.toHaveProperty("reassign")
+		// A delete answers with what it removed rather than a deletion envelope.
+		expectTypeOf<WP_EndpointData<"woocommerce.customers.delete">>().toHaveProperty("email")
+		expectTypeOf(await wordpress.woocommerce.customers.delete({ id: 2, force: true, reassign: 1 })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.customers.delete">
+		>()
+	})
+
+	it("builds the customer role filter from the roles this WordPress has", () => {
+		// `get_collection_params()` reads `$wp_roles` directly, which is why the plugin describes
+		// these on `init` rather than while WooCommerce is still loading.
+		expectTypeOf<WP_EndpointInput<"woocommerce.customers.list">>().toHaveProperty("role")
+		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.customers.list">["role"]>>().toExtend<string>()
+	})
+
+	it("names the routes Kizlo serves apart from the ones WooCommerce serves", () => {
+		// The `kizlo` segment is the boundary: everything under it this plugin serves itself, and
+		// everything beside it WooCommerce does. Two carts live here and they are different objects.
+		expectTypeOf<WP_EndpointResult<"woocommerce.kizlo.cart.merge">>().not.toBeNever()
+		expectTypeOf<WP_EndpointResult<"woocommerce.kizlo.orders.manage_stock">>().not.toBeNever()
+		expectTypeOf<WP_EndpointResult<"woocommerce.store.cart.get">>().not.toBeNever()
+		expectTypeOf<WP_EndpointData<"woocommerce.kizlo.cart.merge">>().toHaveProperty("guest_token")
+		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.get">>().not.toHaveProperty("guest_token")
+	})
+})
+
 describe("services bound to the generated client", () => {
 	const settings = null as unknown as SettingsService
 	const email = null as unknown as EmailService

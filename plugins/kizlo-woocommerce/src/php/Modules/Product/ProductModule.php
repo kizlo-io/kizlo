@@ -3,13 +3,10 @@
 namespace Kizlo\WooCommerce\Modules\Product;
 
 use WP_Term;
-use WP_Error;
 use WP_Comment;
 use WC_Product;
-use WP_REST_Request;
 use WC_Product_Attribute;
-use WC_Product_Variation;
-use WC_REST_Products_Controller;
+use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
 use Automattic\WooCommerce\StoreApi\Schemas\V1\ProductSchema;
 use Automattic\WooCommerce\StoreApi\Formatters\CurrencyFormatter;
 
@@ -227,80 +224,14 @@ class ProductModule
                     'hs_code'   => $product->get_meta('kizlo_hs_code')
                 ], kizlo_apply_extend_filter('product_list_item', $product));
             },
+            // Without this, WooCommerce publishes the data and describes none of
+            // it: get_endpoint_schema() skips an extension registered with no
+            // schema callback. The Store API product spec derives its response
+            // from that schema, so the four fields above would be returned and
+            // described nowhere.
+            'schema_callback' => [KizloBlocks::class, 'storeProduct'],
             'schema_type'     => ARRAY_A,
         ]);
-    }
-
-    public function listMixedProduct(array $items): WP_Error | array
-    {
-        $results = [];
-
-        foreach ($items as $index => $item) {
-            $product_id   = isset($item['product_id']) ? (int) $item['product_id'] : null;
-            $variation_id = isset($item['variation_id']) ? (int) $item['variation_id'] : null;
-
-            if (! $product_id && ! $variation_id) {
-                return new WP_Error('invalid_item', sprintf('Item at index %d must have at least "product_id" or "variation_id".', $index), ['status' => 400]);
-            }
-
-            if ($variation_id) {
-                $product = wc_get_product($variation_id);
-                if (! $product instanceof WC_Product_Variation) {
-                    return new WP_Error('variation_not_found', sprintf('Variation %d not found.', $variation_id), ['status' => 404]);
-                }
-            } else {
-                $product = wc_get_product($product_id);
-                if (! $product instanceof WC_Product) {
-                    return new WP_Error('product_not_found', sprintf('Product %d not found.', $product_id), ['status' => 404]);
-                }
-            }
-
-            $results[] = $product->get_data();
-        }
-
-        return $results;
-    }
-
-    public function getProductPreview(string $slug, string $nonce)
-    {
-        $post = get_page_by_path($slug, OBJECT, 'product');
-
-        if (!$post) {
-            return new WP_Error('not_found', 'Product not found.', ['status' => 404]);
-        }
-
-        return $this->getProductById($post->ID);
-    }
-
-    public function getProductById(int $id)
-    {
-        $new_request = new WP_REST_Request('GET', '/wc/v3/products/' . $id);
-        $new_request->set_param('id', $id);
-        $new_request->set_param('context', 'edit');
-
-        $controller = new WC_REST_Products_Controller();
-        $response = $controller->get_item($new_request);
-
-        if (is_wp_error($response)) return $response;
-
-        return $response->get_data();
-    }
-
-    public function checkReviewExist(int $user_id, int $product_id): WP_Error | bool
-    {
-        if (!$product_id || !$user_id) {
-            return new WP_Error('invalid_params', 'Invalid product or user ID', ['status' => 400]);
-        }
-
-        $comments = get_comments([
-            'post_id' => $product_id,
-            'user_id' => $user_id,
-            'type'    => 'review',
-            'status'  => 'approve',
-            'number'  => 1,
-        ]);
-
-        return !empty($comments);
     }
 
     public function injectReviewUserIdBeforeInsert(int $comment_id, WP_Comment $comment): int

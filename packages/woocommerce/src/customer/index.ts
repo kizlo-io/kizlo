@@ -1,6 +1,5 @@
-import { createProcedure, WC_CORE_BASE } from "kizlo"
+import { createProcedure } from "kizlo"
 import { Customer } from "./schema"
-import type { WC_Customer, WC_CustomerRetrieveErrorCode } from "./types.wc"
 import { deserializeCustomer } from "./utils"
 
 export const CUSTOMER_ROUTER = {
@@ -15,10 +14,19 @@ export const CUSTOMER_ROUTER = {
 			const auth = await context.getAuthUser()
 			if (!auth) throw errors.FORBIDDEN()
 
-			const response = await context.wordpress.get<WC_Customer, WC_CustomerRetrieveErrorCode>(`/customers/${auth.id}`, {
-				base: WC_CORE_BASE,
-			})
-			if (response.error) throw response.error
+			const response = await context.wordpress.woocommerce.customers.retrieve({ id: auth.id })
+			if (response.error) {
+				switch (response.error.code) {
+					case "wc_user_invalid_id":
+						throw errors.NOT_FOUND()
+					case "woocommerce_rest_cannot_view":
+						throw errors.FORBIDDEN()
+					default:
+						context.logger.error("Get customer unhandled error", response.error, { userId: auth.id, code: response.error.code })
+						throw errors.INTERNAL_SERVER_ERROR()
+				}
+			}
+
 			return deserializeCustomer(response.data)
 		},
 	),

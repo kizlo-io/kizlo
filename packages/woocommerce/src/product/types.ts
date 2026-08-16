@@ -1,73 +1,24 @@
-import type { WP_CurrencyFormat } from "kizlo"
-import type { WC_Product } from "./types.wc"
-import type { WCS_Product, WCS_ProductCollectionData } from "./types.wcs"
+import type { WP_EndpointData } from "kizlo"
 
-export interface WCK_Product extends WC_Product {
-	kizlo: {
-		attributes: {
-			id: number
-			name: string
-			taxonomy: string
-			has_variations: false
-			terms: {
-				id: number
-				name: string
-				slug: string
-			}[]
-		}[]
-		variations: {
-			id: number
-			attributes: {
-				name: string
-				value: string
-			}[]
-		}[]
-		prices: {
-			price: string
-			regular_price: string
-			sale_price: string
-		}
-		currency_format: WP_CurrencyFormat
-	}
-}
+/**
+ * A product from the REST v3 API, with the `kizlo` block this plugin's response filter adds.
+ *
+ * The administrative shape rather than the storefront one: it carries every status, which is what
+ * makes it the type a preview reads.
+ */
+export type WCK_Product = WP_EndpointData<"woocommerce.products.retrieve">
 
-export interface WCSK_Product extends WCS_Product {
-	extensions: {
-		kizlo: {
-			on_sale_from: string | null
-			on_sale_to: string | null
-			hs_code: string | null
-			stock: number | null
-		}
-	}
-}
+/**
+ * A product from the Store API, with the `extensions.kizlo` block this plugin registers.
+ *
+ * A different shape from {@link WCK_Product} for the same product. The Store API reports prices in
+ * minor units and hides anything unpublished, so the two are not interchangeable.
+ */
+export type WCSK_Product = WP_EndpointData<"woocommerce.store.products.list">[number]
 
-export interface WCSK_ProductCollectionData extends WCS_ProductCollectionData {
-	kizlo: {
-		taxonomy_counts: WCSK_ProductCollectionDataTaxonomy[]
-		attribute_counts: WCSK_ProductCollectionDataAttribute[]
-	}
-}
+/** Collection counts, with the `kizlo` block the route interceptor adds. */
+export type WCSK_ProductCollectionData = WP_EndpointData<"woocommerce.store.products.collection_data">
 
-export interface WCSK_ProductCollectionDataTaxonomy {
-	id: number
-	name: string
-	slug: string
-	taxonomy: string
-	description: string
-	parent: number
-	count: number
-	thumbnail: string | null
-}
+export type WCSK_ProductCollectionDataTaxonomy = WCSK_ProductCollectionData["kizlo"]["taxonomy_counts"][number]
 
-export interface WCSK_ProductCollectionDataAttribute {
-	id: number
-	name: string
-	slug: string
-	taxonomy: string
-	description: string
-	parent: number
-	count: number
-	swatch_type: "text" | "color" | "image"
-	swatch: string | null
-}
+export type WCSK_ProductCollectionDataAttribute = WCSK_ProductCollectionData["kizlo"]["attribute_counts"][number]

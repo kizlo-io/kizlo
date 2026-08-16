@@ -4,6 +4,7 @@ namespace Kizlo\WooCommerce;
 
 use Kizlo\WooCommerce\Modules\Admin\AttributeSwatch;
 use Kizlo\WooCommerce\Modules\Cart\CartModule;
+use Kizlo\WooCommerce\Modules\Contract\ContractModule;
 use Kizlo\WooCommerce\Modules\Customer\CustomerModule;
 use Kizlo\WooCommerce\Modules\Integration\CoreIntegration;
 use Kizlo\WooCommerce\Modules\Order\OrderModule;
@@ -22,6 +23,7 @@ class Plugin
     private array $modules = [
         CoreIntegration::class,
         WooCommerceModule::class,
+        ContractModule::class,
         ProductModule::class,
         OrderModule::class,
         CustomerModule::class,

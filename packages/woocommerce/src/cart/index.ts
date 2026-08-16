@@ -1,4 +1,4 @@
-import { createProcedure, WC_STORE_BASE } from "kizlo"
+import { createProcedure } from "kizlo"
 import { sessionMiddleware } from "../session"
 import {
 	ADD_CART_ITEM_ERROR_MAP,
@@ -20,21 +20,6 @@ import {
 	UpdateCartInput,
 	UpdateCartItemInput,
 } from "./schema"
-import type {
-	WCS_Cart,
-	WCS_CartAddItemErrorCode,
-	WCS_CartAddItemInput,
-	WCS_CartApplyCouponErrorCode,
-	WCS_CartGetErrorCode,
-	WCS_CartRemoveCouponErrorCode,
-	WCS_CartRemoveItemErrorCode,
-	WCS_CartSelectShippingRateErrorCode,
-	WCS_CartSelectShippingRateInput,
-	WCS_CartUpdateCustomerErrorCode,
-	WCS_CartUpdateCustomerInput,
-	WCS_CartUpdateItemErrorCode,
-	WCS_CartUpdateItemInput,
-} from "./types.wcs"
 import { deserializeCart } from "./utils"
 
 export const CART_ROUTER = {
@@ -48,10 +33,7 @@ export const CART_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, errors }) => {
-			const response = await context.wordpress.get<WCS_Cart, WCS_CartGetErrorCode>("/cart", {
-				base: WC_STORE_BASE,
-				headers: context.sessionHeaders,
-			})
+			const response = await context.wordpress.woocommerce.store.cart.get({}, { headers: context.sessionHeaders })
 
 			if (response.error) {
 				switch (response.error.code) {
@@ -77,50 +59,46 @@ export const CART_ROUTER = {
 		},
 		async ({ context, input: { body: input }, errors }) => {
 			const connInfo = await context.getConnInfo()
-			const defaultBilling = input.billing ?? { ...input.shipping, email: undefined }
+			const billing = input.billing ?? { ...input.shipping, email: undefined }
 
-			const updateData = {
-				billing_address:
-					defaultBilling !== undefined
-						? {
-								first_name: defaultBilling?.firstName ?? "",
-								last_name: defaultBilling?.lastName ?? "",
-								address_1: defaultBilling?.address1 ?? "",
-								address_2: defaultBilling?.address2 ?? "",
-								company: defaultBilling?.company ?? "",
-								email: defaultBilling?.email ?? "",
-								phone: defaultBilling?.phone ?? "",
-								city: defaultBilling?.city ?? "",
-								state: defaultBilling?.state ?? connInfo?.state ?? undefined,
-								country: defaultBilling?.country ?? connInfo?.country ?? undefined,
-								postcode: defaultBilling?.postcode ?? connInfo?.postcode ?? "",
-							}
-						: {},
-				shipping_address:
-					input.shipping !== undefined
-						? {
-								first_name: input.shipping?.firstName ?? "",
-								last_name: input.shipping?.lastName ?? "",
-								address_1: input.shipping?.address1 ?? "",
-								address_2: input.shipping?.address2 ?? "",
-								company: input.shipping?.company ?? "",
-								phone: input.shipping?.phone ?? "",
-								city: input.shipping?.city ?? "",
-								state: input.shipping?.state ?? connInfo?.state ?? undefined,
-								country: input.shipping?.country ?? connInfo?.country ?? undefined,
-								postcode: input.shipping?.postcode ?? connInfo?.postcode ?? "",
-							}
-						: {},
+			// Every address field is a required string on the Store API, so a partial address is sent
+			// filled out rather than sparse. The geo fields are the exception worth reading twice: a
+			// missing state or country falls back to the request's own location, which is what makes
+			// shipping quotable before the shopper has typed an address.
+			const address = {
+				first_name: billing.firstName ?? "",
+				last_name: billing.lastName ?? "",
+				address_1: billing.address1 ?? "",
+				address_2: billing.address2 ?? "",
+				company: billing.company ?? "",
+				phone: billing.phone ?? "",
+				city: billing.city ?? "",
+				state: billing.state ?? connInfo?.state ?? "",
+				country: billing.country ?? connInfo?.country ?? "",
+				postcode: billing.postcode ?? connInfo?.postcode ?? "",
 			}
 
-			const response = await context.wordpress.post<WCS_Cart, WCS_CartUpdateCustomerErrorCode>("/cart/update-customer", {
-				base: WC_STORE_BASE,
-				body: {
-					billing_address: updateData.billing_address,
-					shipping_address: updateData.shipping_address,
-				} satisfies WCS_CartUpdateCustomerInput,
-				headers: context.sessionHeaders,
-			})
+			const response = await context.wordpress.woocommerce.store.cart.update_customer(
+				{
+					billing_address: { ...address, email: billing.email ?? "" },
+					...(input.shipping && {
+						shipping_address: {
+							...address,
+							first_name: input.shipping.firstName ?? "",
+							last_name: input.shipping.lastName ?? "",
+							address_1: input.shipping.address1 ?? "",
+							address_2: input.shipping.address2 ?? "",
+							company: input.shipping.company ?? "",
+							phone: input.shipping.phone ?? "",
+							city: input.shipping.city ?? "",
+							state: input.shipping.state ?? connInfo?.state ?? "",
+							country: input.shipping.country ?? connInfo?.country ?? "",
+							postcode: input.shipping.postcode ?? connInfo?.postcode ?? "",
+						},
+					}),
+				},
+				{ headers: context.sessionHeaders },
+			)
 
 			if (response.error) {
 				switch (response.error.code) {
@@ -145,14 +123,10 @@ export const CART_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input: { body }, errors }) => {
-			const response = await context.wordpress.post<WCS_Cart, WCS_CartSelectShippingRateErrorCode>("/cart/select-shipping-rate", {
-				base: WC_STORE_BASE,
-				headers: context.sessionHeaders,
-				body: {
-					rate_id: body.rateId,
-					package_id: body.packageId,
-				} satisfies WCS_CartSelectShippingRateInput,
-			})
+			const response = await context.wordpress.woocommerce.store.cart.select_shipping_rate(
+				{ rate_id: body.rateId, package_id: body.packageId },
+				{ headers: context.sessionHeaders },
+			)
 
 			if (response.error) {
 				switch (response.error.code) {
@@ -182,15 +156,14 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { body: input }, errors }) => {
-				const response = await context.wordpress.post<WCS_Cart, WCS_CartAddItemErrorCode>("/cart/add-item", {
-					body: {
+				const response = await context.wordpress.woocommerce.store.cart.add_item(
+					{
 						id: input.productId,
 						quantity: input.quantity,
 						variation: input.variations ?? [],
-					} satisfies WCS_CartAddItemInput,
-					base: WC_STORE_BASE,
-					headers: context.sessionHeaders,
-				})
+					},
+					{ headers: context.sessionHeaders },
+				)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -234,14 +207,10 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { params, body }, errors }) => {
-				const response = await context.wordpress.post<WCS_Cart, WCS_CartUpdateItemErrorCode>("/cart/update-item", {
-					body: {
-						key: params.key,
-						quantity: body.quantity,
-					} satisfies WCS_CartUpdateItemInput,
-					base: WC_STORE_BASE,
-					headers: context.sessionHeaders,
-				})
+				const response = await context.wordpress.woocommerce.store.cart.update_item(
+					{ key: params.key, quantity: body.quantity },
+					{ headers: context.sessionHeaders },
+				)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -276,11 +245,10 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { params }, errors }) => {
-				const response = await context.wordpress.post<WCS_Cart, WCS_CartRemoveItemErrorCode>("/cart/remove-item", {
-					body: { key: params.key },
-					base: WC_STORE_BASE,
-					headers: context.sessionHeaders,
-				})
+				const response = await context.wordpress.woocommerce.store.cart.remove_item(
+					{ key: params.key },
+					{ headers: context.sessionHeaders },
+				)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -309,11 +277,10 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { body }, errors }) => {
-				const response = await context.wordpress.post<WCS_Cart, WCS_CartApplyCouponErrorCode>("/cart/apply-coupon", {
-					body: { code: body.code },
-					base: WC_STORE_BASE,
-					headers: context.sessionHeaders,
-				})
+				const response = await context.wordpress.woocommerce.store.cart.apply_coupon(
+					{ code: body.code },
+					{ headers: context.sessionHeaders },
+				)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -342,11 +309,10 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input, errors }) => {
-				const response = await context.wordpress.post<WCS_Cart, WCS_CartRemoveCouponErrorCode>("/cart/remove-coupon", {
-					body: { code: input.params.code },
-					base: WC_STORE_BASE,
-					headers: context.sessionHeaders,
-				})
+				const response = await context.wordpress.woocommerce.store.cart.remove_coupon(
+					{ code: input.params.code },
+					{ headers: context.sessionHeaders },
+				)
 
 				if (response.error) {
 					switch (response.error.code) {

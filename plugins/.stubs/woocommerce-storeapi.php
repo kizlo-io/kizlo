@@ -19,13 +19,29 @@ namespace Automattic\WooCommerce\StoreApi {
 
     class SchemaController
     {
-        /** @return mixed */
-        public function get(string $name) {}
+        public function get(string $name, int $version = 1): \Automattic\WooCommerce\StoreApi\Schemas\V1\AbstractSchema {}
+    }
+
+    class RoutesController
+    {
+        public function get(string $name, string $version = 'v1'): \Automattic\WooCommerce\StoreApi\Routes\V1\AbstractRoute {}
     }
 
     class StoreApi
     {
         public static function container(): Container {}
+    }
+}
+
+namespace Automattic\WooCommerce\StoreApi\Routes\V1 {
+    abstract class AbstractRoute
+    {
+        public function get_path(): string {}
+
+        public function set_namespace(string $namespace): void {}
+
+        /** @return array<array-key, mixed> */
+        public function get_args(): array {}
     }
 }
 
@@ -45,7 +61,13 @@ namespace Automattic\WooCommerce\StoreApi\Utilities {
 }
 
 namespace Automattic\WooCommerce\StoreApi\Schemas\V1 {
-    class CartSchema
+    abstract class AbstractSchema
+    {
+        /** @return array<string, mixed> */
+        public function get_properties(): array {}
+    }
+
+    class CartSchema extends AbstractSchema
     {
         const IDENTIFIER = 'cart';
 
@@ -61,7 +83,7 @@ namespace Automattic\WooCommerce\StoreApi\Schemas\V1 {
         const IDENTIFIER = 'cart-item';
     }
 
-    class ProductSchema
+    class ProductSchema extends AbstractSchema
     {
         const IDENTIFIER = 'product';
     }

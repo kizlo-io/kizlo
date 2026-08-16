@@ -88,6 +88,16 @@ function inheritedPropertyTypes(
 	return result
 }
 
+/**
+ * An object with no properties, no patterns and no `additionalProperties`: one whose contents are
+ * undescribed, not one required to be empty.
+ *
+ * `Record<string, never>` says the second, and it cannot be read from or written to, so a field like
+ * the Store API's `additional_fields` came out unusable rather than merely unspecific. `unknown` is
+ * what `additionalProperties: true` already renders to, and it is the same statement.
+ */
+const UNDESCRIBED_OBJECT = "Record<string, unknown>"
+
 function renderObject(schema: IntrospectionSchema, context: RenderContext, indent = ""): string {
 	const members: string[] = []
 	const propertyTypes: string[] = []
@@ -113,7 +123,7 @@ function renderObject(schema: IntrospectionSchema, context: RenderContext, inden
 		members.push(`${indent}\t[key: string]: ${[...new Set(patterns)].join(" | ")}`)
 	}
 
-	if (!members.length) return "Record<string, never>"
+	if (!members.length) return UNDESCRIBED_OBJECT
 	return `{\n${members.join("\n")}\n${indent}}`
 }
 
@@ -148,7 +158,7 @@ function renderType(schema: IntrospectionSchema, context: RenderContext, indent 
 	if (parents.length) {
 		const inherited = parents.map((id) => context.names.get(id) ?? schemaName(id))
 		const own = schema.type === "object" ? renderObject(schema, context, indent) : type
-		type = [...inherited, ...(own === "Record<string, never>" ? [] : [own])].join(" & ")
+		type = [...inherited, ...(own === UNDESCRIBED_OBJECT ? [] : [own])].join(" & ")
 	}
 
 	return withNullable(type || "unknown", schema)
@@ -166,7 +176,7 @@ function renderNamedSchema(id: string, schema: IntrospectionSchema, context: Ren
 		const inherited = parents.map((parent) => context.names.get(parent) ?? schemaName(parent))
 		const extension = inherited.length ? ` extends ${inherited.join(", ")}` : ""
 		const body = renderObject({ ...schema, nullable: undefined }, context)
-		const declaration = body === "Record<string, never>" ? " {}" : ` ${body}`
+		const declaration = body === UNDESCRIBED_OBJECT ? " {}" : ` ${body}`
 		return `${documentation}export interface ${name}${extension}${declaration}`
 	}
 	return `${documentation}export type ${name} = ${renderType(schema, context)}`
@@ -221,9 +231,20 @@ function renderResult(apiId: string, operationId: string, operation: Introspecti
 	return `export type ${name} =\n\t| ${variants.join("\n\t| ")}`
 }
 
+/**
+ * An operation that declares no parameters takes none, which is a stronger statement than the one
+ * {@link UNDESCRIBED_OBJECT} makes and needs the type that refuses every key. The two look identical
+ * in the document — `type: object` and nothing else — so only the position tells them apart: an
+ * empty input is a complete description of an operation, where an empty field is a field nobody
+ * described.
+ */
+const NO_INPUT = "Record<string, never>"
+
 function renderInput(apiId: string, operationId: string, operation: IntrospectionOperation, context: RenderContext): string {
 	const name = endpointName(apiId, operationId, "EndpointInput")
-	return `${jsdoc(operation.description ?? operation.summary, operation.deprecated)}export type ${name} = ${renderType(operation.input, context)}`
+	const input = renderType(operation.input, context)
+	const declaration = input === UNDESCRIBED_OBJECT ? NO_INPUT : input
+	return `${jsdoc(operation.description ?? operation.summary, operation.deprecated)}export type ${name} = ${declaration}`
 }
 
 interface WordPressEndpointEntry {

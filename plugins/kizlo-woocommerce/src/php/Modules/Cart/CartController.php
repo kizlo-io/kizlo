@@ -25,7 +25,7 @@ class CartController
     public function register(): void
     {
         kizlo_register_route([
-            'id'        => 'woocommerce.cart',
+            'id'        => 'woocommerce.kizlo.cart',
             'operation' => 'merge',
             'method'    => 'POST',
             'route'     => '/cart/merge',
