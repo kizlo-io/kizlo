@@ -61,7 +61,9 @@ final class CoreSchemaTranslator
      */
     public static function schema(mixed $property): ?array
     {
-        if (!is_array($property)) {
+        $property = self::mapping($property);
+
+        if ($property === null) {
             return null;
         }
 
@@ -83,13 +85,16 @@ final class CoreSchemaTranslator
         }
 
         foreach (['properties', 'patternProperties'] as $keyword) {
-            if (!isset($schema[$keyword]) || !is_array($schema[$keyword])) {
+            $block = self::mapping($schema[$keyword] ?? null);
+
+            if ($block === null) {
                 continue;
             }
 
-            $children = [];
+            $schema[$keyword] = $block;
+            $children         = [];
 
-            foreach ($schema[$keyword] as $name => $child) {
+            foreach ($block as $name => $child) {
                 $translated = self::schema($child);
 
                 // A parent missing one property is a different shape, not a
@@ -125,7 +130,7 @@ final class CoreSchemaTranslator
         }
 
         foreach (['items', 'additionalProperties'] as $keyword) {
-            if (!isset($schema[$keyword]) || !is_array($schema[$keyword])) {
+            if (!isset($schema[$keyword]) || self::mapping($schema[$keyword]) === null) {
                 continue;
             }
 
@@ -142,6 +147,13 @@ final class CoreSchemaTranslator
     }
 
     /**
+     * Every JSON type, for a property that declares it accepts anything.
+     *
+     * @var array<int, string>
+     */
+    private const ANY = ['string', 'integer', 'number', 'boolean', 'object', 'array'];
+
+    /**
      * Rewrite WordPress's type spellings into the two Kizlo has.
      *
      * Core writes a multi-type argument as a list, which the contract does not
@@ -150,12 +162,21 @@ final class CoreSchemaTranslator
      * meaning. A bare list with no union beside it is still a union, just spelled
      * the other way round, and `['string', 'null']` is what `nullable` means.
      *
+     * Three spellings are nobody's standard, and dropping the fields that use them
+     * would be the wrong kind of strict: they are returned either way, so the
+     * choice is between describing them and pretending they are not there.
+     * WooCommerce writes `date-time` for an ISO 8601 string, `bool` once for a
+     * boolean, and `mixed` for a meta value that really can be anything. The first
+     * two are typos with an obvious reading. The third is not, so it becomes the
+     * union of everything JSON has rather than a guess at which branch is meant.
+     *
      * @param array<string, mixed> $schema
      * @return array<string, mixed>|null
      */
     private static function resolveType(array $schema): ?array
     {
-        $union = isset($schema['anyOf']) || isset($schema['oneOf']);
+        $schema = self::alias($schema);
+        $union  = isset($schema['anyOf']) || isset($schema['oneOf']);
 
         if (is_array($schema['type'] ?? null)) {
             $members = [];
@@ -190,6 +211,45 @@ final class CoreSchemaTranslator
 
         if (!is_string($type) || !in_array($type, Spec::TYPES, true)) {
             return null;
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Resolve a non-standard type spelling, leaving everything else alone.
+     *
+     * Only a bare string type is aliased. Inside a type list the same spelling
+     * would need the structure keywords redistributed with it, and no WordPress or
+     * WooCommerce schema writes one that way.
+     *
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>
+     */
+    private static function alias(array $schema): array
+    {
+        $type = $schema['type'] ?? null;
+
+        if ($type === 'bool') {
+            $schema['type'] = 'boolean';
+
+            return $schema;
+        }
+
+        if ($type === 'date-time') {
+            $schema['type']   = 'string';
+            $schema['format'] ??= 'date-time';
+
+            return $schema;
+        }
+
+        if ($type === 'mixed' && !isset($schema['anyOf']) && !isset($schema['oneOf'])) {
+            unset($schema['type']);
+
+            $schema['anyOf'] = array_map(
+                static fn(string $member): array => ['type' => $member],
+                self::ANY,
+            );
         }
 
         return $schema;
@@ -242,6 +302,26 @@ final class CoreSchemaTranslator
         $schema['anyOf'] = $branches;
 
         return $schema;
+    }
+
+    /**
+     * A schema or a block of them, as an array, whichever way it was spelled.
+     *
+     * PHP has one type for a list and a map, so a schema that must serialize as a
+     * JSON object rather than `[]` has to be cast to `stdClass` to say so.
+     * WooCommerce does exactly that: an `extensions` block nobody has extended is
+     * `(object) []`, and treating it as untranslatable failed the cart, the
+     * checkout and the product schemas whole, over a field that is empty.
+     *
+     * @return array<array-key, mixed>|null Null for anything that is not a mapping.
+     */
+    private static function mapping(mixed $value): ?array
+    {
+        if ($value instanceof \stdClass) {
+            return get_object_vars($value);
+        }
+
+        return is_array($value) ? $value : null;
     }
 
     /**

@@ -223,6 +223,76 @@ function kizlo_register_spec_schema(string $id, array $schema): void
 }
 
 /**
+ * Rewrite WordPress-style properties in the vocabulary the contract has.
+ *
+ * For describing an API you do not own. Pass whatever the thing you are
+ * describing hands back — a controller's `get_item_schema()['properties']` or
+ * `get_collection_params()`, a Store API route's `get_args()` entry, a schema
+ * class's `get_properties()` — and get properties ready for the `input` or
+ * `responses` of kizlo_register_spec_route().
+ *
+ * Deriving beats copying: a field the upstream API adds in its next release
+ * reaches the contract without anyone re-reading its source, where a
+ * hand-written copy goes stale silently.
+ *
+ * Multi-type arguments become unions, `['string', 'null']` becomes `nullable`,
+ * and WordPress's `context`, `readonly` and `arg_options` bookkeeping is dropped
+ * along with the sanitizers, which a spec route has no endpoint to run. Anything
+ * that cannot be expressed at all is reported to `/introspect` rather than
+ * disappearing.
+ *
+ * @since 1.0.0
+ *
+ * @param array       $properties Item-schema properties, endpoint args or collection params.
+ * @param string      $subject    Route or schema these belong to. Names the source in diagnostics.
+ * @param string|null $context    Keep only what this WordPress context returns, e.g. 'view'. Null keeps everything.
+ * @param bool        $required   Mark every property required. For a response whose fields are always present.
+ *
+ * @example
+ * kizlo_register_spec_route([
+ *     'id'        => 'woocommerce.orders',
+ *     'operation' => 'list',
+ *     'namespace' => 'wc/v3',
+ *     'route'     => '/orders',
+ *     'method'    => 'GET',
+ *     'input'     => [
+ *         'type'       => 'object',
+ *         'properties' => kizlo_translate_spec_properties(
+ *             $controller->get_collection_params(),
+ *             '/orders',
+ *         ),
+ *     ],
+ * ]);
+ *
+ * @return array Properties keyed by name.
+ */
+function kizlo_translate_spec_properties(
+    array $properties,
+    string $subject = '',
+    ?string $context = null,
+    bool $required = false
+): array {
+    return \Kizlo\Modules\Introspection\SpecTranslator::properties($properties, $subject, $context, $required);
+}
+
+/**
+ * The same translation for a single schema rather than a map of them.
+ *
+ * For the places a property map is the wrong shape: a response body that is an
+ * array of items, or a nested block fetched on its own.
+ *
+ * @since 1.0.0
+ *
+ * @param mixed $schema One WordPress-style schema.
+ *
+ * @return array|null Null when the schema cannot be expressed at all.
+ */
+function kizlo_translate_spec_schema($schema): ?array
+{
+    return \Kizlo\Modules\Introspection\SpecTranslator::schema($schema);
+}
+
+/**
  * Registers a REST API route interceptor that fires after route callbacks.
  *
  * Hooks into `rest_request_after_callbacks` at maximum priority and invokes

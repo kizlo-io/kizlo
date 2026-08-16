@@ -43,6 +43,23 @@ namespace {
     function kizlo_register_spec_schema(string $id, array $schema): void {}
 
     /**
+     * @param array<array-key, mixed> $properties
+     * @return array<string, array<string, mixed>>
+     */
+    function kizlo_translate_spec_properties(
+        array $properties,
+        string $subject = '',
+        ?string $context = null,
+        bool $required = false
+    ): array {}
+
+    /**
+     * @param mixed $schema
+     * @return array<string, mixed>|null
+     */
+    function kizlo_translate_spec_schema($schema): ?array {}
+
+    /**
      * @param array $args
      * @throws \InvalidArgumentException
      */

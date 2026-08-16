@@ -1,8 +1,8 @@
 import { toPublicMetadata } from "@kizlo/shared"
 import type { Customer } from "./schema"
-import type { WC_Customer } from "./types.wc"
+import type { WCK_Customer } from "./types"
 
-export function deserializeCustomer(data: WC_Customer): Customer {
+export function deserializeCustomer(data: WCK_Customer): Customer {
 	return {
 		id: data.id,
 		avatarUrl: data.avatar_url.length ? data.avatar_url : null,

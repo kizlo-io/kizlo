@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Describe the WooCommerce Store API and REST v3 routes Kizlo consumes in /introspect, derived from WooCommerce's own route and schema classes

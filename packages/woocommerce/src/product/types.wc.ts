@@ -272,90 +272,9 @@ export interface WC_Product {
 	meta_data: WC_MetaData[]
 }
 
-// ==================================================
-// LIST — GET /wc/v3/products
-// ==================================================
-
-export interface WC_ProductListInput {
-	/** Scope under which the request is made; determines fields present in response. */
-	context?: WC_Context
-	/** Current page of the collection. */
-	page?: number
-	/** Maximum number of items to be returned in result set. */
-	per_page?: number
-	/** Limit results to those matching a string. */
-	search?: string
-	/** Fields to search when used with search parameter. */
-	search_fields?: WC_ProductSearchField[]
-	/** Limit response to resources published after a given ISO8601 compliant date. */
-	after?: string
-	/** Limit response to resources published before a given ISO8601 compliant date. */
-	before?: string
-	/** Limit response to resources modified after a given ISO8601 compliant date. */
-	modified_after?: string
-	/** Limit response to resources modified after a given ISO8601 compliant date. */
-	modified_before?: string
-	/** Whether to interpret dates as GMT when limiting by published or modified date. */
-	dates_are_gmt?: boolean
-	/** Ensure result set excludes specific IDs. */
-	exclude?: number[]
-	/** Limit result set to specific ids. */
-	include?: number[]
-	/** Offset the result set by a specific number of items. */
-	offset?: number
-	/** Order sort attribute ascending or descending. */
-	order?: WC_SortOrder
-	/** Sort collection by object attribute. */
-	orderby?: WC_ProductOrderBy
-	/** Limit result set to those of particular parent IDs. */
-	parent?: number[]
-	/** Limit result set to all items except those of particular parent ID. */
-	parent_exclude?: number[]
-	/** Limit result set to products with a specific slug. */
-	slug?: string
-	/** Limit result set to products assigned specific status. */
-	status?: WC_ProductListStatus
-	/** Limit result set to products with any specified statuses. Comma-separated values of: any, future, trash, draft, pending, private, publish. */
-	include_status?: string
-	/** Exclude products with any specified statuses. Comma-separated values of: future, trash, draft, pending, private, publish. */
-	exclude_status?: string
-	/** Limit result set to products assigned specific type. */
-	type?: WC_ProductType
-	/** Limit result set to products with any types. Comma-separated values of: simple, grouped, external, variable. */
-	include_types?: string
-	/** Exclude products with any specified types. Comma-separated values of: simple, grouped, external, variable. */
-	exclude_types?: string
-	/** Limit result set to products with a specific SKU. */
-	sku?: string
-	/** Limit result set to featured products. */
-	featured?: boolean
-	/** Limit result set to products assigned specific category ID. */
-	category?: string
-	/** Limit result set to products assigned specific tag ID. */
-	tag?: string
-	/** Limit result set to products assigned specific shipping class ID. */
-	shipping_class?: string
-	/** Limit result set to products with specific attribute. */
-	attribute?: string
-	/** Limit result set to products with specific attribute term ID (required assigned attribute). */
-	attribute_term?: string
-	/** Limit result set to products with specific tax class. Default options: standard, reduced-rate, zero-rate. */
-	tax_class?: string
-	/** Limit result set to products on sale. */
-	on_sale?: boolean
-	/** Limit result set to products based on minimum price. */
-	min_price?: string
-	/** Limit result set to products based on maximum price. */
-	max_price?: string
-	/** Limit result set to products with specified stock status. */
-	stock_status?: WC_StockStatus
-	/** Limit result set to virtual products. */
-	virtual?: boolean
-	/** Limit result set to downloadable products. */
-	downloadable?: boolean
-}
-
-export type WC_ProductListErrorCode = "woocommerce_rest_cannot_view"
+// The list and retrieve operations are described by the plugin and generated into the WordPress
+// client, so their inputs and error codes live in the contract rather than here. What is left is the
+// product object and the write inputs, which the test fixture seeds through the admin API with.
 
 // ==================================================
 // CREATE — POST /wc/v3/products
@@ -415,16 +334,6 @@ export type WC_ProductCreateErrorCode =
 	| "woocommerce_rest_product_exists"
 	| "woocommerce_rest_cannot_create"
 	| "woocommerce_rest_invalid_product_id"
-
-// ==================================================
-// RETRIEVE — GET /wc/v3/products/<id>
-// ==================================================
-
-export interface WC_ProductRetrieveInput {
-	id: number
-}
-
-export type WC_ProductRetrieveErrorCode = "woocommerce_rest_cannot_view" | "woocommerce_rest_product_invalid_id"
 
 // ==================================================
 // UPDATE — PUT /wc/v3/products/<id>

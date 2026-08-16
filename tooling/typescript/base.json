@@ -6,6 +6,10 @@
 			"kizlo": ["${configDir}/../kizlo/src/index.ts"],
 			"kizlo/config": ["${configDir}/../kizlo/src/config.ts"],
 			"kizlo/test": ["${configDir}/../kizlo/src/test/index.ts"],
+			// Not a published entry and cannot become one: it constructs the generated client, whose
+			// `declare module "kizlo"` would register this repo's WordPress client as every consuming
+			// app's. Reachable from tests in this repo only. See packages/kizlo/src/test/harness.ts.
+			"kizlo/test-harness": ["${configDir}/../kizlo/src/test/harness.ts"],
 			"kizlo/nextjs": ["${configDir}/../kizlo/src/integrations/nextjs/index.ts"],
 			"kizlo/nextjs/server": ["${configDir}/../kizlo/src/integrations/nextjs/server.ts"],
 			"@kizlo/cf7": ["${configDir}/../cf7/src/index.ts"],

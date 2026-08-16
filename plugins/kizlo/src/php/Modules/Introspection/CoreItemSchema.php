@@ -156,7 +156,7 @@ final class CoreItemSchema
         $properties = is_array($schema['properties'] ?? null) ? $schema['properties'] : [];
 
         $translated = CoreSchemaTranslator::properties(
-            self::inContext($properties, $context),
+            SpecTranslator::inContext($properties, $context),
             static function (string $name) use ($route): void {
                 SpecStore::addError(
                     ['path' => $route, 'keyword' => $name],
@@ -168,7 +168,7 @@ final class CoreItemSchema
             },
         );
 
-        return self::required(array_map(self::written(...), $translated));
+        return SpecTranslator::required(array_map(self::written(...), $translated));
     }
 
     /**
@@ -332,56 +332,4 @@ final class CoreItemSchema
         return $property;
     }
 
-    /**
-     * Drop what the pinned context does not return, nested properties included:
-     * `title` survives while `title.raw` would not, were the context narrower.
-     *
-     * @param array<array-key, mixed> $properties
-     * @return array<string, mixed>
-     */
-    private static function inContext(array $properties, string $context = self::CONTEXT): array
-    {
-        $kept = [];
-
-        foreach ($properties as $name => $property) {
-            if (!is_string($name) || !is_array($property)) {
-                continue;
-            }
-
-            $declared = $property['context'] ?? null;
-
-            if (is_array($declared) && !in_array($context, $declared, true)) {
-                continue;
-            }
-
-            if (isset($property['properties']) && is_array($property['properties'])) {
-                $property['properties'] = self::inContext($property['properties'], $context);
-            }
-
-            $kept[$name] = $property;
-        }
-
-        return $kept;
-    }
-
-    /**
-     * @param array<string, array<string, mixed>> $properties
-     * @return array<string, array<string, mixed>>
-     */
-    private static function required(array $properties): array
-    {
-        $marked = [];
-
-        foreach ($properties as $name => $property) {
-            if (isset($property['properties']) && is_array($property['properties'])) {
-                /** @var array<string, array<string, mixed>> $children */
-                $children               = $property['properties'];
-                $property['properties'] = self::required($children);
-            }
-
-            $marked[$name] = $property + ['required' => true];
-        }
-
-        return $marked;
-    }
 }

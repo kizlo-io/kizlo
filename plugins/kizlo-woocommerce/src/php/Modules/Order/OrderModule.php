@@ -23,7 +23,7 @@ class OrderModule
         add_filter('woocommerce_rest_prepare_shop_order_object', [$this, 'prepareOrderCallback'], PHP_INT_MAX, 2);
 
         kizlo_register_route([
-            'id'        => 'woocommerce.orders',
+            'id'        => 'woocommerce.kizlo.orders',
             'operation' => 'manage_stock',
             'method'    => 'POST',
             'route'     => '/orders/(?P<order_id>\d+)/stock',

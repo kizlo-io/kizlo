@@ -3,17 +3,21 @@
 namespace Kizlo\WooCommerce\Modules\WooCommerce;
 
 /**
- * What this plugin's routes return.
+ * Every schema ID this plugin's contract uses, and the handful of bodies that
+ * are written here rather than derived.
  *
- * Two of these bodies are WooCommerce's own: the product object the WooCommerce
- * REST API prepares, and the Store API cart. Both are described as objects with
- * their extra Kizlo fields named and everything else left open, deliberately.
- * Copying WooCommerce's field list into Kizlo's contract would create exactly
- * the second source of truth this contract exists to remove, and it would go
- * stale on a WooCommerce release rather than on a change here.
+ * Most are not written here. {@see \Kizlo\WooCommerce\Modules\Contract\RestApiRoutes}
+ * and {@see \Kizlo\WooCommerce\Modules\Contract\StoreApiRoutes} build theirs from
+ * WooCommerce's own controllers, because copying WooCommerce's field lists into
+ * Kizlo's contract would create exactly the second source of truth this contract
+ * exists to remove, and it would go stale on a WooCommerce release rather than on
+ * a change here. What is left below is what nothing upstream describes: the two
+ * fields the headless session adds to a cart, the result of a stock adjustment,
+ * and the store's currency formatting.
  *
- * The IDs are vendor-qualified because this is not the Kizlo plugin: `kizlo.*`
- * is reserved for core, and registering into it from out here fails.
+ * The IDs live in one place because both halves reference them. They are
+ * vendor-qualified because this is not the Kizlo plugin: `kizlo.*` is reserved
+ * for core, and registering into it from out here fails.
  */
 final class WooCommerceSchemas
 {
@@ -24,10 +28,34 @@ final class WooCommerceSchemas
      */
     public const ERROR = 'kizlo.error';
 
-    public const PRODUCT       = 'woocommerce.product';
-    public const CART          = 'woocommerce.cart';
-    public const STOCK_RESULT  = 'woocommerce.stock-result';
-    public const REVIEW_EXISTS = 'woocommerce.review-exists';
+    /**
+     * Bodies only a Kizlo route produces, so they sit under `kizlo` rather than
+     * beside WooCommerce's own.
+     *
+     * The segment is what tells a reader which side of the boundary a name is on:
+     * `woocommerce.kizlo.cart` is the cart this plugin's merge route answers with,
+     * `woocommerce.store.cart` is the one WooCommerce serves. Without it the two
+     * read as the same object, and they are not.
+     */
+    public const CART         = 'woocommerce.kizlo.cart';
+    public const STOCK_RESULT = 'woocommerce.kizlo.stock-result';
+
+    /**
+     * WooCommerce's own, reshaped by nobody. `CurrencyFormatter` produces it and
+     * the Store API puts it beside every price, so it is not Kizlo's to claim.
+     */
+    public const CURRENCY_FORMAT = 'woocommerce.currency-format';
+
+    /** Derived from the WooCommerce REST v3 controllers. */
+    public const PRODUCT  = 'woocommerce.product';
+    public const CUSTOMER = 'woocommerce.customer';
+
+    /** Derived from the WooCommerce Store API schema classes. */
+    public const STORE_CART                    = 'woocommerce.store.cart';
+    public const STORE_CHECKOUT                = 'woocommerce.store.checkout';
+    public const STORE_CHECKOUT_ORDER          = 'woocommerce.store.checkout-order';
+    public const STORE_PRODUCT                 = 'woocommerce.store.product';
+    public const STORE_PRODUCT_COLLECTION_DATA = 'woocommerce.store.product-collection-data';
 
     public static function register(): void
     {
@@ -42,25 +70,9 @@ final class WooCommerceSchemas
     public static function all(): array
     {
         return [
-            self::PRODUCT       => self::product(),
-            self::CART          => self::cart(),
-            self::STOCK_RESULT  => self::stockResult(),
-            self::REVIEW_EXISTS => self::reviewExists(),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function product(): array
-    {
-        return [
-            'type'                 => 'object',
-            'description'          => 'A WooCommerce product, as WooCommerce prepares it. Its fields are the WooCommerce REST API\'s and are documented there.',
-            'additionalProperties' => true,
-            'properties'           => [
-                'id' => ['type' => 'integer', 'required' => true],
-            ],
+            self::CART            => self::cart(),
+            self::STOCK_RESULT    => self::stockResult(),
+            self::CURRENCY_FORMAT => self::currencyFormat(),
         ];
     }
 
@@ -71,7 +83,7 @@ final class WooCommerceSchemas
     {
         return [
             'type'                 => 'object',
-            'description'          => 'The Store API cart, plus the two fields the headless session adds.',
+            'description'          => 'The Store API cart, plus the two fields the headless session adds. Its WooCommerce half is described in full by woocommerce.store.cart.',
             'additionalProperties' => true,
             'properties'           => [
                 'guest_token' => [
@@ -107,15 +119,30 @@ final class WooCommerceSchemas
     }
 
     /**
+     * How to render a price, as `WC_Currency_Formatter` reports it.
+     *
+     * Declared rather than derived because WooCommerce keeps this behind a
+     * protected `get_store_currency_properties()` on its Store API schema base,
+     * so there is nothing public to ask. It is the same seven fields the Store
+     * API puts beside every price it returns.
+     *
      * @return array<string, mixed>
      */
-    private static function reviewExists(): array
+    private static function currencyFormat(): array
     {
         return [
-            'type'       => 'object',
-            'properties' => [
-                'exists' => ['type' => 'boolean', 'required' => true, 'description' => 'Whether the user has an approved review on the product.'],
+            'type'        => 'object',
+            'description' => 'The store currency and how to format an amount in it.',
+            'properties'  => [
+                'currency_code'               => ['type' => 'string', 'required' => true, 'description' => 'ISO 4217 code, e.g. GBP.'],
+                'currency_symbol'             => ['type' => 'string', 'required' => true],
+                'currency_minor_unit'         => ['type' => 'integer', 'required' => true, 'description' => 'Decimal places. Prices are integers in this many minor units.'],
+                'currency_decimal_separator'  => ['type' => 'string', 'required' => true],
+                'currency_thousand_separator' => ['type' => 'string', 'required' => true],
+                'currency_prefix'             => ['type' => 'string', 'required' => true],
+                'currency_suffix'             => ['type' => 'string', 'required' => true],
             ],
         ];
     }
+
 }

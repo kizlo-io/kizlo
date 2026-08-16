@@ -11,9 +11,9 @@ import type {
 	CartShippingAddress,
 	CartShippingLine,
 } from "./schema"
-import type { WCS_Cart } from "./types.wcs"
+import type { WCK_Cart } from "./types"
 
-export function deserializeCart(data: WCS_Cart): Cart {
+export function deserializeCart(data: WCK_Cart): Cart {
 	const lineItems = data.items.map<CartItem>((item) => {
 		const totals = calculateLineItemTotals({
 			quantity: item.quantity,
@@ -164,7 +164,7 @@ export function deserializeCart(data: WCS_Cart): Cart {
 	}
 }
 
-function deserializeCartShippingAddress(cart: WCS_Cart): CartShippingAddress {
+function deserializeCartShippingAddress(cart: WCK_Cart): CartShippingAddress {
 	return {
 		address1: cart.shipping_address.address_1,
 		address2: cart.shipping_address.address_2,
@@ -179,7 +179,7 @@ function deserializeCartShippingAddress(cart: WCS_Cart): CartShippingAddress {
 	}
 }
 
-function deserializeCartBillingAddress(cart: WCS_Cart): CartBillingAddress {
+function deserializeCartBillingAddress(cart: WCK_Cart): CartBillingAddress {
 	return {
 		address1: cart.billing_address.address_1,
 		address2: cart.billing_address.address_2,
