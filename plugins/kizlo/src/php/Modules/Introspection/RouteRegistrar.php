@@ -106,6 +106,11 @@ class RouteRegistrar
      * request is made, and nothing verifies that the described route exists —
      * the contract is a statement about someone else's API, taken on trust.
      *
+     * Not owning the route does not put it outside the lockdown. Every request to
+     * this site passes {@see \Kizlo\Modules\RestApi\RestGuard} whatever namespace
+     * it is bound for, so a described route inherits {@see OperationErrors::GUARD}
+     * the way a registered one inherits the wider runtime set.
+     *
      * @param array<string, mixed> $args
      */
     public static function registerSpec(array $args, bool $core): void
@@ -154,7 +159,10 @@ class RouteRegistrar
             );
         }
 
-        SpecStore::addRoute(self::declaration($args, (string) $args['namespace']), $core);
+        SpecStore::addRoute(
+            OperationErrors::withGuard(self::declaration($args, (string) $args['namespace'])),
+            $core,
+        );
     }
 
     /**

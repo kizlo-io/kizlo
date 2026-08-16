@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Honour the method declared on a route interceptor, which was read under the wrong key and ignored

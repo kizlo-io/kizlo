@@ -1,6 +1,4 @@
-import { stringifiedMetaRecord } from "@kizlo/shared"
-import type { WordPressTransport, WP_Result } from "../wordpress"
-import { WP_CORE_BASE } from "../wordpress"
+import { listed, stringifiedMetaRecord } from "@kizlo/shared"
 import type { ListMenuInputOut, MenuGroupItem } from "./schema"
 import type { WPK_MenuItem, WPK_MenuItemListInput } from "./types"
 
@@ -14,32 +12,25 @@ export function deserializeListMenuInput(input?: ListMenuInputOut): WPK_MenuItem
 			: input?.orderby
 
 	return {
-		context: "edit",
 		after: input?.after,
 		before: input?.before,
-		exclude: input?.exclude,
-		include: input?.include,
+		exclude: listed(input?.exclude),
+		include: listed(input?.include),
 		menu_order: input?.menuOrder,
-		menus: input?.menus,
-		menus_exclude: input?.menusExclude,
+		menus: listed(input?.menus),
+		menus_exclude: listed(input?.menusExclude),
 		offset: input?.offset,
 		order: input?.order,
 		orderby,
 		page: input?.page,
 		per_page: input?.perPage,
 		search: input?.search,
-		slug: input?.slug,
+		slug: listed(input?.slug),
 		tax_relation: input?.taxRelation,
 		search_columns: input?.searchColumns,
-		status: "publish",
+		// A menu item is only published or nothing; the draft ones exist but are not menu entries.
+		status: ["publish"],
 	}
-}
-
-export async function listMenuItems(
-	wordpress: WordPressTransport,
-	input: WPK_MenuItemListInput,
-): Promise<WP_Result<WPK_MenuItem[], string>> {
-	return wordpress.get<WPK_MenuItem[], string>("/menu-items", { base: WP_CORE_BASE, searchParams: input })
 }
 
 /**

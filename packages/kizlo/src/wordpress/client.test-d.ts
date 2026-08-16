@@ -3,7 +3,16 @@ import type { EmailService } from "../email/service"
 import type { SettingsService } from "../settings/service"
 import { createWordPressClient, wpEndpoint } from "./endpoint"
 import type { WordPressTransport } from "./transport"
-import type { WP_CallOptions, WP_Client, WP_Endpoint, WP_EndpointData, WP_EndpointInput, WP_EndpointResult, WP_Result } from "./types"
+import type {
+	ActiveWordPressClient,
+	WP_CallOptions,
+	WP_Client,
+	WP_Endpoint,
+	WP_EndpointData,
+	WP_EndpointInput,
+	WP_EndpointResult,
+	WP_Result,
+} from "./types"
 
 type Retrieve = WP_Result<{ id: number }, "not_found">
 type List = WP_Result<{ id: number }[], "not_found">
@@ -106,6 +115,50 @@ describe("addressing an endpoint by path", () => {
 		expectTypeOf<WP_EndpointData<"seo.nowhere.retrieve">>().toBeNever()
 		expectTypeOf<WP_EndpointResult<"seo.nowhere.retrieve">>().toBeNever()
 		expectTypeOf<WP_EndpointInput<"seo.nowhere.retrieve">>().toBeNever()
+	})
+})
+
+/**
+ * The routes WordPress serves and Kizlo only describes. Asserted against this repo's generated
+ * `wordpress.ts`, so a contract that stops matching the call sites fails here rather than in the
+ * procedure that makes the call.
+ */
+describe("described WordPress core routes", () => {
+	const wordpress = null as unknown as ActiveWordPressClient
+
+	it("reads a comment through the route WordPress owns", async () => {
+		expectTypeOf(await wordpress.comments.retrieve({ id: 7 })).toEqualTypeOf<WP_EndpointResult<"comments.retrieve">>()
+		expectTypeOf(await wordpress.comments.retrieve({ id: 7, password: "hunter2" })).toEqualTypeOf<WP_EndpointResult<"comments.retrieve">>()
+		// @ts-expect-error core matches digits on this route, so the id is never a slug
+		await wordpress.comments.retrieve({ id: "7" })
+		// @ts-expect-error `context` is undeclared, so no caller can reshape the response
+		await wordpress.comments.retrieve({ id: 7, context: "edit" })
+	})
+
+	it("separates the Kizlo submission from the route it stands in for", () => {
+		expectTypeOf<WP_EndpointInput<"kizlo.comments.create">>().toHaveProperty("post_id")
+		expectTypeOf<WP_EndpointInput<"comments.create">>().toHaveProperty("post")
+		expectTypeOf<WP_EndpointInput<"comments.create">>().not.toHaveProperty("post_id")
+	})
+
+	it("types a list filter as the array core declares it to be", async () => {
+		expectTypeOf(await wordpress.menuItems.list({ menus: [4], status: ["publish"] })).toEqualTypeOf<WP_EndpointResult<"menuItems.list">>()
+		// @ts-expect-error a bare value is collapsed to a list before the call, never sent as one
+		await wordpress.menuItems.list({ menus: 4 })
+		// @ts-expect-error only the statuses WordPress publishes
+		await wordpress.menuItems.list({ status: ["nonsense"] })
+	})
+
+	it("carries the pagination headers resolveList reads off a list", () => {
+		type Success = Extract<WP_EndpointResult<"menuItems.list">, { error: null }>
+
+		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-Total")
+		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-TotalPages")
+	})
+
+	it("describes the menu containers, not only the items", () => {
+		expectTypeOf<WP_EndpointData<"menus.retrieve">>().toHaveProperty("slug")
+		expectTypeOf<WP_EndpointResult<"menus.delete">>().not.toBeNever()
 	})
 })
 

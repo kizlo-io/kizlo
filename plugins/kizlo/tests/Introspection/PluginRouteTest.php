@@ -100,7 +100,7 @@ class PluginRouteTest extends IntrospectionTestCase
     {
         $operations = $this->operations();
         $expected   = [
-            'comments /comments (create)'                         => 'kizlo_invalid_user',
+            'kizlo.comments /comments (create)'                   => 'kizlo_invalid_user',
             'email /email/send (send)'                            => 'kizlo_email_failed',
             'post-types.post /post-types/post (create)'           => 'rest_cannot_create',
             'taxonomies.category /taxonomies/category/{identifier} (update)' => 'rest_cannot_update',

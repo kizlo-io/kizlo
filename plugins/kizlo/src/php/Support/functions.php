@@ -227,33 +227,33 @@ function kizlo_register_spec_schema(string $id, array $schema): void
  *
  * Hooks into `rest_request_after_callbacks` at maximum priority and invokes
  * the interceptor only when the request matches the given route pattern and,
- * optionally, the specified HTTP methods.
+ * optionally, the HTTP method.
  *
  * @param array $args {
  *     @type string   $route    Required. Route pattern to match against the request. Passed to kizlo_route_match().
- *     @type string[] $methods  Optional. HTTP methods to match (e.g. ['GET', 'POST']). Matches all methods if empty.
- *     @type callable $callback Required. Callback to invoke when the request matches. Receives the response, handler, and request.
+ *     @type string   $method   Optional. HTTP method to match (e.g. 'GET'). Matches every method when omitted.
+ *     @type callable $callback Required. Callback to invoke when the request matches. Receives the request and response.
  * }
  *
- * @throws InvalidArgumentException If `route` is empty.
+ * @throws InvalidArgumentException If `route` or `callback` is missing.
  */
 function kizlo_register_route_interceptor(array $args)
 {
-    $route    = $args['route'];
-    $methods  = $args['methods'];
-    $callback = $args['callback'];
+    $route    = $args['route'] ?? null;
+    $callback = $args['callback'] ?? null;
 
     if (! $route || ! $callback) {
         throw new InvalidArgumentException('Missing required arguments.');
     }
 
-    $filter = static function ($response, $handler, WP_REST_Request $request) use ($route, $methods, $callback) {
+    $method = is_string($args['method'] ?? null) ? strtoupper($args['method']) : null;
+
+    $filter = static function ($response, $handler, WP_REST_Request $request) use ($route, $method, $callback) {
         if (is_wp_error($response) || ! ($response instanceof WP_REST_Response)) {
             return $response;
         }
 
-        $methods_array = is_array($methods) ? $methods : [$methods];
-        if (! empty($methods) && ! in_array(strtoupper($request->get_method()), array_map('strtoupper', $methods_array), true)) {
+        if ($method !== null && strtoupper($request->get_method()) !== $method) {
             return $response;
         }
 

@@ -168,7 +168,56 @@ final class CoreItemSchema
             },
         );
 
-        return self::required($translated);
+        return self::required(array_map(self::written(...), $translated));
+    }
+
+    /**
+     * The one shape a response field is actually written in.
+     *
+     * Core keeps one schema per field and lets it describe both directions, so a
+     * field a caller may *send* two ways is declared with two types even when only
+     * one of them is ever *returned*. `nav_menu_item.title` is the case on these
+     * routes: `['string', 'object']`, because a create accepts a bare string, while
+     * `prepare_item_for_response()` assigns `$data['title'] = array()` and fills it
+     * unconditionally. A response is whatever that method wrote, so describing it
+     * as a union would publish a branch no response can take, and every reader
+     * would have to narrow past it to reach `title.rendered`.
+     *
+     * Narrow only when it is unambiguous: exactly one branch carries structure and
+     * the rest are bare scalars. Two structured branches is a field that genuinely
+     * varies, and that stays a union.
+     *
+     * {@see eitherForm()} is the mirror image, widening the same field on the way
+     * in for the same reason.
+     *
+     * @param array<string, mixed> $property
+     * @return array<string, mixed>
+     */
+    private static function written(array $property): array
+    {
+        $union = $property['anyOf'] ?? null;
+
+        if (is_array($union)) {
+            $structured = array_values(array_filter(
+                $union,
+                static fn(mixed $member): bool => is_array($member) && (isset($member['properties']) || isset($member['items'])),
+            ));
+
+            if (count($structured) === 1) {
+                unset($property['anyOf']);
+                /** @var array<string, mixed> $property */
+                $property = $structured[0] + $property;
+            }
+        }
+
+        if (isset($property['properties']) && is_array($property['properties'])) {
+            $property['properties'] = array_map(
+                static fn(mixed $child): mixed => is_array($child) ? self::written($child) : $child,
+                $property['properties'],
+            );
+        }
+
+        return $property;
     }
 
     /**

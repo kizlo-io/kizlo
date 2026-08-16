@@ -12,6 +12,12 @@ class CommentModule
     {
         add_filter('rest_prepare_comment', [$this, 'prepare'], PHP_INT_MAX, 3);
         (new CommentSubmission())->register();
+
+        // Described on `rest_api_init` rather than at load, because the derivation
+        // reads a controller's item schema and core has not finished registering
+        // by then. Nothing is lost by waiting: `/introspect` is itself a REST
+        // route, so the store is always armed before the document is built.
+        add_action('rest_api_init', [CommentRoutes::class, 'register']);
     }
 
     public function prepare(WP_REST_Response $response, WP_Comment $comment, WP_REST_Request $request): WP_REST_Response
