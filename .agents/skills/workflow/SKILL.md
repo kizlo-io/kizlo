@@ -7,7 +7,7 @@ description: Takes a Linear issue from first read to open PR under this repo's b
 
 Input is an issue key (`KIZ-70`) or a `linear.app` URL; ask if neither is given. One team, `Kizlo`, key `KIZ`.
 
-**Nothing touches git until the user says go**, because handing over an issue key is a request to understand it, not a decision to build it now. That go-ahead then covers the rest: branch, commits, pushes, draft PR, without asking again, since work that exists only on this machine can be lost. This overrides the standing per-action commit-approval rule, for this workflow only. One gate remains, **ask before marking the PR ready for review**, as that is the point it asks for someone's time.
+**Nothing touches git until the user says go**, because handing over an issue key is a request to understand it, not a decision to build it now. That go-ahead then covers the rest: branch, commits, pushes, draft PR, without asking again, since work that exists only on this machine can be lost. This overrides the standing per-action commit-approval rule, for this workflow only. One gate remains at the end, **report against the issue's acceptance and ask before marking the PR ready for review**, as that is the point it asks for someone's time.
 
 No em-dash and no LLM filler anywhere. No Claude or Anthropic attribution in any commit, PR, or file.
 
@@ -20,6 +20,8 @@ No em-dash and no LLM filler anywhere. No Claude or Anthropic attribution in any
 
 Then open the files the issue points at, before saying anything about it. A brief written from the issue text alone repeats the ticket back; the value is what the code does today versus what the issue assumes. Where they contradict, the code wins.
 
+While reading, **pull out the two or three lines that show the problem**: the declaration that is wrong, the call that returns the wrong thing, the test that does not exist. Step 2 is built on those lines, so if you cannot point at any, you have not read enough yet.
+
 Check for prior work, so the brief can say whether this is a fresh start or a resume:
 
 ```bash
@@ -28,15 +30,48 @@ git branch --list "*kiz-<number>*"    # read-only, safe on a dirty tree
 
 ## 2. Explain it, then wait
 
-Write a short brief in the chat and stop there. No branch, no checkout, no edits. Prose and small lists, no headings-and-bullets wall:
+Write a brief in the chat and stop there. No branch, no checkout, no edits.
 
-- **What it is.** The problem in your own words, in terms of the actual code paths, not the issue's phrasing.
+**Write it for someone who has never seen this issue.** An issue can sit in the backlog for months, and the person picking it up has usually lost the context that made it obvious when it was filed, even when they wrote it themselves. So the brief starts by rebuilding that context, not by summarising the ticket.
+
+**Open with two or three plain sentences**: which part of the product this touches, what happens today, and who it hurts. No identifiers, no file paths, no jargon in the opening. Someone who has never opened the repo should be able to follow it.
+
+**Then show the problem.** A few lines of real code, a real request and response, or real output, copied from what you read in step 1, with the fault visible in it. This is the part that carries the brief. A paragraph describing a mismatch is forgettable; two lines showing it are not. Where it helps, put today's behaviour and the intended behaviour side by side.
+
+Then the rest, one or two lines each:
+
 - **What changes.** The files and functions you expect to touch, and the shape of the change.
 - **What proves it.** The acceptance criteria and the test you would write.
-- **What you are leaving alone.** Anything out of scope that sits close enough to look like an omission.
-- **What is unclear.** Contradictions with the code, gaps in the issue, decisions that could go two ways. Recommend on each rather than offering a menu.
+- **Leaving alone.** Anything out of scope sitting close enough to look like an omission.
+- **Unclear.** Contradictions with the code, gaps in the issue, decisions that could go two ways. Recommend on each rather than offering a menu.
 
-Readable in a minute. A shared picture, not a design document.
+About a screen, readable in a minute. Prose and short lists, no wall of headings and bullets, no restating the ticket in the ticket's own words.
+
+<details>
+<summary>Worked example</summary>
+
+**KIZ-70, list filters the API accepts but never advertises**
+
+When something asks Kizlo which filters a post type route accepts, the answer comes from a list written by hand next to the route. WordPress itself accepts more than that list names. So a filter works fine when you call it, while the generated client has no idea it exists, and nobody finds out until someone goes looking for it.
+
+`PostTypeApi::get_collection_args()` declares them literally:
+
+```php
+'search'  => [ 'type' => 'string' ],
+'orderby' => [ 'type' => 'string' ],
+```
+
+The controller serving the same route allows sixteen, `after`, `before`, `slug` and `sticky` among them. So `GET /wp/v2/posts?sticky=1` filters correctly, while `posts.list` in the generated client has no `sticky` on it at all.
+
+**What changes.** `get_collection_args()` reads `get_collection_params()` off the controller the route is registered against, instead of holding its own list. `TaxonomyApi` has the same hand-written list and gets the same treatment.
+
+**What proves it.** A test that walks every managed route and asserts the declared input matches the controller's params, so the two cannot drift again.
+
+**Leaving alone.** The `kizlo/v1` routes have their own hand-written args. The issue puts them out of scope and they do not share this code path.
+
+**Unclear.** Deriving the params also carries core's validation callbacks onto the route, so an unknown `template` starts answering 400 where it used to be accepted and dropped. That is a behaviour change beyond what the issue asks for, and I would take it, since silently storing nothing is worse. Worth your call before I start.
+
+</details>
 
 Then **stop and wait for an explicit go-ahead.** Silence is not one, and neither is the original "do KIZ-70". The user may want to edit the issue, add detail, reprioritise, or shelve it, all cheaper before a branch exists. If they come back with changes, refresh with `get_issue`, brief on what moved, and wait again. On a resume, brief on what the branch already has and what is left, then wait the same way.
 
@@ -197,9 +232,48 @@ Then the PR body goes over the placeholder:
 gh pr edit <n> --title "..." --body "..."
 ```
 
-**Stop and ask before `gh pr ready`.** Report that the work is done, step 6 passes, and the body is written, then wait.
+## 8. Report against acceptance, then ask
 
-## 8. Then leave the status alone
+**Do not call `gh pr ready` yet.** An open PR is not a finished issue, and the user is not reading the diff to work out the difference. Post a short report in the chat that closes the loop the step 2 brief opened.
+
+**Open with one line, in plain words, saying whether the issue is done**: complete, complete with a caveat, or partial. Do not bury it under the detail, and do not let a green step 6 stand in for it. Tests passing means what you wrote works, not that it is what the issue asked for.
+
+**Then take the issue's Acceptance section criterion by criterion**, one line each, in the issue's own order and its own words. Against each, one of:
+
+- **Done**, with the evidence: the test that covers it, the file it landed in, the behaviour you checked by hand. Evidence means something that ran. Do not mark a criterion done because the code looks like it should satisfy it.
+- **Done differently**, when the code made the issue's route impossible, with what you did instead and why.
+- **Not done**, with the reason and what it would take. Blocked on a decision, blocked on access, larger than the issue assumed, or would have meant widening past Out of scope. Say which.
+
+Then only if they carry something:
+
+- **Beyond the issue.** Anything you changed that acceptance never asked for, and why it was unavoidable.
+- **Found along the way.** Real problems you saw and left alone, worth their own issue.
+- **Not verified.** Anything you could not check, including a step 6 command that did not run or a failure that predates the branch. State it here rather than letting it pass as verified.
+
+Then **stop and wait**. Anything short of complete is the user's call, not yours: they may take the PR as it stands, send it back, or split what is left into a new issue. Never mark a partial PR ready to make the report read better, and never let the PR body claim more than this report does.
+
+**If nothing is left, say so in one line and stop there.** A complete issue does not need a caveats section invented for it.
+
+<details>
+<summary>Worked example, a partial</summary>
+
+**KIZ-70 is not fully done.** The post type half is finished and working; the taxonomy half is blocked on a decision I need from you. PR #131 is up as a draft.
+
+Against acceptance:
+
+- *Post type routes declare every filter their controller accepts.* **Done.** `PostTypeApi` now reads `get_collection_params()` off the registered controller. `ListParameterTest::test_post_type_args_match_controller` walks all six managed types and compares the two.
+- *Taxonomy routes do the same.* **Not done.** Taxonomy controllers are registered later than post type ones, so at the point the args are built the controller does not exist yet. Fixing it means moving registration to `rest_api_init`, which changes the boot order for everything else on that hook. That is bigger than this issue and I did not want to take it without asking.
+- *An unknown filter is rejected rather than ignored.* **Done differently.** The issue asked for an explicit check. Deriving the params carries core's own validation callbacks onto the route, which does this already, so the check would have been dead code. Verified by hand: `POST /wp/v2/posts` with `template=nope` answers 400 where it used to answer 201.
+
+**Found along the way.** `kizlo/v1` routes have the same hand-written list and the same drift. Out of scope here, worth its own issue.
+
+**Not verified.** `pnpm test` passes. Plugin PHPUnit did not run, the test container would not come up on this machine, so the new `ListParameterTest` has only been read, not executed. CI will be the first real run of it.
+
+Left to decide: move taxonomy registration to `rest_api_init` in this PR, or split it out and merge the post type half now. I would split it.
+
+</details>
+
+## 9. Then leave the status alone
 
 Step 3 set `In Progress` and the integration takes it from there: review activity moves it to `In Review`, merge to `Done`. Do not call `save_issue` again, never set `Done` yourself, and do not claim the status moved. Say the PR is open, and whether it is still a draft.
 
