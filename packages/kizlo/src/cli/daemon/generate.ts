@@ -3,8 +3,9 @@ import path from "node:path"
 import { resolveWordPressConnection } from "../../kizlo"
 import { generateContract } from "../../shared/contract"
 import type { AnyProcedureRouter } from "../../shared/procedure"
-import { fetchIntrospection, IntrospectionFetchError } from "../../wordpress/fetch-introspection"
+import { fetchIntrospection } from "../../wordpress/fetch-introspection"
 import { generateWordPressClient } from "../../wordpress/generate"
+import type { IntrospectionDiagnostic, IntrospectionDocument } from "../../wordpress/introspection"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
 import { WORDPRESS_CLIENT_META_REL } from "../wp/constants"
@@ -107,14 +108,59 @@ function wordPressMeta(etag: string | undefined, hash: string): string {
 	return `${JSON.stringify({ etag, hash }, null, "\t")}\n`
 }
 
-function formatDiagnostic(diagnostic: { type: string; message: string; data: Record<string, string> }): string {
-	const location = Object.values(diagnostic.data).filter(Boolean).join(" > ")
+/** Where a diagnostic landed: `schema_id > api_id > path > operation > pointer > keyword`, as sent. */
+function diagnosticLocation(diagnostic: IntrospectionDiagnostic): string {
+	return Object.values(diagnostic.data).filter(Boolean).join(" > ")
+}
+
+function formatDiagnostic(diagnostic: IntrospectionDiagnostic): string {
+	const location = diagnosticLocation(diagnostic)
 	return `${diagnostic.type}: ${location ? `${location}: ` : ""}${diagnostic.message}`
+}
+
+/**
+ * WordPress publishes everything that survived validation and names what it had to drop, so what a
+ * partial contract is worth is the generator's call rather than the transport's. Taking it is the
+ * default: a third-party plugin's broken declaration then costs its own routes and nothing else,
+ * where refusing the document costs the project every route that still works, for a mistake in code
+ * it does not own. Strict generation makes the opposite trade for CI, where a client silently short
+ * of routes typechecks clean and ships the gap.
+ */
+export class PartialContractError extends Error {
+	readonly excluded: number
+
+	constructor(excluded: number) {
+		super(`WordPress excluded ${excluded} ${excluded === 1 ? "contribution" : "contributions"} from the contract.`)
+		this.name = "PartialContractError"
+		this.excluded = excluded
+	}
 }
 
 export interface GenerateWordPressOptions {
 	credentials?: WordPressCredentials
 	fetch?: typeof globalThis.fetch
+	/** Refuse a document WordPress had to exclude anything from, leaving the client on disk untouched. */
+	strict?: boolean
+}
+
+/**
+ * Say what the document says about itself, then apply the policy. Warnings mean a declaration lost a
+ * constraint and still types correctly, so they never gate anything; errors mean a contribution was
+ * dropped and its routes and types are absent from what follows.
+ */
+function reportDiagnostics(document: IntrospectionDocument, strict: boolean): void {
+	for (const diagnostic of document.diagnostics) {
+		if (diagnostic.type === "warning") log.warn(formatDiagnostic(diagnostic))
+		else log.error(formatDiagnostic(diagnostic))
+	}
+
+	const excluded = new Set(document.diagnostics.filter((diagnostic) => diagnostic.type === "error").map(diagnosticLocation))
+	if (!excluded.size) return
+	if (strict) throw new PartialContractError(excluded.size)
+	log.warn(
+		`Generating without the ${excluded.size} excluded ${excluded.size === 1 ? "contribution" : "contributions"} above. ` +
+			"Their routes and types are missing from the client; `kizlo generate --strict` refuses the contract instead.",
+	)
 }
 
 /** Fetch `/introspect`, reporting its diagnostics in the CLI's voice. Returns undefined on a 304. */
@@ -125,24 +171,13 @@ async function fetchDocument(
 ): Promise<Awaited<ReturnType<typeof fetchIntrospection>> | undefined> {
 	loadEnvFiles(cwd)
 	const credentials = options.credentials ?? resolveWordPressConnection(undefined).credentials
-	let result: Awaited<ReturnType<typeof fetchIntrospection>>
-	try {
-		result = await fetchIntrospection(credentials, { etag, fetch: options.fetch })
-	} catch (error) {
-		if (error instanceof IntrospectionFetchError) {
-			for (const diagnostic of error.diagnostics) {
-				if (diagnostic.type === "warning") log.warn(formatDiagnostic(diagnostic))
-				else log.error(formatDiagnostic(diagnostic))
-			}
-		}
-		throw error
-	}
+	// Strict generation never revalidates: a 304 carries no diagnostics, so a warm meta file left over
+	// from a partial generation would answer "unchanged" and pass a run whose whole job is to fail.
+	const result = await fetchIntrospection(credentials, { etag: options.strict ? undefined : etag, fetch: options.fetch })
 
 	if (result.status === "not-modified") return undefined
 	if (!result.document) throw new Error("WordPress introspection returned no document.")
-	for (const diagnostic of result.document.diagnostics) {
-		if (diagnostic.type === "warning") log.warn(formatDiagnostic(diagnostic))
-	}
+	reportDiagnostics(result.document, options.strict === true)
 	return result
 }
 
@@ -199,7 +234,7 @@ function writeGeneratedWordPress(cfg: ResolvedConfig, client: string, meta: stri
  * Loads the Kizlo server, builds its contract, and writes `contract.json` and
  * the generated barrel. Returns false when the entry has no Kizlo server.
  */
-export async function generateOnce(cfg: ResolvedConfig, credentials?: WordPressCredentials): Promise<boolean> {
+export async function generateOnce(cfg: ResolvedConfig, options: GenerateWordPressOptions = {}): Promise<boolean> {
 	loadEnvFiles(cfg.cwd)
 	const entry = path.resolve(cfg.cwd, cfg.serverEntry)
 	const { router } = await importIgnoringVirtualModules<{ router?: AnyProcedureRouter }>(cfg.cwd, entry)
@@ -207,7 +242,7 @@ export async function generateOnce(cfg: ResolvedConfig, credentials?: WordPressC
 	if (!router) return false
 
 	const contract = JSON.stringify(await generateContract(router))
-	const wordpress = await generateWordPressOnce(cfg, { credentials })
+	const wordpress = await generateWordPressOnce(cfg, options)
 
 	fs.mkdirSync(path.resolve(cfg.cwd, cfg.generatedDir), { recursive: true })
 	atomicWrite(path.resolve(cfg.cwd, cfg.contractPath), contract)

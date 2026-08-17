@@ -1,8 +1,19 @@
 import path from "node:path"
 import { defineCommand } from "citty"
 import { resolveConfig, resolveWordPressClientDir } from "../daemon/config"
-import { generateOnce, generateWorkspaceClientOnce } from "../daemon/generate"
+import { generateOnce, generateWorkspaceClientOnce, PartialContractError } from "../daemon/generate"
 import { log } from "../daemon/logger"
+
+/**
+ * Report and exit non-zero. A refused partial contract is the one failure here that is a decision
+ * rather than a fault, and its diagnostics are already on screen, so it prints its own line and no
+ * stack: the useful detail is what strict mode did not do to the files on disk.
+ */
+function fail(message: string, error: unknown): never {
+	if (error instanceof PartialContractError) log.error(`${error.message} The generated client on disk is unchanged.`)
+	else log.error(message, error)
+	process.exit(1)
+}
 
 export const generate = defineCommand({
 	meta: {
@@ -14,9 +25,14 @@ export const generate = defineCommand({
 			type: "string",
 			description: "Override the Kizlo directory (defaults to kizlo.config.ts)",
 		},
+		strict: {
+			type: "boolean",
+			description: "Fail instead of generating a client WordPress had to exclude routes or types from",
+		},
 	},
 	async run({ args }) {
 		const cwd = process.cwd()
+		const strict = args.strict === true
 
 		// A package or workspace that ships procedures has no server to build a contract from, but its
 		// procedures still call the generated tree, so it needs the client on its own. Which WordPress
@@ -24,12 +40,11 @@ export const generate = defineCommand({
 		const wordpressClientDir = await resolveWordPressClientDir(cwd)
 		if (wordpressClientDir) {
 			try {
-				const result = await generateWorkspaceClientOnce(cwd, wordpressClientDir)
+				const result = await generateWorkspaceClientOnce(cwd, wordpressClientDir, { strict })
 				const file = path.resolve(cwd, wordpressClientDir, "wordpress.ts")
 				log.success(`WordPress client ${result === "generated" ? "written to" : "already current at"} ${file}`)
 			} catch (error) {
-				log.error("Failed to generate the WordPress client:", error)
-				process.exit(1)
+				fail("Failed to generate the WordPress client:", error)
 			}
 		}
 
@@ -43,10 +58,9 @@ export const generate = defineCommand({
 		}
 		let ok: boolean
 		try {
-			ok = await generateOnce(cfg)
+			ok = await generateOnce(cfg, { strict })
 		} catch (error) {
-			log.error("Failed to generate the Kizlo contract:", error)
-			process.exit(1)
+			fail("Failed to generate the Kizlo contract:", error)
 		}
 		if (!ok) {
 			log.error(`No Kizlo server found in ${cfg.serverEntry}`)

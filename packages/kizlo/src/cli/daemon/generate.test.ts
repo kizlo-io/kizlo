@@ -2,9 +2,11 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, describe, expect, test, vi } from "vitest"
+import type { IntrospectionDocument } from "../../wordpress/introspection"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import type { ResolvedConfig } from "./config"
-import { generateWordPressOnce } from "./generate"
+import { generateWordPressOnce, PartialContractError } from "./generate"
+import { log } from "./logger"
 
 function config(cwd: string): ResolvedConfig {
 	return {
@@ -30,7 +32,48 @@ function seedEnv(cwd: string): void {
 
 afterEach(() => {
 	for (const key of ["KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD"]) delete process.env[key]
+	vi.restoreAllMocks()
 })
+
+function project(): ResolvedConfig {
+	const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
+	seedEnv(cwd)
+	return config(cwd)
+}
+
+function responder(...responses: Response[]): typeof globalThis.fetch {
+	const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+	for (const response of responses) fetch.mockResolvedValueOnce(response)
+	return fetch as unknown as typeof globalThis.fetch
+}
+
+/**
+ * What WordPress serves when one contributor's declaration could not be published: everything that
+ * survived, plus an error diagnostic per exclusion. `acme.album` stands for the valid work that
+ * arrived in the same document, so a test can tell "wrote the subset" from "wrote nothing".
+ */
+function excluded(): IntrospectionDocument {
+	return {
+		...INTROSPECTION_FIXTURE,
+		hash: `sha256:${"c".repeat(64)}`,
+		schemas: { ...INTROSPECTION_FIXTURE.schemas, "acme.album": { type: "object", properties: { title: { type: "string" } } } },
+		diagnostics: [
+			...INTROSPECTION_FIXTURE.diagnostics,
+			{ type: "error", message: "Referenced schema does not exist.", data: { schema_id: "vendor.money" } },
+			{ type: "error", message: "Declares no successful response.", data: { api_id: "vendor.orders", path: "/orders" } },
+		],
+	}
+}
+
+/** Everything the CLI said, as one string. */
+function transcript(method: "warn" | "error"): string {
+	return (log[method] as unknown as ReturnType<typeof vi.fn>).mock.calls.map((call: unknown[]) => call.join(" ")).join("\n")
+}
+
+function watchLog(): void {
+	vi.spyOn(log, "warn").mockImplementation(() => {})
+	vi.spyOn(log, "error").mockImplementation(() => {})
+}
 
 describe("generateWordPressOnce", () => {
 	test("fetches once, writes current output, and reuses the ETag without rewriting", async () => {
@@ -103,16 +146,6 @@ describe("generateWordPressOnce", () => {
 	test.each([
 		["fetch failure", () => Promise.reject(new Error("offline"))],
 		["invalid document", () => Promise.resolve(Response.json({ nope: true }))],
-		[
-			"error diagnostic",
-			() =>
-				Promise.resolve(
-					modified({
-						...INTROSPECTION_FIXTURE,
-						diagnostics: [{ type: "error", message: "Excluded operation.", data: { api_id: "acme.broken" } }],
-					}),
-				),
-		],
 	])("preserves the last valid output after a %s", async (_label, next) => {
 		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
 		seedEnv(cwd)
@@ -126,5 +159,79 @@ describe("generateWordPressOnce", () => {
 		await expect(generateWordPressOnce(cfg, { fetch: vi.fn(next) as unknown as typeof globalThis.fetch })).rejects.toThrow()
 		expect(fs.readFileSync(sourcePath, "utf8")).toBe(source)
 		expect(fs.readFileSync(metaPath, "utf8")).toBe(meta)
+	})
+})
+
+describe("a contract WordPress excluded a contribution from", () => {
+	test("regenerates from the validated subset rather than leaving the client stale", async () => {
+		watchLog()
+		const cfg = project()
+		const source = path.join(cfg.cwd, cfg.wordpressPath)
+		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+		const before = fs.readFileSync(source, "utf8")
+
+		expect(await generateWordPressOnce(cfg, { fetch: responder(modified(excluded(), '"partial"')) })).toBe("generated")
+		const after = fs.readFileSync(source, "utf8")
+		expect(after).not.toBe(before)
+		// The valid contributions in the same document, the one that arrived with it and the ones
+		// that were already there. An exclusion costs its own contribution and nothing else.
+		expect(after).toContain("WP_AcmeAlbum")
+		expect(after).toContain("WP_AcmeBook")
+	})
+
+	test("writes the validated subset on a first generation, so the stub is never left in place", async () => {
+		watchLog()
+		const cfg = project()
+
+		expect(await generateWordPressOnce(cfg, { fetch: responder(modified(excluded())) })).toBe("generated")
+		expect(fs.readFileSync(path.join(cfg.cwd, cfg.wordpressPath), "utf8")).toContain("WP_AcmeBook")
+	})
+
+	test("names every exclusion and says the client is short of them", async () => {
+		watchLog()
+		const cfg = project()
+		await generateWordPressOnce(cfg, { fetch: responder(modified(excluded())) })
+
+		const errors = transcript("error")
+		expect(errors).toContain("vendor.money")
+		expect(errors).toContain("Referenced schema does not exist.")
+		expect(errors).toContain("vendor.orders > /orders")
+		// Two exclusions, counted by location rather than by diagnostic, and the warning that they are
+		// missing from what was written. The fixture's own warning stays a warning and counts for nothing.
+		expect(transcript("warn")).toContain("2 excluded contributions")
+	})
+
+	test("strict generation rejects it, leaving the client and its meta untouched", async () => {
+		watchLog()
+		const cfg = project()
+		const source = path.join(cfg.cwd, cfg.wordpressPath)
+		const meta = path.join(cfg.cwd, cfg.wordpressMetaPath)
+		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+		const [client, cache] = [fs.readFileSync(source, "utf8"), fs.readFileSync(meta, "utf8")]
+
+		await expect(generateWordPressOnce(cfg, { strict: true, fetch: responder(modified(excluded())) })).rejects.toThrow(PartialContractError)
+		expect(fs.readFileSync(source, "utf8")).toBe(client)
+		expect(fs.readFileSync(meta, "utf8")).toBe(cache)
+		expect(transcript("error")).toContain("vendor.money")
+	})
+
+	test("strict generation refetches, so a warm cache cannot answer 304 over an exclusion", async () => {
+		watchLog()
+		const cfg = project()
+		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+
+		const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => modified(excluded()))
+		await expect(generateWordPressOnce(cfg, { strict: true, fetch: fetch as unknown as typeof globalThis.fetch })).rejects.toThrow(
+			PartialContractError,
+		)
+		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("If-None-Match")).toBeNull()
+	})
+
+	test("strict generation writes a contract that excluded nothing", async () => {
+		watchLog()
+		const cfg = project()
+
+		expect(await generateWordPressOnce(cfg, { strict: true, fetch: responder(modified()) })).toBe("generated")
+		expect(fs.readFileSync(path.join(cfg.cwd, cfg.wordpressPath), "utf8")).toContain("WP_AcmeBook")
 	})
 })
