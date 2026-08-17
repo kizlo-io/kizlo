@@ -91,12 +91,37 @@ npx kizlo generate
 
 It exits non-zero if it can't find a Kizlo server in your entry file or if generation fails, so a stale or
 broken contract fails the build rather than slipping through. It accepts `--dir` to point at a Kizlo
-directory other than the one in `kizlo.config.ts`.
+directory other than the one in `kizlo.config.ts`, and `--strict` to [refuse a partial
+contract](#when-a-plugins-routes-cant-be-published).
 
 <Callout>
   Wire `kizlo generate` into your `build` script (e.g. `"build": "kizlo generate && next build"`) so the
   contract is always regenerated as part of every production build.
 </Callout>
+
+### When a plugin's routes can't be published
+
+One plugin's broken declaration doesn't take the rest of the contract down with it. WordPress publishes
+everything that passed validation and reports what it had to drop, and `generate` writes that subset. Your
+routes keep regenerating while the broken plugin gets fixed.
+
+Every exclusion is printed with the schema or route it landed on, then a count of what's missing from the
+generated client. Warnings are separate: a warning means a declaration lost a constraint, and the type it
+produces is still correct.
+
+Pass `--strict` to refuse a partial contract instead:
+
+```package-install
+npx kizlo generate --strict
+```
+
+Strict generation prints the same diagnostics, exits non-zero, and leaves the client already on disk
+untouched, so a build never replaces a complete client with one that's quietly short of routes. Reach for it
+in CI, where a missing route typechecks clean and ships the gap. It governs the WordPress client only, since
+`contract.json` is built from your own procedures and has no third-party contributors.
+
+`kizlo dev` is always partial. A watcher that refused to write would leave you working against a client that
+can't be regenerated until someone else's plugin is fixed.
 
 ## `kizlo dev`
 

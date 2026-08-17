@@ -1,4 +1,4 @@
-import { type IntrospectionDiagnostic, type IntrospectionDocument, parseIntrospectionDocument } from "./introspection"
+import { type IntrospectionDocument, parseIntrospectionDocument } from "./introspection"
 import type { WordPressCredentials } from "./types"
 
 export interface IntrospectionFetchResult {
@@ -7,13 +7,16 @@ export interface IntrospectionFetchResult {
 	etag?: string
 }
 
+/**
+ * WordPress could not be asked, or did not answer with a contract: a transport failure, a non-2xx
+ * status, a body that is not JSON. A document that parsed is never one of these, however much of it
+ * WordPress had to exclude, because what to do about an exclusion is the generator's policy and not
+ * this function's. It reports; {@link generateWordPressOnce} decides.
+ */
 export class IntrospectionFetchError extends Error {
-	readonly diagnostics: IntrospectionDiagnostic[]
-
-	constructor(message: string, diagnostics: IntrospectionDiagnostic[] = []) {
+	constructor(message: string) {
 		super(message)
 		this.name = "IntrospectionFetchError"
-		this.diagnostics = diagnostics
 	}
 }
 
@@ -61,8 +64,6 @@ export async function fetchIntrospection(
 		)
 	}
 	const document = parseIntrospectionDocument(value)
-	const errors = document.diagnostics.filter((diagnostic) => diagnostic.type === "error")
-	if (errors.length) throw new IntrospectionFetchError("WordPress introspection excluded part of the contract.", document.diagnostics)
 
 	return {
 		status: "modified",

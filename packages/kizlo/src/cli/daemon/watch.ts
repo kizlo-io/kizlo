@@ -18,7 +18,7 @@ function debounce<T extends (...args: never[]) => Promise<void>>(fn: T, delay: n
 
 async function regenerate(cfg: ResolvedConfig, credentials: WordPressCredentials): Promise<void> {
 	try {
-		const ok = await generateOnce(cfg, credentials)
+		const ok = await generateOnce(cfg, { credentials })
 		if (ok) log.success("Contract updated")
 		else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
 	} catch (error) {
@@ -112,7 +112,7 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 
 	if (cfg) {
 		try {
-			const ok = await generateOnce(cfg, credentials)
+			const ok = await generateOnce(cfg, { credentials })
 			if (ok) log.success("Contract generated")
 			else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
 		} catch (error) {
