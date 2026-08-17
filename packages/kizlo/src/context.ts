@@ -2,9 +2,14 @@ import {
 	base64Decode,
 	type Cookie,
 	type CookieOptions,
+	EXTENSION_VERSIONS_HEADER,
+	type ExtensionPluginRequirement,
+	extensionUpdateMessage,
 	isPluginVersionSupported,
 	PLUGIN_VERSION_HEADER,
+	parseExtensionVersions,
 	pluginUpdateMessage,
+	satisfiesVersion,
 	tryCatchSync,
 } from "@kizlo/shared"
 import { stringifySetCookie } from "cookie"
@@ -25,6 +30,8 @@ export interface ContextConfig {
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
 	wordpressEndpoints?: object
+	/** WordPress plugins the registered extensions need, checked against what each response reports. */
+	extensionPlugins?: ExtensionPluginRequirement[]
 }
 
 export type AuthUserFn = () => Promise<AuthUser | null>
@@ -75,7 +82,7 @@ export class Context {
 
 	constructor(config: ContextConfig) {
 		this.config = config
-		const options = { credentials: config.credentials, onResponse: (headers: Headers) => this.warnIfPluginOutdated(headers) }
+		const options = { credentials: config.credentials, onResponse: (headers: Headers) => this.warnIfOutdated(headers) }
 		const transport = new WordPressTransport(options)
 		// The generated endpoints are inert data, so the client is the pair: the tree overlaid on the
 		// transport it runs against. The cast hands back whatever shape that project's `wordpress.ts` declares.
@@ -86,18 +93,32 @@ export class Context {
 	}
 
 	/**
-	 * Warn when the WordPress plugin is older than {@link isPluginVersionSupported} allows, read from the
-	 * `X-Kizlo-Version` header the plugin stamps on every response. A version mismatch is a serious
-	 * contract break, so this fires on every WordPress response rather than once — the header rides
-	 * responses the runtime already makes, so it costs no extra request. Emitted through `console.warn`
+	 * Warn when the WordPress side is older than the client needs, read from the `X-Kizlo-Version` and
+	 * `X-Kizlo-Extensions` headers the plugin stamps on every response. A version mismatch is a serious
+	 * contract break, so this fires on every WordPress response rather than once — the headers ride
+	 * responses the runtime already makes, so they cost no extra request. Emitted through `console.warn`
 	 * rather than the logger adapter on purpose: the adapter is optional (it defaults to a no-op), and
 	 * this is a setup problem every user must see regardless of whether they've wired up logging.
 	 */
-	private warnIfPluginOutdated(headers: Headers): void {
+	private warnIfOutdated(headers: Headers): void {
 		const installed = headers.get(PLUGIN_VERSION_HEADER)
-		if (isPluginVersionSupported(installed)) return
-		// Bold yellow, boxed in dashes so it stands out in a busy dev console.
-		const inner = ` ${pluginUpdateMessage(installed)} `
+		if (!isPluginVersionSupported(installed)) this.warn(pluginUpdateMessage(installed))
+
+		const plugins = this.config.extensionPlugins
+		if (!plugins?.length) return
+
+		// A plugin whose own requirements failed did not start and is absent from the header, so the
+		// same check covers both "too old" and "installed but not running".
+		const active = parseExtensionVersions(headers.get(EXTENSION_VERSIONS_HEADER))
+		for (const plugin of plugins) {
+			if (satisfiesVersion(active[plugin.slug], plugin.version)) continue
+			this.warn(extensionUpdateMessage(plugin, active[plugin.slug]))
+		}
+	}
+
+	/** Bold yellow, boxed in dashes so it stands out in a busy dev console. */
+	private warn(message: string): void {
+		const inner = ` ${message} `
 		const border = "-".repeat(inner.length + 2)
 		console.warn(`\n\x1b[1m\x1b[33m${border}\n|${inner}|\n${border}\x1b[0m\n`)
 	}

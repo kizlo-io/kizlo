@@ -1,3 +1,4 @@
+import type { ExtensionPluginRequirement } from "@kizlo/shared"
 import { tryCatch } from "@kizlo/shared"
 import { OpenAPIHandler } from "@orpc/openapi/fetch"
 import { createRouterClient, ORPCError } from "@orpc/server"
@@ -10,7 +11,7 @@ import { Context, type ProcedureContext } from "./context"
 import { ROUTER_MAP, type RouterMap } from "./router"
 import { CONTRACT_GENERATION_ENV, RPC_PROTOCOL_HEADER } from "./shared/constants"
 import { KizloError } from "./shared/error"
-import type { AnyExtension, InferExtensionRouter } from "./shared/extension"
+import { type AnyExtension, assertExtensionEndpoints, type InferExtensionRouter } from "./shared/extension"
 import type { InvocationScope } from "./shared/procedure"
 import { createResultClient, type ResultClient } from "./shared/result"
 import { createOrpcRouter } from "./shared/router"
@@ -68,6 +69,7 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 			siteSecret: config.siteSecret,
 			credentials: config.credentials,
 			wordpressEndpoints: config.wordpressEndpoints,
+			extensionPlugins: extensions.plugins,
 		})
 
 		this.router = Object.assign(Object.assign({}, { ...extensions.router, ...ROUTER_MAP }), {
@@ -154,8 +156,16 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 	private registerExtensions() {
 		const router: Record<string, any> = {}
 		const events: EventHandler[] = []
+		const plugins: ExtensionPluginRequirement[] = []
+
+		// Contract generation imports this module for the router's exported shape alone, with no
+		// generated tree to check against and no request that could reach a missing endpoint.
+		const generating = Boolean(process.env[CONTRACT_GENERATION_ENV])
 
 		for (const extension of this.config.extensions ?? []) {
+			if (!generating) assertExtensionEndpoints(extension, this.config.wordpressEndpoints ?? {})
+			if (extension.requires?.plugin) plugins.push(extension.requires.plugin)
+
 			const data = extension.init({ context: { something: "" } })
 			if (data.router) router[extension.id] = data.router
 			for (const handler of data.events ?? []) events.push(handler)
@@ -163,6 +173,7 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 
 		return {
 			events,
+			plugins,
 			router: router as InferExtensionRouter<TExts>,
 		}
 	}

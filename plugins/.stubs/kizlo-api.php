@@ -42,6 +42,8 @@ namespace {
     /** @param array $schema */
     function kizlo_register_spec_schema(string $id, array $schema): void {}
 
+    function kizlo_extension(string $file, callable $boot): bool {}
+
     /**
      * @param array<array-key, mixed> $properties
      * @return array<string, array<string, mixed>>

@@ -188,6 +188,51 @@ function kizlo_register_spec_route(array $args): void
 }
 
 /**
+ * Start a plugin that builds on Kizlo, but only at versions that can carry it.
+ *
+ * Kizlo's PHP API grows in core releases, so a plugin calling a function added
+ * in core 0.12.0 fatals against core 0.11.0, and WordPress answers a fatal with
+ * a white screen rather than a notice. `Requires Plugins` cannot prevent it: it
+ * checks that a slug is active, not how new it is.
+ *
+ * Declare the versions in a `Kizlo Requires` header next to the WordPress ones,
+ * as a comma-separated list of slugs and minimum versions. Anything with a
+ * plugin header can be named, not only Kizlo:
+ *
+ *     Requires Plugins: kizlo, woocommerce
+ *     Kizlo Requires: kizlo 0.12.0, woocommerce 9.0
+ *
+ * Then hand over the boot. It runs when every requirement holds. When one does
+ * not, nothing of the plugin runs and the Plugins screen says which version of
+ * what is missing.
+ *
+ * @since 1.0.0
+ *
+ * @param string   $file Plugin's main file, i.e. __FILE__ from it. The header is read off this.
+ * @param callable $boot Runs when the requirements hold.
+ *
+ * @return bool Whether the plugin started.
+ *
+ * @example
+ * // In the plugin's main file. The function_exists check is the one requirement
+ * // this cannot express: a core old enough to lack it is too old to be asked.
+ * add_action('kizlo_loaded', function (): void {
+ *     if (!function_exists('kizlo_extension')) {
+ *         add_action('admin_notices', function (): void {
+ *             echo '<div class="notice notice-error"><p>My Plugin needs Kizlo 0.12.0 or newer.</p></div>';
+ *         });
+ *         return;
+ *     }
+ *
+ *     kizlo_extension(__FILE__, fn() => My\Plugin::instance()->boot());
+ * });
+ */
+function kizlo_extension(string $file, callable $boot): bool
+{
+    return \Kizlo\Modules\Extension\Extensions::register($file, $boot);
+}
+
+/**
  * Register a globally reusable schema.
  *
  * Schema IDs are global, so they must be vendor- or domain-qualified. The
