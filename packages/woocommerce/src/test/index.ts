@@ -32,6 +32,16 @@ async function upsertCoupon(service: SeedContext["service"], coupon: (typeof COU
 }
 
 /**
+ * WooCommerce ships every gateway disabled, and paying an order needs an available one, so the
+ * checkout tests have nothing to reach without this. Bank transfer is the gateway with no shipping
+ * method or country conditions attached to it, so enabling it says the least about the rest.
+ */
+async function enableBankTransfer(service: SeedContext["service"]): Promise<void> {
+	const updated = await service.put(`${WC_CORE_BASE}/payment_gateways/bacs`, { body: { enabled: true } })
+	if (updated.error) throw updated.error
+}
+
+/**
  * WooCommerce test fixture: installs WooCommerce + the kizlo-woocommerce plugin, seeds
  * products/coupons. Pass `plugins` to override the defaults — e.g. bind-mount your local
  * source with `{ path: "plugins/kizlo-woocommerce" }` to develop/test against live files.
@@ -53,6 +63,7 @@ export function woocommerce(opts: { plugins?: DevPluginSource[] } = {}) {
 				if (!productId) productId = id
 			}
 			for (const coupon of COUPONS) await upsertCoupon(service, coupon)
+			await enableBankTransfer(service)
 			return { productId }
 		},
 		async cleanup({ service, userId }) {

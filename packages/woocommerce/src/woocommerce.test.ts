@@ -1,10 +1,12 @@
+import { WC_CORE_BASE } from "kizlo"
 import { getKizloTestInstance, getTestCredentials } from "kizlo/test-harness"
 import { afterAll, beforeAll, expect, test } from "vitest"
 import { Cart } from "./cart/schema"
-import { Checkout } from "./checkout/schema"
+import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { Customer } from "./customer/schema"
 import { woocommerce } from "./index"
 import { Product, ProductFilters, ProductList } from "./product/schema"
+import type { BillingAddress } from "./schema"
 
 /**
  * The WooCommerce extension against a real WooCommerce, calling every route through the endpoints
@@ -263,6 +265,118 @@ test("checkout.get returns a checkout carrying the cart WooCommerce does not dec
 	// `__experimentalCart` is returned by both checkout responses and described by neither, so this
 	// resolving at all is the hand-written half of the spec doing its job.
 	expect(result.cart?.lineItems).toHaveLength(1)
+})
+
+/**
+ * Retrying payment on an order that already exists, which is the one checkout call whose addresses
+ * come from the caller rather than from the cart session.
+ *
+ * Each of these creates its own order, because a retry only works on an order still waiting to be
+ * paid and a successful one is no longer that. They read the stored order back over the admin API
+ * rather than trusting the response alone: what WooCommerce answers with and what it kept are the
+ * same thing here only if the address actually landed on the order.
+ *
+ * The orders are guest orders, verified by key and billing email. An order owned by a registered
+ * customer cannot be retried through Kizlo at all: WooCommerce checks the owner in the route's
+ * permission callback, which runs before the plugin switches the request to the cart user, so the
+ * check sees the application-password admin and answers 403.
+ */
+const ORDER_EMAIL = "stored.shopper@example.com"
+
+const STORED_SHIPPING = {
+	first_name: "Stored",
+	last_name: "Shopper",
+	address_1: "1 Old Road",
+	city: "Leeds",
+	postcode: "LS1 1AA",
+	country: "GB",
+}
+
+const RETRY_BILLING: BillingAddress = {
+	firstName: "Retry",
+	lastName: "Payer",
+	email: "retry.payer@example.com",
+	phone: "01610000000",
+	address1: "12 Fallback Street",
+	city: "Manchester",
+	postcode: "M1 1AA",
+	state: "",
+	country: "GB",
+}
+
+type SeededOrder = { id: number; order_key: string; shipping: typeof STORED_SHIPPING }
+
+/** The admin-authenticated client the test instance is wired with, for the wc/v3 routes Kizlo has no procedure for. */
+function admin() {
+	return kizlo.context.createServerContext().wordpress
+}
+
+async function createPendingOrder(): Promise<SeededOrder> {
+	const created = await admin().post<SeededOrder>(`${WC_CORE_BASE}/orders`, {
+		body: {
+			status: "pending",
+			payment_method: "bacs",
+			customer_id: 0,
+			billing: { ...STORED_SHIPPING, email: ORDER_EMAIL },
+			shipping: STORED_SHIPPING,
+			line_items: [{ product_id: productId, quantity: 1 }],
+		},
+	})
+	if (created.error) throw created.error
+	return created.data
+}
+
+async function storedOrder(id: number): Promise<SeededOrder> {
+	const order = await admin().get<SeededOrder>(`${WC_CORE_BASE}/orders/${id}`, {})
+	if (order.error) throw order.error
+	return order.data
+}
+
+test("checkout.retry leaves an absent shipping address off the call, so WooCommerce falls back to billing", async () => {
+	const order = await createPendingOrder()
+
+	const result = await client().checkout.retry.call({
+		params: { orderId: order.id },
+		body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress: RETRY_BILLING },
+	})
+
+	expect(result.billingAddress.address1).toBe(RETRY_BILLING.address1)
+	// WooCommerce copies billing onto shipping only when the argument is absent, so a blank object
+	// sent in its place would leave this holding the address the order already had, or fail
+	// validation outright.
+	expect(result.shippingAddress.address1).toBe(RETRY_BILLING.address1)
+	expect(result.shippingAddress.city).toBe(RETRY_BILLING.city)
+
+	const stored = await storedOrder(order.id)
+	expect(stored.shipping.address_1).toBe(RETRY_BILLING.address1)
+	expect(stored.shipping.postcode).toBe(RETRY_BILLING.postcode)
+})
+
+test("checkout.retry sends the shipping address a caller did give", async () => {
+	const order = await createPendingOrder()
+	const shippingAddress = { ...RETRY_BILLING, firstName: "Delivery", address1: "34 Separate Way", city: "Bristol", postcode: "BS1 1AA" }
+
+	const result = await client().checkout.retry.call({
+		params: { orderId: order.id },
+		body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress: RETRY_BILLING, shippingAddress },
+	})
+
+	expect(result.shippingAddress.address1).toBe(shippingAddress.address1)
+	expect(result.billingAddress.address1).toBe(RETRY_BILLING.address1)
+
+	const stored = await storedOrder(order.id)
+	expect(stored.shipping.address_1).toBe(shippingAddress.address1)
+})
+
+test("checkout.retry refuses a body with no billing address", async () => {
+	const order = await createPendingOrder()
+	const body = { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs" } as Omit<RetryCheckoutInput, "orderId">
+
+	await expect(client().checkout.retry.call({ params: { orderId: order.id }, body })).rejects.toThrow()
+
+	// The refusal is Kizlo's own, so nothing reached WooCommerce and the order still holds what it did.
+	const stored = await storedOrder(order.id)
+	expect(stored.shipping.address_1).toBe(STORED_SHIPPING.address_1)
 })
 
 // ==================================================
