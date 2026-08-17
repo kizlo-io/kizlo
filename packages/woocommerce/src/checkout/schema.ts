@@ -42,7 +42,9 @@ export const RetryCheckoutInput = z.object({
 	orderId: NumberLike,
 	paymentMethod: z.string(),
 	billingEmail: z.email().optional(),
-	billingAddress: BillingAddress.optional(),
+	// WooCommerce registers `billing_address` as required and copies it onto shipping when no
+	// shipping address is sent, so a retry that omits it has nothing to pay against.
+	billingAddress: BillingAddress,
 	paymentData: CheckoutPaymentData.optional(),
 	shippingAddress: ShippingAddress.optional(),
 })

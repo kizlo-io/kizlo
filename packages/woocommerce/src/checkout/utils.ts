@@ -30,21 +30,29 @@ export function gateway(method: string | undefined): Gateway | undefined {
  * the route nothing said so: the retry call passed a Kizlo address straight through as
  * `billing_address`, where every key missed and WooCommerce kept the address already on the order.
  *
- * Every field is required there, so an address given in part is sent filled out.
+ * Every field is required there, so an address given in part is sent filled out. An address that was
+ * not given at all is a different thing and never reaches here: WooCommerce reads an absent
+ * `shipping_address` as "use the billing address", and a blank one as an address, so a caller who
+ * omitted it must leave the argument off the call rather than send this filled with empty strings.
  */
-export function serializeAddress(address: ShippingAddress | BillingAddress | undefined) {
+export function serializeAddress(address: ShippingAddress) {
 	return {
-		first_name: address?.firstName ?? "",
-		last_name: address?.lastName ?? "",
-		address_1: address?.address1 ?? "",
-		address_2: address?.address2 ?? "",
-		company: address?.company ?? "",
-		city: address?.city ?? "",
-		state: address?.state ?? "",
-		country: address?.country ?? "",
-		postcode: address?.postcode ?? "",
-		phone: address?.phone ?? "",
+		first_name: address.firstName,
+		last_name: address.lastName,
+		address_1: address.address1,
+		address_2: address.address2 ?? "",
+		company: address.company ?? "",
+		city: address.city,
+		state: address.state,
+		country: address.country,
+		postcode: address.postcode,
+		phone: address.phone,
 	}
+}
+
+/** The same, plus the email WooCommerce carries on the billing address alone. */
+export function serializeBillingAddress(address: BillingAddress) {
+	return { ...serializeAddress(address), email: address.email }
 }
 
 export function deserializeCheckout(data: WCK_Checkout | WCK_CheckoutOrder): Checkout {

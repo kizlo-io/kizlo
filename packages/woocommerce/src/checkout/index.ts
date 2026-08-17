@@ -2,7 +2,7 @@ import { createProcedure } from "kizlo"
 import { sessionMiddleware } from "../session"
 import { CONFIRM_CHECKOUT_ERROR_MAP, GET_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERROR_MAP, UPDATE_CHECKOUT_ERROR_MAP } from "./error"
 import { Checkout, ConfirmCheckoutInput, RetryCheckoutInput, UpdateCheckoutInput } from "./schema"
-import { deserializeCheckout, gateway, serializeAddress } from "./utils"
+import { deserializeCheckout, gateway, serializeAddress, serializeBillingAddress } from "./utils"
 
 export const CHECKOUT_ROUTER = {
 	get: createProcedure(
@@ -182,8 +182,10 @@ export const CHECKOUT_ROUTER = {
 					payment_data: input.body.paymentData,
 					billing_email: input.body.billingEmail,
 					payment_method: gateway(input.body.paymentMethod),
-					billing_address: { ...serializeAddress(input.body.billingAddress), email: input.body.billingAddress?.email ?? "" },
-					shipping_address: serializeAddress(input.body.shippingAddress),
+					billing_address: serializeBillingAddress(input.body.billingAddress),
+					// Left off the call entirely when the caller gave no shipping address, which is what
+					// makes WooCommerce copy the billing address onto shipping instead of storing a blank.
+					shipping_address: input.body.shippingAddress ? serializeAddress(input.body.shippingAddress) : undefined,
 				},
 				{ headers: context.sessionHeaders },
 			)
