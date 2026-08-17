@@ -31,6 +31,12 @@ use Throwable;
  * find them. They are named per operation below, read off the route classes, the
  * same way {@see \Kizlo\Modules\Appearance\MenuRoutes} names core's.
  *
+ * Which arguments a mutation cannot run without. WooCommerce writes
+ * `'required' => true` on some of them, `rate_id` on the shipping rate route among
+ * them, and leaves it off arguments whose handlers read them unconditionally all
+ * the same. Deriving that literally publishes an operation weaker than the handler
+ * behind it, so the cart mutations name theirs per operation below.
+ *
  * Two of these operations return a field WooCommerce does not describe, because
  * this plugin adds it with a response filter that has no schema half. Those are
  * merged in from {@see KizloBlocks}, which says so at each call.
@@ -198,12 +204,19 @@ final class StoreApiRoutes
      * rather than the piece it changed, which is what makes a mutation and a read
      * interchangeable at the call site.
      *
+     * The last column of each row names the arguments the operation cannot run
+     * without, which WooCommerce registers as optional. It is deliberately shorter
+     * than the argument list: `add_item` takes a quantity and a variation and needs
+     * neither, because `CartController::add_to_cart()` fills a null quantity with
+     * the product's minimum and a variation is only meaningful on a variable
+     * product, which is a condition no flat flag can carry.
+     *
      * @return array<int, array<string, mixed>>
      */
     private static function cart(RoutesController $routes): array
     {
         $operations = [
-            ['cart', 'get', 'GET', 'Retrieve the cart', []],
+            ['cart', 'get', 'GET', 'Retrieve the cart', [], []],
             ['cart-add-item', 'add_item', 'POST', 'Add an item to the cart', [
                 'woocommerce_rest_cart_invalid_parent_product',
                 'woocommerce_rest_cart_invalid_product',
@@ -216,37 +229,37 @@ final class StoreApiRoutes
                 'woocommerce_rest_product_out_of_stock',
                 'woocommerce_rest_product_partially_out_of_stock',
                 'woocommerce_rest_variation_id_from_variation_data',
-            ]],
+            ], ['id']],
             ['cart-update-item', 'update_item', 'POST', 'Change the quantity of a cart item', [
                 'woocommerce_rest_cart_invalid_key',
                 'woocommerce_rest_cart_invalid_product',
                 'woocommerce_rest_product_invalid_quantity',
                 'woocommerce_rest_product_out_of_stock',
                 'woocommerce_rest_product_partially_out_of_stock',
-            ]],
+            ], ['key', 'quantity']],
             ['cart-remove-item', 'remove_item', 'POST', 'Remove an item from the cart', [
                 'woocommerce_rest_cart_invalid_key',
-            ]],
+            ], ['key']],
             ['cart-apply-coupon', 'apply_coupon', 'POST', 'Apply a coupon to the cart', [
                 'woocommerce_rest_cart_coupon_disabled',
                 'woocommerce_rest_cart_coupon_error',
-            ]],
+            ], ['code']],
             ['cart-remove-coupon', 'remove_coupon', 'POST', 'Remove a coupon from the cart', [
                 'woocommerce_rest_cart_coupon_disabled',
                 'woocommerce_rest_cart_coupon_error',
                 'woocommerce_rest_cart_coupon_invalid_code',
-            ]],
+            ], ['code']],
             ['cart-select-shipping-rate', 'select_shipping_rate', 'POST', 'Choose a shipping rate for a package', [
                 'woocommerce_rest_cart_missing_rate_id',
                 'woocommerce_rest_cart_shipping_rate_not_found',
                 'woocommerce_rest_shipping_disabled',
-            ]],
-            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', []],
+            ], []],
+            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', [], []],
         ];
 
         $declarations = [];
 
-        foreach ($operations as [$identifier, $operation, $method, $summary, $errors]) {
+        foreach ($operations as [$identifier, $operation, $method, $summary, $errors, $required]) {
             $declarations[] = self::declaration(
                 routes: $routes,
                 identifier: $identifier,
@@ -258,6 +271,7 @@ final class StoreApiRoutes
                 responses: [
                     '200' => ['description' => 'The cart.', 'body' => ['$ref' => WooCommerceSchemas::STORE_CART]],
                 ],
+                required: $required,
             );
         }
 
@@ -396,6 +410,7 @@ final class StoreApiRoutes
      * @param array<int, string>                  $errors
      * @param array<array-key, mixed>             $responses Keyed by status, which PHP reads as an int.
      * @param array<string, array<string, mixed>> $extra     Properties the path carries rather than the args.
+     * @param array<int, string>                  $required  Derived arguments the handler cannot run without.
      * @return array<string, mixed>
      */
     private static function declaration(
@@ -409,13 +424,14 @@ final class StoreApiRoutes
         array $responses,
         string $description = '',
         array $extra = [],
+        array $required = [],
     ): array {
         $route = self::route($routes, $identifier);
         $path  = $route === null ? '' : $route->get_path();
 
         $input = [
             'type'       => 'object',
-            'properties' => $extra + ($route === null ? [] : self::args($route, $method, $path)),
+            'properties' => $extra + self::required($route === null ? [] : self::args($route, $method, $path), $required),
         ];
 
         if (in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
@@ -478,6 +494,38 @@ final class StoreApiRoutes
         }
 
         return [];
+    }
+
+    /**
+     * Mark the derived arguments the handler cannot run without.
+     *
+     * WooCommerce registers most cart mutation arguments without `required`, then
+     * reads them in the handler regardless, so a client generated from the
+     * registration alone can express a call that cannot work: `remove_item()` with
+     * no key reaches `woocommerce_rest_cart_invalid_key` every time. This flips the
+     * flag afterwards rather than in {@see self::args()}, which stays a pure read of
+     * what WooCommerce declared.
+     *
+     * A name with no argument behind it is left alone, because a WooCommerce release
+     * that renames an argument should cost this operation its overlay and not its
+     * whole declaration. Nothing here notices that happening, which is the case
+     * KIZ-111 is opened to cover.
+     *
+     * @param array<string, array<string, mixed>> $args
+     * @param array<int, string>                  $names
+     * @return array<string, array<string, mixed>>
+     */
+    private static function required(array $args, array $names): array
+    {
+        foreach ($names as $name) {
+            if (!isset($args[$name])) {
+                continue;
+            }
+
+            $args[$name]['required'] = true;
+        }
+
+        return $args;
     }
 
     /**

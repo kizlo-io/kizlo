@@ -172,6 +172,84 @@ test("cart.coupons.apply maps an unknown coupon to its Kizlo error", async () =>
 })
 
 // ==================================================
+// CART — the arguments the contract calls required
+// ==================================================
+
+/**
+ * The plugin marks the cart mutation arguments WooCommerce registers as optional and then reads in
+ * the handler anyway, which is what stops `remove_item()` compiling. Nothing in TypeScript can check
+ * that claim against WooCommerce, so these send each mutation without it and assert the failure. A
+ * WooCommerce release that grows a default for one of them turns its case green in a way that reads
+ * as an overlay to drop rather than a test to fix.
+ *
+ * These reach the generated endpoints rather than the extension's procedures, because the procedures
+ * are the layer whose schemas already refuse the call.
+ */
+function store() {
+	return kizlo.context.createServerContext().wordpress.woocommerce.store
+}
+
+/** What the session middleware sends, so these land on the same cart as the tests above. */
+function session() {
+	return { headers: { "X-Kizlo-User-Id": String(getTestCredentials().users.user.id) } }
+}
+
+test("cart.add_item without a product cannot resolve one", async () => {
+	const response = await store().cart.add_item({} as { id: number }, session())
+
+	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_product")
+})
+
+test("cart.remove_item without a key matches no cart item", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+
+	const response = await store().cart.remove_item({} as { key: string }, session())
+
+	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_key")
+})
+
+test("cart.update_item without a key changes nothing it can name", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+
+	const response = await store().cart.update_item({ quantity: 3 } as { key: string; quantity: number }, session())
+
+	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_key")
+})
+
+test("cart.apply_coupon without a code applies no coupon", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+
+	const response = await store().cart.apply_coupon({} as { code: string }, session())
+
+	expect(response.error?.code).toBe("woocommerce_rest_cart_coupon_error")
+})
+
+test("cart.remove_coupon without a code removes no coupon", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+
+	const response = await store().cart.remove_coupon({} as { code: string }, session())
+
+	expect(response.error?.code).toBe("woocommerce_rest_cart_coupon_error")
+})
+
+/**
+ * The other half of the overlay: `add_item` takes a quantity and a variation and is marked as
+ * needing neither, because WooCommerce fills them. This is the call that would break if the overlay
+ * were widened to every argument the handler reads.
+ */
+test("cart.add_item without a quantity takes the product's minimum", async () => {
+	await emptyCart()
+	const response = await store().cart.add_item({ id: productId }, session())
+
+	expect(response.error).toBeNull()
+	expect(response.data?.items_count).toBe(1)
+})
+
+// ==================================================
 // CHECKOUT — wc/store/v1
 // ==================================================
 

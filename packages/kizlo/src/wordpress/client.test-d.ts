@@ -190,6 +190,41 @@ describe("described WooCommerce routes", () => {
 		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.add_item">>().toEqualTypeOf<WP_EndpointData<"woocommerce.store.cart.get">>()
 	})
 
+	/**
+	 * WooCommerce registers these arguments without `required`, then reads them in the handler
+	 * regardless, so the plugin marks them and these are the calls that stop compiling because of it.
+	 * A bare mutation is the one worth guarding hardest: every property being optional is what made
+	 * the whole input argument optional, so `remove_item()` used to be a call you could write.
+	 */
+	it("refuses a cart mutation missing what its handler reads", async () => {
+		// @ts-expect-error the cart cannot add an unnamed product
+		await wordpress.woocommerce.store.cart.add_item({ quantity: 2 })
+		// @ts-expect-error an update names the item it changes and the quantity to change it to
+		await wordpress.woocommerce.store.cart.update_item({ key: "a1b2" })
+		// @ts-expect-error removal is by item key, and there is no cart-wide default
+		await wordpress.woocommerce.store.cart.remove_item()
+		// @ts-expect-error both coupon operations name a code
+		await wordpress.woocommerce.store.cart.apply_coupon()
+		// @ts-expect-error and neither treats an absent one as "whichever is applied"
+		await wordpress.woocommerce.store.cart.remove_coupon()
+	})
+
+	/**
+	 * The other half of the overlay, and the reason it is written per operation rather than applied to
+	 * every optional Woo argument: these calls are meaningful with nothing in them and stay callable.
+	 */
+	it("leaves an operation callable when its arguments really are optional", async () => {
+		expectTypeOf(await wordpress.woocommerce.store.cart.get()).toEqualTypeOf<WP_EndpointResult<"woocommerce.store.cart.get">>()
+		expectTypeOf(await wordpress.woocommerce.store.cart.update_customer()).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.update_customer">
+		>()
+		// `CartController::add_to_cart()` fills a null quantity with the product's minimum, and a
+		// variation only means anything on a variable product, so neither is required alongside the ID.
+		expectTypeOf(await wordpress.woocommerce.store.cart.add_item({ id: 4 })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.add_item">
+		>()
+	})
+
 	it("types the product filters the storefront actually sends", async () => {
 		expectTypeOf(
 			await wordpress.woocommerce.store.products.list({ per_page: 12, stock_status: ["instock"], rating: [4, 5] }),
