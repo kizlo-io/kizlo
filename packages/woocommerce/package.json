@@ -70,6 +70,6 @@
 		"vitest": "catalog:"
 	},
 	"peerDependencies": {
-		"kizlo": ">=0.1.0"
+		"kizlo": ">=0.15.0"
 	}
 }

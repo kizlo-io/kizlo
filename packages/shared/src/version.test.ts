@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isPluginVersionSupported, MIN_PLUGIN_VERSION } from "./version"
+import { extensionUpdateMessage, isPluginVersionSupported, MIN_PLUGIN_VERSION, parseExtensionVersions } from "./version"
 
 describe("isPluginVersionSupported", () => {
 	it("accepts the exact minimum", () => {
@@ -29,5 +29,41 @@ describe("isPluginVersionSupported", () => {
 		expect(isPluginVersionSupported("")).toBe(false)
 		expect(isPluginVersionSupported("0.8")).toBe(false)
 		expect(isPluginVersionSupported("not-a-version")).toBe(false)
+	})
+})
+
+describe("parseExtensionVersions", () => {
+	it("reads slug and version pairs", () => {
+		expect(parseExtensionVersions("kizlo-woocommerce=0.2.0,kizlo-cf7=0.1.0")).toEqual({
+			"kizlo-woocommerce": "0.2.0",
+			"kizlo-cf7": "0.1.0",
+		})
+	})
+
+	it("tolerates spacing around the pairs", () => {
+		expect(parseExtensionVersions(" kizlo-woocommerce = 0.2.0 ")).toEqual({ "kizlo-woocommerce": "0.2.0" })
+	})
+
+	it("returns nothing for an absent or empty header", () => {
+		expect(parseExtensionVersions(null)).toEqual({})
+		expect(parseExtensionVersions(undefined)).toEqual({})
+		expect(parseExtensionVersions("")).toEqual({})
+	})
+
+	it("drops a pair it cannot read rather than inventing a version", () => {
+		expect(parseExtensionVersions("kizlo-woocommerce,kizlo-cf7=0.1.0")).toEqual({ "kizlo-cf7": "0.1.0" })
+		expect(parseExtensionVersions("=0.2.0")).toEqual({})
+	})
+})
+
+describe("extensionUpdateMessage", () => {
+	const requirement = { slug: "kizlo-woocommerce", name: "Kizlo WooCommerce", version: "0.2.0" }
+
+	it("names the installed version and the one required", () => {
+		expect(extensionUpdateMessage(requirement, "0.1.0")).toBe("Kizlo WooCommerce plugin outdated (0.1.0). Update to 0.2.0+.")
+	})
+
+	it("says so when the plugin is not running at all", () => {
+		expect(extensionUpdateMessage(requirement)).toBe("Kizlo WooCommerce plugin outdated (not active). Update to 0.2.0+.")
 	})
 })

@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Require Kizlo 0.12.0 and WooCommerce 10.9, and report which one is missing instead of starting without it

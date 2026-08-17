@@ -7,6 +7,7 @@ use Kizlo\Modules\Appearance\AppearanceModule;
 use Kizlo\Modules\Comment\CommentModule;
 use Kizlo\Modules\CustomFields\CustomFieldsModule;
 use Kizlo\Modules\Email\EmailModule;
+use Kizlo\Modules\Extension\ExtensionModule;
 use Kizlo\Modules\Headless\HeadlessModule;
 use Kizlo\Modules\Introspection\IntrospectionModule;
 use Kizlo\Modules\Post\PostModule;
@@ -35,6 +36,7 @@ class Plugin
      * @var array<int, class-string>
      */
     private array $modules = [
+        ExtensionModule::class,
         AdminModule::class,
         SettingsModule::class,
         HeadlessModule::class,
