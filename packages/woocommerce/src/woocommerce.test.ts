@@ -251,6 +251,35 @@ test("cart.add_item without a quantity takes the product's minimum", async () =>
 	expect(response.data?.items_count).toBe(1)
 })
 
+/**
+ * `add_item` is the one cart mutation WooCommerce answers `201` to, from `set_status( 201 )` in
+ * `CartAddItem::get_route_post_response()`, and the contract declared `200` for all eight until
+ * KIZ-106. A status is a discriminant a caller can narrow on, so it has to be the one the server
+ * sends rather than the one the loop that built the declaration found convenient. The second call
+ * is the other half: it pins a mutation that really is `200`, so a fix applied to the whole loop
+ * rather than to the one operation fails here.
+ */
+test("cart.add_item reports the item it created with 201", async () => {
+	await emptyCart()
+	const response = await store().cart.add_item({ id: productId, quantity: 1 }, session())
+
+	expect(response.error).toBeNull()
+	expect(response.status).toBe(201)
+	expect(response.data?.items_count).toBe(1)
+})
+
+test("cart.update_item changes an item it did not create with 200", async () => {
+	await emptyCart()
+	const added = await store().cart.add_item({ id: productId, quantity: 1 }, session())
+	const key = added.data?.items[0]?.key
+	if (!key) throw new Error("cart.add_item returned no item to update.")
+
+	const response = await store().cart.update_item({ key, quantity: 2 }, session())
+
+	expect(response.error).toBeNull()
+	expect(response.status).toBe(200)
+})
+
 // ==================================================
 // CHECKOUT — wc/store/v1
 // ==================================================

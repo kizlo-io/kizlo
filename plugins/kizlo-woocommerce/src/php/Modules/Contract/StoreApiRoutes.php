@@ -31,6 +31,13 @@ use Throwable;
  * find them. They are named per operation below, read off the route classes, the
  * same way {@see \Kizlo\Modules\Appearance\MenuRoutes} names core's.
  *
+ * The status a success answers with. WordPress has nowhere to declare one:
+ * `WP_REST_Server::get_data_for_route()` publishes methods, args and the item
+ * schema, and no responses at all, so a route's status exists only as a
+ * `set_status()` call inside the handler body. Core makes twelve of them and
+ * WooCommerce one, and none is reachable without running the route. They are
+ * named per operation below and pinned by the integration tests instead.
+ *
  * Which arguments a mutation cannot run without. WooCommerce writes
  * `'required' => true` on some of them, `rate_id` on the shipping rate route among
  * them, and leaves it off arguments whose handlers read them unconditionally all
@@ -200,9 +207,15 @@ final class StoreApiRoutes
     }
 
     /**
-     * Eight operations, one response. Every cart route answers with the whole cart
+     * Eight operations, one body. Every cart route answers with the whole cart
      * rather than the piece it changed, which is what makes a mutation and a read
      * interchangeable at the call site.
+     *
+     * The status is not shared, because `add_item` alone answers `201`:
+     * `CartAddItem::get_route_post_response()` calls `set_status( 201 )` where the
+     * other seven leave the `200` `WP_REST_Response` starts as. Declaring one
+     * status across the loop published a discriminant a caller could narrow on and
+     * get a wrong answer from, which is the whole of KIZ-106.
      *
      * The last column of each row names the arguments the operation cannot run
      * without, which WooCommerce registers as optional. It is deliberately shorter
@@ -216,8 +229,8 @@ final class StoreApiRoutes
     private static function cart(RoutesController $routes): array
     {
         $operations = [
-            ['cart', 'get', 'GET', 'Retrieve the cart', [], []],
-            ['cart-add-item', 'add_item', 'POST', 'Add an item to the cart', [
+            ['cart', 'get', 'GET', 'Retrieve the cart', '200', [], []],
+            ['cart-add-item', 'add_item', 'POST', 'Add an item to the cart', '201', [
                 'woocommerce_rest_cart_invalid_parent_product',
                 'woocommerce_rest_cart_invalid_product',
                 'woocommerce_rest_cart_item_exists',
@@ -230,36 +243,36 @@ final class StoreApiRoutes
                 'woocommerce_rest_product_partially_out_of_stock',
                 'woocommerce_rest_variation_id_from_variation_data',
             ], ['id']],
-            ['cart-update-item', 'update_item', 'POST', 'Change the quantity of a cart item', [
+            ['cart-update-item', 'update_item', 'POST', 'Change the quantity of a cart item', '200', [
                 'woocommerce_rest_cart_invalid_key',
                 'woocommerce_rest_cart_invalid_product',
                 'woocommerce_rest_product_invalid_quantity',
                 'woocommerce_rest_product_out_of_stock',
                 'woocommerce_rest_product_partially_out_of_stock',
             ], ['key', 'quantity']],
-            ['cart-remove-item', 'remove_item', 'POST', 'Remove an item from the cart', [
+            ['cart-remove-item', 'remove_item', 'POST', 'Remove an item from the cart', '200', [
                 'woocommerce_rest_cart_invalid_key',
             ], ['key']],
-            ['cart-apply-coupon', 'apply_coupon', 'POST', 'Apply a coupon to the cart', [
+            ['cart-apply-coupon', 'apply_coupon', 'POST', 'Apply a coupon to the cart', '200', [
                 'woocommerce_rest_cart_coupon_disabled',
                 'woocommerce_rest_cart_coupon_error',
             ], ['code']],
-            ['cart-remove-coupon', 'remove_coupon', 'POST', 'Remove a coupon from the cart', [
+            ['cart-remove-coupon', 'remove_coupon', 'POST', 'Remove a coupon from the cart', '200', [
                 'woocommerce_rest_cart_coupon_disabled',
                 'woocommerce_rest_cart_coupon_error',
                 'woocommerce_rest_cart_coupon_invalid_code',
             ], ['code']],
-            ['cart-select-shipping-rate', 'select_shipping_rate', 'POST', 'Choose a shipping rate for a package', [
+            ['cart-select-shipping-rate', 'select_shipping_rate', 'POST', 'Choose a shipping rate for a package', '200', [
                 'woocommerce_rest_cart_missing_rate_id',
                 'woocommerce_rest_cart_shipping_rate_not_found',
                 'woocommerce_rest_shipping_disabled',
             ], []],
-            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', [], []],
+            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', '200', [], []],
         ];
 
         $declarations = [];
 
-        foreach ($operations as [$identifier, $operation, $method, $summary, $errors, $required]) {
+        foreach ($operations as [$identifier, $operation, $method, $summary, $status, $errors, $required]) {
             $declarations[] = self::declaration(
                 routes: $routes,
                 identifier: $identifier,
@@ -269,7 +282,7 @@ final class StoreApiRoutes
                 summary: $summary,
                 errors: array_merge(self::CART_ROUTE, $errors),
                 responses: [
-                    '200' => ['description' => 'The cart.', 'body' => ['$ref' => WooCommerceSchemas::STORE_CART]],
+                    $status => ['description' => 'The cart.', 'body' => ['$ref' => WooCommerceSchemas::STORE_CART]],
                 ],
                 required: $required,
             );
