@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Declare the cart mutation arguments WooCommerce registers as optional but its handlers require
