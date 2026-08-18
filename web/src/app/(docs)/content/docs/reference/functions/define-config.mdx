@@ -58,6 +58,20 @@ export default defineConfig({
 })
 ```
 
+Give each branch its own local WordPress with `worktrees`, so parallel checkouts of the project stop
+sharing one database:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  worktrees: true,
+  dev: { local: true },
+  test: { local: true },
+})
+```
+
 Seed both from shared fixtures, and override ports where they clash:
 
 ```ts title="kizlo.config.ts"

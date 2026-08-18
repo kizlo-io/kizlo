@@ -59,6 +59,33 @@ You seed each from **[fixtures](#fixtures)** in `kizlo.config.ts`, a separate li
 at the same ones and a post or plugin behaves identically whether you're building or testing; give them
 different sets when a test needs a world your dev site doesn't.
 
+### One stack per branch
+
+Both environments are named after your project, so every checkout of it shares them. Work in one place at a
+time and that is what you want: the same containers and the same database, whichever directory you started
+from.
+
+It stops being what you want once you keep several checkouts at once, typically git worktrees, one per
+branch. Two suites then truncate each other's tables while each reports its own URL. Set `worktrees` to give
+each branch its own pair:
+
+```ts title="kizlo.config.ts"
+export default defineConfig({
+  worktrees: true,
+  dev: { local: true },
+  test: { local: true },
+})
+```
+
+The branch is appended to the stack name, so `shop` on `fix/checkout-total` runs
+`kizlo-shop-fix-checkout-total-dev`. Ports are picked per stack, and an explicitly configured `dev.port` or
+`test.port` becomes a starting point rather than a fixed pin, since one pinned port cannot serve every branch
+at once.
+
+Each stack holds its own database, so a new branch starts from your fixtures rather than from the state you
+left on the last one, and a branch you never return to keeps its containers until you remove them. Switching
+branches inside one checkout moves it to that branch's stack for the same reason.
+
 ## Fixtures
 
 A **fixture** is the unit of that shared content: a `seed` function that creates known records over the typed

@@ -34,7 +34,8 @@ export async function runSeeds(config: BootstrapConfig): Promise<() => Promise<v
 
 	const path = credentialsPath()
 	mkdirSync(dirname(path), { recursive: true })
-	writeFileSync(path, `${JSON.stringify({ url: boot.url, users: boot.users, fixtures: boot.fixtures }, null, 2)}\n`)
+	const artifact = { url: boot.url, project: config.project, users: boot.users, fixtures: boot.fixtures }
+	writeFileSync(path, `${JSON.stringify(artifact, null, 2)}\n`)
 
 	return async () => {
 		for (const fixture of config.fixtures ?? []) await fixture.cleanup?.(ctx)

@@ -71,3 +71,8 @@ debug.txt
 .fallow
 
 .temp
+# agent worktrees (one isolated checkout per session)
+# .agents/ is where the workflow skill puts them; harnesses that pick their own
+# location keep using it, so both are ignored.
+.agents/worktrees/
+.claude/worktrees/

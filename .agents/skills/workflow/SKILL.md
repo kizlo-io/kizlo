@@ -7,9 +7,9 @@ description: Takes a Linear issue from first read to open PR under this repo's b
 
 Input is an issue key (`KIZ-70`) or a `linear.app` URL; ask if neither is given. One team, `Kizlo`, key `KIZ`.
 
-**Nothing touches git until the user says go**, because handing over an issue key is a request to understand it, not a decision to build it now. That go-ahead then covers the rest: branch, commits, pushes, draft PR, without asking again, since work that exists only on this machine can be lost. This overrides the standing per-action commit-approval rule, for this workflow only. One gate remains at the end, **report against the issue's acceptance and ask before marking the PR ready for review**, as that is the point it asks for someone's time.
+**Nothing touches git until the user says go**, because handing over an issue key is a request to understand it, not a decision to build it now. That go-ahead then covers the rest: worktree, branch, commits, pushes, draft PR, without asking again, since work that exists only on this machine can be lost. This overrides the standing per-action commit-approval rule, for this workflow only. One gate remains at the end, **report against the issue's acceptance and ask before marking the PR ready for review**, as that is the point it asks for someone's time.
 
-No em-dash and no LLM filler anywhere. No Claude or Anthropic attribution in any commit, PR, or file.
+No em-dash and no LLM filler anywhere. No agent or vendor attribution in any commit, PR, or file, whichever assistant is running this.
 
 ## 1. Read the issue and the code around it
 
@@ -22,11 +22,14 @@ Then open the files the issue points at, before saying anything about it. A brie
 
 While reading, **pull out the two or three lines that show the problem**: the declaration that is wrong, the call that returns the wrong thing, the test that does not exist. Step 2 is built on those lines, so if you cannot point at any, you have not read enough yet.
 
-Check for prior work, so the brief can say whether this is a fresh start or a resume:
+Check for prior work, so the brief can say whether this is a fresh start or a resume. Both are read-only and safe on a dirty tree, from any branch:
 
 ```bash
-git branch --list "*kiz-<number>*"    # read-only, safe on a dirty tree
+git branch --list "*kiz-<number>*"
+git worktree list
 ```
+
+A branch with no worktree is prior work from before this workflow used them; a worktree already on that branch is a session someone may still have open.
 
 ## 2. Explain it, then wait
 
@@ -75,33 +78,58 @@ The controller serving the same route allows sixteen, `after`, `before`, `slug` 
 
 Then **stop and wait for an explicit go-ahead.** Silence is not one, and neither is the original "do KIZ-70". The user may want to edit the issue, add detail, reprioritise, or shelve it, all cheaper before a branch exists. If they come back with changes, refresh with `get_issue`, brief on what moved, and wait again. On a resume, brief on what the branch already has and what is left, then wait the same way.
 
-## 3. Clean start, branch, mark it started
+## 3. Worktree off fresh `main`, mark it started
+
+**Every issue gets its own worktree**, so the branch this session builds is never the branch another session is sitting on. The main checkout is left exactly as found: never `git checkout`, never `git stash`, never ask the user to clean their tree first.
+
+First look, and say what you see:
 
 ```bash
-git status --porcelain   # must print nothing
+git status --porcelain
 ```
 
-**If that prints anything, stop and tell the user what is dirty.** Do not commit or amend to clear it, do not `git stash` it somewhere they did not ask for, and do not check out anyway and drag it onto the new branch. Distinguish tracked modifications from untracked files; untracked-only is usually safe to carry, but let them decide.
+**If it prints anything, name what is dirty and pause for a one-word confirm.** Nothing here touches those files, so the pause exists only so the user can say "that is work in progress, carry on" rather than discovering later that they expected it to come along. A clean tree needs no pause.
 
-Then refresh `main`, even if already on it, rather than branching off a stale one:
+Then, from the main checkout:
 
 ```bash
-git checkout main && git pull
+git fetch origin main
+git worktree add .agents/worktrees/kiz-70 -b fix/kiz-70-derive-list-parameters origin/main
 ```
 
-If step 1 found an existing `kiz-<number>` branch, this is a resume: check it out and continue instead of starting a second one. Otherwise:
+**Branch off `origin/main`, never local `main` and never `HEAD`.** This session may have been open for hours while `main` moved, and a branch cut from a stale ref is a merge conflict you handed yourself.
+
+The branch is `<type>/kiz-<number>-<short-slug>`. Type is the Conventional Commit type (`feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, `ci`, `build`, `style`, `revert`), and a bug stays `fix` even when the remedy is a rewrite. Slug is three or four words naming the change, not the symptom: write it yourself, ignore whatever branch name Linear offers. **Keep the `kiz-<number>` token exactly**, it is what attaches the PR to the issue.
+
+A worktree is a fresh checkout with none of the gitignored files, so carry them across before entering:
 
 ```bash
-git checkout -b fix/kiz-70-derive-list-parameters   # <type>/kiz-<number>-<short-slug>, never commit to main
+cp .env .agents/worktrees/kiz-70/.env    # skip if the repo has no .env
 ```
 
-Type is the Conventional Commit type (`feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, `ci`, `build`, `style`, `revert`). A bug stays `fix` even when the remedy is a rewrite. Slug is three or four words naming the change, not the symptom: write it yourself, ignore whatever branch name Linear offers. **Keep the `kiz-<number>` token exactly**, it is what attaches the PR to the issue.
+Then move the session into that directory, by whatever the harness running this offers: a tool that takes the path, or a change of working directory. Creating the worktree with git first, rather than letting a harness create one, is what keeps the branch name under this skill's control.
+
+Once inside, install and build, because a worktree starts with neither `node_modules` nor any package's `dist`:
+
+```bash
+pnpm install
+pnpm build
+```
+
+The install is what the pre-commit hook and step 6 need. The build is what `kizlo.config.ts` needs, since it imports `@kizlo/cf7/test` and `@kizlo/woocommerce/test`: skip it and every `kizlo` command dies on `Package subpath './test' is not defined`. Turbo restores both from cache, so this is seconds rather than a cold build.
+
+**Everything from here happens in there.** Some harnesses enforce that and refuse anything reaching back into the main checkout, so a refusal naming the worktree means a path went to the wrong checkout, not that the command was wrong. Where nothing enforces it the rule still holds, because the main checkout is another session's workspace. `git` itself is shared, so commits, pushes, and `gh` behave normally from inside.
+
+Two cases that are not a fresh start:
+
+- **Step 1 found a `kiz-<number>` branch with no worktree.** Attach one to it rather than starting a second branch: `git worktree add .agents/worktrees/kiz-70 fix/kiz-70-<slug>`, no `-b`, no `origin/main`. Then rebase onto fresh `main` from inside it, since the point of step 3 is a current base: `git rebase origin/main`.
+- **This session is already in a worktree.** Do not nest one inside another. If it is this issue's worktree, carry on in it. If it is another issue's, stop and tell the user to run the workflow from a session in the main checkout.
 
 If the issue is in `Backlog` or `Todo`, `save_issue` it to `In Progress`. Linear cannot see a local branch, so this is the one status write you make.
 
 ## 4. Implement, and get on the remote early
 
-Match the surrounding code. Use the sibling skill when one covers the work (`wp-types`, `wp-service`, `wcs-types`, `wc-types`, `procedure-errors`, `docs`).
+Match the surrounding code. Use the `docs` skill when the work touches documentation.
 
 **As soon as the first coherent piece of work exists, commit it, push it, and open the PR as a draft.** Do not save this for the end.
 
@@ -148,7 +176,15 @@ vendor/bin/changelogger add -f <slug> -s <patch|minor|major> \
 pnpm check && pnpm typecheck && pnpm build && pnpm test
 ```
 
-`pnpm test` needs `pnpm kizlo test up` first, and plugin PHPUnit only runs in-container via `pnpm kizlo test`. If a failure predates the branch, say so rather than absorbing it here. This gates marking the PR ready, not the step 4 checkpoints.
+Plugin PHPUnit only runs in-container, so it comes from `pnpm kizlo test` rather than `pnpm test`. If a failure predates the branch, say so rather than absorbing it here. This gates marking the PR ready, not the step 4 checkpoints.
+
+**The WordPress stack follows the branch.** `worktrees: true` in `kizlo.config.ts` appends the checked-out branch to the compose project, so these containers are this branch's alone and a suite running on another cannot reach them. Nothing here needs coordinating with other sessions.
+
+Each stack is a WordPress and a MySQL container, left up for fast reruns. Once step 8's report is posted, stop this one rather than leaving it running behind an open PR:
+
+```bash
+pnpm kizlo test stop
+```
 
 ## 7. Finish the PR
 
@@ -217,10 +253,13 @@ The checkpoints from step 4 existed to keep unfinished work off this machine onl
 A branch holding exactly one commit prefills that box with that commit verbatim, so write the commit body once and the merge box is correct with nothing to paste:
 
 ```bash
-git reset --soft $(git merge-base HEAD main)
+git merge-base HEAD origin/main          # read the base commit
+git reset --soft <that sha>              # pass it literally, not as a substitution
 git commit -m "<subject>" -m "<commit body>"
 git push --force-with-lease
 ```
+
+`origin/main`, not `main`: step 3 cut the branch from the remote ref, and local `main` belongs to the main checkout, which this session has not touched and may be behind. Run the two commands separately rather than nesting a substitution, which some harnesses refuse inside a worktree because they cannot trace it statically.
 
 Force-pushing is safe here and only here: it is your own PR branch, before review, and nobody else has commits on it. Never `--force`, always `--force-with-lease`. If review later adds commits, collapse again before merge.
 
@@ -273,8 +312,14 @@ Left to decide: move taxonomy registration to `rest_api_init` in this PR, or spl
 
 </details>
 
-## 9. Then leave the status alone
+## 9. Then leave the status and the worktree alone
 
 Step 3 set `In Progress` and the integration takes it from there: review activity moves it to `In Review`, merge to `Done`. Do not call `save_issue` again, never set `Done` yourself, and do not claim the status moved. Say the PR is open, and whether it is still a draft.
+
+**Stay in the worktree.** Do not leave it and do not remove it: review comments land on this branch, and this is where they get fixed. The user ends the session when they are done with it. Removal is theirs to run from the main checkout once the PR merges:
+
+```bash
+git worktree remove .agents/worktrees/kiz-70
+```
 
 If the issue never moves once the PR is ready, the `kiz-<number>` token is wrong or the PR did not attach. Say so instead of fixing it by hand.

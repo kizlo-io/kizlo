@@ -11,6 +11,7 @@ const fixtures = [
 ]
 
 export default defineConfig({
+	worktrees: true,
 	wordpressClientDir: ".",
 	dev: { local: true, fixtures },
 	test: { local: true, fixtures },

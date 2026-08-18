@@ -4,7 +4,7 @@ import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { githubRelease, kizloRelease } from "./constants"
 import { isLocalPlugin } from "./types"
-import { credentialsPath, findConfigDir, resolvePluginSource } from "./utils"
+import { credentialsPath, findConfigDir, recordedPort, resolvePluginSource } from "./utils"
 
 describe("githubRelease", () => {
 	test("builds a release-zip URL where the asset is named after the tag", () => {
@@ -73,5 +73,46 @@ describe("findConfigDir", () => {
 		const nested = path.join(dir, "apps", "web")
 		fs.mkdirSync(nested, { recursive: true })
 		expect(credentialsPath(nested)).toBe(path.join(dir, ".kizlo", "test.json"))
+	})
+})
+
+describe("recordedPort", () => {
+	let dir: string
+	let cwd: string
+
+	beforeEach(() => {
+		cwd = process.cwd()
+		dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-port-")))
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), "export default {}\n")
+		process.chdir(dir)
+	})
+
+	afterEach(() => {
+		process.chdir(cwd)
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
+	function writeCredentials(credentials: Record<string, unknown>): void {
+		fs.mkdirSync(path.join(dir, ".kizlo"), { recursive: true })
+		fs.writeFileSync(path.join(dir, ".kizlo", "test.json"), JSON.stringify(credentials))
+	}
+
+	test("reads the port out of the recorded url", () => {
+		writeCredentials({ url: "http://localhost:8889", project: "kizlo-shop-main-test" })
+		expect(recordedPort("kizlo-shop-main-test")).toBe(8889)
+	})
+
+	test("ignores a port another stack recorded", () => {
+		writeCredentials({ url: "http://localhost:8889", project: "kizlo-shop-main-test" })
+		expect(recordedPort("kizlo-shop-fix-checkout-test")).toBeUndefined()
+	})
+
+	test("ignores an artifact written before stacks were recorded", () => {
+		writeCredentials({ url: "http://localhost:8889" })
+		expect(recordedPort("kizlo-shop-main-test")).toBeUndefined()
+	})
+
+	test("is undefined when nothing has been seeded here", () => {
+		expect(recordedPort("kizlo-shop-main-test")).toBeUndefined()
 	})
 })

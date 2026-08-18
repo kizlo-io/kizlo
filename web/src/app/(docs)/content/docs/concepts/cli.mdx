@@ -291,6 +291,7 @@ export default defineConfig({
 | `dir` | all | Kizlo's home directory — where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory) |
 | `alias` | `init` | Import-alias prefix for generated imports, e.g. `@`. Blank means relative imports |
 | `name` | `dev`, `test` | Base name for the Docker projects (`<name>-dev`, `<name>-test`). Defaults to the sanitized `package.json` name, then the config dir basename |
+| `worktrees` | `dev`, `test` | Append the checked-out branch to `name`, so each branch gets its own Docker projects (`<name>-<branch>-dev`). Off unless set. Turn it on when you keep several checkouts of one project, typically [git worktrees](/docs/concepts/development-and-testing#one-stack-per-branch), so their WordPress and database stop being shared |
 | `dev.local` | `dev` | Run local WordPress under `kizlo dev`. When `true`, `kizlo dev` boots a Docker WordPress in `.kizlo/local`; unset or `false` runs the watcher alone. Set by `create`/`init` when you choose local WordPress |
 | `dev.port` | `dev` | Port local WordPress listens on under `kizlo dev`. Defaults to `8080` |
 | `dev.dbPort` | `dev` | Host port the local MySQL is published on (bound to `127.0.0.1`) so you can point a SQL client at the database. Defaults to `3307`; change it if it clashes |

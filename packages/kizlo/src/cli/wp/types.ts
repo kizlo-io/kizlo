@@ -27,6 +27,12 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
  */
 export interface TestCredentials {
 	url: string
+	/**
+	 * Compose project these belong to. The artifact outlives the stack that wrote it, and the stack's
+	 * identity moves with the branch under `worktrees`, so a reader has to check this before trusting
+	 * {@link TestCredentials.url} to still describe a stack of its own.
+	 */
+	project?: string
 	users: {
 		user: TestUser
 		admin: TestAdminUser
