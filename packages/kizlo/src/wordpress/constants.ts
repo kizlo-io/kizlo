@@ -1,11 +1,12 @@
 import type { Duration } from "@kizlo/shared"
 
-export const WC_CORE_BASE = `/wp-json/wc/v3`
+/**
+ * Base paths for the two APIs still reached without a generated endpoint: WordPress core, which
+ * fixtures and tests seed directly, and the Kizlo plugin's own, which the CLI calls before a client
+ * exists. Everything else derives its prefix from the namespace its endpoint definition carries.
+ */
 export const WP_CORE_BASE = "/wp-json/wp/v2"
-export const WP_KIZLO_BASE = `/wp-json/kizlo/v1`
-export const WC_STORE_BASE = `/wp-json/wc/store/v1`
-
-export const CART_HASH_HEADER_KEY = "cart-hash"
+export const WP_KIZLO_BASE = "/wp-json/kizlo/v1"
 
 export const WP_AUTH_TYPE = "Basic"
 export const WP_AUTH_HEADER_KEY = "authorization"

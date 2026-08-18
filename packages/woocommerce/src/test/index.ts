@@ -1,5 +1,5 @@
-import { WC_CORE_BASE, WC_STORE_BASE } from "kizlo"
 import { type DevPluginSource, defineFixture, kizloRelease, type SeedContext } from "kizlo/test"
+import { WC_CORE_BASE, WC_STORE_BASE } from "../constants"
 import type { WC_Product, WC_ProductCreateInput } from "../product/types.wc"
 
 const PRODUCTS: Array<Pick<WC_ProductCreateInput, "slug" | "name" | "regular_price">> = [

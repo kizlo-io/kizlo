@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "vitest"
 import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test/harness"
-import { WordPressTransport, WP_CORE_BASE } from "../wordpress"
+import { WordPressTransport } from "../wordpress"
+import { WP_CORE_BASE } from "../wordpress/constants"
 import { Category, CategoryList } from "./schema"
 
 let kizlo: KizloTestInstance
