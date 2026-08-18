@@ -322,6 +322,35 @@ describe("described WooCommerce routes", () => {
 	})
 })
 
+/**
+ * Error codes reach a call site from two places, and which place decides whether a caller can rely
+ * on them. The generated union carries what a route publishes about itself; the common bucket
+ * carries only what no document can declare, and widens every endpoint with it. These assert the
+ * division from both ends, so moving a code between them cannot pass unnoticed.
+ */
+describe("error codes on a generated call", () => {
+	type CodeOn<TPath extends string> = Extract<WP_EndpointResult<TPath>, { data: null }>["error"]["code"]
+	/** An endpoint declaring nothing of its own, so its codes are the common bucket exactly. */
+	type CommonCode = Extract<WP_Result<{ id: number }, never>, { data: null }>["error"]["code"]
+
+	it("widens every endpoint with the codes no route can describe about itself", () => {
+		expectTypeOf<"invalid_path_parameter">().toExtend<CommonCode>()
+		expectTypeOf<"rest_no_route">().toExtend<CommonCode>()
+		// Nothing was sent, so this is reachable on an endpoint whose own union cannot mention it.
+		expectTypeOf<"invalid_path_parameter">().toExtend<CodeOn<"comments.retrieve">>()
+	})
+
+	it("leaves the codes WordPress publishes to the union that declares them", () => {
+		expectTypeOf<"rest_forbidden">().not.toExtend<CommonCode>()
+		expectTypeOf<"rest_invalid_param">().not.toExtend<CommonCode>()
+		expectTypeOf<"rest_missing_callback_param">().not.toExtend<CommonCode>()
+		// Still reachable where it matters, from the endpoint's own declaration rather than the bucket.
+		expectTypeOf<"rest_forbidden">().toExtend<CodeOn<"comments.retrieve">>()
+		expectTypeOf<"rest_invalid_param">().toExtend<CodeOn<"comments.retrieve">>()
+		expectTypeOf<"rest_missing_callback_param">().toExtend<CodeOn<"comments.retrieve">>()
+	})
+})
+
 describe("services bound to the generated client", () => {
 	const settings = null as unknown as SettingsService
 	const email = null as unknown as EmailService

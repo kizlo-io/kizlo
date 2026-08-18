@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { buildWordPressRequest, createWordPressClient, wpEndpoint } from "./endpoint"
 import { WordPressTransport } from "./transport"
-import type { WP_EndpointDefinition } from "./types"
+import type { WP_EndpointDefinition, WP_Result } from "./types"
 
 type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
@@ -17,7 +17,7 @@ const RETRIEVE: WP_EndpointDefinition = {
 
 function client() {
 	const transport = new WordPressTransport({ credentials })
-	const endpoints = { books: { retrieve: wpEndpoint<{ identifier: string }, { data: unknown }>(RETRIEVE) } }
+	const endpoints = { books: { retrieve: wpEndpoint<{ identifier: string }, WP_Result<{ id: number }, "invalid_book">>(RETRIEVE) } }
 	return createWordPressClient(transport, endpoints)
 }
 
@@ -33,16 +33,42 @@ describe("wpEndpoint", () => {
 describe("buildWordPressRequest", () => {
 	test("interpolates path parameters and keeps the remainder as query", () => {
 		expect(buildWordPressRequest(RETRIEVE, { identifier: "dune messiah", page: 2 })).toEqual({
-			base: "/wp-json/kizlo/v1",
-			path: "/books/dune%20messiah",
-			method: "GET",
-			searchParams: { page: 2 },
-			responseContentTypes: { "200": "application/json" },
+			request: {
+				base: "/wp-json/kizlo/v1",
+				path: "/books/dune%20messiah",
+				method: "GET",
+				searchParams: { page: 2 },
+				responseContentTypes: { "200": "application/json" },
+			},
+			error: null,
 		})
 	})
 
-	test("names the path parameter an input is missing", () => {
-		expect(() => buildWordPressRequest(RETRIEVE, {})).toThrow('Missing WordPress path parameter "identifier"')
+	/**
+	 * Each of these interpolates into a URL that means something other than "this book": the two
+	 * literals become `/books/undefined` and `/books/null`, and an empty segment leaves `/books/`,
+	 * which is the collection route beside it. A symbol is here because `String()` throws on one,
+	 * which is the last way the builder itself could have raised.
+	 */
+	test.each([
+		["absent", {}],
+		["undefined", { identifier: undefined }],
+		["null", { identifier: null }],
+		["an empty string", { identifier: "" }],
+		["a boolean", { identifier: true }],
+		["an object", { identifier: { id: 1 } }],
+		["NaN", { identifier: Number.NaN }],
+		["a symbol", { identifier: Symbol("dune") }],
+	])("reports the parameter rather than throwing when it is %s", (_label, input) => {
+		const built = buildWordPressRequest(RETRIEVE, input)
+
+		expect(built.request).toBeNull()
+		expect(built.error?.code).toBe("invalid_path_parameter")
+		expect(built.error?.message).toContain('"identifier"')
+	})
+
+	test("interpolates a zero, which is a segment a route can be asked for", () => {
+		expect(buildWordPressRequest(RETRIEVE, { identifier: 0 }).request?.path).toBe("/books/0")
 	})
 })
 
@@ -55,6 +81,19 @@ describe("createWordPressClient", () => {
 
 		expect(result).toMatchObject({ data: { id: 1 }, error: null })
 		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune?context=edit")
+	})
+
+	test("resolves to a failure for an unusable path parameter, without reaching the network", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
+		vi.stubGlobal("fetch", fetch)
+
+		// `undefined` is the case types do not catch: the field is there, so the call compiles.
+		const result = await client().books.retrieve({ identifier: undefined as unknown as string })
+
+		expect(result).toMatchObject({ data: null, status: 0 })
+		expect(result.error?.code).toBe("invalid_path_parameter")
+		expect(result.error?.message).toContain('"identifier"')
+		expect(fetch).not.toHaveBeenCalled()
 	})
 
 	test("applies per-call options over the definition", async () => {

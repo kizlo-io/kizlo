@@ -110,12 +110,17 @@ type WP_EndpointCallInput<TEndpoint> =
  */
 export type WP_EndpointInput<TPath extends string> = WP_EndpointCallInput<WP_EndpointAtPath<ActiveWordPressClient, TPath>>
 
+/**
+ * The codes that widen every endpoint's own union, because no introspection document can declare
+ * them. `rest_no_route` is the answer when the route does not exist, which no route can describe
+ * about itself, and the rest are raised here rather than received: the request either never left or
+ * came back as something the route never promised. Codes WordPress publishes per route belong in the
+ * generated union instead, which already spells them out on every endpoint.
+ */
 export type WP_CommonErrorCode =
-	| "rest_invalid_param"
-	| "rest_missing_callback_param"
-	| "rest_forbidden"
 	| "rest_no_route"
 	| "rest_cookie_invalid_nonce"
+	| "invalid_path_parameter"
 	| "unexpected_error"
 	| "unknown_error"
 
@@ -161,6 +166,13 @@ export interface WP_RequestInput {
 	signal?: AbortSignal
 	timeout?: Duration
 }
+
+/**
+ * A request that was built, or the reason it could not be. Building fails before anything is sent,
+ * so the error is reported rather than thrown: a caller holding a generated endpoint branches on
+ * `response.error` for every other failure and this one arrives the same way.
+ */
+export type WP_RequestBuild = { request: WP_RequestInput; error: null } | { request: null; error: WP_Error<"invalid_path_parameter"> }
 
 export type WP_RequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
 

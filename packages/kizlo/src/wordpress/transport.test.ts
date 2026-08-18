@@ -108,4 +108,22 @@ describe("generated endpoints", () => {
 		expect(failed.error?.code).toBe("invalid_book")
 		expect(failed.status).toBe(400)
 	})
+
+	/**
+	 * Preparing a request can fail as readily as sending one, and a body that will not serialize is
+	 * the reachable case: it is caller data. It reports as a transport failure rather than rejecting,
+	 * so a caller branching on `response.error` never has to also wrap the call in a try.
+	 */
+	test("reports a request it cannot prepare rather than rejecting", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }))
+		vi.stubGlobal("fetch", fetch)
+		const circular: Record<string, unknown> = {}
+		circular.self = circular
+
+		const result = await call(definition({ method: "POST", requestContentType: "application/json" }), circular)
+
+		expect(result.error?.code).toBe("unknown_error")
+		expect(result.status).toBe(0)
+		expect(fetch).not.toHaveBeenCalled()
+	})
 })
