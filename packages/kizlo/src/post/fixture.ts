@@ -1,5 +1,5 @@
 import { defineFixture, type SeedContext } from "../cli/wp/types"
-import { WP_CORE_BASE } from "../wordpress"
+import { WP_CORE_BASE } from "../wordpress/constants"
 
 interface SeedPost {
 	slug: string

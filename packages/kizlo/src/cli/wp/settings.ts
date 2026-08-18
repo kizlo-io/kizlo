@@ -1,5 +1,6 @@
 import { PLUGIN_VERSION_HEADER } from "@kizlo/shared"
-import { type WordPressCredentials, WordPressTransport, WP_KIZLO_BASE } from "../../wordpress"
+import { type WordPressCredentials, WordPressTransport } from "../../wordpress"
+import { WP_KIZLO_BASE } from "../../wordpress/constants"
 
 /** Site-level settings the CLI pushes into the plugin so it can reach and trust the Kizlo server. */
 export interface SiteSettingsSync {
