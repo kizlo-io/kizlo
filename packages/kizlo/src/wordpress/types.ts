@@ -189,12 +189,43 @@ export interface WordPressCredentials {
 	password: string
 }
 
-export type WP_TypedHeaders<T extends Record<string, unknown>> = Headers & { readonly __kizloHeaders?: T }
+type WP_DeclaredHeaderName<T extends Record<string, unknown>> = string extends keyof T ? never : Extract<keyof T, string>
 
-export type WP_Success<TData, TStatus extends number = number, THeaders extends Record<string, unknown> = Record<string, never>> = {
+type WP_RequiredHeaderName<T extends Record<string, unknown>> = {
+	[TName in WP_DeclaredHeaderName<T>]-?: undefined extends T[TName] ? never : TName
+}[WP_DeclaredHeaderName<T>]
+
+type WP_ReadableHeaders<THeaderName extends string> = {
+	get<TName extends THeaderName | (string & Record<never, never>)>(name: TName): string | null
+}
+
+type WP_RequiredHeaders<THeaders extends Record<string, unknown>> = [WP_RequiredHeaderName<THeaders>] extends [never]
+	? object
+	: {
+			get<TName extends string>(name: Lowercase<TName> extends Lowercase<WP_RequiredHeaderName<THeaders>> ? TName : never): string
+		}
+
+/**
+ * Response headers keep the open `Headers` API, but a literal name the endpoint requires cannot be
+ * absent. The declared spellings stay visible to editor completion while the open string member
+ * accepts any other header, and lowercasing both sides follows the case-insensitive runtime API.
+ */
+export type WP_TypedHeaders<THeaders extends Record<string, unknown>, THeaderName extends string = WP_DeclaredHeaderName<THeaders>> = Omit<
+	Headers,
+	"get"
+> &
+	WP_RequiredHeaders<THeaders> &
+	WP_ReadableHeaders<THeaderName>
+
+export type WP_Success<
+	TData,
+	TStatus extends number = number,
+	THeaders extends Record<string, unknown> = Record<string, never>,
+	THeaderName extends string = string,
+> = {
 	data: TData
 	status: TStatus
-	headers: WP_TypedHeaders<THeaders>
+	headers: WP_TypedHeaders<THeaders, THeaderName>
 	error: null
 }
 
@@ -202,13 +233,19 @@ export type WP_Failure<
 	TError extends string,
 	TStatus extends number = number,
 	THeaders extends Record<string, unknown> = Record<string, never>,
+	THeaderName extends string = string,
 > = {
 	data: null
 	status: TStatus
-	headers: WP_TypedHeaders<THeaders>
+	headers: WP_TypedHeaders<THeaders, THeaderName>
 	error: WP_Error<TError>
 }
 
-export type WP_TransportFailure<TError extends string> = WP_Failure<TError, 0>
+export type WP_TransportFailure<TError extends string, THeaderName extends string = string> = WP_Failure<
+	TError,
+	0,
+	Record<string, never>,
+	THeaderName
+>
 
 export type WP_Result<TData, TError extends string> = WP_Success<TData> | WP_Failure<TError>

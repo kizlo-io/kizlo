@@ -12,9 +12,14 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export class WordPressTransport {
 		constructor(options: WordPressTransportOptions)
 	}
-	export type WP_Success<T, S extends number, H extends Record<string, unknown>> = { data: T; status: S; headers: Headers & { __headers?: H }; error: null }
-	export type WP_Failure<E extends string, S extends number, H extends Record<string, unknown>> = { data: null; status: S; headers: Headers & { __headers?: H }; error: Error & { code: E } }
-	export type WP_TransportFailure<E extends string> = WP_Failure<E, 0, Record<string, never>>
+	type WP_DeclaredHeaderName<H extends Record<string, unknown>> = string extends keyof H ? never : Extract<keyof H, string>
+	type WP_RequiredHeaderName<H extends Record<string, unknown>> = { [N in WP_DeclaredHeaderName<H>]-?: undefined extends H[N] ? never : N }[WP_DeclaredHeaderName<H>]
+	type WP_ReadableHeaders<K extends string> = { get<N extends K | (string & Record<never, never>)>(name: N): string | null }
+	type WP_RequiredHeaders<H extends Record<string, unknown>> = [WP_RequiredHeaderName<H>] extends [never] ? object : { get<N extends string>(name: Lowercase<N> extends Lowercase<WP_RequiredHeaderName<H>> ? N : never): string }
+	export type WP_TypedHeaders<H extends Record<string, unknown>, K extends string = WP_DeclaredHeaderName<H>> = Omit<Headers, "get"> & WP_RequiredHeaders<H> & WP_ReadableHeaders<K>
+	export type WP_Success<T, S extends number, H extends Record<string, unknown>, K extends string = string> = { data: T; status: S; headers: WP_TypedHeaders<H, K>; error: null }
+	export type WP_Failure<E extends string, S extends number, H extends Record<string, unknown>, K extends string = string> = { data: null; status: S; headers: WP_TypedHeaders<H, K>; error: Error & { code: E } }
+	export type WP_TransportFailure<E extends string, K extends string = string> = WP_Failure<E, 0, Record<string, never>, K>
 	export interface WP_Endpoint<TInput, TResult> { namespace: string; path: string; method: string; pathParameters: string[]; responseContentTypes: Record<string, string | undefined>; readonly input?: TInput; readonly result?: TResult }
 	export type WP_CallOptions = { signal?: AbortSignal }
 	export type WP_CallArguments<I> = Record<string, never> extends I ? [input?: I, options?: WP_CallOptions] : [input: I, options?: WP_CallOptions]
@@ -119,6 +124,70 @@ describe("generateWordPressClient", () => {
 		expect(result.match(/WP_Failure</g)).toHaveLength(1)
 		expect(result).toContain("number, Record<string, never>>")
 		expect(result).not.toContain("WP_TransportFailure")
+	})
+
+	test("shares declared header names across every result member", () => {
+		const client = generateWordPressClient(INTROSPECTION_FIXTURE)
+		const result = /export type WP_PostTypesBookListEndpointResult =\n[\s\S]+?(?=\n\n)/.exec(client)?.[0] ?? ""
+
+		// Once as the success header itself, then once on each result member as its shared completion name.
+		expect(result.match(/"X-WP-Total"/g)).toHaveLength(3)
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": client,
+				"usage.ts": `import type { WordPressClient } from "./wordpress"
+				declare const wordpress: WordPressClient
+				wordpress.postTypes.book.list().then((response) => {
+					const total: string | null = response.headers.get("x-wp-total")
+					if (response.error === null) {
+						const requiredTotal: string = response.headers.get("x-wp-total")
+					}
+				})`,
+			}),
+		).toEqual([])
+	})
+
+	test("keeps readable failure headers attached to the status that declares them", () => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		const retrieve = document.apis["post-types.book"]?.paths["/post-types/book/{identifier}"]?.retrieve
+		if (!retrieve) throw new Error("Fixture is missing post-types.book.retrieve")
+
+		retrieve.responses["401"] = {
+			content_type: "application/json",
+			headers: { type: "object", properties: { "Retry-After": { type: "integer", required: true } } },
+			body: { type: "object" },
+		}
+		retrieve.responses["404"] = {
+			content_type: "application/json",
+			headers: { type: "object", properties: { "X-WP-Reason": { type: "string", required: true } } },
+			body: { type: "object" },
+		}
+
+		const client = generateWordPressClient(document)
+		const result = /export type WP_PostTypesBookRetrieveEndpointResult =\n[\s\S]+?(?=\n\n)/.exec(client)?.[0] ?? ""
+
+		expect(result.match(/WP_Failure</g)).toHaveLength(2)
+		expect(result).toContain("WP_TransportFailure")
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": client,
+				"usage.ts": `import type { WordPressClient } from "./wordpress"
+				declare const wordpress: WordPressClient
+				wordpress.postTypes.book.retrieve({ identifier: "dune" }).then((response) => {
+					const retryAfterBeforeNarrowing: string | null = response.headers.get("retry-after")
+					if (response.status === 401) {
+						const retryAfter: string = response.headers.get("retry-after")
+						const reason: string | null = response.headers.get("x-wp-reason")
+					}
+					if (response.status === 404) {
+						const reason: string = response.headers.get("x-wp-reason")
+						const retryAfter: string | null = response.headers.get("retry-after")
+					}
+				})`,
+			}),
+		).toEqual([])
 	})
 
 	test("emits a client whose calls reject unknown APIs, endpoints, fields, and values", () => {

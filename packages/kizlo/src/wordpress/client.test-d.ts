@@ -11,7 +11,10 @@ import type {
 	WP_EndpointData,
 	WP_EndpointInput,
 	WP_EndpointResult,
+	WP_Failure,
 	WP_Result,
+	WP_Success,
+	WP_TypedHeaders,
 } from "./types"
 
 type Retrieve = WP_Result<{ id: number }, "not_found">
@@ -46,6 +49,38 @@ describe("WP_Client", () => {
 
 	it("passes `any` through so a project compiles before its first generation", () => {
 		expectTypeOf<WP_Client<Endpoints>["untyped"]>().toBeAny()
+	})
+})
+
+describe("WP_TypedHeaders", () => {
+	type TypedHeaders = WP_TypedHeaders<{ "X-Optional"?: string; "X-Required": number }>
+	const headers = null as unknown as TypedHeaders
+
+	it("reads required declarations as strings regardless of case", () => {
+		expectTypeOf(headers.get("X-Required")).toEqualTypeOf<string>()
+		expectTypeOf(headers.get("x-required")).toEqualTypeOf<string>()
+		expectTypeOf(headers.get("X-rEqUiReD")).toEqualTypeOf<string>()
+	})
+
+	it("keeps optional, unknown, and dynamic names nullable", () => {
+		const dynamicName = "x-required" as string
+
+		expectTypeOf(headers.get("X-Optional")).toEqualTypeOf<string | null>()
+		expectTypeOf(headers.get("X-Unknown")).toEqualTypeOf<string | null>()
+		expectTypeOf(headers.get(dynamicName)).toEqualTypeOf<string | null>()
+	})
+
+	it("remains assignable to the native Headers surface", () => {
+		expectTypeOf<TypedHeaders>().toMatchTypeOf<Headers>()
+	})
+
+	it("keeps legacy result unions callable before regeneration", () => {
+		type LegacyResult = WP_Success<null, 200, { "X-Required": number }> | WP_Failure<"failed", number, Record<string, never>>
+		const result = null as unknown as LegacyResult
+		const required = result.headers.get("x-required")
+
+		expectTypeOf(required).toEqualTypeOf<string | null>()
+		if (result.error === null) expectTypeOf(result.headers.get("x-required")).toEqualTypeOf<string>()
 	})
 })
 
@@ -149,11 +184,21 @@ describe("described WordPress core routes", () => {
 		await wordpress.menuItems.list({ status: ["nonsense"] })
 	})
 
-	it("carries the pagination headers resolveList reads off a list", () => {
+	it("types the pagination headers resolveList reads off a list", () => {
 		type Success = Extract<WP_EndpointResult<"menuItems.list">, { error: null }>
+		const headers = null as unknown as Success["headers"]
 
-		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-Total")
-		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-TotalPages")
+		expectTypeOf(headers.get("x-wp-total")).toEqualTypeOf<string>()
+		expectTypeOf(headers.get("X-WP-TotalPages")).toEqualTypeOf<string>()
+		expectTypeOf(headers.get("x-not-declared")).toEqualTypeOf<string | null>()
+	})
+
+	it("keeps headers callable before the endpoint result is narrowed", async () => {
+		const response = await wordpress.postTypes.post.list()
+		const total = response.headers.get("x-wp-total")
+
+		expectTypeOf(total).toEqualTypeOf<string | null>()
+		if (response.error === null) expectTypeOf(response.headers.get("x-wp-total")).toEqualTypeOf<string>()
 	})
 
 	it("describes the menu containers, not only the items", () => {
@@ -236,11 +281,13 @@ describe("described WooCommerce routes", () => {
 		expectTypeOf<WP_EndpointInput<"woocommerce.store.products.collection_data">>().toHaveProperty("calculate_price_range")
 	})
 
-	it("carries the pagination headers resolveList reads off a product page", () => {
+	it("types the pagination headers resolveList reads off a product page", () => {
 		type Success = Extract<WP_EndpointResult<"woocommerce.store.products.list">, { error: null }>
+		const headers = null as unknown as Success["headers"]
 
-		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-Total")
-		expectTypeOf<NonNullable<Success["headers"]["__kizloHeaders"]>>().toHaveProperty("X-WP-TotalPages")
+		expectTypeOf(headers.get("x-wp-total")).toEqualTypeOf<string>()
+		expectTypeOf(headers.get("X-WP-TotalPages")).toEqualTypeOf<string>()
+		expectTypeOf(headers.get("x-not-declared")).toEqualTypeOf<string | null>()
 	})
 
 	it("separates updating a checkout from submitting one", () => {
