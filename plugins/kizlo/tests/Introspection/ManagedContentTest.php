@@ -99,6 +99,18 @@ class ManagedContentTest extends IntrospectionTestCase
         }
     }
 
+    /**
+     * The plugin used to include a `projects` post type from file scope, so any site
+     * that happened to have one managed it without ever opting in.
+     */
+    public function test_a_post_type_no_one_included_is_not_described(): void
+    {
+        register_post_type('projects', ['public' => true, 'show_in_rest' => true, 'supports' => ['title', 'editor']]);
+        $this->seedSettings(['post_types' => ['projects' => ['rest_api_enabled' => true]]]);
+
+        $this->assertArrayNotHasKey('post-types.projects', $this->document()['apis']);
+    }
+
     public function test_an_explicitly_included_post_type_is_described(): void
     {
         register_post_type('book', ['public' => true, 'show_in_rest' => true, 'supports' => ['title', 'editor']]);

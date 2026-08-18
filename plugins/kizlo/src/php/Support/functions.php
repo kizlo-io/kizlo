@@ -557,5 +557,3 @@ function kizlo_emit_event(string $type, ?array $data = null): bool
 {
     return \Kizlo\Modules\Webhook\Webhook::sendEvent($type, $data);
 }
-
-kizlo_include_post_type('projects');
