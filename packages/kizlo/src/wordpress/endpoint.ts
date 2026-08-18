@@ -1,5 +1,6 @@
+import { WP_Error } from "./error"
 import type { WordPressTransport } from "./transport"
-import type { WP_CallOptions, WP_Client, WP_Endpoint, WP_EndpointDefinition, WP_RequestInput } from "./types"
+import type { WP_CallOptions, WP_Client, WP_Endpoint, WP_EndpointDefinition, WP_RequestBuild } from "./types"
 
 /**
  * One generated endpoint, as data. The two type parameters are phantom, so this is the definition
@@ -10,13 +11,45 @@ export function wpEndpoint<TInput, TResult>(definition: WP_EndpointDefinition): 
 	return definition
 }
 
-/** Turn a definition and its input into a request: interpolate path parameters, then split the rest. */
-export function buildWordPressRequest(definition: WP_EndpointDefinition, input: object): WP_RequestInput {
+/**
+ * What a path segment can be built from. Everything else names a different resource once it is in
+ * the URL rather than failing loudly: `undefined` and `null` interpolate as those literal words, an
+ * empty string collapses the segment so a retrieve resolves to the collection route beside it, and a
+ * symbol throws on conversion. `0` stays valid, because a route matching digits can be asked for it.
+ */
+function isUsablePathParameter(value: unknown): value is string | number | bigint {
+	if (typeof value === "string") return value !== ""
+	if (typeof value === "number") return Number.isFinite(value)
+	return typeof value === "bigint"
+}
+
+/** Names what arrived without converting it, since `String()` throws on a symbol. */
+function describeValue(value: unknown): string {
+	if (value === null) return "null"
+	if (typeof value === "string") return "an empty string"
+	if (typeof value === "number") return String(value)
+	return typeof value
+}
+
+/**
+ * Turn a definition and its input into a request: interpolate path parameters, then split the rest.
+ *
+ * A path parameter that cannot be interpolated comes back as an error rather than throwing. The
+ * generated input marks these required, so TypeScript catches the ones it can see, and what reaches
+ * here is the value that was present but unusable — typically an identifier read off a request the
+ * caller never validated.
+ */
+export function buildWordPressRequest(definition: WP_EndpointDefinition, input: object): WP_RequestBuild {
 	let path = definition.path
 	const rest: Record<string, unknown> = { ...input }
 	for (const name of definition.pathParameters) {
-		if (!(name in rest)) throw new Error(`Missing WordPress path parameter "${name}".`)
-		const encoded = encodeURIComponent(String(rest[name]))
+		const value = rest[name]
+		if (!isUsablePathParameter(value)) {
+			const message = `WordPress path parameter "${name}" must be a non-empty string or a finite number, received ${describeValue(value)}.`
+			return { request: null, error: new WP_Error({ code: "invalid_path_parameter", message }) }
+		}
+
+		const encoded = encodeURIComponent(String(value))
 		const marker = `{${name}}`
 		while (path.includes(marker)) path = path.replace(marker, encoded)
 		delete rest[name]
@@ -24,11 +57,14 @@ export function buildWordPressRequest(definition: WP_EndpointDefinition, input: 
 
 	const hasBody = ["POST", "PUT", "PATCH"].includes(definition.method)
 	return {
-		base: `/wp-json/${definition.namespace}`,
-		path,
-		method: definition.method,
-		...(hasBody ? { body: rest, requestContentType: definition.requestContentType } : { searchParams: rest }),
-		responseContentTypes: definition.responseContentTypes,
+		request: {
+			base: `/wp-json/${definition.namespace}`,
+			path,
+			method: definition.method,
+			...(hasBody ? { body: rest, requestContentType: definition.requestContentType } : { searchParams: rest }),
+			responseContentTypes: definition.responseContentTypes,
+		},
+		error: null,
 	}
 }
 
@@ -45,7 +81,11 @@ function isEndpoint(value: object): value is WP_EndpointDefinition {
 
 function createCaller(definition: WP_EndpointDefinition, transport: WordPressTransport) {
 	return async (input: object = {}, options?: WP_CallOptions) => {
-		return transport.request({ ...buildWordPressRequest(definition, input), ...options })
+		const built = buildWordPressRequest(definition, input)
+		// Nothing was sent, so this reports the shape a transport failure has: status 0, no headers.
+		if (built.error) return { data: null, status: 0, headers: new Headers(), error: built.error }
+
+		return transport.request({ ...built.request, ...options })
 	}
 }
 

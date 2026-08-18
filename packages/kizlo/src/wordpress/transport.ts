@@ -206,7 +206,16 @@ export class WordPressTransport {
 		return { data, status: response.status, headers: response.headers, error: null }
 	}
 
+	/**
+	 * Preparing the request is inside the same `tryCatch` as sending it, because preparing can fail
+	 * too: a body that will not serialize, a path that will not resolve. Those are reported the way a
+	 * refused connection is rather than rejecting, so no call through a generated endpoint throws.
+	 */
 	private async fetch(input: WP_RequestInput): Promise<TryCatchResult<Response, Error>> {
+		return tryCatch(this.send(input))
+	}
+
+	private async send(input: WP_RequestInput): Promise<Response> {
 		const url = this.resolveUrl(input)
 
 		if (input.searchParams) {
@@ -227,14 +236,12 @@ export class WordPressTransport {
 
 		const hasBody = !["GET", "DELETE", "HEAD", "OPTIONS"].includes(input.method)
 
-		return tryCatch(
-			fetch(url.toString(), {
-				headers,
-				method: input.method,
-				signal: this.resolveSignal(input),
-				...(hasBody && body !== undefined ? { body } : {}),
-			}),
-		)
+		return fetch(url.toString(), {
+			headers,
+			method: input.method,
+			signal: this.resolveSignal(input),
+			...(hasBody && body !== undefined ? { body } : {}),
+		})
 	}
 
 	private serializeBody(body: unknown, contentType: WP_RequestContentType | undefined): BodyInit | undefined {
