@@ -35,44 +35,86 @@ A branch with no worktree is prior work from before this workflow used them; a w
 
 Write a brief in the chat and stop there. No branch, no checkout, no edits.
 
-**Write it for someone who has never seen this issue.** An issue can sit in the backlog for months, and the person picking it up has usually lost the context that made it obvious when it was filed, even when they wrote it themselves. So the brief starts by rebuilding that context, not by summarising the ticket.
+**The reader is the person who filed the issue, months later.** They are not being taught the codebase. They want their memory refreshed without reopening the ticket, and they want to see the fix you have in mind, because a problem and its fix land together or not at all.
 
-**Open with two or three plain sentences**: which part of the product this touches, what happens today, and who it hurts. No identifiers, no file paths, no jargon in the opening. Someone who has never opened the repo should be able to follow it.
+**Use these headings, in this order, and no others.** The first two are required. The last two are omitted entirely when they hold nothing, rather than carrying a line that says there is nothing.
 
-**Then show the problem.** A few lines of real code, a real request and response, or real output, copied from what you read in step 1, with the fault visible in it. This is the part that carries the brief. A paragraph describing a mismatch is forgettable; two lines showing it are not. Where it helps, put today's behaviour and the intended behaviour side by side.
+### The problem
 
-Then the rest, one or two lines each:
+Two or three plain sentences, then code.
 
-- **What changes.** The files and functions you expect to touch, and the shape of the change.
-- **What proves it.** The acceptance criteria and the test you would write.
-- **Leaving alone.** Anything out of scope sitting close enough to look like an omission.
-- **Unclear.** Contradictions with the code, gaps in the issue, decisions that could go two ways. Recommend on each rather than offering a menu.
+**The code carries this section.** Real code from step 1, with the fault visible in it. Put today's behaviour and the wanted behaviour side by side where that shows it faster.
 
-About a screen, readable in a minute. Prose and short lists, no wall of headings and bullets, no restating the ticket in the ticket's own words.
+### Recommended fix
+
+**Required. Never brief without one.** A problem with no proposed fix is a riddle. Naming the fix is half of what makes the problem clear, because it shows what "fixed" looks like.
+
+Show the shape of the change as code, a few lines, before and after. Not the implementation, just enough to see the move. Close with one line naming the test that proves it.
+
+### Also found
+
+Real problems you hit that the issue does not cover. One line each, and **every line ends in one of two verdicts**:
+
+- **Fixing here.** Small, and it sits in code this branch already touches.
+- **Needs its own issue.** Everything else. Give it the title you would file, and file it with `save_issue` once the go-ahead lands.
+
+Out of scope work earns a line here only when the code you are touching makes its absence look like an oversight.
+
+### Your call
+
+Only real forks: the issue contradicts the code, or a choice changes what gets built. **Recommend one and say why. Never lay out a menu.**
+
+### Rules that matter more than the structure
+
+- **Nothing important lives inside a paragraph.** Every risk, decision and found problem gets its own line under a bold label. Buried mid-sentence, it gets missed.
+- **Code instead of description.** If two lines of code and a sentence say the same thing, cut the sentence.
+- **Paths and identifiers belong in the code block**, not woven through a clause. `renderEndpointNode()` mid-sentence reads as noise.
+- **One idea per sentence.** No stacked clauses, no semicolons joining three thoughts.
+- **Half a screen.** Over that, cut prose. Never cut code.
+- **No `What changes`, `What proves it` or `Leaving alone` sections.** They read as bookkeeping, and the fix section already carries what they held.
 
 <details>
 <summary>Worked example</summary>
 
-**KIZ-70, list filters the API accepts but never advertises**
+**KIZ-70, the client cannot see filters the API accepts**
 
-When something asks Kizlo which filters a post type route accepts, the answer comes from a list written by hand next to the route. WordPress itself accepts more than that list names. So a filter works fine when you call it, while the generated client has no idea it exists, and nobody finds out until someone goes looking for it.
+Post type routes tell Kizlo which filters they accept through a list written by hand. WordPress accepts more than that list names. The filter works when you call it over HTTP, and the generated client has no idea it exists.
 
-`PostTypeApi::get_collection_args()` declares them literally:
+The hand-written list, all of it:
 
 ```php
+// PostTypeApi::get_collection_args()
 'search'  => [ 'type' => 'string' ],
 'orderby' => [ 'type' => 'string' ],
 ```
 
-The controller serving the same route allows sixteen, `after`, `before`, `slug` and `sticky` among them. So `GET /wp/v2/posts?sticky=1` filters correctly, while `posts.list` in the generated client has no `sticky` on it at all.
+The controller behind that same route allows sixteen, `sticky` among them:
 
-**What changes.** `get_collection_args()` reads `get_collection_params()` off the controller the route is registered against, instead of holding its own list. `TaxonomyApi` has the same hand-written list and gets the same treatment.
+```ts
+GET /wp/v2/posts?sticky=1     // filters correctly
+posts.list({ sticky: true })  // does not compile, no such field
+```
 
-**What proves it.** A test that walks every managed route and asserts the declared input matches the controller's params, so the two cannot drift again.
+### Recommended fix
 
-**Leaving alone.** The `kizlo/v1` routes have their own hand-written args. The issue puts them out of scope and they do not share this code path.
+Stop hand-writing the list. Read it off the controller the route is registered against.
 
-**Unclear.** Deriving the params also carries core's validation callbacks onto the route, so an unknown `template` starts answering 400 where it used to be accepted and dropped. That is a behaviour change beyond what the issue asks for, and I would take it, since silently storing nothing is worse. Worth your call before I start.
+```php
+// before
+return [ 'search' => [...], 'orderby' => [...] ];
+
+// after
+return $this->controller->get_collection_params();
+```
+
+`TaxonomyApi` holds the same hand-written list and takes the same change.
+
+Proved by a test that walks every managed route and compares its declared input against the controller's params.
+
+### Also found
+
+- Reading the controller's params also carries core's validation callbacks onto the route. An unknown `template` starts answering 400 instead of being accepted and dropped. **Fixing here.** It falls out of the same change, and silently storing nothing is the worse behaviour.
+- The `kizlo/v1` routes have their own hand-written args and the same drift. **Needs its own issue**, "Derive kizlo/v1 route args from their controllers".
 
 </details>
 
@@ -125,7 +167,7 @@ Two cases that are not a fresh start:
 - **Step 1 found a `kiz-<number>` branch with no worktree.** Attach one to it rather than starting a second branch: `git worktree add .agents/worktrees/kiz-70 fix/kiz-70-<slug>`, no `-b`, no `origin/main`. Then rebase onto fresh `main` from inside it, since the point of step 3 is a current base: `git rebase origin/main`.
 - **This session is already in a worktree.** Do not nest one inside another. If it is this issue's worktree, carry on in it. If it is another issue's, stop and tell the user to run the workflow from a session in the main checkout.
 
-If the issue is in `Backlog` or `Todo`, `save_issue` it to `In Progress`. Linear cannot see a local branch, so this is the one status write you make.
+If the issue is in `Backlog` or `Todo`, `save_issue` it to `In Progress`. Linear cannot see a local branch, so this is the only time you set this issue's status by hand. Filing new issues from `Also found` is a different write and stays allowed.
 
 ## 4. Implement, and get on the remote early
 
@@ -259,7 +301,7 @@ git commit -m "<subject>" -m "<commit body>"
 git push --force-with-lease
 ```
 
-`origin/main`, not `main`: step 3 cut the branch from the remote ref, and local `main` belongs to the main checkout, which this session has not touched and may be behind. Run the two commands separately rather than nesting a substitution, which some harnesses refuse inside a worktree because they cannot trace it statically.
+`origin/main` again here, for the reason step 3 gave. Run the two commands separately rather than nesting a substitution, which some harnesses refuse inside a worktree because they cannot trace it statically.
 
 Force-pushing is safe here and only here: it is your own PR branch, before review, and nobody else has commits on it. Never `--force`, always `--force-with-lease`. If review later adds commits, collapse again before merge.
 
@@ -286,7 +328,7 @@ gh pr edit <n> --title "..." --body "..."
 Then only if they carry something:
 
 - **Beyond the issue.** Anything you changed that acceptance never asked for, and why it was unavoidable.
-- **Found along the way.** Real problems you saw and left alone, worth their own issue.
+- **Found along the way.** Real problems you saw. One line each, ending in the same two verdicts step 2 uses: **Fixed here**, or **Needs its own issue**. File the second kind with `save_issue` before posting the report, and give the key you filed. Do not leave a problem described but unfiled.
 - **Not verified.** Anything you could not check, including a step 6 command that did not run or a failure that predates the branch. State it here rather than letting it pass as verified.
 
 Then **stop and wait**. Anything short of complete is the user's call, not yours: they may take the PR as it stands, send it back, or split what is left into a new issue. Never mark a partial PR ready to make the report read better, and never let the PR body claim more than this report does.
@@ -304,7 +346,7 @@ Against acceptance:
 - *Taxonomy routes do the same.* **Not done.** Taxonomy controllers are registered later than post type ones, so at the point the args are built the controller does not exist yet. Fixing it means moving registration to `rest_api_init`, which changes the boot order for everything else on that hook. That is bigger than this issue and I did not want to take it without asking.
 - *An unknown filter is rejected rather than ignored.* **Done differently.** The issue asked for an explicit check. Deriving the params carries core's own validation callbacks onto the route, which does this already, so the check would have been dead code. Verified by hand: `POST /wp/v2/posts` with `template=nope` answers 400 where it used to answer 201.
 
-**Found along the way.** `kizlo/v1` routes have the same hand-written list and the same drift. Out of scope here, worth its own issue.
+**Found along the way.** `kizlo/v1` routes have the same hand-written list and the same drift. **Needs its own issue**, filed as KIZ-88.
 
 **Not verified.** `pnpm test` passes. Plugin PHPUnit did not run, the test container would not come up on this machine, so the new `ListParameterTest` has only been read, not executed. CI will be the first real run of it.
 
@@ -314,7 +356,7 @@ Left to decide: move taxonomy registration to `rest_api_init` in this PR, or spl
 
 ## 9. Then leave the status and the worktree alone
 
-Step 3 set `In Progress` and the integration takes it from there: review activity moves it to `In Review`, merge to `Done`. Do not call `save_issue` again, never set `Done` yourself, and do not claim the status moved. Say the PR is open, and whether it is still a draft.
+Step 3 set `In Progress` and the integration takes it from there: review activity moves it to `In Review`, merge to `Done`. Never touch this issue's status again, never set `Done` yourself, and do not claim the status moved. Say the PR is open, and whether it is still a draft.
 
 **Stay in the worktree.** Do not leave it and do not remove it: review comments land on this branch, and this is where they get fixed. The user ends the session when they are done with it. Removal is theirs to run from the main checkout once the PR merges:
 
