@@ -80,6 +80,19 @@ export interface KizloGlobalConfig {
 	name?: string
 
 	/**
+	 * Give each branch its own local Docker stacks, by appending the checked-out branch to
+	 * {@link name} (`kizlo-<name>-<branch>-dev`). Off unless set, since the stacks it isolates
+	 * are the ones an existing project is already using.
+	 *
+	 * Turn it on when you work in several checkouts at once, typically git worktrees: without it
+	 * every checkout of a project resolves to one stack, so parallel `kizlo dev` and `kizlo test`
+	 * runs share a single WordPress and a single database while appearing to be separate.
+	 *
+	 * A detached `HEAD` names no branch and keeps the unsuffixed stack.
+	 */
+	worktrees?: boolean
+
+	/**
 	 * Directory to write the WordPress client into, as `<wordpressClientDir>/wordpress.ts`. For a package or
 	 * workspace that ships procedures but no Kizlo server: there is no router to build a contract from,
 	 * yet those procedures still call the generated tree, so they need the client on its own.

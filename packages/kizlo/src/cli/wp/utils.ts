@@ -107,13 +107,21 @@ export function getTestCredentials(): TestCredentials {
  * The host port the credentials artifact advertises, if it exists — the port a warm test
  * stack is pinned to. Tests connect via this URL, so a reused stack must come back up on
  * the same port; `undefined` means no stack has ever been seeded here (a cold boot).
+ *
+ * Pass `project` to get the port only when the artifact says that stack wrote it. One checkout has
+ * one artifact but can have many stacks under `worktrees`, so a port recorded by another branch's
+ * stack describes a live WordPress this one has no claim on, and reads as cold instead. An artifact
+ * from before stacks were recorded names nobody, so it reads as cold too: the caller then picks a
+ * free port, which is the recorded one again whenever that stack is genuinely the one still there.
  */
-export function recordedPort(): number | undefined {
+export function recordedPort(project?: string): number | undefined {
 	const path = credentialsPath()
 	if (!existsSync(path)) return undefined
 	try {
-		const { url } = JSON.parse(readFileSync(path, "utf-8")) as TestCredentials
-		const port = new URL(url).port
+		const credentials = JSON.parse(readFileSync(path, "utf-8")) as TestCredentials
+		if (project && credentials.project !== project) return undefined
+
+		const port = new URL(credentials.url).port
 		return port ? Number(port) : undefined
 	} catch {
 		return undefined

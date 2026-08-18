@@ -19,6 +19,7 @@ const configSchema = z.object({
 	dir: z.string().optional(),
 	alias: z.string().optional(),
 	name: z.string().optional(),
+	worktrees: z.boolean().optional(),
 	wordpressClientDir: z.string().optional(),
 	dev: z
 		.object({
@@ -134,22 +135,55 @@ function sanitizeProjectName(raw: string): string {
 	return id || "kizlo"
 }
 
+const HEAD_REF_PREFIX = "ref: refs/heads/"
+
+/**
+ * The branch checked out at `dir`, read out of git's own files rather than by running git, so this
+ * stays synchronous and works where git isn't on PATH. `.git` is a directory in a main checkout and
+ * a file holding `gitdir: <path>` in a linked worktree, which is what makes each worktree report its
+ * own branch. Returns undefined when there is no branch to name: no repository, an unreadable one, or
+ * a detached `HEAD`, which holds a commit id instead of a ref.
+ */
+function currentBranch(dir: string): string | undefined {
+	try {
+		const dotGit = path.join(dir, ".git")
+		let gitDir = dotGit
+		if (fs.statSync(dotGit).isFile()) {
+			const pointer = fs.readFileSync(dotGit, "utf8").match(/^gitdir:\s*(.+)$/m)
+			if (!pointer?.[1]) return undefined
+			gitDir = path.resolve(dir, pointer[1].trim())
+		}
+
+		const head = fs.readFileSync(path.join(gitDir, "HEAD"), "utf8").trim()
+		return head.startsWith(HEAD_REF_PREFIX) ? head.slice(HEAD_REF_PREFIX.length) : undefined
+	} catch {
+		return undefined
+	}
+}
+
 /**
  * Base name for the local stacks: the config `name` if set, else the `package.json`
  * `name` at `configDir`, else the config dir basename — sanitized to a Docker id.
+ *
+ * With `worktrees` on, the checked-out branch is appended rather than replacing that name, so
+ * sibling checkouts of one project separate while two unrelated projects sitting on the same branch
+ * stay apart. Replacing it would collide those two, which is this option's own bug one level up.
  */
-export function resolveStackName(configDir: string, configName?: string): string {
-	if (configName) return sanitizeProjectName(configName)
+export function resolveStackName(configDir: string, { name, worktrees }: { name?: string; worktrees?: boolean } = {}): string {
+	const base = name ? sanitizeProjectName(name) : sanitizeProjectName(packageName(configDir) ?? path.basename(configDir))
+	if (!worktrees) return base
 
-	let pkgName: string | undefined
+	const branch = currentBranch(configDir)
+	return branch ? `${base}-${sanitizeProjectName(branch)}` : base
+}
+
+function packageName(configDir: string): string | undefined {
 	try {
 		const pkg = JSON.parse(fs.readFileSync(path.join(configDir, "package.json"), "utf8")) as { name?: string }
-		pkgName = pkg.name
+		return pkg.name
 	} catch {
-		pkgName = undefined
+		return undefined
 	}
-
-	return sanitizeProjectName(pkgName ?? path.basename(configDir))
 }
 
 /**
@@ -171,7 +205,10 @@ export interface ResolvedTestConfig {
 	/** Resolved credentials artifact path under `configDir`. */
 	credentialsPath: string
 	port: number
-	/** True when `test.port` was set in config — the user owns collisions, so don't auto-step. */
+	/**
+	 * True when `test.port` was set in config — the user owns collisions, so don't auto-step.
+	 * Always false under `worktrees`: a pinned port names one stack, and there is a stack per branch.
+	 */
 	portExplicit: boolean
 	fixtures: Fixture[]
 	packageManager: PackageManager
@@ -192,10 +229,10 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 	return {
 		configDir,
 		local: Boolean(test.local),
-		project: stackProject(resolveStackName(configDir, fileConfig?.name), "test"),
+		project: stackProject(resolveStackName(configDir, { name: fileConfig?.name, worktrees: fileConfig?.worktrees }), "test"),
 		command: test.command,
 		port: test.port ?? DEFAULT_TEST_PORT,
-		portExplicit: test.port !== undefined,
+		portExplicit: test.port !== undefined && !fileConfig?.worktrees,
 		fixtures: test.fixtures ?? [],
 		credentialsPath: credentialsPath(cwd),
 		packageManager: test.packageManager ?? (await detectPackageManager(configDir)) ?? "npm",
@@ -208,11 +245,17 @@ export interface ResolvedDevConfig {
 	/** Docker compose project name (`kizlo-<name>-dev`). */
 	project: string
 	port: number
-	/** True when `dev.port` was set in config — the user owns collisions, so don't auto-step. */
+	/**
+	 * True when `dev.port` was set in config — the user owns collisions, so don't auto-step.
+	 * Always false under `worktrees`: a pinned port names one stack, and there is a stack per branch.
+	 */
 	portExplicit: boolean
 	/** Host port the dev MySQL is published on (bound to `127.0.0.1`) for direct DB access. */
 	dbPort: number
-	/** True when `dev.dbPort` was set in config — the user owns collisions, so don't auto-step. */
+	/**
+	 * True when `dev.dbPort` was set in config — the user owns collisions, so don't auto-step.
+	 * Always false under `worktrees`, for the same reason as {@link ResolvedDevConfig.portExplicit}.
+	 */
 	dbPortExplicit: boolean
 	/** Fixtures to seed on a fresh install; also carry the plugins they need. */
 	fixtures: Fixture[]
@@ -257,11 +300,11 @@ export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> 
 
 	return {
 		configDir,
-		project: stackProject(resolveStackName(configDir, fileConfig?.name), "dev"),
+		project: stackProject(resolveStackName(configDir, { name: fileConfig?.name, worktrees: fileConfig?.worktrees }), "dev"),
 		port: dev.port ?? DEFAULT_DEV_PORT,
-		portExplicit: dev.port !== undefined,
+		portExplicit: dev.port !== undefined && !fileConfig?.worktrees,
 		dbPort: dev.dbPort ?? DEFAULT_DEV_DB_PORT,
-		dbPortExplicit: dev.dbPort !== undefined,
+		dbPortExplicit: dev.dbPort !== undefined && !fileConfig?.worktrees,
 		fixtures: dev.fixtures ?? [],
 		wordpressPath: LOCAL_DIR_REL,
 		wordpressDir: path.resolve(configDir, LOCAL_DIR_REL),

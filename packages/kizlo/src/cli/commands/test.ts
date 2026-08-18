@@ -35,7 +35,7 @@ async function resolveTestPort(cfg: ResolvedTestConfig, stack: DockerStack, fres
 		const live = await stack.publishedPort()
 		if (live !== undefined) return live
 
-		const recorded = recordedPort()
+		const recorded = recordedPort(cfg.project)
 		if (recorded !== undefined) {
 			if (await isFree(recorded)) return recorded
 			log.error(
@@ -58,7 +58,7 @@ async function bringUp(cfg: ResolvedTestConfig, stack: DockerStack, fresh = fals
 
 	await withSpinner("Starting test WordPress", () => bound.composeUp(), "Test WordPress ready")
 	if (await isSeeded()) log.info("Test WordPress already seeded — skipping seed.")
-	else await withSpinner("Seeding WordPress", () => runSeeds({ port, fixtures: cfg.fixtures }), "WordPress seeded")
+	else await withSpinner("Seeding WordPress", () => runSeeds({ port, project: cfg.project, fixtures: cfg.fixtures }), "WordPress seeded")
 
 	return { stack: bound, port }
 }

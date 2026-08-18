@@ -6,6 +6,8 @@ import { ensurePlugins } from "./utils"
 export interface BootstrapConfig {
 	/** Published WP port (default 8080). */
 	port?: number
+	/** Compose project owning the stack, recorded so a later run can tell whose credentials these are. */
+	project?: string
 	/** Extension fixtures to install + seed. */
 	fixtures?: Fixture[]
 }
