@@ -193,6 +193,26 @@ function responseHeaders(response: IntrospectionResponse, context: RenderContext
 	return response.headers ? renderType(response.headers, context) : NO_HEADERS
 }
 
+function schemaPropertyNames(schema: IntrospectionSchema, context: RenderContext, seen = new Set<string>()): Set<string> {
+	const names = new Set(Object.keys(schema.properties ?? {}))
+	const references = [schema.$ref, ...(schema.$extends ? (Array.isArray(schema.$extends) ? schema.$extends : [schema.$extends]) : [])]
+	for (const reference of references) {
+		if (!reference || seen.has(reference)) continue
+		seen.add(reference)
+		const referenced = context.schemas.get(reference)
+		if (!referenced) continue
+		for (const name of schemaPropertyNames(referenced, context, seen)) names.add(name)
+	}
+	for (const child of [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])]) {
+		for (const name of schemaPropertyNames(child, context, seen)) names.add(name)
+	}
+	return names
+}
+
+function responseHeaderNames(response: IntrospectionResponse, context: RenderContext): string[] {
+	return response.headers ? [...schemaPropertyNames(response.headers, context)] : []
+}
+
 function responseStatus(status: string): string {
 	return status === "default" ? "number" : status
 }
@@ -213,19 +233,27 @@ function renderResult(apiId: string, operationId: string, operation: Introspecti
 	const errors = operation.errors.map(literal).join(" | ") || "never"
 	const responses = sortedEntries(operation.responses)
 	const failures = responses.filter(([status]) => !isSuccessStatus(status))
+	const headerNames = [...new Set(responses.flatMap(([, response]) => responseHeaderNames(response, context)))]
+		.sort((left, right) => left.localeCompare(right))
+		.map(literal)
+		.join(" | ")
+	const sharedHeaderNames = headerNames ? `, ${headerNames}` : ""
 
 	const variants = responses
 		.filter(([status]) => isSuccessStatus(status))
-		.map(([status, response]) => `WP_Success<${responseBody(response, context)}, ${status}, ${responseHeaders(response, context)}>`)
+		.map(
+			([status, response]) =>
+				`WP_Success<${responseBody(response, context)}, ${status}, ${responseHeaders(response, context)}${sharedHeaderNames}>`,
+		)
 
 	const failureHeaders = new Set([NO_HEADERS, ...failures.map(([, response]) => responseHeaders(response, context))])
 	if (failureHeaders.size === 1) {
-		variants.push(`WP_Failure<${errors}, number, ${NO_HEADERS}>`)
+		variants.push(`WP_Failure<${errors}, number, ${NO_HEADERS}${sharedHeaderNames}>`)
 	} else {
 		for (const [status, response] of failures) {
-			variants.push(`WP_Failure<${errors}, ${responseStatus(status)}, ${responseHeaders(response, context)}>`)
+			variants.push(`WP_Failure<${errors}, ${responseStatus(status)}, ${responseHeaders(response, context)}${sharedHeaderNames}>`)
 		}
-		variants.push(`WP_TransportFailure<${errors}>`)
+		variants.push(`WP_TransportFailure<${errors}${sharedHeaderNames}>`)
 	}
 
 	return `export type ${name} =\n\t| ${variants.join("\n\t| ")}`

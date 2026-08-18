@@ -7185,8 +7185,8 @@ export type WP_CommentsListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_cannot_read" | "rest_cannot_read_post" | "rest_comment_not_supported_post_type" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_param" | "rest_invalid_param" | "rest_missing_callback_param", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_cannot_read" | "rest_cannot_read_post" | "rest_comment_not_supported_post_type" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_param" | "rest_invalid_param" | "rest_missing_callback_param", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a comment
@@ -7546,8 +7546,8 @@ export type WP_MenuItemsListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_cannot_view" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_cannot_view" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a menu item
@@ -7755,8 +7755,8 @@ export type WP_MenusListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_cannot_view" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_id", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_cannot_view" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_id", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a menu
@@ -7943,8 +7943,8 @@ export type WP_PostTypesAttachmentListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a attachment entry
@@ -8102,8 +8102,8 @@ export type WP_PostTypesPageListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a page entry
@@ -8317,8 +8317,8 @@ export type WP_PostTypesPostListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a post entry
@@ -8546,8 +8546,8 @@ export type WP_PostTypesProductListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_post_type" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_forbidden_status" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_no_search_term_defined" | "rest_orderby_include_missing_include" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a product entry
@@ -9373,8 +9373,8 @@ export type WP_TaxonomiesCategoryListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a category term
@@ -9502,8 +9502,8 @@ export type WP_TaxonomiesPostTagListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a post_tag term
@@ -9631,8 +9631,8 @@ export type WP_TaxonomiesProductCatListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a product_cat term
@@ -9760,8 +9760,8 @@ export type WP_TaxonomiesProductTagListEndpointResult =
 	 */
 	"X-WP-Total": number
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"invalid_param" | "invalid_taxonomy" | "kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_forbidden_context" | "rest_invalid_param" | "rest_missing_callback_param" | "rest_post_invalid_page_number", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a product_tag term
@@ -10121,8 +10121,8 @@ export type WP_WoocommerceCustomersListEndpointResult =
 	 * Pages available at the requested page size.
 	 */
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_invalid_param" | "rest_missing_callback_param" | "woocommerce_rest_cannot_view", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_invalid_param" | "rest_missing_callback_param" | "woocommerce_rest_cannot_view", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a customer
@@ -10879,8 +10879,8 @@ export type WP_WoocommerceProductsListEndpointResult =
 	 * Pages available at the requested page size.
 	 */
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_invalid_param" | "rest_missing_callback_param" | "woocommerce_rest_cannot_view", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_invalid_param" | "rest_missing_callback_param" | "woocommerce_rest_cannot_view", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Delete a product
@@ -12276,8 +12276,8 @@ export type WP_WoocommerceStoreProductsListEndpointResult =
 	 * Pages available at the requested page size.
 	 */
 	"X-WP-TotalPages": number
-}>
-	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_invalid_param" | "rest_missing_callback_param" | "woocommerce_rest_unknown_server_error", number, Record<string, never>>
+}, "X-WP-Total" | "X-WP-TotalPages">
+	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_invalid_param" | "rest_missing_callback_param" | "woocommerce_rest_unknown_server_error", number, Record<string, never>, "X-WP-Total" | "X-WP-TotalPages">
 
 /**
  * Takes the same filters as the product list and answers with counts across the whole matching collection rather than a page of it.
