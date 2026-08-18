@@ -68,6 +68,7 @@ function withNullable(type: string, schema: IntrospectionSchema): string {
 function inheritedPropertyTypes(
 	schema: IntrospectionSchema,
 	context: RenderContext,
+	indent = "",
 	seen = new Set<string>(),
 ): { types: string[]; hasOptional: boolean } {
 	const result = { types: [] as string[], hasOptional: false }
@@ -78,10 +79,10 @@ function inheritedPropertyTypes(
 		const parentSchema = context.schemas.get(parent)
 		if (!parentSchema) continue
 		for (const child of Object.values(parentSchema.properties ?? {})) {
-			result.types.push(renderType(child, context))
+			result.types.push(renderType(child, context, indent))
 			result.hasOptional ||= !child.required
 		}
-		const inherited = inheritedPropertyTypes(parentSchema, context, seen)
+		const inherited = inheritedPropertyTypes(parentSchema, context, indent, seen)
 		result.types.push(...inherited.types)
 		result.hasOptional ||= inherited.hasOptional
 	}
@@ -101,22 +102,23 @@ const UNDESCRIBED_OBJECT = "Record<string, unknown>"
 function renderObject(schema: IntrospectionSchema, context: RenderContext, indent = ""): string {
 	const members: string[] = []
 	const propertyTypes: string[] = []
+	const childIndent = `${indent}\t`
 	let hasOptionalProperty = false
 	for (const [name, child] of sortedEntries(schema.properties ?? {})) {
-		propertyTypes.push(renderType(child, context))
+		propertyTypes.push(renderType(child, context, childIndent))
 		hasOptionalProperty ||= !child.required
 		members.push(
-			`${jsdoc(child.description, child.deprecated, `${indent}\t`)}${indent}\t${property(name)}${child.required ? "" : "?"}: ${renderType(child, context)}`,
+			`${jsdoc(child.description, child.deprecated, childIndent)}${childIndent}${property(name)}${child.required ? "" : "?"}: ${renderType(child, context, childIndent)}`,
 		)
 	}
 
-	const patterns = sortedEntries(schema.patternProperties ?? {}).map(([, child]) => renderType(child, context))
+	const patterns = sortedEntries(schema.patternProperties ?? {}).map(([, child]) => renderType(child, context, childIndent))
 	if (schema.additionalProperties === true) patterns.push("unknown")
 	else if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
-		patterns.push(renderType(schema.additionalProperties, context))
+		patterns.push(renderType(schema.additionalProperties, context, childIndent))
 	}
 	if (patterns.length) {
-		const inherited = inheritedPropertyTypes(schema, context)
+		const inherited = inheritedPropertyTypes(schema, context, childIndent)
 		patterns.push(...propertyTypes)
 		patterns.push(...inherited.types)
 		if (hasOptionalProperty || inherited.hasOptional) patterns.push("undefined")
@@ -339,6 +341,7 @@ function renderRecord(value: Record<string, string | undefined>): string {
 	const entries = sortedEntries(value)
 		.filter(([, item]) => item !== undefined)
 		.map(([key, item]) => `${property(key)}: ${literal(item)}`)
+	if (entries.length === 0) return "{}"
 	return `{ ${entries.join(", ")} }`
 }
 
@@ -420,12 +423,13 @@ const RUNTIME_TYPES = ["WP_Failure", "WP_Success", "WP_TransportFailure"]
 const REGISTRY = `declare module "kizlo" {\n\tinterface WordPressClientRegistry {\n\t\tendpoints: typeof endpoints\n\t}\n}`
 
 /**
- * The `kizlo` names a generated module uses: whatever its bodies mention, plus the two the tree
- * itself always needs. `wpEndpoint` is the only value among them, so the rest erase at build.
+ * The `kizlo` names a generated module uses. `wpEndpoint` is the only value among them, so the rest
+ * erase at build.
  */
-function kizloImports(body: string): string {
+function kizloImports(body: string, hasEndpoints: boolean): string {
 	const types = new Set(["WP_Client", ...RUNTIME_TYPES.filter((name) => new RegExp(`\\b${name}\\b`).test(body))])
-	return [...types, "wpEndpoint"]
+	const values = hasEndpoints ? ["wpEndpoint"] : []
+	return [...types, ...values]
 		.sort()
 		.map((name) => (types.has(name) ? `type ${name}` : name))
 		.join(", ")
@@ -449,13 +453,14 @@ export function generateWordPressClient(document: IntrospectionDocument): string
 
 	const tree = endpointTree(document)
 	const body = declarations.join("\n\n")
+	const endpointBody = renderEndpointNode(tree, "\t")
 
 	const moduleBody = [
 		body,
-		`export const endpoints = ${renderEndpointNode(tree, "\t")}`,
+		`export const endpoints = ${endpointBody}`,
 		`export type WordPressClient = WP_Client<typeof endpoints>`,
 		REGISTRY,
 	].join("\n\n")
 
-	return generatedModule(document.hash, `import { ${kizloImports(body)} } from "kizlo"`, moduleBody)
+	return generatedModule(document.hash, `import { ${kizloImports(moduleBody, endpointBody !== "{}")} } from "kizlo"`, moduleBody)
 }

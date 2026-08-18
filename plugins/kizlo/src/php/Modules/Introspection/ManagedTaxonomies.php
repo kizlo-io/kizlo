@@ -90,7 +90,7 @@ class ManagedTaxonomies
             'id'        => $id,
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $single,
-            'summary'   => sprintf('Update a %s term', $slug),
+            'summary'   => sprintf('Update %s term', $slug),
             'input'     => [
                 '$extends'     => "{$id}.update-input",
                 'type'         => 'object',
@@ -152,7 +152,7 @@ class ManagedTaxonomies
                 'namespace' => KIZLO_API_NAMESPACE,
                 'route'     => $collection,
                 'method'    => 'POST',
-                'summary'   => sprintf('Create a %s term', $slug),
+                'summary'   => sprintf('Create %s term', $slug),
                 'input'     => ['$extends' => "{$id}.create-input", 'type' => 'object', 'content_type' => Spec::JSON_CONTENT_TYPE],
                 'errors'    => self::createErrors(),
                 'responses' => [
@@ -178,7 +178,7 @@ class ManagedTaxonomies
                 'namespace' => KIZLO_API_NAMESPACE,
                 'route'     => $single,
                 'method'    => 'DELETE',
-                'summary'   => sprintf('Delete a %s term', $slug),
+                'summary'   => sprintf('Delete %s term', $slug),
                 'input'     => [
                     'type'       => 'object',
                     'properties' => [

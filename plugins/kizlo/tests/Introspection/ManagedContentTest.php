@@ -241,6 +241,20 @@ class ManagedContentTest extends IntrospectionTestCase
         $this->assertSame($operations['update']['responses'], $operations['replace']['responses']);
     }
 
+    public function test_managed_write_summaries_need_no_indefinite_article(): void
+    {
+        $apis       = $this->document()['apis'];
+        $attachment = $apis['post-types.attachment']['paths'];
+        $category   = $apis['taxonomies.category']['paths'];
+
+        $this->assertSame('Create attachment entry', $attachment['/post-types/attachment']['create']['summary']);
+        $this->assertSame('Update attachment entry', $attachment['/post-types/attachment/{identifier}']['update']['summary']);
+        $this->assertSame('Delete attachment entry', $attachment['/post-types/attachment/{identifier}']['delete']['summary']);
+        $this->assertSame('Create category term', $category['/taxonomies/category']['create']['summary']);
+        $this->assertSame('Update category term', $category['/taxonomies/category/{identifier}']['update']['summary']);
+        $this->assertSame('Delete category term', $category['/taxonomies/category/{identifier}']['delete']['summary']);
+    }
+
     // ============================================================
     // LIST VS SINGLE
     // ============================================================

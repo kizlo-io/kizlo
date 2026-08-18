@@ -85,6 +85,7 @@ describe("generateWordPressClient", () => {
 		expect(first).toContain("}) | null")
 		expect(first).toContain("export type WP_AcmeChoice = WP_AcmeBook | string | null")
 		expect(first).toContain("[key: string]: number | boolean | undefined")
+		expect(first).toContain("publication?: {\n\t\timprint?: {\n\t\t\tname: string\n\t\t}\n\t}")
 		expect(first).toContain("@deprecated")
 		expect(first).toContain("export interface WP_PostTypesBookCreateInput")
 		expect(first).toContain("export type WP_PostTypesBookCreateEndpointInput = WP_PostTypesBookCreateInput")
@@ -104,6 +105,32 @@ describe("generateWordPressClient", () => {
 		expect(client).toContain("endpoints: typeof endpoints")
 		expect(client).toContain("export interface WP_AcmeBook extends WP_AcmeEntity")
 		expect(client).toContain(`import { type WP_Client, type WP_Failure, type WP_Success, wpEndpoint } from "kizlo"`)
+	})
+
+	test("formats empty records without padding", () => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		const list = document.apis["post-types.book"]?.paths["/post-types/book"]?.list
+		if (!list) throw new Error("The fixture list endpoint is missing")
+		list.responses = { "204": {} }
+
+		const client = generateWordPressClient(document)
+
+		expect(client).toContain("responseContentTypes: {}")
+		expect(client).not.toContain("{  }")
+	})
+
+	test("does not import the endpoint helper for a schema-only document", () => {
+		const client = generateWordPressClient({
+			...INTROSPECTION_FIXTURE,
+			schemas: {
+				...INTROSPECTION_FIXTURE.schemas,
+				"acme.endpoint-note": { type: "string", description: "A schema may mention wpEndpoint in its documentation." },
+			},
+			apis: {},
+		})
+
+		expect(client).toContain(`import { type WP_Client } from "kizlo"`)
+		expect(client).not.toMatch(/^import .*wpEndpoint/m)
 	})
 
 	test("captures each endpoint's definition once, under its own documentation", () => {
