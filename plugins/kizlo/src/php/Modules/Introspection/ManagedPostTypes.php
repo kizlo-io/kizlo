@@ -167,7 +167,7 @@ class ManagedPostTypes
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $collection,
             'method'    => 'POST',
-            'summary'   => sprintf('Create a %s entry', $slug),
+            'summary'   => sprintf('Create %s entry', $slug),
             'input'     => self::createInput($slug, $id),
             'errors'    => self::createErrors($slug),
             'responses' => [
@@ -183,7 +183,7 @@ class ManagedPostTypes
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $single,
             'method'    => 'PATCH',
-            'summary'   => sprintf('Update a %s entry', $slug),
+            'summary'   => sprintf('Update %s entry', $slug),
 
             // JSON even for an upload type. There is no way to replace the binary
             // through PATCH and WordPress does not offer one either: editing an
@@ -208,7 +208,7 @@ class ManagedPostTypes
             'namespace' => KIZLO_API_NAMESPACE,
             'route'     => $single,
             'method'    => 'DELETE',
-            'summary'   => sprintf('Delete a %s entry', $slug),
+            'summary'   => sprintf('Delete %s entry', $slug),
             'input'     => [
                 'type'       => 'object',
                 'properties' => [

@@ -27,6 +27,15 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 					type: "object",
 					additionalProperties: { anyOf: [{ type: "string" }, { type: "number" }] },
 				},
+				publication: {
+					type: "object",
+					properties: {
+						imprint: {
+							type: "object",
+							properties: { name: { type: "string", required: true } },
+						},
+					},
+				},
 			},
 		},
 		"acme.dictionary": {
