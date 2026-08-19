@@ -96,26 +96,77 @@ function transportMember(transport: WordPressTransport, key: PropertyKey): unkno
 }
 
 /**
+ * Keys that must not become a missing-endpoint node, whatever the tree holds. A symbol is never an
+ * endpoint name, and `then` decides whether a value is a thenable: handing the promise machinery a
+ * function that resolves to a result rather than calling back would hang an `await` on the node
+ * forever. Both resolve to `undefined`, which is what they did before any of this existed.
+ */
+function isInertKey(key: PropertyKey): boolean {
+	return typeof key === "symbol" || key === "then"
+}
+
+/**
+ * Stands in for a path the generated tree does not have, so the failure names the path instead of
+ * arriving as `undefined` and becoming `is not a function` two property accesses later.
+ *
+ * It keeps proxying, because the absent key can be a whole subtree rather than the leaf: `postTypes`
+ * going missing has to survive `.post.list` before anything is called. Calling it resolves to the
+ * shape a request that never left already has, so a caller branches on `response.error` for this the
+ * way it does for a path parameter that could not be interpolated.
+ *
+ * Why the path is absent is not knowable from here. It is a post type or taxonomy whose API access
+ * was switched off, a plugin that is missing or predates the contract, or a generated client built
+ * against a different WordPress, and the client sees the same nothing in every case. So the message
+ * reports what it can prove and names the command that resolves it.
+ */
+function missingEndpoint(path: string): unknown {
+	const call = async () => ({
+		data: null,
+		status: 0,
+		headers: new Headers(),
+		error: new WP_Error({
+			code: "rest_no_route",
+			message: `No endpoint at "${path}" in this project's generated client, so nothing was sent. Run \`kizlo generate\` against the WordPress you are connecting to.`,
+		}),
+	})
+
+	return new Proxy(call, {
+		get(target, key) {
+			if (isInertKey(key)) return Reflect.get(target, key)
+			return missingEndpoint(`${path}.${String(key)}`)
+		},
+		// The tree is what says an endpoint exists, and this node is what says it does not.
+		has: () => false,
+	})
+}
+
+/**
  * Resolves lazily rather than walking the tree up front: a serverless invocation reloads the module
  * and touches one or two endpoints, so binding all of them on every cold start is work thrown away.
  * Each node memoizes what it hands back, so repeated access costs one map lookup.
+ *
+ * `path` is the dotted route to this node, empty at the root, carried so a key that resolves to
+ * nothing can name where it was reached from.
  */
-function proxyNode(node: object, transport: WordPressTransport, root: boolean): unknown {
+function proxyNode(node: object, transport: WordPressTransport, path: string): unknown {
 	const cache = new Map<PropertyKey, unknown>()
+	const root = path === ""
 
 	return new Proxy(node, {
 		get(target, key, receiver) {
 			if (cache.has(key)) return cache.get(key)
 
 			const value = Reflect.get(target, key, receiver)
+			const dotted = root ? String(key) : `${path}.${String(key)}`
 			let resolved: unknown
 			if (value !== null && typeof value === "object") {
-				resolved = isEndpoint(value) ? createCaller(value, transport) : proxyNode(value, transport, false)
-			}
-			// Endpoints shadow the transport, so this only runs for a key the generated tree lacks:
-			// `get`, `post`, `resolveList` and the rest stay reachable on the client an extension holds.
-			else if (value === undefined && root) resolved = transportMember(transport, key)
-			else resolved = value
+				resolved = isEndpoint(value) ? createCaller(value, transport) : proxyNode(value, transport, dotted)
+			} else if (value === undefined && !isInertKey(key)) {
+				// Endpoints shadow the transport, so this only runs for a key the generated tree lacks:
+				// `get`, `post`, `resolveList` and the rest stay reachable on the client an extension holds.
+				const member = root ? transportMember(transport, key) : undefined
+				resolved = member ?? missingEndpoint(dotted)
+			} else resolved = value
 
 			cache.set(key, resolved)
 			return resolved
@@ -130,5 +181,5 @@ export function createWordPressClient<TEndpoints extends object>(
 	transport: WordPressTransport,
 	endpoints: TEndpoints,
 ): WP_Client<TEndpoints> & WordPressTransport {
-	return proxyNode(endpoints, transport, true) as WP_Client<TEndpoints> & WordPressTransport
+	return proxyNode(endpoints, transport, "") as WP_Client<TEndpoints> & WordPressTransport
 }

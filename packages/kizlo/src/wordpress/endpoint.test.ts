@@ -151,3 +151,57 @@ describe("createWordPressClient", () => {
 		expect("nope" in wordpress).toBe(false)
 	})
 })
+
+/**
+ * The tree describes whatever the connected installation serves, and Kizlo's own routers call fixed
+ * paths into it, so a post type with API access switched off takes `postTypes.post` out from under
+ * `post.list`. These resolve to a failure rather than throwing, which is how a request that never
+ * left already reports itself.
+ */
+describe("an endpoint the tree does not have", () => {
+	/** The generated tree is what types these paths, so a test reaching for an absent one has to say so. */
+	const absent = () => client() as unknown as Record<string, any>
+
+	test("resolves to a failure naming the operation that was called", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
+		vi.stubGlobal("fetch", fetch)
+
+		const result = await absent().books.destroy({ identifier: "dune" })
+
+		expect(result).toMatchObject({ data: null, status: 0 })
+		expect(result.error.code).toBe("rest_no_route")
+		expect(result.error.message).toContain('"books.destroy"')
+		expect(result.error.message).toContain("kizlo generate")
+		expect(fetch).not.toHaveBeenCalled()
+	})
+
+	test("keeps proxying through an absent branch, so the leaf still names the whole path", async () => {
+		const result = await absent().postTypes.post.list({ status: ["publish"] })
+
+		expect(result.error.code).toBe("rest_no_route")
+		expect(result.error.message).toContain('"postTypes.post.list"')
+	})
+
+	test("stays absent to `in`, so a caller can branch on the subtree instead", () => {
+		const wordpress = absent()
+
+		expect("post" in wordpress.postTypes).toBe(false)
+		expect("destroy" in wordpress.books).toBe(false)
+	})
+
+	test("is not a thenable, so awaiting a subtree cannot hang", async () => {
+		// `then` reaching the promise machinery as a function that resolves rather than calls back
+		// would never settle. It stays `undefined`, so the await resolves to the node itself.
+		expect(typeof absent().postTypes.then).toBe("undefined")
+		await expect(Promise.resolve(absent().postTypes)).resolves.toBeDefined()
+	})
+
+	test("leaves the transport reachable, which is the other thing an unknown key can be", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }))
+		vi.stubGlobal("fetch", fetch)
+
+		await absent().get("/anything", { base: "/wp-json/wp/v2" })
+
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/wp/v2/anything")
+	})
+})

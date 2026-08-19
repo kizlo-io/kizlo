@@ -24,7 +24,8 @@ export const COMMENT_ROUTER_MAP = {
 			if (response.error) {
 				switch (response.error.code) {
 					case "rest_comment_invalid_id":
-					case "rest_post_invalid_id": {
+					case "rest_post_invalid_id":
+					case "rest_no_route": {
 						throw errors.COMMENT_NOT_FOUND()
 					}
 					case "rest_cannot_read":
@@ -83,6 +84,9 @@ export const COMMENT_ROUTER_MAP = {
 					}
 					case "rest_comment_not_supported_post_type": {
 						throw errors.COMMENT_POST_TYPE_NOT_SUPPORTED()
+					}
+					case "rest_no_route": {
+						throw errors.NOT_FOUND()
 					}
 					default:
 						context.logger.error("List comments unhandled error", response.error, { code: response.error.code })
@@ -175,6 +179,9 @@ export const COMMENT_ROUTER_MAP = {
 					}
 					case "comment_reply_to_unapproved_comment": {
 						throw errors.COMMENT_PARENT_UNAPPROVED()
+					}
+					case "rest_no_route": {
+						throw errors.NOT_FOUND()
 					}
 					default:
 						context.logger.error("Submit comment unhandled error", response.error, { code: response.error.code })

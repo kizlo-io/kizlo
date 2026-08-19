@@ -65,6 +65,28 @@ return response.data
 
 An `identifier` on a managed post type or taxonomy accepts a numeric ID or slug as a string.
 
+## Call an endpoint the tree does not have
+
+The file describes one WordPress at one moment. Switch off API access for a post type, deactivate the plugin
+that serves a route, or generate against a different site, and your code is left calling a path the file no
+longer has.
+
+The call resolves to a failure instead of throwing, carrying the `rest_no_route` code that is already in every
+endpoint's error union. Nothing is sent, so the check you write for any failed request covers it.
+
+```ts
+const response = await context.wordpress.postTypes.post.list()
+
+// response.error.code
+// "rest_no_route"
+
+// response.error.message
+// No endpoint at "postTypes.post.list" in this project's generated client, so nothing was sent.
+// Run `kizlo generate` against the WordPress you are connecting to.
+```
+
+To branch before calling, ask the client what it carries: `"woocommerce" in context.wordpress`.
+
 ## Override one call
 
 Pass request-specific options as the second argument. They affect this invocation without changing the endpoint
