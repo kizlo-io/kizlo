@@ -1,5 +1,8 @@
 import { createServer } from "node:net"
 
+/** How many ports upward of the preferred one {@link findFreePort} probes before giving up on the range. */
+export const PORT_SCAN_RANGE = 100
+
 /** Thrown when an explicitly-configured port is already taken — a collision the user owns. */
 export class PortInUseError extends Error {
 	readonly port: number
@@ -46,7 +49,7 @@ function ephemeralPort(host: string): Promise<number> {
  * `127.0.0.1` for the loopback-only MySQL port — a port can be free on one and not the other.
  */
 export async function findFreePort(preferred: number, host = "0.0.0.0"): Promise<number> {
-	for (let port = preferred; port < preferred + 100; port++) {
+	for (let port = preferred; port < preferred + PORT_SCAN_RANGE; port++) {
 		if (await isFree(port, host)) return port
 	}
 	return ephemeralPort(host)
