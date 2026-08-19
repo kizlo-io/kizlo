@@ -223,8 +223,6 @@ export class WordPressTransport {
 			for (const [k, v] of params) url.searchParams.append(k, v)
 		}
 
-		if (!url.searchParams.has("context")) url.searchParams.set("context", "edit")
-
 		const body = this.#serializeBody(input.body, input.requestContentType)
 		const isFormData = body instanceof FormData
 
