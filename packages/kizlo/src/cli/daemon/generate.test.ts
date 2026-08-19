@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test, vi } from "vitest"
 import type { IntrospectionDocument } from "../../wordpress/introspection"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import type { ResolvedConfig } from "./config"
-import { generateWordPressOnce, PartialContractError } from "./generate"
+import { generateWordPressOnce, generateWordPressSource, PartialContractError } from "./generate"
 import { log } from "./logger"
 
 function config(cwd: string): ResolvedConfig {
@@ -160,6 +160,17 @@ describe("generateWordPressOnce", () => {
 		await expect(generateWordPressOnce(cfg, { fetch: vi.fn(next) as unknown as typeof globalThis.fetch })).rejects.toThrow()
 		expect(fs.readFileSync(sourcePath, "utf8")).toBe(source)
 		expect(fs.readFileSync(metaPath, "utf8")).toBe(meta)
+	})
+})
+
+describe("generateWordPressSource", () => {
+	test("returns current output without writing the client or its cache", async () => {
+		const cfg = project()
+		const source = await generateWordPressSource(cfg.cwd, { strict: true, fetch: responder(modified()) })
+
+		expect(source).toContain("WP_AcmeBook")
+		expect(fs.existsSync(path.join(cfg.cwd, cfg.wordpressPath))).toBe(false)
+		expect(fs.existsSync(path.join(cfg.cwd, cfg.wordpressMetaPath))).toBe(false)
 	})
 })
 

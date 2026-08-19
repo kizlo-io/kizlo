@@ -9,7 +9,7 @@ app, **generates the contract** that types your [client](/docs/concepts/client) 
 [server](/docs/concepts/extension), runs **local WordPress** you can build against, and **runs
 your tests** against a real, disposable WordPress.
 
-It ships with the `kizlo` package, so there's nothing extra to install — reach for it through your package
+It ships with the `kizlo` package, so there's nothing extra to install. Reach for it through your package
 runner:
 
 ```package-install
@@ -24,16 +24,17 @@ A handful of commands cover the whole workflow, from first scaffold to a green t
 | --- | --- |
 | [`kizlo create`](#kizlo-create) | Scaffold a new project with Kizlo already wired |
 | [`kizlo init`](#kizlo-init) | Set up Kizlo in the current project |
-| [`kizlo generate`](#kizlo-generate) | Generate the contract once — for builds and CI |
+| [`kizlo check`](#kizlo-check) | Verify generated files without changing them |
+| [`kizlo generate`](#kizlo-generate) | Generate the contract once for builds and CI |
 | [`kizlo dev`](#kizlo-dev) | Watch and regenerate the contract as you edit, and run local WordPress. Bare starts it; `stop`, `reset` |
-| [`kizlo test`](#kizlo-test) | Boot local WordPress, seed it, and run your tests — `stop`, `reset` |
+| [`kizlo test`](#kizlo-test) | Boot local WordPress, seed it, and run your tests (`stop`, `reset`) |
 
 Every command reads [`kizlo.config.ts`](#configuration) to find where your server lives and how your test
 environment is set up.
 
 ## `kizlo create`
 
-`create` scaffolds a **new project** with Kizlo already wired — reach for it when you're starting from
+`create` scaffolds a **new project** with Kizlo already wired. Reach for it when you're starting from
 scratch rather than adding to an app you already have. Give it a template and a directory name:
 
 ```package-install
@@ -43,13 +44,13 @@ npx kizlo@latest create nextjs my-app
 Both arguments are optional (`kizlo create [template] [project-name]`); `create` prompts for whichever you
 leave off, and the template auto-selects while `nextjs` is the only one. It creates `my-app/`, lays down a
 fully wired project for that template, and runs the same WordPress credential prompts as
-[`init`](#kizlo-init). When it finishes, `cd my-app`, install dependencies, and make your first call — the
+[`init`](#kizlo-init). When it finishes, `cd my-app`, install dependencies, and make your first call. The
 [Next.js quickstart](/docs/quickstarts/nextjs) walks it end to end.
 
 ## `kizlo init`
 
 `init` sets Kizlo up in an existing project. It detects your framework, package manager, `src` directory, and
-import alias, then scaffolds the server, client, route handler, and config — prompting for your WordPress
+import alias, then scaffolds the server, client, route handler, and config, prompting for your WordPress
 credentials along the way and writing them to `.env`.
 
 ```package-install
@@ -61,7 +62,7 @@ detail. Past the defaults, a few flags tune the run:
 
 | Flag | Effect |
 | --- | --- |
-| `--yes`, `-y` | Skip the prompts and scaffold with defaults — non-interactive, for CI |
+| `--yes`, `-y` | Skip the prompts and scaffold with defaults (non-interactive, for CI) |
 | `--force`, `-f` | Overwrite existing `.env` values and the server entry without asking |
 | `--preset <id>` | Force a setup preset (`base`, `nextjs`) instead of auto-detecting |
 | `--alias <prefix>` | Set the import alias for generated imports (e.g. `@`); blank for relative |
@@ -69,8 +70,8 @@ detail. Past the defaults, a few flags tune the run:
 ### Backend URL
 
 The plugin delivers webhook events to your Kizlo backend, so `init` records where it's reachable. A detected
-framework mounts the handler at a known path (`/api/kizlo` for Next.js), so `init` asks one question — your
-app's public URL — and derives the backend from it, writing it to `NEXT_PUBLIC_KIZLO_API_URL`.
+framework mounts the handler at a known path (`/api/kizlo` for Next.js), so `init` asks one question: your
+app's public URL. It derives the backend from it and writes it to `NEXT_PUBLIC_KIZLO_API_URL`.
 
 The **base** preset has no known mount, so `init` asks two URLs: your public **site URL** (what the plugin
 points back at) and the **backend URL** where you've mounted the handler (written to `KIZLO_API_URL`).
@@ -79,10 +80,30 @@ The generated `client.ts` routes to that backend. Same-origin deploys default to
 a different origin is inlined into `createKizloClient(contract, { url })`. Swap that for your bundler's own
 public env var (e.g. `import.meta.env.VITE_KIZLO_API_URL`) to set it per environment.
 
+## `kizlo check`
+
+`check` compares each configured `wordpress.ts` with the contract published by WordPress. It exits non-zero
+and prints a unified diff when a committed client is stale. It never changes the file.
+
+```package-install
+npx kizlo check
+```
+
+Use `--test` after `kizlo test` to check against the WordPress stack built from `test.fixtures`. This makes the
+same command useful locally and in CI:
+
+```bash
+npx kizlo test
+npx kizlo check --test
+```
+
+Pass `--dir <path>` when the Kizlo server lives somewhere other than the configured `dir`. If the check fails,
+the message prints the matching `kizlo generate` command.
+
 ## `kizlo generate`
 
 `generate` builds the [contract](/docs/concepts/client) **once** and exits. It's the command for builds and
-CI — run it before you typecheck or bundle, so `server/generated/` exists and is current when the client
+CI. Run it before you typecheck or bundle, so `server/generated/` exists and is current when the client
 imports it.
 
 ```package-install
@@ -91,7 +112,8 @@ npx kizlo generate
 
 It exits non-zero if it can't find a Kizlo server in your entry file or if generation fails, so a stale or
 broken contract fails the build rather than slipping through. It accepts `--dir` to point at a Kizlo
-directory other than the one in `kizlo.config.ts`, and `--strict` to [refuse a partial
+directory other than the one in `kizlo.config.ts`, `--test` to generate from WordPress left running by
+`kizlo test`, and `--strict` to [refuse a partial
 contract](#when-a-plugins-routes-cant-be-published).
 
 <Callout>
@@ -126,10 +148,10 @@ can't be regenerated until someone else's plugin is fixed.
 ## `kizlo dev`
 
 `kizlo dev` is the command you run while developing. It **watches your server** and regenerates the
-[contract](/docs/concepts/client) on every save — debounced, so a burst of saves collapses into one rebuild,
+[contract](/docs/concepts/client) on every save. A debounce collapses a burst of saves into one rebuild,
 and your client stays typed against the latest server without you thinking about it. A broken server entry
 doesn't stop it: it reports the error and keeps watching, so the next save can fix it. Only one watcher writes
-the contract at a time — a single-instance lock means a framework dev script and `kizlo dev` won't fight over
+the contract at a time. A single-instance lock means a framework dev script and `kizlo dev` won't fight over
 the same file.
 
 ```package-install
@@ -150,11 +172,11 @@ environment:
 
 | Command | What it does |
 | --- | --- |
-| `kizlo dev` | Start local WordPress and the watcher — idempotent, never wipes |
+| `kizlo dev` | Start local WordPress and the watcher; idempotent, never wipes |
 | `kizlo dev stop` | Stop local WordPress, keeping everything for a fast resume |
 | `kizlo dev reset` | Wipe the database **and** the `.kizlo/local` install, so the next `kizlo dev` rebuilds fresh |
 
-`kizlo dev` runs in the foreground and stops local WordPress when you press **Ctrl+C** or close the terminal —
+`kizlo dev` runs in the foreground and stops local WordPress when you press **Ctrl+C** or close the terminal,
 like `next dev`, so it never outlives your session. `stop` and `reset` are escape hatches for the rare times
 you need to act on it outside a `kizlo dev` run.
 
@@ -174,11 +196,11 @@ On first install, `kizlo dev` mints a **random** admin password (not a guessable
 so you can log into `wp-admin`. Save it then; it isn't stored on disk. Later runs are idempotent and leave
 that login untouched.
 
-Local WordPress mints no application password — that's a test concern. To point an app at it over
+Local WordPress mints no application password. That's a test concern. To point an app at it over
 REST, create one in `wp-admin → Users → Profile → Application Passwords`.
 
 Its MySQL is published on `127.0.0.1:3307` (override with [`dev.dbPort`](#configuration)) so you can
-inspect or edit tables directly, beyond what `wp-admin` exposes. Kizlo doesn't bundle a database UI — point
+inspect or edit tables directly, beyond what `wp-admin` exposes. Kizlo doesn't bundle a database UI. Point
 whatever client you already use (the `mysql` CLI, TablePlus, DBeaver, Sequel Ace) at host `127.0.0.1`, that
 port, database `wordpress`, user `wordpress`, password `wppass`:
 
@@ -196,15 +218,15 @@ Local WordPress always enables PHP OPcache with dev-safe settings (it still pick
 offsets most of the slower file I/O that a bind-mounted install costs on macOS/Windows.
 
 On native Linux it also runs the container as **your** user, so the files WordPress writes into the folder are
-owned by you and stay editable — no `sudo`, no permission surprises. macOS/Windows handle that mapping
+owned by you and stay editable: no `sudo`, no permission surprises. macOS/Windows handle that mapping
 already, so nothing extra happens there.
 
 ### Seed with fixtures
 
 If you want a *code-defined* starting point rather than a real-data snapshot, point
 [`dev.fixtures`](#configuration) at the same [fixtures](/docs/concepts/development-and-testing#fixtures) your test environment uses. Each
-runs once over REST (and can drop to wp-cli for anything REST can't reach) on a **fresh** install — the first
-`kizlo dev` or after `reset` — so your dev environment mirrors your test data from versioned code:
+runs once over REST (and can drop to wp-cli for anything REST can't reach) on a **fresh** install: the first
+`kizlo dev` or after `reset`. Your dev environment then mirrors your test data from versioned code:
 
 ```ts
 dev: { fixtures: [postFixture()] }
@@ -214,7 +236,7 @@ On reruns of an existing install, fixtures don't re-run, so your manual edits ar
 
 ## `kizlo test`
 
-With [`test.local`](#configuration) set, `kizlo test` runs your test suite against **real WordPress** — no
+With [`test.local`](#configuration) set, `kizlo test` runs your test suite against **real WordPress**, with no
 mocks. It boots a Docker-based WordPress (on `http://localhost:8889`, independent of your local dev
 WordPress), seeds it with your [fixtures](#configuration), then runs your project's own test command against
 it:
@@ -236,7 +258,7 @@ default for that reason. Two flags change the lifecycle:
 npx kizlo test --reset --teardown   # a clean install, torn down afterward
 ```
 
-Under the hood `test` runs your package manager's `test` script — `pnpm test`, `npm test`, `bun run test` —
+Under the hood `test` runs your package manager's `test` script (`pnpm test`, `npm test`, or `bun run test`),
 detected from your lockfile, or whatever you set as the test [`command`](#configuration). Its output streams
 straight to your terminal, and `kizlo test` exits with your suite's exit code. Without `test.local`, `kizlo
 test` skips the Docker WordPress entirely and just runs that script.
@@ -250,7 +272,7 @@ test` skips the Docker WordPress entirely and just runs that script.
 
 A `kizlo test` run leaves WordPress **up** by default, so you can poke at WP Admin, debug a
 [fixture](/docs/concepts/development-and-testing#fixtures), or point another tool at the seeded credentials between runs. To get
-running WordPress without invoking your suite, run `kizlo test` once — it seeds and stays up.
+running WordPress without invoking your suite, run `kizlo test` once. It seeds and stays up.
 
 These subcommands drive that same install's lifecycle by hand:
 
@@ -259,7 +281,7 @@ These subcommands drive that same install's lifecycle by hand:
 | `kizlo test stop` | Stop it, keeping the database volume for a fast resume |
 | `kizlo test reset` | Wipe the database volume and reseed fresh |
 
-The difference between `stop` and `reset` is the database volume — `stop` keeps it, `reset` throws it away.
+The difference between `stop` and `reset` is the database volume: `stop` keeps it, `reset` throws it away.
 
 ## Configuration
 
@@ -288,16 +310,16 @@ export default defineConfig({
 
 | Field | Used by | Meaning |
 | --- | --- | --- |
-| `dir` | all | Kizlo's home directory — where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory) |
+| `dir` | all | Kizlo's home directory, where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory) |
 | `alias` | `init` | Import-alias prefix for generated imports, e.g. `@`. Blank means relative imports |
 | `name` | `dev`, `test` | Base name for the Docker projects (`<name>-dev`, `<name>-test`). Defaults to the sanitized `package.json` name, then the config dir basename |
 | `worktrees` | `dev`, `test` | Append the checked-out branch to `name`, so each branch gets its own Docker projects (`<name>-<branch>-dev`). Off unless set. Turn it on when you keep several checkouts of one project, typically [git worktrees](/docs/concepts/development-and-testing#one-stack-per-branch), so their WordPress and database stop being shared |
 | `dev.local` | `dev` | Run local WordPress under `kizlo dev`. When `true`, `kizlo dev` boots a Docker WordPress in `.kizlo/local`; unset or `false` runs the watcher alone. Set by `create`/`init` when you choose local WordPress |
 | `dev.port` | `dev` | Port local WordPress listens on under `kizlo dev`. Defaults to `8080` |
 | `dev.dbPort` | `dev` | Host port the local MySQL is published on (bound to `127.0.0.1`) so you can point a SQL client at the database. Defaults to `3307`; change it if it clashes |
-| `dev.fixtures` | `dev` | [Fixtures](/docs/concepts/development-and-testing#fixtures) to build local WordPress from — the same fixtures the test environment uses. Each declares the plugins it needs (wp.org slugs / zip sources to install, or `{ path }` local dirs bind-mounted live into `wp-content/plugins` by basename) and is seeded on a **fresh** install (first `kizlo dev` / after `reset`) |
+| `dev.fixtures` | `dev` | [Fixtures](/docs/concepts/development-and-testing#fixtures) to build local WordPress from, matching the test environment. Each declares the plugins it needs (wp.org slugs / zip sources to install, or `{ path }` local dirs bind-mounted live into `wp-content/plugins` by basename) and is seeded on a **fresh** install (first `kizlo dev` / after `reset`) |
 | `test.local` | `test` | Run local WordPress under `kizlo test`. When `true`, `kizlo test` boots a disposable Docker WordPress, seeds it, and runs your suite against it; unset or `false` just runs your test script. Set by `create`/`init` when you choose local WordPress |
 | `test.port` | `test` | Port test WordPress listens on. Defaults to `8889` |
-| `test.fixtures` | `test` | Fixtures to install and seed onto test WordPress — core content plus any extension's fixtures |
+| `test.fixtures` | `test` | Fixtures to install and seed onto test WordPress: core content plus any extension's fixtures |
 | `test.packageManager` | `test` | Package manager for the test command. Auto-detected from your lockfile when unset |
 | `test.command` | `test` | Override the test command entirely, instead of `<packageManager> test` |

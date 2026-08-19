@@ -1,8 +1,10 @@
 import path from "node:path"
 import { defineCommand } from "citty"
+import type { WordPressCredentials } from "../../wordpress/types"
 import { resolveConfig, resolveWordPressClientDir } from "../daemon/config"
 import { generateOnce, generateWorkspaceClientOnce, PartialContractError, reportGenerationError } from "../daemon/generate"
 import { log } from "../daemon/logger"
+import { testWordPressCredentials } from "./_test-wordpress"
 
 /**
  * Report and exit non-zero. A refused partial contract says one thing here that it cannot say
@@ -29,10 +31,25 @@ export const generate = defineCommand({
 			type: "boolean",
 			description: "Fail instead of generating a client WordPress had to exclude routes or types from",
 		},
+		test: {
+			type: "boolean",
+			description: "Generate against WordPress left running by kizlo test",
+		},
 	},
 	async run({ args }) {
 		const cwd = process.cwd()
 		const strict = args.strict === true
+		let credentials: WordPressCredentials | undefined
+		if (args.test) {
+			try {
+				credentials = await testWordPressCredentials(cwd)
+			} catch (error) {
+				log.error(error instanceof Error ? error.message : String(error))
+				process.exitCode = 1
+				return
+			}
+		}
+		const options = { credentials, strict }
 
 		// A package or workspace that ships procedures has no server to build a contract from, but its
 		// procedures still call the generated tree, so it needs the client on its own. Which WordPress
@@ -40,7 +57,7 @@ export const generate = defineCommand({
 		const wordpressClientDir = await resolveWordPressClientDir(cwd)
 		if (wordpressClientDir) {
 			try {
-				const result = await generateWorkspaceClientOnce(cwd, wordpressClientDir, { strict })
+				const result = await generateWorkspaceClientOnce(cwd, wordpressClientDir, options)
 				const file = path.resolve(cwd, wordpressClientDir, "wordpress.ts")
 				log.success(`WordPress client ${result === "generated" ? "written to" : "already current at"} ${file}`)
 			} catch (error) {
@@ -58,7 +75,7 @@ export const generate = defineCommand({
 		}
 		let ok: boolean
 		try {
-			ok = await generateOnce(cfg, { strict })
+			ok = await generateOnce(cfg, options)
 		} catch (error) {
 			fail("Failed to generate the Kizlo contract:", error)
 		}
