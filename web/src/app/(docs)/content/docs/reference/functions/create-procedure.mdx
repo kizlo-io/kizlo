@@ -108,7 +108,7 @@ export const content = () =>
             output: z.array(z.object({ id: z.number(), title: z.string() })),
           },
           async ({ input, context, errors }) => {
-            const { data, error } = await context.wordpress.posts.list({ search: input.term })
+            const { data, error } = await context.wordpress.postTypes.post.list({ search: input.term })
             if (error) throw errors.INTERNAL_SERVER_ERROR()
 
             return data.map((post) => ({ id: post.id, title: post.title.rendered }))
@@ -126,7 +126,9 @@ export const content = () =>
             errors: { FEATURED_NOT_FOUND: { status: 404, message: "Featured item not found" } },
           },
           async ({ input, context, errors }) => {
-            const { data, error } = await context.wordpress.posts.get({ id: input.params.id })
+            const { data, error } = await context.wordpress.postTypes.post.retrieve({
+              identifier: String(input.params.id),
+            })
             if (error) throw errors.FEATURED_NOT_FOUND()
 
             return { id: data.id, headline: data.title.rendered }

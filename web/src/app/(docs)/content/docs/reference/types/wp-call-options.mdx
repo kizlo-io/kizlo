@@ -1,0 +1,35 @@
+---
+title: WP_CallOptions
+icon: Cube
+description: Override headers, cancellation, or timeout for one generated endpoint call.
+types: [WP_CallOptions]
+---
+
+`WP_CallOptions` is the optional second argument on every generated WordPress endpoint. Its values apply only
+to that request.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/wordpress/types.ts"
+  name="WP_CallOptions"
+/>
+
+| Option | Type | Effect |
+| --- | --- | --- |
+| `headers` | `Record<string, string>` | Add or override request headers. |
+| `signal` | `AbortSignal` | Cancel the request from an existing controller or signal. |
+| `timeout` | `Duration` | Override the transport timeout with milliseconds or a duration string such as `"5 seconds"`. |
+
+```ts
+const controller = new AbortController()
+
+await context.wordpress.postTypes.post.retrieve(
+  { identifier: "featured" },
+  {
+    headers: { "X-Request-Source": "homepage" },
+    signal: controller.signal,
+    timeout: "5 seconds",
+  },
+)
+```
+
+Pass an empty input object first when an endpoint has no required input but still needs call options.

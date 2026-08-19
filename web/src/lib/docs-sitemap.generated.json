@@ -8,12 +8,17 @@
 		"/docs/concepts/development-and-testing",
 		"/docs/concepts/extension",
 		"/docs/concepts/plugin",
+		"/docs/concepts/wordpress-client",
 		"/docs/installation",
 		"/docs/php/functions/emit-event",
 		"/docs/php/functions/extend-post-type",
 		"/docs/php/functions/include-post-type",
 		"/docs/php/functions/register-route",
 		"/docs/php/functions/register-route-interceptor",
+		"/docs/php/functions/register-spec-route",
+		"/docs/php/functions/register-spec-schema",
+		"/docs/php/functions/translate-spec-properties",
+		"/docs/php/functions/translate-spec-schema",
 		"/docs/quickstarts/astro",
 		"/docs/quickstarts/nextjs",
 		"/docs/quickstarts/tanstack-start/react",
@@ -41,6 +46,10 @@
 		"/docs/reference/types/error-definition",
 		"/docs/reference/types/fixture",
 		"/docs/reference/types/kizlo-error",
-		"/docs/reference/types/procedure-context"
+		"/docs/reference/types/procedure-context",
+		"/docs/reference/types/wp-call-options",
+		"/docs/reference/types/wp-endpoint-data",
+		"/docs/reference/types/wp-endpoint-input",
+		"/docs/reference/types/wp-endpoint-result"
 	]
 }

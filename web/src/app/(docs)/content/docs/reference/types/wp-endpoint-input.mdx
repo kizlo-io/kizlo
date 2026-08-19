@@ -1,0 +1,28 @@
+---
+title: WP_EndpointInput
+icon: Cube
+description: Extract the input accepted by a generated WordPress endpoint.
+types: [WP_EndpointInput]
+---
+
+`WP_EndpointInput<Path>` resolves the first argument accepted by an endpoint in the active generated
+[WordPress client](/docs/concepts/wordpress-client). Use it when a helper or service forwards the same input as
+that endpoint.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/wordpress/types.ts"
+  name="WP_EndpointInput"
+/>
+
+```ts
+import type { WP_EndpointInput } from "kizlo"
+
+export type PostListInput = WP_EndpointInput<"postTypes.post.list">
+
+export function featuredInput(input: PostListInput): PostListInput {
+  return { ...input, sticky: true }
+}
+```
+
+The path resolves against the project compiling the code, so a changed WordPress route updates every alias on
+the next generation.

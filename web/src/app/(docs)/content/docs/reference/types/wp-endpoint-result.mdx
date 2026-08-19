@@ -1,0 +1,26 @@
+---
+title: WP_EndpointResult
+icon: Cube
+description: Extract the complete result union from a generated WordPress endpoint.
+types: [WP_EndpointResult]
+---
+
+`WP_EndpointResult<Path>` resolves everything an endpoint can return: successful data, declared failures,
+status codes, and response headers. Use it for a wrapper whose return type must match the generated call.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/wordpress/types.ts"
+  name="WP_EndpointResult"
+/>
+
+```ts
+import type { ActiveWordPressClient, WP_EndpointResult } from "kizlo"
+
+export async function getFeaturedPost(
+  wordpress: ActiveWordPressClient,
+): Promise<WP_EndpointResult<"postTypes.post.retrieve">> {
+  return wordpress.postTypes.post.retrieve({ identifier: "featured" })
+}
+```
+
+Use [`WP_EndpointData`](/docs/reference/types/wp-endpoint-data) when only the successful payload is needed.
