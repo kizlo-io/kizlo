@@ -1,0 +1,65 @@
+---
+title: kizlo_register_spec_route
+icon: Function
+description: Describe an existing WordPress route without registering or calling it.
+---
+
+`kizlo_register_spec_route` adds a core or third-party route to Kizlo's introspection document. Use it when
+another plugin owns the endpoint and your generated client still needs its input, result, and errors.
+
+It registers no route, makes no request, and does not verify that the endpoint exists. The declaration must stay
+aligned with the plugin version your extension supports.
+
+## Parameters
+
+```php
+kizlo_register_spec_route(array $args): void
+```
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | API ID whose dot-separated segments become the client path. |
+| `operation` | `string` | Lowercase snake_case name, such as `list`, `retrieve`, or `bulk_delete`. The generated method is camelized. |
+| `namespace` | `string` | Route namespace, such as `wc/v3`. |
+| `route` | `string` | Route path inside the namespace. |
+| `method` | `string` | One HTTP method. Arrays and the plural `methods` key are rejected. |
+| `input` | `array` | Request schema. Named route captures must have required properties with matching names. |
+| `errors` | `string[]` | Handler-specific WordPress error codes. |
+| `responses` | `array` | Status-keyed response contracts. |
+| `summary` | `string` | Optional short operation summary. |
+| `description` | `string` | Optional operation description. |
+| `deprecated` | `bool` | Optional deprecation marker. |
+
+Runtime keys such as `callback`, `permission_callback`, `args`, `sanitize_callback`, and
+`validate_callback` are rejected because this function describes an endpoint rather than serving it.
+
+## Returns
+
+`void`. The operation appears in `GET /kizlo/v1/introspect` and in the generated WordPress client after the
+declaration passes contract validation.
+
+## Example
+
+```php title="wp-content/plugins/acme-orders/routes.php"
+kizlo_register_spec_route([
+    'id'        => 'acme.orders',
+    'operation' => 'retrieve',
+    'namespace' => 'acme/v1',
+    'route'     => '/orders/(?P<id>\\d+)',
+    'method'    => 'GET',
+    'input'     => [
+        'type'       => 'object',
+        'properties' => [
+            'id' => ['type' => 'integer', 'required' => true],
+        ],
+    ],
+    'errors'    => ['acme_order_not_found'],
+    'responses' => [
+        '200' => ['body' => ['$ref' => 'acme.order']],
+        '404' => ['body' => ['$ref' => 'kizlo.error']],
+    ],
+]);
+```
+
+After `kizlo generate`, call it as `context.wordpress.acme.orders.retrieve({ id: 42 })`. Register referenced
+schemas with [`kizlo_register_spec_schema`](/docs/php/functions/register-spec-schema).

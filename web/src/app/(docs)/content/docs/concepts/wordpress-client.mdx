@@ -1,0 +1,114 @@
+---
+title: WordPress client
+icon: TreeStructure
+description: Generate and call the WordPress endpoints described by your active plugins.
+---
+
+The generated **WordPress client** types the routes published by the plugins active on your WordPress site. You
+call it through `context.wordpress` in a procedure, event handler, fixture, or other server-side Kizlo code.
+
+## Generate the client
+
+`kizlo init` and `kizlo create` write a stub at `<dir>/server/generated/wordpress.ts`. The first generation
+replaces it with endpoints fetched from `GET /kizlo/v1/introspect` on your configured WordPress site.
+
+| Command | When it writes `wordpress.ts` |
+| --- | --- |
+| `kizlo generate` | Once, before a build or typecheck |
+| `kizlo dev` | On startup and whenever the WordPress introspection document changes |
+
+For the default `dir: "src/lib/kizlo"`, the file lives at
+`src/lib/kizlo/server/generated/wordpress.ts`. A package without a Kizlo server can set
+[`wordpressClientDir`](/docs/concepts/cli#configuration) and receives `<wordpressClientDir>/wordpress.ts`
+instead.
+
+<Callout>
+  Commit `wordpress.ts`. It gives builds and teammates the same WordPress contract without requiring a live
+  site during installation. The `.kizlo/wordpress.meta.json` cache stays local and is regenerated as needed.
+</Callout>
+
+## What the stub means
+
+The stub marks the endpoint tree as `any` so a new project compiles before it has connected to WordPress. It
+does not mean that WordPress has no routes, and it does not provide endpoint definitions at runtime.
+
+Run `kizlo generate` before relying on endpoint completion or checking a production build. The generated file
+replaces `any` with the routes, inputs, results, and error codes published by the active site.
+
+## Read the endpoint tree
+
+Each API ID segment becomes a nested client key. Kizlo camelizes every segment and operation name for the
+generated TypeScript member.
+
+| Introspection declaration | Generated call |
+| --- | --- |
+| API ID `post-types.post`, operation `list` | `wordpress.postTypes.post.list()` |
+| API ID `post-types.post`, operation `retrieve` | `wordpress.postTypes.post.retrieve()` |
+| API ID `woocommerce.store.cart`, operation `add_item` | `wordpress.woocommerce.store.cart.addItem()` |
+
+The input object combines the fields from the route declaration. Path parameters are inserted into the URL;
+the remaining fields become query parameters for reads or a request body for writes. Required fields make the
+first argument required, while an endpoint with no required fields can be called without one.
+
+```ts
+const response = await context.wordpress.postTypes.post.retrieve({
+  identifier: "hello-world",
+})
+
+if (response.error) {
+  context.logger.error(response.error.message)
+  throw response.error
+}
+
+return response.data
+```
+
+An `identifier` on a managed post type or taxonomy accepts a numeric ID or slug as a string.
+
+## Override one call
+
+Pass request-specific options as the second argument. They affect this invocation without changing the endpoint
+definition or transport defaults.
+
+```ts
+const controller = new AbortController()
+
+await context.wordpress.postTypes.post.retrieve(
+  { identifier: "42" },
+  {
+    headers: { "X-Request-Source": "featured" },
+    signal: controller.signal,
+    timeout: "5 seconds",
+  },
+)
+```
+
+See [`WP_CallOptions`](/docs/reference/types/wp-call-options) for the option types.
+
+## Name endpoint shapes
+
+Use the dotted client path to reuse a generated shape without importing the generated file:
+
+```ts
+import type { WP_EndpointData, WP_EndpointInput, WP_EndpointResult } from "kizlo"
+
+type Post = WP_EndpointData<"postTypes.post.retrieve">
+type PostListInput = WP_EndpointInput<"postTypes.post.list">
+type PostResult = WP_EndpointResult<"postTypes.post.retrieve">
+```
+
+The reference pages cover [`WP_EndpointData`](/docs/reference/types/wp-endpoint-data),
+[`WP_EndpointInput`](/docs/reference/types/wp-endpoint-input), and
+[`WP_EndpointResult`](/docs/reference/types/wp-endpoint-result).
+
+## Add a route the plugin does not own
+
+An extension plugin can add a core or third-party route to the document without registering a new WordPress
+endpoint. Register its reusable response shapes with
+[`kizlo_register_spec_schema`](/docs/php/functions/register-spec-schema), then describe each operation with
+[`kizlo_register_spec_route`](/docs/php/functions/register-spec-route).
+
+When the upstream API already exposes WordPress-style schemas, derive the declaration with
+[`kizlo_translate_spec_properties`](/docs/php/functions/translate-spec-properties) or
+[`kizlo_translate_spec_schema`](/docs/php/functions/translate-spec-schema). Regenerate the client after the
+companion plugin is active, then call the new API ID and operation through the naming rules above.

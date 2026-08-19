@@ -1,5 +1,14 @@
 {
 	"title": "Types",
 	"icon": "Cube",
-	"pages": ["procedure-context", "error-definition", "fixture", "kizlo-error"]
+	"pages": [
+		"procedure-context",
+		"wp-endpoint-data",
+		"wp-endpoint-input",
+		"wp-endpoint-result",
+		"wp-call-options",
+		"error-definition",
+		"fixture",
+		"kizlo-error"
+	]
 }

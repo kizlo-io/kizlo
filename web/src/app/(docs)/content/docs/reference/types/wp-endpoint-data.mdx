@@ -1,0 +1,25 @@
+---
+title: WP_EndpointData
+icon: Cube
+description: Extract the success payload from a generated WordPress endpoint.
+types: [WP_EndpointData]
+---
+
+`WP_EndpointData<Path>` resolves the successful `data` value for an endpoint in the active generated
+[WordPress client](/docs/concepts/wordpress-client). Use it to name a WordPress shape without restating its
+fields.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/wordpress/types.ts"
+  name="WP_EndpointData"
+/>
+
+```ts
+import type { WP_EndpointData } from "kizlo"
+
+export type Post = WP_EndpointData<"postTypes.post.retrieve">
+export type PostListItem = WP_EndpointData<"postTypes.post.list">[number]
+```
+
+The path uses the same dot-separated keys as `context.wordpress`. It resolves to `never` when a generated
+client has no matching endpoint, and to `any` while the pre-generation stub is active.

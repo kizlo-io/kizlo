@@ -1,0 +1,45 @@
+---
+title: kizlo_translate_spec_schema
+icon: Function
+description: Translate one WordPress-style schema into the Kizlo contract vocabulary.
+---
+
+`kizlo_translate_spec_schema` converts one schema when a property map is the wrong input shape. Use it for a
+response body, an array item, or a nested schema obtained on its own.
+
+## Parameters
+
+```php
+kizlo_translate_spec_schema(mixed $schema): ?array
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `$schema` | `mixed` | One WordPress-style schema. |
+
+It applies the same type normalization and cleanup as
+[`kizlo_translate_spec_properties`](/docs/php/functions/translate-spec-properties).
+
+## Returns
+
+The translated schema, or `null` when the input cannot be expressed honestly in the contract.
+
+## Example
+
+```php title="wp-content/plugins/acme-reports/routes.php"
+$body = kizlo_translate_spec_schema([
+    'type'  => 'array',
+    'items' => $controller->get_item_schema(),
+]);
+
+if ($body !== null) {
+    kizlo_register_spec_route([
+        'id'        => 'acme.reports',
+        'operation' => 'list',
+        'namespace' => 'acme/v1',
+        'route'     => '/reports',
+        'method'    => 'GET',
+        'responses' => ['200' => ['body' => $body]],
+    ]);
+}
+```

@@ -1,0 +1,77 @@
+---
+title: kizlo_translate_spec_properties
+icon: Function
+description: Translate WordPress-style property maps into Kizlo contract schemas.
+---
+
+`kizlo_translate_spec_properties` converts properties returned by WordPress and third-party controllers into
+the schema vocabulary accepted by Kizlo spec routes. Derive a declaration when the upstream API exposes its
+shape instead of copying that shape into your plugin.
+
+## Parameters
+
+```php
+kizlo_translate_spec_properties(
+    array $properties,
+    string $subject = '',
+    ?string $context = null,
+    bool $required = false
+): array
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `$properties` | `array` | Item properties, endpoint arguments, or collection parameters. |
+| `$subject` | `string` | Route or schema name used in diagnostics. |
+| `$context` | `string|null` | Keep fields visible in this WordPress context, such as `view`. `null` keeps every context. |
+| `$required` | `bool` | Mark each surviving property, including nested properties, as required. |
+
+The translation normalizes multi-type values and common WooCommerce spellings. It removes WordPress
+bookkeeping and runtime callbacks that a spec route cannot execute. A property that cannot be expressed is
+omitted and reported against `$subject` in the introspection diagnostics.
+
+<Callout>
+  Set `$required` only for response fields the upstream route always returns. Leave it `false` for request
+  arguments and conditional response fields.
+</Callout>
+
+## Returns
+
+An array of translated properties keyed by name.
+
+## Example
+
+```php title="wp-content/plugins/acme-comments/contracts.php"
+$controller = new WP_REST_Comments_Controller();
+$schema = $controller->get_item_schema();
+
+kizlo_register_spec_schema('acme.comment', [
+    'type'       => 'object',
+    'properties' => kizlo_translate_spec_properties(
+        $schema['properties'],
+        'acme.comment',
+        context: 'view',
+        required: true,
+    ),
+]);
+
+kizlo_register_spec_route([
+    'id'        => 'acme.comments',
+    'operation' => 'list',
+    'namespace' => 'wp/v2',
+    'route'     => '/comments',
+    'method'    => 'GET',
+    'input'     => [
+        'type'       => 'object',
+        'properties' => kizlo_translate_spec_properties(
+            $controller->get_collection_params(),
+            'wp/v2 /comments',
+        ),
+    ],
+    'responses' => [
+        '200' => [
+            'body' => ['type' => 'array', 'items' => ['$ref' => 'acme.comment']],
+        ],
+    ],
+]);
+```
