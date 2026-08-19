@@ -29,6 +29,9 @@ export const MENU_ROUTER_MAP = {
 						case "rest_cannot_view": {
 							throw errors.MENU_ITEM_FORBIDDEN()
 						}
+						case "rest_no_route": {
+							throw errors.NOT_FOUND()
+						}
 						default:
 							context.logger.error("List menu items unhandled error", response.error, { code: response.error.code })
 							throw errors.INTERNAL_SERVER_ERROR()
@@ -81,6 +84,9 @@ export const MENU_ROUTER_MAP = {
 						}
 						case "rest_cannot_view": {
 							throw errors.MENU_ITEM_FORBIDDEN()
+						}
+						case "rest_no_route": {
+							throw errors.NOT_FOUND()
 						}
 						default:
 							context.logger.error("Group list menu items unhandled error", response.error, { code: response.error.code })
