@@ -1,11 +1,12 @@
 import fs from "node:fs"
 import path from "node:path"
+import { isPluginVersionSupported, pluginUpdateMessage } from "@kizlo/shared"
 import { resolveWordPressConnection } from "../../kizlo"
 import { generateContract } from "../../shared/contract"
 import type { AnyProcedureRouter } from "../../shared/procedure"
 import { fetchIntrospection } from "../../wordpress/fetch-introspection"
 import { generateWordPressClient } from "../../wordpress/generate"
-import type { IntrospectionDiagnostic, IntrospectionDocument } from "../../wordpress/introspection"
+import { type IntrospectionDiagnostic, type IntrospectionDocument, IntrospectionVersionError } from "../../wordpress/introspection"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
 import { WORDPRESS_CLIENT_META_REL } from "../wp/constants"
@@ -136,6 +137,16 @@ export class PartialContractError extends Error {
 	}
 }
 
+/**
+ * Report a failed generation under `message`. A version mismatch and a refused partial contract are
+ * diagnoses rather than faults: the message is the whole report, and the stack consola would print
+ * beneath it buries the one line the user has to act on. Anything else is a fault and keeps its stack.
+ */
+export function reportGenerationError(message: string, error: unknown): void {
+	if (error instanceof IntrospectionVersionError || error instanceof PartialContractError) log.error(error.message)
+	else log.error(message, error)
+}
+
 export interface GenerateWordPressOptions {
 	credentials?: WordPressCredentials
 	fetch?: typeof globalThis.fetch
@@ -163,6 +174,26 @@ function reportDiagnostics(document: IntrospectionDocument, strict: boolean): vo
 	)
 }
 
+/**
+ * Plugin versions already named as outdated. `kizlo dev` refetches every few seconds, and the answer
+ * cannot change until the plugin does, so the warning is worth one line per version rather than one
+ * per poll. An updated plugin that is still too old is a version this has not seen, and says so again.
+ */
+const reportedPluginVersions = new Set<string>()
+
+/**
+ * Name a plugin too old for this package at generation, where it is still actionable, rather than
+ * leaving it to the runtime's first request. A warning either way, strict included: strict decides
+ * what to do about routes WordPress excluded, and an outdated plugin excludes nothing by itself.
+ */
+function reportPluginVersion(installed: string | null): void {
+	if (isPluginVersionSupported(installed)) return
+	const key = installed ?? ""
+	if (reportedPluginVersions.has(key)) return
+	reportedPluginVersions.add(key)
+	log.warn(pluginUpdateMessage(installed))
+}
+
 /** Fetch `/introspect`, reporting its diagnostics in the CLI's voice. Returns undefined on a 304. */
 async function fetchDocument(
 	cwd: string,
@@ -174,6 +205,9 @@ async function fetchDocument(
 	// Strict generation never revalidates: a 304 carries no diagnostics, so a warm meta file left over
 	// from a partial generation would answer "unchanged" and pass a run whose whole job is to fail.
 	const result = await fetchIntrospection(credentials, { etag: options.strict ? undefined : etag, fetch: options.fetch })
+	// Before the 304, which carries the header too: a project generating nothing new still has a plugin
+	// its client may have outgrown.
+	reportPluginVersion(result.pluginVersion)
 
 	if (result.status === "not-modified") return undefined
 	if (!result.document) throw new Error("WordPress introspection returned no document.")

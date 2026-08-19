@@ -1,3 +1,4 @@
+import { PLUGIN_VERSION_HEADER } from "@kizlo/shared"
 import { type IntrospectionDocument, parseIntrospectionDocument } from "./introspection"
 import type { WordPressCredentials } from "./types"
 
@@ -5,6 +6,12 @@ export interface IntrospectionFetchResult {
 	status: "modified" | "not-modified"
 	document?: IntrospectionDocument
 	etag?: string
+	/**
+	 * The plugin version WordPress stamped on the response, or null from a plugin predating the header.
+	 * Reported rather than acted on, like the document's diagnostics: whether an outdated plugin is
+	 * worth a warning or a refusal belongs to the generator.
+	 */
+	pluginVersion: string | null
 }
 
 /**
@@ -46,7 +53,11 @@ export async function fetchIntrospection(
 		throw new IntrospectionFetchError(`Could not fetch ${url}: ${error instanceof Error ? error.message : String(error)}`)
 	}
 
-	if (response.status === 304) return { status: "not-modified", etag: options.etag }
+	// Stamped on every REST response the plugin dispatches, the 304 included, so a revalidated contract
+	// still says which plugin served it.
+	const pluginVersion = response.headers.get(PLUGIN_VERSION_HEADER)
+
+	if (response.status === 304) return { status: "not-modified", etag: options.etag, pluginVersion }
 	if (!response.ok) {
 		let detail = ""
 		try {
@@ -69,5 +80,6 @@ export async function fetchIntrospection(
 		status: "modified",
 		document,
 		etag: response.headers.get("etag") ?? `"${document.hash}"`,
+		pluginVersion,
 	}
 }

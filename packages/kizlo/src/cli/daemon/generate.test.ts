@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { MIN_PLUGIN_VERSION, pluginUpdateMessage } from "@kizlo/shared"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import type { IntrospectionDocument } from "../../wordpress/introspection"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
@@ -233,5 +234,48 @@ describe("a contract WordPress excluded a contribution from", () => {
 
 		expect(await generateWordPressOnce(cfg, { strict: true, fetch: responder(modified()) })).toBe("generated")
 		expect(fs.readFileSync(path.join(cfg.cwd, cfg.wordpressPath), "utf8")).toContain("WP_AcmeBook")
+	})
+})
+
+/**
+ * Each test uses a plugin version no other test in this file has used: an outdated plugin is named
+ * once per version for the life of the process, which is what keeps `kizlo dev`'s poll from repeating
+ * the warning every few seconds.
+ */
+describe("the plugin version WordPress stamps on the contract", () => {
+	function served(pluginVersion: string, body: IntrospectionDocument | null = INTROSPECTION_FIXTURE): Response {
+		const headers = { etag: '"fixture"', "x-kizlo-version": pluginVersion }
+		return body ? Response.json(body, { headers }) : new Response(null, { status: 304, headers })
+	}
+
+	test("names a plugin too old for this package at generation", async () => {
+		watchLog()
+		await generateWordPressOnce(project(), { fetch: responder(served("0.7.0")) })
+		expect(transcript("warn")).toContain(pluginUpdateMessage("0.7.0"))
+	})
+
+	test("names it on a revalidated contract too, where nothing is generated", async () => {
+		watchLog()
+		const cfg = project()
+		await generateWordPressOnce(cfg, { fetch: responder(served(MIN_PLUGIN_VERSION)) })
+		expect(await generateWordPressOnce(cfg, { fetch: responder(served("0.6.0", null)) })).toBe("unchanged")
+		expect(transcript("warn")).toContain(pluginUpdateMessage("0.6.0"))
+	})
+
+	test("says it once however often the client refetches", async () => {
+		watchLog()
+		const cfg = project()
+		await generateWordPressOnce(cfg, { fetch: responder(served("0.5.0")) })
+		await generateWordPressOnce(cfg, { fetch: responder(served("0.5.0", null)) })
+		const said = transcript("warn")
+			.split("\n")
+			.filter((line) => line.includes("Kizlo plugin outdated"))
+		expect(said).toHaveLength(1)
+	})
+
+	test("says nothing about a plugin new enough", async () => {
+		watchLog()
+		await generateWordPressOnce(project(), { fetch: responder(served(MIN_PLUGIN_VERSION)) })
+		expect(transcript("warn")).not.toContain("Kizlo plugin outdated")
 	})
 })

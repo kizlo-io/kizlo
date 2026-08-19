@@ -1,17 +1,17 @@
 import path from "node:path"
 import { defineCommand } from "citty"
 import { resolveConfig, resolveWordPressClientDir } from "../daemon/config"
-import { generateOnce, generateWorkspaceClientOnce, PartialContractError } from "../daemon/generate"
+import { generateOnce, generateWorkspaceClientOnce, PartialContractError, reportGenerationError } from "../daemon/generate"
 import { log } from "../daemon/logger"
 
 /**
- * Report and exit non-zero. A refused partial contract is the one failure here that is a decision
- * rather than a fault, and its diagnostics are already on screen, so it prints its own line and no
- * stack: the useful detail is what strict mode did not do to the files on disk.
+ * Report and exit non-zero. A refused partial contract says one thing here that it cannot say
+ * anywhere else, since its diagnostics are already on screen and the useful detail is what strict
+ * mode did not do to the files on disk.
  */
 function fail(message: string, error: unknown): never {
 	if (error instanceof PartialContractError) log.error(`${error.message} The generated client on disk is unchanged.`)
-	else log.error(message, error)
+	else reportGenerationError(message, error)
 	process.exit(1)
 }
 

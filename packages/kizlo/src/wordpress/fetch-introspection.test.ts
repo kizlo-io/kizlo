@@ -36,7 +36,21 @@ describe("fetchIntrospection", () => {
 
 	test("reports a revalidated contract as unchanged", async () => {
 		const result = await fetchIntrospection(CREDENTIALS, { etag: '"cached"', fetch: responds(new Response(null, { status: 304 })) })
-		expect(result).toEqual({ status: "not-modified", etag: '"cached"' })
+		expect(result).toEqual({ status: "not-modified", etag: '"cached"', pluginVersion: null })
+	})
+
+	test("carries the plugin version WordPress stamped, on a document and on a 304 alike", async () => {
+		const headers = { "x-kizlo-version": "0.8.1" }
+		const document = await fetchIntrospection(CREDENTIALS, { fetch: responds(Response.json(INTROSPECTION_FIXTURE, { headers })) })
+		expect(document.pluginVersion).toBe("0.8.1")
+
+		const revalidated = await fetchIntrospection(CREDENTIALS, { fetch: responds(new Response(null, { status: 304, headers })) })
+		expect(revalidated.pluginVersion).toBe("0.8.1")
+	})
+
+	test("reports a plugin predating the version header as null", async () => {
+		const result = await fetchIntrospection(CREDENTIALS, { fetch: responds(Response.json(INTROSPECTION_FIXTURE)) })
+		expect(result.pluginVersion).toBeNull()
 	})
 
 	test.each([

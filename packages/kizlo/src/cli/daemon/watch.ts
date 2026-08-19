@@ -4,7 +4,7 @@ import { resolveWordPressConnection } from "../../kizlo"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
 import { type ResolvedConfig, resolveConfig, resolveWordPressClientDir } from "./config"
-import { generateOnce, generateWordPressOnce, generateWorkspaceClientOnce } from "./generate"
+import { generateOnce, generateWordPressOnce, generateWorkspaceClientOnce, reportGenerationError } from "./generate"
 import { acquire, isLocked, lockPath, release } from "./lock"
 import { log } from "./logger"
 
@@ -22,7 +22,7 @@ async function regenerate(cfg: ResolvedConfig, credentials: WordPressCredentials
 		if (ok) log.success("Contract updated")
 		else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
 	} catch (error) {
-		log.error("Failed to update the Kizlo contract:", error)
+		reportGenerationError("Failed to update the Kizlo contract:", error)
 	}
 }
 
@@ -63,7 +63,7 @@ function refreshWordPress(
 				log.success("WordPress client updated")
 			}
 		} catch (error) {
-			log.error("Failed to update the WordPress service:", error)
+			reportGenerationError("Failed to update the WordPress service:", error)
 		} finally {
 			refreshing = false
 		}
@@ -106,7 +106,7 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 				log.success("WordPress client generated")
 			}
 		} catch (error) {
-			log.error("Failed to generate the WordPress client:", error)
+			reportGenerationError("Failed to generate the WordPress client:", error)
 		}
 	}
 
@@ -116,7 +116,7 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 			if (ok) log.success("Contract generated")
 			else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
 		} catch (error) {
-			log.error("Failed to generate the Kizlo contract:", error)
+			reportGenerationError("Failed to generate the Kizlo contract:", error)
 		}
 	}
 
