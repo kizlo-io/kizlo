@@ -4,6 +4,7 @@ import path from "node:path"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import type { WordPressCredentials } from "../../wordpress/types"
+import type { ResolvedConfig } from "./config"
 import { log } from "./logger"
 import { createWordPressRefresh } from "./watch"
 
@@ -39,10 +40,25 @@ function serving(): typeof globalThis.fetch {
 	return vi.fn(async () => Response.json(INTROSPECTION_FIXTURE, { headers: { etag: '"fixture"' } })) as unknown as typeof globalThis.fetch
 }
 
+/** An app carrying its own service, written somewhere the workspace client will not land on. */
+function config(cwd: string): ResolvedConfig {
+	return {
+		cwd,
+		dir: "kizlo",
+		serverDir: "src/server",
+		serverEntry: "src/server/index.ts",
+		generatedDir: "src/service",
+		contractPath: "src/service/contract.json",
+		barrelPath: "src/service/index.ts",
+		wordpressPath: "src/service/wordpress.ts",
+		wordpressMetaPath: ".kizlo/wordpress.json",
+	}
+}
+
 /** A refresh whose transport can be swapped between passes, the way a poll's answer changes under it. */
-function poll(cwd: string): (fetch: typeof globalThis.fetch) => Promise<void> {
+function poll(cwd: string, cfg?: ResolvedConfig): (fetch: typeof globalThis.fetch) => Promise<void> {
 	let current: typeof globalThis.fetch = serving()
-	const refresh = createWordPressRefresh(cwd, undefined, CLIENT_DIR, {
+	const refresh = createWordPressRefresh(cwd, cfg, CLIENT_DIR, {
 		credentials: CREDENTIALS,
 		fetch: ((input, init) => current(input, init)) as typeof globalThis.fetch,
 	})
@@ -60,7 +76,7 @@ describe("createWordPressRefresh", () => {
 		for (let attempt = 0; attempt < 4; attempt++) await pass(refusing("offline"))
 
 		expect(lines("error")).toHaveLength(1)
-		expect(lines("error")[0]).toContain("Failed to update the WordPress service:")
+		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
 	})
 
 	test("reports again when the failure changes", async () => {
@@ -86,7 +102,7 @@ describe("createWordPressRefresh", () => {
 		await pass(refusing("offline"))
 		await pass(serving())
 
-		expect(lines("success")).toContain("Updating the WordPress service again")
+		expect(lines("success")).toContain("Updating the WordPress client again")
 
 		await pass(refusing("offline"))
 		expect(lines("error")).toHaveLength(2)
@@ -100,6 +116,20 @@ describe("createWordPressRefresh", () => {
 		await pass(serving())
 
 		expect(lines("error")).toHaveLength(0)
-		expect(lines("success")).not.toContain("Updating the WordPress service again")
+		expect(lines("success")).not.toContain("Updating the WordPress client again")
+	})
+
+	test("names each generation in its own failure, and repeats neither", async () => {
+		watchLog()
+		const cwd = workspace()
+		const pass = poll(cwd, config(cwd))
+
+		await pass(refusing("offline"))
+		await pass(refusing("offline"))
+
+		const errors = lines("error")
+		expect(errors).toHaveLength(2)
+		expect(errors[0]).toContain("Failed to update the WordPress service:")
+		expect(errors[1]).toContain("Failed to update the WordPress client:")
 	})
 })
