@@ -28,7 +28,7 @@ namespace Kizlo\Modules\Introspection;
  *
  * {@see CoreSchemaTranslator} keeps `sanitize_callback` and `validate_callback`,
  * because managed routes put them back on the endpoint they registered. Nothing
- * reachable through this bridge registers anything: `kizlo_register_spec_route()`
+ * reachable through this bridge registers anything: `kizlo_register_route_spec()`
  * rightly refuses a callback, since a spec has no endpoint to attach one to. So
  * they are stripped on the way out rather than left for the caller to trip over.
  */

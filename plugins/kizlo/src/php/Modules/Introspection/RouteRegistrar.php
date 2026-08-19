@@ -7,8 +7,8 @@ use WP_Error;
 use WP_REST_Request;
 
 /**
- * The work behind `kizlo_register_route()`, `kizlo_register_spec_route()` and
- * `kizlo_register_spec_schema()`.
+ * The work behind `kizlo_register_route()`, `kizlo_register_route_spec()` and
+ * `kizlo_register_route_schema()`.
  *
  * A runtime registration does three things at once: it registers the WordPress
  * endpoint, it turns the declared input into that endpoint's validation and
@@ -135,13 +135,13 @@ class RouteRegistrar
         $id = $args['id'] ?? '';
 
         if (!is_string($id) || $id === '') {
-            _doing_it_wrong('kizlo_register_spec_route', '"id" is required.', '1.0.0');
+            _doing_it_wrong('kizlo_register_route_spec', '"id" is required.', '1.0.0');
             return;
         }
 
         if (!is_string($args['namespace'] ?? null) || $args['namespace'] === '') {
             self::fail(
-                'kizlo_register_spec_route',
+                'kizlo_register_route_spec',
                 ['api_id' => $id, 'keyword' => 'namespace'],
                 '"namespace" is required; a standalone spec has no namespace to inherit.',
             );
@@ -151,14 +151,14 @@ class RouteRegistrar
         foreach (['callback', 'permission_callback', 'args'] as $key) {
             if (isset($args[$key])) {
                 self::fail(
-                    'kizlo_register_spec_route',
+                    'kizlo_register_route_spec',
                     ['api_id' => $id, 'keyword' => $key],
                     sprintf('"%s" describes a runtime route; a standalone spec registers nothing.', $key),
                 );
             }
         }
 
-        $method = self::method($args, 'kizlo_register_spec_route', ['api_id' => $id]);
+        $method = self::method($args, 'kizlo_register_route_spec', ['api_id' => $id]);
 
         if ($method === null) {
             return;
@@ -170,7 +170,7 @@ class RouteRegistrar
 
         foreach (RuntimeKeywordScanner::find($input) as $hit) {
             self::fail(
-                'kizlo_register_spec_route',
+                'kizlo_register_route_spec',
                 ['api_id' => $id, 'pointer' => $hit['pointer'], 'keyword' => $hit['keyword']],
                 sprintf('"%s" describes a runtime route; a standalone spec registers nothing.', $hit['keyword']),
             );
@@ -189,7 +189,7 @@ class RouteRegistrar
     {
         if (!Spec::isValidSchemaId($id)) {
             self::fail(
-                'kizlo_register_spec_schema',
+                'kizlo_register_route_schema',
                 ['schema_id' => $id],
                 'Schema IDs are global and must be vendor-qualified, for example "acme.widget".',
             );
@@ -198,7 +198,7 @@ class RouteRegistrar
 
         if (Spec::isReservedId($id) && !$core) {
             self::fail(
-                'kizlo_register_spec_schema',
+                'kizlo_register_route_schema',
                 ['schema_id' => $id],
                 'This ID prefix is reserved for Kizlo core.',
             );
@@ -349,6 +349,14 @@ class RouteRegistrar
             // form it was meant to take: `'required' => 1` is enforced rather than
             // being treated as an unusable flag.
             $input    = SchemaCoercer::coerce($input);
+
+            // Route schemas are document-only until a runtime input references
+            // one. Materialize just that dependency graph here, leaving every
+            // response-only schema lazy on unrelated REST requests.
+            if (SpecStore::materializeReferences($input)) {
+                Registry::flush();
+            }
+
             $schemas  = Registry::schemaMap();
             $critical = ArgTranslator::criticalErrors($input, $schemas);
 

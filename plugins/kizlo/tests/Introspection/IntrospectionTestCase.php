@@ -166,4 +166,16 @@ abstract class IntrospectionTestCase extends SeoTestCase
             'responses' => ['200' => ['body' => ['type' => 'array', 'items' => ['type' => 'string']]]],
         ], $overrides);
     }
+
+    /** @param array<string, mixed> $route */
+    protected function registerRouteSpec(array $route): void
+    {
+        kizlo_register_route_spec(static fn(): array => $route);
+    }
+
+    /** @param array<string, mixed> $schema */
+    protected function registerRouteSchema(string $id, array $schema): void
+    {
+        kizlo_register_route_schema($id, static fn(): array => $schema);
+    }
 }

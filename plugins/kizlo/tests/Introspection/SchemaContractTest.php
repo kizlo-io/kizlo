@@ -13,7 +13,7 @@ class SchemaContractTest extends IntrospectionTestCase
      */
     private function register(array $schema): void
     {
-        kizlo_register_spec_schema('acme.widget', $schema);
+        $this->registerRouteSchema('acme.widget', $schema);
     }
 
     /**
@@ -164,8 +164,8 @@ class SchemaContractTest extends IntrospectionTestCase
 
     public function test_a_valid_union_of_named_schemas_is_accepted(): void
     {
-        kizlo_register_spec_schema('acme.square', ['type' => 'object', 'properties' => ['side' => ['type' => 'number']]]);
-        kizlo_register_spec_schema('acme.circle', ['type' => 'object', 'properties' => ['radius' => ['type' => 'number']]]);
+        $this->registerRouteSchema('acme.square', ['type' => 'object', 'properties' => ['side' => ['type' => 'number']]]);
+        $this->registerRouteSchema('acme.circle', ['type' => 'object', 'properties' => ['radius' => ['type' => 'number']]]);
         $this->register(['oneOf' => [['$ref' => 'acme.square'], ['$ref' => 'acme.circle']]]);
 
         $this->assertSame(
@@ -214,9 +214,9 @@ class SchemaContractTest extends IntrospectionTestCase
 
     public function test_a_schema_id_must_be_vendor_qualified(): void
     {
-        $this->setExpectedIncorrectUsage('kizlo_register_spec_schema');
+        $this->setExpectedIncorrectUsage('kizlo_register_route_schema');
 
-        kizlo_register_spec_schema('widget', ['type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema('widget', ['type' => 'object', 'properties' => []]);
 
         $this->assertErrorContains($this->errors(), 'must be vendor-qualified');
     }

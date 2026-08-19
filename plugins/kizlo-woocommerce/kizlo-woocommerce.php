@@ -31,7 +31,7 @@ require_once KIZLO_WOOCOMMERCE_PATH . 'vendor/autoload.php';
 /**
  * Start through Kizlo's gate, so the `Kizlo Requires` header above decides whether
  * anything here runs. This plugin describes the WooCommerce contract with core
- * functions (`kizlo_register_spec_route()` and friends) that arrived in Kizlo
+ * functions (`kizlo_register_route_spec()` and friends) that arrived in Kizlo
  * 0.12.0, and calling one of those against an older core is a fatal.
  *
  * The `function_exists` check is the one requirement the header cannot express:

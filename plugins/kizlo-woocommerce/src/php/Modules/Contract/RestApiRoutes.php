@@ -48,30 +48,72 @@ final class RestApiRoutes
 
     public static function register(): void
     {
-        foreach (self::resources() as $resource) {
-            foreach (self::declarations($resource) as $declaration) {
-                kizlo_register_spec_route($declaration);
+        foreach ([self::PRODUCTS_API_ID, self::CUSTOMERS_API_ID] as $id) {
+            foreach (['list', 'retrieve', 'create', 'update', 'delete'] as $operation) {
+                kizlo_register_route_spec(
+                    static fn(): array => self::routeSpec($id, $operation),
+                );
             }
         }
     }
 
     public static function registerSchemas(): void
     {
-        foreach (self::resources() as $resource) {
-            $properties = self::response($resource['controller'], $resource['schema']);
-
-            // Added to the product by `woocommerce_rest_prepare_product_object`, a
-            // response filter, so no schema WooCommerce publishes mentions it.
-            if ($resource['schema'] === WooCommerceSchemas::PRODUCT) {
-                $properties['kizlo'] = KizloBlocks::restProduct();
-            }
-
-            kizlo_register_spec_schema($resource['schema'], [
-                'type'        => 'object',
-                'description' => $resource['description'],
-                'properties'  => $properties,
-            ]);
+        foreach ([WooCommerceSchemas::PRODUCT, WooCommerceSchemas::CUSTOMER] as $id) {
+            kizlo_register_route_schema(
+                $id,
+                static fn(): array => self::routeSchema($id),
+            );
         }
+    }
+
+    /** @return array<string, mixed> */
+    private static function routeSpec(string $id, string $operation): array
+    {
+        static $specs = null;
+
+        if ($specs === null) {
+            $specs = [];
+
+            foreach (self::resources() as $resource) {
+                $specs[$resource['id']] = array_combine(
+                    ['list', 'retrieve', 'create', 'update', 'delete'],
+                    self::declarations($resource),
+                );
+            }
+        }
+
+        return $specs[$id][$operation]
+            ?? throw new \RuntimeException(sprintf('WooCommerce REST route "%s.%s" is unavailable.', $id, $operation));
+    }
+
+    /** @return array<string, mixed> */
+    private static function routeSchema(string $id): array
+    {
+        static $schemas = null;
+
+        if ($schemas === null) {
+            $schemas = [];
+
+            foreach (self::resources() as $resource) {
+                $properties = self::response($resource['controller'], $resource['schema']);
+
+                // Added to the product by `woocommerce_rest_prepare_product_object`, a
+                // response filter, so no schema WooCommerce publishes mentions it.
+                if ($resource['schema'] === WooCommerceSchemas::PRODUCT) {
+                    $properties['kizlo'] = KizloBlocks::restProduct();
+                }
+
+                $schemas[$resource['schema']] = [
+                    'type'        => 'object',
+                    'description' => $resource['description'],
+                    'properties'  => $properties,
+                ];
+            }
+        }
+
+        return $schemas[$id]
+            ?? throw new \RuntimeException(sprintf('WooCommerce REST schema "%s" is unavailable.', $id));
     }
 
     // ============================================================

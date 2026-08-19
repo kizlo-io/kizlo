@@ -37,10 +37,11 @@ namespace {
 
     function kizlo_register_route(array $args): void {}
 
-    function kizlo_register_spec_route(array $args): void {}
+    /** @param callable(): array<string, mixed> $derive */
+    function kizlo_register_route_spec(callable $derive): void {}
 
-    /** @param array $schema */
-    function kizlo_register_spec_schema(string $id, array $schema): void {}
+    /** @param callable(): array<string, mixed> $derive */
+    function kizlo_register_route_schema(string $id, callable $derive): void {}
 
     function kizlo_extension(string $file, callable $boot): bool {}
 

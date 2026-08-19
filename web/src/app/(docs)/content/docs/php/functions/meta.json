@@ -3,8 +3,8 @@
 	"icon": "Function",
 	"pages": [
 		"register-route",
-		"register-spec-route",
-		"register-spec-schema",
+		"register-route-spec",
+		"register-route-schema",
 		"translate-spec-properties",
 		"translate-spec-schema",
 		"register-route-interceptor",

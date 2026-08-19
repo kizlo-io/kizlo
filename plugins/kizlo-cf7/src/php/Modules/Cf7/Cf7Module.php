@@ -19,7 +19,7 @@ class Cf7Module
 
     public function register(): void
     {
-        kizlo_register_spec_schema(self::RESULT, self::result());
+        kizlo_register_route_schema(self::RESULT, static fn(): array => self::result());
 
         kizlo_register_route([
             'id'        => 'cf7.forms',

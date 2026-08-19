@@ -17,7 +17,7 @@ use Throwable;
  * the schema classes behind `SchemaController`, so both halves are already
  * described in PHP by the plugin that serves them. This class asks those objects
  * the same questions `register_rest_route()` asks and hands the answers to
- * `kizlo_register_spec_route()`.
+ * `kizlo_register_route_spec()`.
  *
  * The alternative was copying WooCommerce's field lists into Kizlo, which is
  * roughly two thousand lines that would go quietly wrong on a WooCommerce
@@ -84,14 +84,10 @@ final class StoreApiRoutes
 
     public static function register(): void
     {
-        $routes = self::routes();
-
-        if ($routes === null) {
-            return;
-        }
-
-        foreach (self::declarations($routes) as $declaration) {
-            kizlo_register_spec_route($declaration);
+        for ($index = 0; $index < 14; $index++) {
+            kizlo_register_route_spec(
+                static fn(): array => self::routeSpec($index),
+            );
         }
     }
 
@@ -100,53 +96,100 @@ final class StoreApiRoutes
      */
     public static function registerSchemas(): void
     {
-        $schemas = self::schemas();
+        foreach (
+            [
+                WooCommerceSchemas::STORE_CART,
+                WooCommerceSchemas::STORE_CHECKOUT,
+                WooCommerceSchemas::STORE_CHECKOUT_ORDER,
+                WooCommerceSchemas::STORE_PRODUCT,
+                WooCommerceSchemas::STORE_PRODUCT_COLLECTION_DATA,
+            ] as $id
+        ) {
+            kizlo_register_route_schema(
+                $id,
+                static fn(): array => self::routeSchema($id),
+            );
+        }
+    }
 
-        if ($schemas === null) {
-            return;
+    /** @return array<string, mixed> */
+    private static function routeSpec(int $index): array
+    {
+        static $specs = null;
+
+        if ($specs === null) {
+            $routes = self::routes();
+
+            if ($routes === null) {
+                throw new \RuntimeException('The WooCommerce Store API routes controller is unavailable.');
+            }
+
+            $specs = self::declarations($routes);
         }
 
-        $derived = [
-            WooCommerceSchemas::STORE_CART                    => 'cart',
-            WooCommerceSchemas::STORE_CHECKOUT                => 'checkout',
-            WooCommerceSchemas::STORE_CHECKOUT_ORDER          => 'checkout-order',
-            WooCommerceSchemas::STORE_PRODUCT                 => 'product',
-            WooCommerceSchemas::STORE_PRODUCT_COLLECTION_DATA => 'product-collection-data',
-        ];
+        return $specs[$index]
+            ?? throw new \RuntimeException(sprintf('WooCommerce Store API route %d is unavailable.', $index));
+    }
 
-        foreach ($derived as $id => $identifier) {
-            $properties = self::properties($schemas, $identifier, $id);
+    /** @return array<string, mixed> */
+    private static function routeSchema(string $id): array
+    {
+        static $derived = null;
 
-            if ($properties === null) {
-                continue;
+        if ($derived === null) {
+            $schemas = self::schemas();
+
+            if ($schemas === null) {
+                throw new \RuntimeException('The WooCommerce Store API schema controller is unavailable.');
             }
 
-            // Collection data carries a `kizlo` block added by a route
-            // interceptor, which is a response filter and has no schema half for
-            // the derivation to find.
-            if ($identifier === 'product-collection-data') {
-                $properties['kizlo'] = KizloBlocks::collectionData();
-            }
+            $derived = [];
 
-            // Both checkout responses carry the whole cart, and `get_properties()`
-            // does not mention it: `CheckoutSchema` writes `__experimentalCart`
-            // in `get_item_response()` and `get_draft_response()` only. Null on
-            // the order response when the order has no cart behind it.
-            if ($identifier === 'checkout' || $identifier === 'checkout-order') {
-                $properties['__experimentalCart'] = [
-                    '$ref'        => WooCommerceSchemas::STORE_CART,
-                    'required'    => true,
-                    'nullable'    => true,
-                    'description' => 'The cart the checkout was built from. Returned but undeclared by WooCommerce, so it is named here.',
+            foreach (
+                [
+                    WooCommerceSchemas::STORE_CART                    => 'cart',
+                    WooCommerceSchemas::STORE_CHECKOUT                => 'checkout',
+                    WooCommerceSchemas::STORE_CHECKOUT_ORDER          => 'checkout-order',
+                    WooCommerceSchemas::STORE_PRODUCT                 => 'product',
+                    WooCommerceSchemas::STORE_PRODUCT_COLLECTION_DATA => 'product-collection-data',
+                ] as $schemaId => $identifier
+            ) {
+                $properties = self::properties($schemas, $identifier, $schemaId);
+
+                if ($properties === null) {
+                    continue;
+                }
+
+                // Collection data carries a `kizlo` block added by a route
+                // interceptor, which is a response filter and has no schema half for
+                // the derivation to find.
+                if ($identifier === 'product-collection-data') {
+                    $properties['kizlo'] = KizloBlocks::collectionData();
+                }
+
+                // Both checkout responses carry the whole cart, and `get_properties()`
+                // does not mention it: `CheckoutSchema` writes `__experimentalCart`
+                // in `get_item_response()` and `get_draft_response()` only. Null on
+                // the order response when the order has no cart behind it.
+                if ($identifier === 'checkout' || $identifier === 'checkout-order') {
+                    $properties['__experimentalCart'] = [
+                        '$ref'        => WooCommerceSchemas::STORE_CART,
+                        'required'    => true,
+                        'nullable'    => true,
+                        'description' => 'The cart the checkout was built from. Returned but undeclared by WooCommerce, so it is named here.',
+                    ];
+                }
+
+                $derived[$schemaId] = [
+                    'type'        => 'object',
+                    'description' => sprintf('The Store API `%s` object, as WooCommerce describes it.', $identifier),
+                    'properties'  => $properties,
                 ];
             }
-
-            kizlo_register_spec_schema($id, [
-                'type'        => 'object',
-                'description' => sprintf('The Store API `%s` object, as WooCommerce describes it.', $identifier),
-                'properties'  => $properties,
-            ]);
         }
+
+        return $derived[$id]
+            ?? throw new \RuntimeException(sprintf('WooCommerce Store API schema "%s" is unavailable.', $id));
     }
 
     // ============================================================

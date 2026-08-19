@@ -19,7 +19,7 @@ use WP_REST_Posts_Controller;
  * WordPress documentation.
  *
  * The per-module schema classes come in through here rather than through
- * `kizlo_register_spec_schema()`, and for the same reason the rest of this class
+ * `kizlo_register_route_schema()`, and for the same reason the rest of this class
  * exists: core schemas have to be present whenever a route's input is translated,
  * which is every REST request, while the public helper is a contribution channel
  * whose entries only exist once the contributing plugin has loaded.

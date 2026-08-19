@@ -24,16 +24,24 @@ final class MenuRoutes
 
     public static function register(): void
     {
-        foreach ([self::menus(), self::menuItems()] as $resource) {
-            foreach ($resource->declarations() as $declaration) {
-                kizlo_register_spec_route($declaration);
-            }
+        self::registerResource(static fn(): CoreResource => self::menus());
+        self::registerResource(static fn(): CoreResource => self::menuItems());
+    }
+
+    private static function registerResource(callable $resource): void
+    {
+        foreach (['list', 'retrieve', 'create', 'update', 'delete'] as $operation) {
+            kizlo_register_route_spec(
+                static fn(): array => $resource()->operation($operation),
+            );
         }
     }
 
     private static function menus(): CoreResource
     {
-        return new CoreResource(
+        static $resource = null;
+
+        return $resource ??= new CoreResource(
             id: self::MENU_API_ID,
             namespace: 'wp/v2',
             base: '/menus',
@@ -49,7 +57,9 @@ final class MenuRoutes
 
     private static function menuItems(): CoreResource
     {
-        return new CoreResource(
+        static $resource = null;
+
+        return $resource ??= new CoreResource(
             id: self::MENU_ITEM_API_ID,
             namespace: 'wp/v2',
             base: '/menu-items',

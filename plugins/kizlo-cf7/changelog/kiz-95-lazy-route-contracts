@@ -1,0 +1,4 @@
+Significance: patch
+Type: changed
+
+Register the Contact Form 7 contract through Kizlo's callable route schema API

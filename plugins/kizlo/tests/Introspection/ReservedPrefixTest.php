@@ -31,9 +31,9 @@ class ReservedPrefixTest extends IntrospectionTestCase
      */
     public function test_a_reserved_schema_id_is_rejected_from_outside_the_plugin(string $id): void
     {
-        $this->setExpectedIncorrectUsage('kizlo_register_spec_schema');
+        $this->setExpectedIncorrectUsage('kizlo_register_route_schema');
 
-        kizlo_register_spec_schema($id, ['type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema($id, ['type' => 'object', 'properties' => []]);
 
         $this->assertErrorContains($this->errors(), 'reserved for Kizlo core');
     }
@@ -69,7 +69,7 @@ class ReservedPrefixTest extends IntrospectionTestCase
 
     public function test_a_vendor_qualified_id_is_accepted_from_outside_the_plugin(): void
     {
-        kizlo_register_spec_schema('acme.thing', ['type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema('acme.thing', ['type' => 'object', 'properties' => []]);
 
         $this->assertArrayHasKey('acme.thing', $this->document()['schemas']);
     }

@@ -21,7 +21,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
      */
     private function property(array $property): array
     {
-        kizlo_register_spec_schema('acme.widget', ['type' => 'object', 'properties' => ['field' => $property]]);
+        $this->registerRouteSchema('acme.widget', ['type' => 'object', 'properties' => ['field' => $property]]);
 
         return $this->document()['schemas']['acme.widget']['properties']['field'];
     }
@@ -76,8 +76,8 @@ class SchemaCoercionTest extends IntrospectionTestCase
 
     public function test_two_registrations_differing_only_by_a_repairable_typo_still_merge(): void
     {
-        kizlo_register_spec_schema('acme.widget', ['type' => 'object', 'title' => 23, 'properties' => []]);
-        kizlo_register_spec_schema('acme.widget', ['type' => 'object', 'title' => '23', 'properties' => []]);
+        $this->registerRouteSchema('acme.widget', ['type' => 'object', 'title' => 23, 'properties' => []]);
+        $this->registerRouteSchema('acme.widget', ['type' => 'object', 'title' => '23', 'properties' => []]);
 
         $this->assertSame('23', $this->document()['schemas']['acme.widget']['title']);
     }
@@ -132,7 +132,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
 
     public function test_a_word_outside_the_map_is_not_guessed_at(): void
     {
-        kizlo_register_spec_schema('acme.widget', [
+        $this->registerRouteSchema('acme.widget', [
             'type'       => 'object',
             'properties' => ['field' => ['type' => 'string', 'required' => 'maybe']],
         ]);
@@ -144,7 +144,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
     {
         $this->actingAsAdmin();
 
-        kizlo_register_spec_schema('acme.address', [
+        $this->registerRouteSchema('acme.address', [
             'type'       => 'object',
             'properties' => ['city' => ['type' => 'string', 'required' => 'yes']],
         ]);
@@ -183,7 +183,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
     {
         $this->setExpectedIncorrectUsage('kizlo_register_route');
 
-        kizlo_register_spec_schema('acme.address', [
+        $this->registerRouteSchema('acme.address', [
             'type'       => 'object',
             'properties' => ['city' => ['type' => 'string', 'required' => 'maybe']],
         ]);
@@ -210,7 +210,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
 
     public function test_a_non_numeric_bound_is_not_guessed_at(): void
     {
-        kizlo_register_spec_schema('acme.widget', [
+        $this->registerRouteSchema('acme.widget', [
             'type'       => 'object',
             'properties' => ['field' => ['type' => 'integer', 'minimum' => 'five']],
         ]);
@@ -220,7 +220,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
 
     public function test_a_fractional_length_is_not_rounded(): void
     {
-        kizlo_register_spec_schema('acme.widget', [
+        $this->registerRouteSchema('acme.widget', [
             'type'       => 'object',
             'properties' => ['field' => ['type' => 'string', 'maxLength' => '5.5']],
         ]);
@@ -230,7 +230,7 @@ class SchemaCoercionTest extends IntrospectionTestCase
 
     public function test_an_unknown_type_is_never_guessed_at(): void
     {
-        kizlo_register_spec_schema('acme.widget', ['type' => 'object', 'properties' => ['field' => ['type' => 'strong']]]);
+        $this->registerRouteSchema('acme.widget', ['type' => 'object', 'properties' => ['field' => ['type' => 'strong']]]);
 
         $this->assertErrorContains($this->errors(), 'Unknown type "strong"');
     }

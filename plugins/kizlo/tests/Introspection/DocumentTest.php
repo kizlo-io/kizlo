@@ -31,11 +31,11 @@ class DocumentTest extends IntrospectionTestCase
 
     public function test_schema_ids_api_ids_paths_operations_errors_and_responses_are_sorted(): void
     {
-        kizlo_register_spec_schema('zeta.thing', ['type' => 'object', 'properties' => []]);
-        kizlo_register_spec_schema('alpha.thing', ['type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema('zeta.thing', ['type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema('alpha.thing', ['type' => 'object', 'properties' => []]);
 
-        kizlo_register_spec_route($this->operation(['id' => 'zeta.api', 'route' => '/zeta']));
-        kizlo_register_spec_route($this->operation([
+        $this->registerRouteSpec($this->operation(['id' => 'zeta.api', 'route' => '/zeta']));
+        $this->registerRouteSpec($this->operation([
             'id'        => 'alpha.api',
             'route'     => '/beta',
             'operation' => 'retrieve',
@@ -43,7 +43,7 @@ class DocumentTest extends IntrospectionTestCase
             'errors'    => ['zeta_error', 'alpha_error'],
             'responses' => ['500' => ['body' => ['$ref' => 'kizlo.error']], '200' => ['body' => ['type' => 'string']]],
         ]));
-        kizlo_register_spec_route($this->operation(['id' => 'alpha.api', 'route' => '/alpha']));
+        $this->registerRouteSpec($this->operation(['id' => 'alpha.api', 'route' => '/alpha']));
 
         $document = $this->document();
 
@@ -66,7 +66,7 @@ class DocumentTest extends IntrospectionTestCase
 
     public function test_object_properties_keep_their_declared_order(): void
     {
-        kizlo_register_spec_schema('acme.widget', [
+        $this->registerRouteSchema('acme.widget', [
             'type'       => 'object',
             'properties' => [
                 'zeta'  => ['type' => 'string'],
@@ -83,8 +83,8 @@ class DocumentTest extends IntrospectionTestCase
 
     public function test_identical_configuration_produces_an_identical_hash(): void
     {
-        kizlo_register_spec_schema('acme.widget', ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]]);
-        kizlo_register_spec_route($this->operation());
+        $this->registerRouteSchema('acme.widget', ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]]);
+        $this->registerRouteSpec($this->operation());
 
         $first = $this->document();
 
@@ -93,10 +93,10 @@ class DocumentTest extends IntrospectionTestCase
 
     public function test_a_changed_contract_changes_the_hash(): void
     {
-        kizlo_register_spec_schema('acme.widget', ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]]);
+        $this->registerRouteSchema('acme.widget', ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]]);
         $before = $this->document()['hash'];
 
-        kizlo_register_spec_schema('acme.other', ['type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema('acme.other', ['type' => 'object', 'properties' => []]);
 
         $this->assertNotSame($before, $this->document()['hash']);
     }
@@ -124,7 +124,7 @@ class DocumentTest extends IntrospectionTestCase
 
     public function test_an_operation_is_emitted_without_the_registrys_bookkeeping(): void
     {
-        kizlo_register_spec_route($this->operation([
+        $this->registerRouteSpec($this->operation([
             'summary'     => 'List widgets',
             'description' => 'Every widget.',
             'deprecated'  => true,
@@ -141,7 +141,7 @@ class DocumentTest extends IntrospectionTestCase
 
     public function test_optional_operation_metadata_is_omitted_when_not_declared(): void
     {
-        kizlo_register_spec_route($this->operation());
+        $this->registerRouteSpec($this->operation());
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
 
