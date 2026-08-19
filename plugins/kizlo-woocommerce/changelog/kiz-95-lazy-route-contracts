@@ -1,0 +1,4 @@
+Significance: patch
+Type: changed
+
+Defer WooCommerce route and schema derivation until Kizlo requests the introspection contract

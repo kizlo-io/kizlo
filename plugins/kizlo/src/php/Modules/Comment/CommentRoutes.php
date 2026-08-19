@@ -25,14 +25,18 @@ final class CommentRoutes
 
     public static function register(): void
     {
-        foreach (self::resource()->declarations() as $declaration) {
-            kizlo_register_spec_route($declaration);
+        foreach (['list', 'retrieve', 'create', 'update', 'delete'] as $operation) {
+            kizlo_register_route_spec(
+                static fn(): array => self::resource()->operation($operation),
+            );
         }
     }
 
     private static function resource(): CoreResource
     {
-        return new CoreResource(
+        static $resource = null;
+
+        return $resource ??= new CoreResource(
             id: self::API_ID,
             namespace: 'wp/v2',
             base: '/comments',

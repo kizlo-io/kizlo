@@ -59,21 +59,9 @@ final class WooCommerceSchemas
 
     public static function register(): void
     {
-        foreach (self::all() as $id => $schema) {
-            kizlo_register_spec_schema($id, $schema);
-        }
-    }
-
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    public static function all(): array
-    {
-        return [
-            self::CART            => self::cart(),
-            self::STOCK_RESULT    => self::stockResult(),
-            self::CURRENCY_FORMAT => self::currencyFormat(),
-        ];
+        kizlo_register_route_schema(self::CART, static fn(): array => self::cart());
+        kizlo_register_route_schema(self::STOCK_RESULT, static fn(): array => self::stockResult());
+        kizlo_register_route_schema(self::CURRENCY_FORMAT, static fn(): array => self::currencyFormat());
     }
 
     /**

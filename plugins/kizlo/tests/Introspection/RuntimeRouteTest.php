@@ -277,7 +277,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
 
     public function test_refs_and_extends_are_resolved_for_the_runtime_but_not_the_document(): void
     {
-        kizlo_register_spec_schema('acme.address', [
+        $this->registerRouteSchema('acme.address', [
             'type'       => 'object',
             'properties' => ['city' => ['type' => 'string', 'required' => true]],
         ]);
@@ -313,7 +313,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
      */
     public function test_a_nested_required_property_is_enforced_by_rest_validate_value_from_schema(): void
     {
-        kizlo_register_spec_schema('acme.address', [
+        $this->registerRouteSchema('acme.address', [
             'type'       => 'object',
             'properties' => [
                 'city'     => ['type' => 'string', 'required' => true],
@@ -455,15 +455,15 @@ class RuntimeRouteTest extends IntrospectionTestCase
         // A union carries no `type`, and WordPress only auto-validates an argument
         // that has one — so without an explicit validate_callback this reached the
         // handler unchecked.
-        kizlo_register_spec_schema('acme.card', [
+        $this->registerRouteSchema('acme.card', [
             'type'       => 'object',
             'properties' => ['method' => ['type' => 'string', 'required' => true, 'enum' => ['card']]],
         ]);
-        kizlo_register_spec_schema('acme.bank', [
+        $this->registerRouteSchema('acme.bank', [
             'type'       => 'object',
             'properties' => ['method' => ['type' => 'string', 'required' => true, 'enum' => ['bank']]],
         ]);
-        kizlo_register_spec_schema('acme.payment', [
+        $this->registerRouteSchema('acme.payment', [
             'oneOf' => [['$ref' => 'acme.card'], ['$ref' => 'acme.bank']],
         ]);
 

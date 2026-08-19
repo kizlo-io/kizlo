@@ -101,7 +101,7 @@ class SpecTranslationTest extends IntrospectionTestCase
 
     /**
      * A spec route has no endpoint to attach a callback to and
-     * `kizlo_register_spec_route()` rightly refuses one, so the bridge cannot
+     * `$this->registerRouteSpec()` rightly refuses one, so the bridge cannot
      * hand any back.
      */
     public function test_runtime_callbacks_do_not_survive(): void
@@ -238,12 +238,12 @@ class SpecTranslationTest extends IntrospectionTestCase
         $controller = new \WP_REST_Comments_Controller();
         $schema     = $controller->get_item_schema();
 
-        kizlo_register_spec_schema('acme.comment', [
+        $this->registerRouteSchema('acme.comment', [
             'type'       => 'object',
             'properties' => kizlo_translate_spec_properties($schema['properties'], 'acme.comment', context: 'view', required: true),
         ]);
 
-        kizlo_register_spec_route([
+        $this->registerRouteSpec([
             'id'        => 'acme.comments',
             'operation' => 'list',
             'namespace' => 'acme/v1',

@@ -105,8 +105,8 @@ The reference pages cover [`WP_EndpointData`](/docs/reference/types/wp-endpoint-
 
 An extension plugin can add a core or third-party route to the document without registering a new WordPress
 endpoint. Register its reusable response shapes with
-[`kizlo_register_spec_schema`](/docs/php/functions/register-spec-schema), then describe each operation with
-[`kizlo_register_spec_route`](/docs/php/functions/register-spec-route).
+[`kizlo_register_route_schema`](/docs/php/functions/register-route-schema), then describe each operation with
+[`kizlo_register_route_spec`](/docs/php/functions/register-route-spec).
 
 When the upstream API already exposes WordPress-style schemas, derive the declaration with
 [`kizlo_translate_spec_properties`](/docs/php/functions/translate-spec-properties) or

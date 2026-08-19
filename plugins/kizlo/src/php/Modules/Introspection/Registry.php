@@ -82,6 +82,8 @@ class Registry
      */
     public static function build(): array
     {
+        SpecStore::materialize();
+
         $diagnostics = new Diagnostics();
 
         SpecStore::applyDiagnostics($diagnostics);

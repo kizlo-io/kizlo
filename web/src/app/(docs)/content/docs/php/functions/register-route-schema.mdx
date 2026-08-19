@@ -1,22 +1,25 @@
 ---
-title: kizlo_register_spec_schema
+title: kizlo_register_route_schema
 icon: Function
-description: Register a reusable schema for described WordPress routes.
+description: Lazily register a reusable schema for described WordPress routes.
 ---
 
-`kizlo_register_spec_schema` adds a named schema to Kizlo's introspection document. Reference it from route
+`kizlo_register_route_schema` adds a named schema to Kizlo's introspection document. Reference it from route
 inputs and responses to define a shared shape once.
 
 ## Parameters
 
 ```php
-kizlo_register_spec_schema(string $id, array $schema): void
+kizlo_register_route_schema(string $id, callable $derive): void
 ```
 
 | Parameter | Type | Description |
 | --- | --- | --- |
 | `$id` | `string` | Globally unique, vendor-qualified ID such as `acme.order`. |
-| `$schema` | `array` | Schema written in Kizlo's contract vocabulary. |
+| `$derive` | `callable` | Factory that returns a schema written in Kizlo's contract vocabulary. |
+
+Kizlo calls the factory when introspection builds the document. It can also call the factory when a registered
+runtime route references the schema from its input, because WordPress needs that shape for request validation.
 
 The `kizlo.*`, `post-types.*`, and `taxonomies.*` prefixes are reserved for Kizlo core. A third-party plugin
 must use its own vendor or domain prefix.
@@ -32,7 +35,7 @@ must use its own vendor or domain prefix.
 ## Example
 
 ```php title="wp-content/plugins/acme-orders/schemas.php"
-kizlo_register_spec_schema('acme.order', [
+kizlo_register_route_schema('acme.order', fn(): array => [
     'type'       => 'object',
     'properties' => [
         'id'     => ['type' => 'integer', 'required' => true],
@@ -46,4 +49,4 @@ kizlo_register_spec_schema('acme.order', [
 ```
 
 Use `['$ref' => 'acme.order']` in a
-[`kizlo_register_spec_route`](/docs/php/functions/register-spec-route) response.
+[`kizlo_register_route_spec`](/docs/php/functions/register-route-spec) response.

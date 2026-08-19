@@ -10,7 +10,7 @@ class ReferenceTest extends IntrospectionTestCase
 {
     private function registerPost(): void
     {
-        kizlo_register_spec_schema('acme.post', [
+        $this->registerRouteSchema('acme.post', [
             'type'       => 'object',
             'properties' => [
                 'id'    => ['type' => 'integer', 'required' => true],
@@ -25,7 +25,7 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_a_ref_resolves_regardless_of_registration_order(): void
     {
-        kizlo_register_spec_schema('acme.list', [
+        $this->registerRouteSchema('acme.list', [
             'type'       => 'object',
             'properties' => ['items' => ['type' => 'array', 'items' => ['$ref' => 'acme.post']]],
         ]);
@@ -39,7 +39,7 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_a_missing_ref_target_fails_introspection(): void
     {
-        kizlo_register_spec_schema('acme.list', [
+        $this->registerRouteSchema('acme.list', [
             'type'       => 'object',
             'properties' => ['post' => ['$ref' => 'acme.nope']],
         ]);
@@ -51,7 +51,7 @@ class ReferenceTest extends IntrospectionTestCase
     {
         $this->registerPost();
 
-        kizlo_register_spec_schema('acme.list', [
+        $this->registerRouteSchema('acme.list', [
             'type'       => 'object',
             'properties' => [
                 'post' => ['$ref' => 'acme.post', 'required' => true, 'nullable' => true, 'description' => 'The post.'],
@@ -65,7 +65,7 @@ class ReferenceTest extends IntrospectionTestCase
     {
         $this->registerPost();
 
-        kizlo_register_spec_schema('acme.list', [
+        $this->registerRouteSchema('acme.list', [
             'type'       => 'object',
             'properties' => [
                 'post' => ['$ref' => 'acme.post', 'type' => 'object', 'properties' => ['extra' => ['type' => 'string']]],
@@ -77,7 +77,7 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_a_recursive_ref_is_allowed(): void
     {
-        kizlo_register_spec_schema('acme.node', [
+        $this->registerRouteSchema('acme.node', [
             'type'       => 'object',
             'properties' => [
                 'name'     => ['type' => 'string', 'required' => true],
@@ -96,7 +96,7 @@ class ReferenceTest extends IntrospectionTestCase
     {
         $this->registerPost();
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => 'acme.post',
             'type'       => 'object',
             'properties' => ['isbn' => ['type' => 'string']],
@@ -111,12 +111,12 @@ class ReferenceTest extends IntrospectionTestCase
     public function test_extends_accepts_multiple_parents(): void
     {
         $this->registerPost();
-        kizlo_register_spec_schema('acme.seo', [
+        $this->registerRouteSchema('acme.seo', [
             'type'       => 'object',
             'properties' => ['canonical' => ['type' => 'string', 'required' => true]],
         ]);
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => ['acme.post', 'acme.seo'],
             'type'       => 'object',
             'properties' => ['isbn' => ['type' => 'string']],
@@ -127,12 +127,12 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_extends_works_on_a_nested_property(): void
     {
-        kizlo_register_spec_schema('acme.user', [
+        $this->registerRouteSchema('acme.user', [
             'type'       => 'object',
             'properties' => ['id' => ['type' => 'integer', 'required' => true]],
         ]);
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             'type'       => 'object',
             'properties' => [
                 'author' => [
@@ -151,12 +151,12 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_extends_works_on_an_array_items_schema(): void
     {
-        kizlo_register_spec_schema('acme.user', [
+        $this->registerRouteSchema('acme.user', [
             'type'       => 'object',
             'properties' => ['id' => ['type' => 'integer', 'required' => true]],
         ]);
 
-        kizlo_register_spec_schema('acme.roster', [
+        $this->registerRouteSchema('acme.roster', [
             'type'  => 'array',
             'items' => [
                 'type'       => 'object',
@@ -170,7 +170,7 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_an_unknown_parent_fails_introspection(): void
     {
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => 'acme.postt',
             'type'       => 'object',
             'properties' => [],
@@ -184,9 +184,9 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_extending_a_union_fails_introspection(): void
     {
-        kizlo_register_spec_schema('acme.shape', ['anyOf' => [['type' => 'string'], ['type' => 'integer']]]);
+        $this->registerRouteSchema('acme.shape', ['anyOf' => [['type' => 'string'], ['type' => 'integer']]]);
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => 'acme.shape',
             'type'       => 'object',
             'properties' => [],
@@ -197,9 +197,9 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_extending_a_non_object_fails_introspection(): void
     {
-        kizlo_register_spec_schema('acme.name', ['type' => 'string']);
+        $this->registerRouteSchema('acme.name', ['type' => 'string']);
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => 'acme.name',
             'type'       => 'object',
             'properties' => [],
@@ -210,8 +210,8 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_circular_inheritance_fails_introspection(): void
     {
-        kizlo_register_spec_schema('acme.a', ['$extends' => 'acme.b', 'type' => 'object', 'properties' => []]);
-        kizlo_register_spec_schema('acme.b', ['$extends' => 'acme.a', 'type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema('acme.a', ['$extends' => 'acme.b', 'type' => 'object', 'properties' => []]);
+        $this->registerRouteSchema('acme.b', ['$extends' => 'acme.a', 'type' => 'object', 'properties' => []]);
 
         $this->assertErrorContains($this->errors(), 'Circular inheritance');
     }
@@ -220,7 +220,7 @@ class ReferenceTest extends IntrospectionTestCase
     {
         $this->registerPost();
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => 'acme.post',
             'type'       => 'object',
             'properties' => ['title' => ['type' => 'integer']],
@@ -231,10 +231,10 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_two_parents_disagreeing_on_a_property_fails_introspection(): void
     {
-        kizlo_register_spec_schema('acme.left', ['type' => 'object', 'properties' => ['ref' => ['type' => 'string']]]);
-        kizlo_register_spec_schema('acme.right', ['type' => 'object', 'properties' => ['ref' => ['type' => 'integer']]]);
+        $this->registerRouteSchema('acme.left', ['type' => 'object', 'properties' => ['ref' => ['type' => 'string']]]);
+        $this->registerRouteSchema('acme.right', ['type' => 'object', 'properties' => ['ref' => ['type' => 'integer']]]);
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => ['acme.left', 'acme.right'],
             'type'       => 'object',
             'properties' => [],
@@ -247,7 +247,7 @@ class ReferenceTest extends IntrospectionTestCase
     {
         $this->registerPost();
 
-        kizlo_register_spec_schema('acme.article', [
+        $this->registerRouteSchema('acme.article', [
             '$extends'   => 'acme.post',
             'type'       => 'object',
             'properties' => ['title' => ['type' => 'string', 'maxLength' => 60]],
@@ -258,9 +258,9 @@ class ReferenceTest extends IntrospectionTestCase
 
     public function test_a_parents_own_parents_are_merged_transitively(): void
     {
-        kizlo_register_spec_schema('acme.base', ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]]);
-        kizlo_register_spec_schema('acme.middle', ['$extends' => 'acme.base', 'type' => 'object', 'properties' => ['slug' => ['type' => 'string']]]);
-        kizlo_register_spec_schema('acme.leaf', ['$extends' => 'acme.middle', 'type' => 'object', 'properties' => ['id' => ['type' => 'string']]]);
+        $this->registerRouteSchema('acme.base', ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]]);
+        $this->registerRouteSchema('acme.middle', ['$extends' => 'acme.base', 'type' => 'object', 'properties' => ['slug' => ['type' => 'string']]]);
+        $this->registerRouteSchema('acme.leaf', ['$extends' => 'acme.middle', 'type' => 'object', 'properties' => ['id' => ['type' => 'string']]]);
 
         // The conflict is reported against the parent that was extended, not the
         // grandparent that originally declared the property — that is the schema

@@ -155,14 +155,16 @@ function kizlo_register_route(array $args): void
  * Uses the same flat operation format as kizlo_register_route(), but requires a
  * `namespace` and accepts no runtime callback and no validation/sanitization
  * callbacks. Nothing is registered, no request is made, and the described route
- * is not verified to exist.
+ * is not verified to exist. The factory is evaluated only when `/introspect`
+ * builds the document, so deriving somebody else's route costs ordinary
+ * WordPress requests nothing.
  *
  * @since 1.0.0
  *
- * @param array $args Flat operation, plus a required `namespace` (e.g. 'wc/v3').
+ * @param callable(): array<string, mixed> $derive Returns a flat operation plus a required `namespace` (e.g. 'wc/v3').
  *
  * @example
- * kizlo_register_spec_route([
+ * kizlo_register_route_spec(fn(): array => [
  *     'id'        => 'woocommerce.orders',
  *     'operation' => 'list',
  *     'namespace' => 'wc/v3',
@@ -179,10 +181,10 @@ function kizlo_register_route(array $args): void
  *
  * @return void
  */
-function kizlo_register_spec_route(array $args): void
+function kizlo_register_route_spec(callable $derive): void
 {
-    \Kizlo\Modules\Introspection\RouteRegistrar::registerSpec(
-        $args,
+    \Kizlo\Modules\Introspection\SpecStore::addRouteFactory(
+        $derive,
         \Kizlo\Modules\Introspection\SpecStore::callerIsCore(),
     );
 }
@@ -244,11 +246,11 @@ function kizlo_extension(string $file, callable $boot): bool
  *
  * @since 1.0.0
  *
- * @param string $id     Globally unique, vendor-qualified ID, e.g. 'orders.order'.
- * @param array  $schema Kizlo schema.
+ * @param string                            $id     Globally unique, vendor-qualified ID, e.g. 'orders.order'.
+ * @param callable(): array<string, mixed> $derive Returns the Kizlo schema when introspection needs it.
  *
  * @example
- * kizlo_register_spec_schema('orders.order', [
+ * kizlo_register_route_schema('orders.order', fn(): array => [
  *     'type'       => 'object',
  *     'properties' => [
  *         'id'     => ['type' => 'integer', 'required' => true],
@@ -258,11 +260,11 @@ function kizlo_extension(string $file, callable $boot): bool
  *
  * @return void
  */
-function kizlo_register_spec_schema(string $id, array $schema): void
+function kizlo_register_route_schema(string $id, callable $derive): void
 {
-    \Kizlo\Modules\Introspection\RouteRegistrar::registerSchema(
+    \Kizlo\Modules\Introspection\SpecStore::addSchemaFactory(
         $id,
-        $schema,
+        $derive,
         \Kizlo\Modules\Introspection\SpecStore::callerIsCore(),
     );
 }
@@ -274,7 +276,7 @@ function kizlo_register_spec_schema(string $id, array $schema): void
  * describing hands back — a controller's `get_item_schema()['properties']` or
  * `get_collection_params()`, a Store API route's `get_args()` entry, a schema
  * class's `get_properties()` — and get properties ready for the `input` or
- * `responses` of kizlo_register_spec_route().
+ * `responses` of kizlo_register_route_spec().
  *
  * Deriving beats copying: a field the upstream API adds in its next release
  * reaches the contract without anyone re-reading its source, where a
@@ -294,7 +296,7 @@ function kizlo_register_spec_schema(string $id, array $schema): void
  * @param bool        $required   Mark every property required. For a response whose fields are always present.
  *
  * @example
- * kizlo_register_spec_route([
+ * kizlo_register_route_spec(fn(): array => [
  *     'id'        => 'woocommerce.orders',
  *     'operation' => 'list',
  *     'namespace' => 'wc/v3',

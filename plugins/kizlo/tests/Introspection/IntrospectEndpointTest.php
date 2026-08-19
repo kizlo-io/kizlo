@@ -148,7 +148,7 @@ class IntrospectEndpointTest extends IntrospectionTestCase
     {
         $this->actingAsAdmin();
 
-        kizlo_register_spec_schema('acme.broken', [
+        $this->registerRouteSchema('acme.broken', [
             'type'       => 'object',
             'properties' => ['post' => ['$ref' => 'acme.missing']],
         ]);
@@ -171,8 +171,8 @@ class IntrospectEndpointTest extends IntrospectionTestCase
     {
         $this->actingAsAdmin();
 
-        kizlo_register_spec_schema('acme.broken', ['type' => 'object', 'properties' => ['x' => ['$ref' => 'acme.missing']]]);
-        kizlo_register_spec_schema('acme.dependent', ['type' => 'object', 'properties' => ['b' => ['$ref' => 'acme.broken']]]);
+        $this->registerRouteSchema('acme.broken', ['type' => 'object', 'properties' => ['x' => ['$ref' => 'acme.missing']]]);
+        $this->registerRouteSchema('acme.dependent', ['type' => 'object', 'properties' => ['b' => ['$ref' => 'acme.broken']]]);
 
         $data = $this->get()->get_data();
 
@@ -187,12 +187,12 @@ class IntrospectEndpointTest extends IntrospectionTestCase
     {
         $this->actingAsAdmin();
 
-        kizlo_register_spec_schema('acme.broken', [
+        $this->registerRouteSchema('acme.broken', [
             '$extends'   => 'kizlo.postt',
             'type'       => 'object',
             'properties' => [],
         ]);
-        kizlo_register_spec_route($this->operation([
+        $this->registerRouteSpec($this->operation([
             'operation' => 'create',
             'method'    => 'POST',
             'responses' => ['404' => ['body' => ['$ref' => 'kizlo.error']]],
@@ -219,7 +219,7 @@ class IntrospectEndpointTest extends IntrospectionTestCase
             'method'   => 'GET',
             'callback' => static fn() => ['ok' => true],
         ]);
-        kizlo_register_spec_route($this->operation(['responses' => []]));
+        $this->registerRouteSpec($this->operation(['responses' => []]));
 
         global $wp_rest_server;
         $wp_rest_server = new WP_REST_Server();

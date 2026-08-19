@@ -66,19 +66,20 @@ final class CoreResource
     }
 
     /**
-     * The five declarations, ready for `kizlo_register_spec_route()`.
+     * One declaration, derived only when its registered factory is materialized.
      *
-     * @return array<int, array<string, mixed>>
+     * @return array<string, mixed>
      */
-    public function declarations(): array
+    public function operation(string $operation): array
     {
-        return [
-            $this->list(),
-            $this->retrieve(),
-            $this->create(),
-            $this->update(),
-            $this->delete(),
-        ];
+        return match ($operation) {
+            'list'     => $this->list(),
+            'retrieve' => $this->retrieve(),
+            'create'   => $this->create(),
+            'update'   => $this->update(),
+            'delete'   => $this->delete(),
+            default    => throw new \InvalidArgumentException(sprintf('Unknown resource operation "%s".', $operation)),
+        };
     }
 
     // ============================================================
@@ -228,7 +229,7 @@ final class CoreResource
             // callbacks, because {@see CoreItemSchema} serves managed routes too
             // and those put them back on the endpoint. A described route registers
             // nothing to put them on, so they are stripped here rather than
-            // reaching `kizlo_register_spec_route()`, which rightly refuses them:
+            // reaching `kizlo_register_route_spec()`, which rightly refuses them:
             // a callback in a hand-written spec is a mistake worth reporting, and
             // it stays one.
             'input'     => SchemaNormalizer::normalize($input),

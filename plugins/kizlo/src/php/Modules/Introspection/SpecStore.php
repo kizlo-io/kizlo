@@ -3,13 +3,20 @@
 namespace Kizlo\Modules\Introspection;
 
 /**
- * Backing store for the two public registration helpers.
+ * Backing store for the two public contract registration helpers.
  *
- * `kizlo_register_spec_schema()` and `kizlo_register_spec_route()` contribute
- * through the `kizlo_introspection_schemas` / `kizlo_introspection_routes`
- * filters like anyone else. What the store adds is provenance: it fingerprints
- * everything registered from inside the Kizlo plugin, which is how the registry
- * later tells a core registration into `kizlo.*` from a third-party one.
+ * The public helpers accept factories rather than resolved arrays. Registration
+ * therefore costs one closure allocation on an ordinary request, and the work
+ * behind a controller's schema methods only runs when {@see Registry::build()}
+ * asks for the document. Schema factories referenced by a runtime route's input
+ * are the exception: that one dependency graph is materialized at
+ * `rest_api_init`, because WordPress needs it to validate the endpoint.
+ *
+ * Materialized entries contribute through the `kizlo_introspection_schemas` /
+ * `kizlo_introspection_routes` filters like anyone else. What the store adds is
+ * provenance: it fingerprints everything registered from inside the Kizlo
+ * plugin, which is how the registry later tells a core registration into
+ * `kizlo.*` from a third-party one.
  */
 class SpecStore
 {
@@ -18,6 +25,15 @@ class SpecStore
 
     /** @var array<int, array<string, mixed>> */
     private static array $routes = [];
+
+    /** @var array<string, array<int, array{derive: callable, trusted: bool}>> */
+    private static array $schemaFactories = [];
+
+    /** @var array<int, array{derive: callable, trusted: bool}> */
+    private static array $routeFactories = [];
+
+    /** @var array<string, true> Guards circular schema factory dependencies. */
+    private static array $materializingSchemas = [];
 
     /** @var array<string, true> Fingerprints of entries registered from inside the plugin. */
     private static array $trusted = [];
@@ -28,11 +44,74 @@ class SpecStore
     /**
      * What the plugin itself registered, captured the first time a test resets.
      *
-     * @var array{schemas: array<int, array{id: string, schema: array<string, mixed>}>, routes: array<int, array<string, mixed>>, trusted: array<string, true>}|null
+     * @var array{
+     *     schemas: array<int, array{id: string, schema: array<string, mixed>}>,
+     *     routes: array<int, array<string, mixed>>,
+     *     schemaFactories: array<string, array<int, array{derive: callable, trusted: bool}>>,
+     *     routeFactories: array<int, array{derive: callable, trusted: bool}>,
+     *     trusted: array<string, true>
+     * }|null
      */
     private static ?array $baseline = null;
 
     private static bool $hooked = false;
+
+    public static function addSchemaFactory(string $id, callable $derive, bool $trusted): void
+    {
+        self::$schemaFactories[$id][] = ['derive' => $derive, 'trusted' => $trusted];
+    }
+
+    public static function addRouteFactory(callable $derive, bool $trusted): void
+    {
+        self::$routeFactories[] = ['derive' => $derive, 'trusted' => $trusted];
+    }
+
+    /** Materialize everything the introspection document can publish. */
+    public static function materialize(): void
+    {
+        foreach (array_keys(self::$schemaFactories) as $id) {
+            self::materializeSchema($id);
+        }
+
+        $factories            = self::$routeFactories;
+        self::$routeFactories = [];
+
+        foreach ($factories as $entry) {
+            try {
+                $route = ($entry['derive'])();
+            } catch (\Throwable $error) {
+                self::addError(
+                    ['keyword' => 'factory'],
+                    sprintf('A route spec factory threw %s: %s', $error::class, $error->getMessage()),
+                );
+                continue;
+            }
+
+            if (!is_array($route)) {
+                self::addError(['keyword' => 'factory'], 'A route spec factory must return an array.');
+                continue;
+            }
+
+            RouteRegistrar::registerSpec($route, $entry['trusted']);
+        }
+    }
+
+    /**
+     * Materialize only the registered schemas a runtime input references.
+     *
+     * @param array<string, mixed> $schema
+     * @return bool Whether a factory ran, so the caller knows its schema-map memo is stale.
+     */
+    public static function materializeReferences(array $schema): bool
+    {
+        $materialized = false;
+
+        foreach (self::references($schema) as $id) {
+            $materialized = self::materializeSchema($id) || $materialized;
+        }
+
+        return $materialized;
+    }
 
     /**
      * @param array<string, mixed> $schema
@@ -108,13 +187,22 @@ class SpecStore
      */
     public static function reset(): void
     {
-        self::$baseline ??= ['schemas' => self::$schemas, 'routes' => self::$routes, 'trusted' => self::$trusted];
+        self::$baseline ??= [
+            'schemas'         => self::$schemas,
+            'routes'          => self::$routes,
+            'schemaFactories' => self::$schemaFactories,
+            'routeFactories'  => self::$routeFactories,
+            'trusted'         => self::$trusted,
+        ];
 
-        self::$schemas = self::$baseline['schemas'];
-        self::$routes  = self::$baseline['routes'];
-        self::$trusted = self::$baseline['trusted'];
-        self::$errors  = [];
-        self::$hooked  = false;
+        self::$schemas             = self::$baseline['schemas'];
+        self::$routes              = self::$baseline['routes'];
+        self::$schemaFactories     = self::$baseline['schemaFactories'];
+        self::$routeFactories      = self::$baseline['routeFactories'];
+        self::$trusted             = self::$baseline['trusted'];
+        self::$errors              = [];
+        self::$materializingSchemas = [];
+        self::$hooked              = false;
 
         self::hook();
     }
@@ -159,6 +247,70 @@ class SpecStore
         add_filter('kizlo_introspection_routes', static function (array $routes): array {
             return array_merge($routes, self::$routes);
         });
+    }
+
+    private static function materializeSchema(string $id): bool
+    {
+        if (!isset(self::$schemaFactories[$id]) || isset(self::$materializingSchemas[$id])) {
+            return false;
+        }
+
+        $factories = self::$schemaFactories[$id];
+        unset(self::$schemaFactories[$id]);
+
+        self::$materializingSchemas[$id] = true;
+
+        foreach ($factories as $entry) {
+            try {
+                $schema = ($entry['derive'])();
+            } catch (\Throwable $error) {
+                self::addError(
+                    ['schema_id' => $id, 'keyword' => 'factory'],
+                    sprintf('The schema factory threw %s: %s', $error::class, $error->getMessage()),
+                );
+                continue;
+            }
+
+            if (!is_array($schema)) {
+                self::addError(
+                    ['schema_id' => $id, 'keyword' => 'factory'],
+                    'A route schema factory must return an array.',
+                );
+                continue;
+            }
+
+            RouteRegistrar::registerSchema($id, $schema, $entry['trusted']);
+
+            foreach (self::references($schema) as $reference) {
+                self::materializeSchema($reference);
+            }
+        }
+
+        unset(self::$materializingSchemas[$id]);
+
+        return true;
+    }
+
+    /**
+     * @param array<array-key, mixed> $schema
+     * @return array<int, string>
+     */
+    private static function references(array $schema): array
+    {
+        $references = [];
+
+        foreach ($schema as $key => $value) {
+            if (($key === '$ref' || $key === '$extends') && is_string($value)) {
+                $references[] = $value;
+                continue;
+            }
+
+            if (is_array($value)) {
+                array_push($references, ...self::references($value));
+            }
+        }
+
+        return array_values(array_unique($references));
     }
 
     /**
