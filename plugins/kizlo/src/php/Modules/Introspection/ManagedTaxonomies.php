@@ -204,7 +204,6 @@ class ManagedTaxonomies
     {
         return [
             'invalid_taxonomy',
-            'rest_forbidden_context',
             'rest_post_invalid_page_number',
         ];
     }
@@ -214,7 +213,6 @@ class ManagedTaxonomies
     {
         return [
             'invalid_taxonomy',
-            'rest_forbidden_context',
             'rest_term_invalid',
             'term_not_found',
         ];

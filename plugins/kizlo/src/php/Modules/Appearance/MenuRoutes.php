@@ -78,6 +78,11 @@ final class MenuRoutes
      * contributes `rest_cannot_view` on both reads and `rest_invalid_menu_location`
      * on both writes; everything else is the term controller's.
      *
+     * The list keeps `rest_forbidden_context` where every other read here dropped
+     * it, because the term controller has a second raise site that never consults
+     * `context`: `?post=` answers it whenever the post is not in the taxonomy, and
+     * `nav_menu` is registered against `nav_menu_item`, so every ordinary post is.
+     *
      * @return array<string, array<int, string>>
      */
     private static function menuErrors(): array
@@ -90,7 +95,6 @@ final class MenuRoutes
             ],
             'retrieve' => [
                 'rest_cannot_view',
-                'rest_forbidden_context',
                 'rest_term_invalid',
             ],
             'create' => [
@@ -125,14 +129,12 @@ final class MenuRoutes
         return [
             'list' => [
                 'rest_cannot_view',
-                'rest_forbidden_context',
                 'rest_no_search_term_defined',
                 'rest_orderby_include_missing_include',
                 'rest_post_invalid_page_number',
             ],
             'retrieve' => [
                 'rest_cannot_view',
-                'rest_forbidden_context',
                 'rest_post_invalid_id',
             ],
             'create' => [

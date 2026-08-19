@@ -30,6 +30,12 @@ use WP_REST_Controller;
  * rendered field, none of which Kizlo reads and none of which belong in a public
  * response. Leaving the parameter undeclared is also what makes the description
  * true: a generated client cannot ask for a shape the contract does not describe.
+ *
+ * It also settles which error codes these routes can carry. Core raises
+ * `rest_forbidden_context` from a `'edit' === $request['context']` branch, so a
+ * route that declares no `context` cannot reach one, and declaring the code would
+ * describe an answer the route has no way to give. The exceptions are the raise
+ * sites that never look at `context` at all, which are named where they are kept.
  */
 final class CoreResource
 {

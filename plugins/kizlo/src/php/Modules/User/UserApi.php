@@ -107,7 +107,6 @@ class UserApi
     {
         return [
             'invalid_field',
-            'rest_forbidden_context',
             'rest_user_cannot_view',
             'rest_user_invalid_id',
             'user_not_found',
@@ -176,6 +175,10 @@ class UserApi
      * Read through core's controller with the context pinned, so the response
      * carries every field it can produce rather than the narrower set a missing
      * `context` parameter would have selected.
+     *
+     * Calling `get_item()` rather than dispatching means core's permission checks
+     * do not run, which is why the declared errors name none of the codes those
+     * checks raise. {@see \Kizlo\Modules\PostType\PostTypeApi::pinContext()}.
      */
     private function readUser(int $userId): WP_REST_Response|WP_Error
     {

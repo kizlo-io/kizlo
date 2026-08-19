@@ -92,6 +92,12 @@ final class CommentRoutes
      * pre-dispatch codes are not here; {@see \Kizlo\Modules\Introspection\OperationErrors}
      * adds those to every described route.
      *
+     * `rest_forbidden_param` on the list is not a context error despite reading
+     * like one. The controller raises it for a caller without `edit_posts` that
+     * filters on `author`, `author_exclude`, `author_email`, `type` or `status`,
+     * all five of which the route declares, so it stands where the context codes
+     * could not. {@see CoreResource} for why those went.
+     *
      * @return array<string, array<int, string>>
      */
     private static function errors(): array
@@ -101,14 +107,12 @@ final class CommentRoutes
                 'rest_cannot_read',
                 'rest_cannot_read_post',
                 'rest_comment_not_supported_post_type',
-                'rest_forbidden_context',
                 'rest_forbidden_param',
             ],
             'retrieve' => [
                 'rest_cannot_read',
                 'rest_cannot_read_post',
                 'rest_comment_invalid_id',
-                'rest_forbidden_context',
                 'rest_post_invalid_id',
             ],
             'create' => [
