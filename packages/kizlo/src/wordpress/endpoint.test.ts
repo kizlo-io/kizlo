@@ -80,7 +80,7 @@ describe("createWordPressClient", () => {
 		const result = await client().books.retrieve({ identifier: "dune" })
 
 		expect(result).toMatchObject({ data: { id: 1 }, error: null })
-		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune?context=edit")
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune")
 	})
 
 	test("resolves to a failure for an unusable path parameter, without reaching the network", async () => {
@@ -120,7 +120,7 @@ describe("createWordPressClient", () => {
 		expect(sent["X-Kizlo-Guest-Token"]).toBe("t_1")
 		expect(sent["X-Kizlo-User-Id"]).toBe("7")
 		// The headers ride along; the route they ride to is still the definition's.
-		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune?context=edit")
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune")
 	})
 
 	test("falls through to transport methods the tree does not define", async () => {
@@ -130,7 +130,7 @@ describe("createWordPressClient", () => {
 
 		await wordpress.get("/anything", { base: "/wp-json/wp/v2" })
 
-		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/wp/v2/anything?context=edit")
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/wp/v2/anything")
 		// Reading a transport method off the proxy must not lose its receiver.
 		expect(wordpress.resolveListMetadata({ page: 1, totalPages: 2, totalItems: 3 })).toMatchObject({ has_next_page: true })
 	})

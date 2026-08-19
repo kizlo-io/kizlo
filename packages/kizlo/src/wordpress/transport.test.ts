@@ -42,9 +42,35 @@ describe("generated endpoints", () => {
 		expect(result.data).toEqual({ id: 1 })
 		const [url, init] = fetch.mock.calls[0] ?? []
 		const headers = init?.headers as Record<string, string> | undefined
-		expect(url).toBe("https://wp.example/wp-json/kizlo/v1/books/dune%20messiah?page=2&context=edit")
+		expect(url).toBe("https://wp.example/wp-json/kizlo/v1/books/dune%20messiah?page=2")
 		expect(init?.method).toBe("GET")
 		expect(headers?.authorization).toMatch(/^Basic /)
+	})
+
+	/**
+	 * The transport used to append `context=edit` to every request, from back when it only spoke to
+	 * `wp/v2` and `kizlo/v1`. It now carries whatever the described route declares and nothing else:
+	 * the routes Kizlo serves pin the context server side, and the routes it only describes are
+	 * described in the context WordPress falls back to. A Store API cart call is where the old rule
+	 * was most obviously wrong, and it is the case with no query string to hide behind.
+	 */
+	test("sends only the query the caller gave it, on any namespace", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ items: [] }))
+		vi.stubGlobal("fetch", fetch)
+
+		await call(definition({ namespace: "wc/store/v1", path: "/cart" }), {})
+
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/wc/store/v1/cart")
+	})
+
+	/** The escape hatch an extension reaches for, so a context it asks for by hand still arrives. */
+	test("carries a context the caller asked for", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
+		vi.stubGlobal("fetch", fetch)
+
+		await call(definition(), { context: "edit" })
+
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books?context=edit")
 	})
 
 	test("partitions path input from a JSON request body", async () => {
@@ -63,7 +89,7 @@ describe("generated endpoints", () => {
 
 		const [url, init] = fetch.mock.calls[0] ?? []
 		const headers = init?.headers as Record<string, string> | undefined
-		expect(url).toBe("https://wp.example/wp-json/kizlo/v1/books/7?context=edit")
+		expect(url).toBe("https://wp.example/wp-json/kizlo/v1/books/7")
 		expect(init?.body).toBe('{"title":"Dune"}')
 		expect(headers?.["Content-Type"]).toBe("application/json")
 	})
