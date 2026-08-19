@@ -9,7 +9,6 @@ use WP_REST_Server;
 use WP_REST_Users_Controller;
 use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\OperationErrors;
-use Kizlo\Modules\User\UserApi;
 
 /**
  * A `kizlo/v1` route cannot answer a code core only raises from a permission check.
@@ -170,30 +169,44 @@ class PermissionErrorTest extends IntrospectionTestCase
     public static function survivingCodeProvider(): array
     {
         return [
-            'a post delete refused by check_delete_permission' => ['post-types.post /post-types/{identifier} delete', 'rest_user_cannot_delete_post'],
-            'a term delete wp_delete_term refuses'             => ['taxonomies.category /taxonomies/{identifier} delete', 'rest_cannot_delete'],
+            'a post delete refused by check_delete_permission' => ['post-types.post /post-types/post/{identifier} delete', 'rest_user_cannot_delete_post'],
+            'a term delete wp_delete_term refuses'             => ['taxonomies.category /taxonomies/category/{identifier} delete', 'rest_cannot_delete'],
             'a status the list sanitizer refuses'              => ['post-types.post /post-types/post list', 'rest_forbidden_status'],
         ];
     }
 
     /**
-     * `rest_forbidden_status` survives for a reason worth pinning: the sanitizer
-     * that raises it is core's, and it reaches the managed route because
-     * `sanitize_callback` is a keyword the derivation carries rather than drops.
+     * `rest_forbidden_status` survives for a reason worth pinning. The check that
+     * raises it lives in a `sanitize_callback` rather than in a permission check,
+     * and `sanitize_callback` is a keyword {@see \Kizlo\Modules\Introspection\Spec}
+     * treats as part of a schema, so the derived arguments carry core's own
+     * sanitizer onto the managed route instead of replacing it with the default.
+     *
+     * Core wraps a sanitizer's failure in `rest_invalid_param` and reports the
+     * original under `details`, on its own route as much as on this one, so the
+     * two routes are compared rather than a shape being asserted from memory.
      */
-    public function test_the_managed_list_carries_cores_own_status_sanitizer(): void
+    public function test_the_managed_list_refuses_a_forbidden_status_the_way_cores_own_route_does(): void
     {
         add_role('kizlo_permission_test', 'Kizlo Permission Test', ['read' => true, 'manage_options' => true]);
         wp_set_current_user(self::factory()->user->create(['role' => 'kizlo_permission_test']));
 
         $server = $this->boot();
 
-        $request = new WP_REST_Request('GET', '/kizlo/v1/post-types/post');
-        $request->set_query_params(['status' => 'draft']);
+        $args = $this->readArgs($server, '/kizlo/v1/post-types/post');
 
-        $response = $server->dispatch($request);
+        $this->assertSame('sanitize_post_statuses', $args['status']['sanitize_callback'][1]);
 
-        $this->assertSame('rest_forbidden_status', $response->get_data()['code']);
+        $core    = $this->get($server, '/wp/v2/posts', ['status' => 'draft']);
+        $managed = $this->get($server, '/kizlo/v1/post-types/post', ['status' => 'draft']);
+
+        $this->assertSame($core->get_status(), $managed->get_status());
+        $this->assertSame($core->get_data()['code'], $managed->get_data()['code']);
+        $this->assertSame(
+            $core->get_data()['data']['details']['status']['code'],
+            $managed->get_data()['data']['details']['status']['code'],
+        );
+        $this->assertSame('rest_forbidden_status', $managed->get_data()['data']['details']['status']['code']);
 
         remove_role('kizlo_permission_test');
     }
@@ -205,16 +218,14 @@ class PermissionErrorTest extends IntrospectionTestCase
     /**
      * Every operation this plugin serves, keyed by where it is.
      *
-     * `UserApi` registers at plugin boot rather than on `rest_api_init`, and
-     * {@see IntrospectionTestCase} clears the store per test, so its declarations
-     * are put back here. Managed content is rebuilt by the document itself.
+     * {@see \Kizlo\Modules\Introspection\SpecStore::reset()} restores the baseline
+     * captured at plugin boot rather than emptying the store, so the plugin's own
+     * registrations are already here and managed content is rebuilt per document.
      *
      * @return array<string, array<string, mixed>>
      */
     private function kizloOperations(): array
     {
-        (new UserApi())->register();
-
         $found = [];
 
         foreach ($this->document()['apis'] as $apiId => $api) {
@@ -258,9 +269,9 @@ class PermissionErrorTest extends IntrospectionTestCase
      * The controller a Kizlo-served API calls into, or null when it serves itself.
      *
      * The pairing is what {@see \Kizlo\Modules\PostType\PostTypeApi},
-     * {@see \Kizlo\Modules\Taxonomy\TaxonomyApi} and {@see UserApi} actually do,
-     * read the same way {@see CoreControllers} reads it so a post type registered
-     * with a controller of its own is checked against that one.
+     * {@see \Kizlo\Modules\Taxonomy\TaxonomyApi} and {@see \Kizlo\Modules\User\UserApi}
+     * actually do, read the same way {@see CoreControllers} reads it so a post
+     * type registered with a controller of its own is checked against that one.
      */
     private function controllerFor(string $apiId): ?WP_REST_Controller
     {
@@ -401,5 +412,32 @@ class PermissionErrorTest extends IntrospectionTestCase
         $request->set_body((string) wp_json_encode($body));
 
         return $server->dispatch($request);
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     */
+    private function get(WP_REST_Server $server, string $route, array $query): \WP_REST_Response
+    {
+        $request = new WP_REST_Request('GET', $route);
+        $request->set_query_params($query);
+
+        return $server->dispatch($request);
+    }
+
+    /**
+     * The arguments WordPress validates a route's GET against.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function readArgs(WP_REST_Server $server, string $route): array
+    {
+        foreach ($server->get_routes()[$route] as $endpoint) {
+            if (!empty($endpoint['methods']['GET'])) {
+                return $endpoint['args'];
+            }
+        }
+
+        $this->fail(sprintf('"%s" has no GET endpoint.', $route));
     }
 }
