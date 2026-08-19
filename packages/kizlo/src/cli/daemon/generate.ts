@@ -215,6 +215,17 @@ async function fetchDocument(
 	return result
 }
 
+/**
+ * Produce the WordPress client without writing it or its ETag cache. Health checks use this to ask
+ * the same generator as `kizlo generate` what should be on disk, while leaving a contributor's
+ * checkout untouched. Callers choose strictness just as generation does.
+ */
+export async function generateWordPressSource(cwd: string, options: GenerateWordPressOptions = {}): Promise<string> {
+	const result = await fetchDocument(cwd, options)
+	if (!result?.document) throw new Error("WordPress introspection returned no document.")
+	return generateWordPressClient(result.document)
+}
+
 export async function generateWordPressOnce(
 	cfg: ResolvedConfig,
 	options: GenerateWordPressOptions = {},
