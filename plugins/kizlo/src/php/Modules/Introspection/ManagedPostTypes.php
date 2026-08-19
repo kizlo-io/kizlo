@@ -235,7 +235,6 @@ class ManagedPostTypes
     {
         return [
             'invalid_post_type',
-            'rest_forbidden_context',
             'rest_forbidden_status',
             'rest_no_search_term_defined',
             'rest_orderby_include_missing_include',
@@ -249,7 +248,6 @@ class ManagedPostTypes
         return [
             'invalid_post_type',
             'post_type_not_found',
-            'rest_forbidden_context',
             'rest_post_incorrect_password',
             'rest_post_invalid_id',
         ];

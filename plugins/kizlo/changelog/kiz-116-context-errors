@@ -1,0 +1,4 @@
+Significance: patch
+Type: changed
+
+Stop declaring the context errors that routes without a context parameter cannot raise

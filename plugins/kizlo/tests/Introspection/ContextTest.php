@@ -27,6 +27,12 @@ use WP_REST_Posts_Controller;
  * produce is produced and described, so nothing is hidden by omission. What a
  * browser is allowed to see is decided by the extension procedure that returns
  * it, which is the only route out.
+ *
+ * The declared errors follow the parameter, and the last section holds them to
+ * it. `rest_forbidden_context` is raised from a `context` branch in core's
+ * permission checks, so an operation that declares no `context` cannot answer it
+ * and does not claim it. Two codes look like exceptions and are not, and one
+ * route genuinely is.
  */
 class ContextTest extends IntrospectionTestCase
 {
@@ -222,8 +228,122 @@ class ContextTest extends IntrospectionTestCase
     }
 
     // ============================================================
+    // AND THE DECLARED ERROR GOES WITH IT
+    // ============================================================
+
+    /**
+     * Core raises `rest_forbidden_context` from an `'edit' === $request['context']`
+     * branch, so an operation that declares no `context` has no way to reach one
+     * and no business naming the code. The sweep is over the whole document rather
+     * than a list, because the next route added is the one that would be missed.
+     *
+     * The exception is named rather than excused; {@see self::KEEPS_THE_ERROR}.
+     */
+    public function test_no_operation_without_a_context_parameter_declares_the_context_error(): void
+    {
+        // The described core routes contribute on rest_api_init, so an unbooted
+        // document holds only the managed half and the sweep would miss them.
+        $this->boot();
+
+        foreach ($this->operations() as $where => $operation) {
+            if (isset($operation['input']['properties']['context']) || in_array($where, self::KEEPS_THE_ERROR, true)) {
+                continue;
+            }
+
+            $this->assertNotContains('rest_forbidden_context', $operation['errors'] ?? [], $where);
+        }
+    }
+
+    /**
+     * The term controller has a second raise site that never reads `context`: a
+     * `?post=` whose post is not in the taxonomy is refused outright. `nav_menu`
+     * is registered against `nav_menu_item`, so every ordinary post qualifies and
+     * an administrator can still be answered the code.
+     */
+    public function test_the_menus_list_keeps_the_context_error_it_can_still_raise(): void
+    {
+        $this->boot();
+
+        $this->assertContains('rest_forbidden_context', $this->document()['apis']['menus']['paths']['/menus']['list']['errors']);
+
+        $post     = self::factory()->post->create(['post_type' => 'post', 'post_status' => 'publish']);
+        $response = $this->dispatch('GET', '/wp/v2/menus', ['post' => $post]);
+
+        $this->assertSame(403, $response->get_status());
+        $this->assertSame('rest_forbidden_context', $response->get_data()['code']);
+    }
+
+    /**
+     * `rest_forbidden_param` reads like a context error and is not one. The comment
+     * controller raises it for a caller that filters on a protected parameter, and
+     * all five it protects are declared, so nothing about dropping `context` puts
+     * the code out of reach.
+     */
+    public function test_the_comment_list_keeps_the_error_its_declared_filters_can_raise(): void
+    {
+        $this->boot();
+
+        $list = $this->document()['apis']['comments']['paths']['/comments']['list'];
+
+        $this->assertContains('rest_forbidden_param', $list['errors']);
+
+        foreach (['author', 'author_exclude', 'author_email', 'type', 'status'] as $protected) {
+            $this->assertArrayHasKey($protected, $list['input']['properties']);
+        }
+    }
+
+    /**
+     * Pinning `edit` server side does not put the error back, which is the half
+     * that is easy to assume. Core raises it from `get_items_permissions_check()`,
+     * and WordPress calls that when it dispatches its own route; a managed route
+     * carries Kizlo's own permission callback and then calls the controller's data
+     * method directly, so the check never runs.
+     *
+     * Same user, same pinned context, opposite answers.
+     */
+    public function test_a_managed_list_cannot_raise_what_cores_own_route_does(): void
+    {
+        add_role('kizlo_context_test', 'Kizlo Context Test', ['read' => true, 'manage_options' => true]);
+        wp_set_current_user(self::factory()->user->create(['role' => 'kizlo_context_test']));
+
+        $this->boot();
+
+        $core = $this->dispatch('GET', '/wp/v2/posts', ['context' => 'edit']);
+        $this->assertSame('rest_forbidden_context', $core->get_data()['code']);
+
+        $managed = $this->dispatch('GET', '/kizlo/v1/post-types/post');
+        $this->assertSame(200, $managed->get_status());
+
+        remove_role('kizlo_context_test');
+    }
+
+    // ============================================================
     // HELPERS
     // ============================================================
+
+    /** The list route the term controller can still refuse without a `context`. */
+    private const KEEPS_THE_ERROR = ['menus /menus list'];
+
+    /**
+     * Every operation in the document, keyed by where it is, so a failure names
+     * the route rather than an index.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function operations(): array
+    {
+        $found = [];
+
+        foreach ($this->document()['apis'] as $apiId => $api) {
+            foreach ($api['paths'] as $path => $operations) {
+                foreach ($operations as $name => $operation) {
+                    $found[sprintf('%s %s %s', $apiId, $path, $name)] = $operation;
+                }
+            }
+        }
+
+        return $found;
+    }
 
     /**
      * @return array<string, array<string, mixed>>

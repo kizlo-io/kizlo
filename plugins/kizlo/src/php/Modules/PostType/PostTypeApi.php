@@ -96,6 +96,13 @@ class PostTypeApi
      * `$request['context']`. Removing it from the route arguments alone would
      * have left `?context=view` reshaping the response with nothing describing
      * it, which is the defect the derivation exists to end.
+     *
+     * Pinning `edit` does not make core's `rest_forbidden_context` reachable.
+     * That code is raised from `get_items_permissions_check()` and its siblings,
+     * which WordPress calls when it dispatches its own route. A managed route is
+     * gated by {@see \Kizlo\Modules\Introspection\RouteRegistrar} and then calls
+     * the controller's data method directly, so no permission check runs and the
+     * declared errors say so.
      */
     private static function pinContext(WP_REST_Request $request): WP_REST_Request
     {

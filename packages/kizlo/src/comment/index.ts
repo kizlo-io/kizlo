@@ -78,7 +78,6 @@ export const COMMENT_ROUTER_MAP = {
 				switch (response.error.code) {
 					case "rest_cannot_read":
 					case "rest_cannot_read_post":
-					case "rest_forbidden_context":
 					case "rest_forbidden_param": {
 						throw errors.COMMENT_FORBIDDEN()
 					}
