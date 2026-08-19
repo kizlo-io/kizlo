@@ -149,7 +149,65 @@ export class InvalidIntrospectionDocumentError extends Error {
 	}
 }
 
+/**
+ * WordPress published a well-formed document written to a contract this package does not speak. The
+ * remedy is an upgrade on one side or the other, never an edit to anything the user wrote, so it is
+ * reported on its own rather than as a failed field: the version is the only difference that matters,
+ * and every other one the schema would report follows from it.
+ */
+export class IntrospectionVersionError extends Error {
+	/** The version this package speaks. */
+	readonly expected: string
+	/** The version WordPress published. */
+	readonly received: string
+
+	constructor(received: string) {
+		super(versionMessage(received))
+		this.name = "IntrospectionVersionError"
+		this.expected = WORDPRESS_INTROSPECTION_VERSION
+		this.received = received
+	}
+}
+
+/** A `major.minor` version as numbers, or null for anything that is not one. */
+function parseVersion(value: string): [number, number] | null {
+	const parts = value.trim().split(".")
+	if (parts.length !== 2) return null
+	const [major, minor] = parts.map(Number) as [number, number]
+	if (![major, minor].every((part) => Number.isInteger(part) && part >= 0)) return null
+	return [major, minor]
+}
+
+/**
+ * Which side is behind, and what to do about it. A version that will not parse orders against
+ * nothing, so it names both remedies and leaves the choice rather than guessing a direction.
+ */
+function versionMessage(received: string): string {
+	const published = parseVersion(received)
+	const understood = parseVersion(WORDPRESS_INTROSPECTION_VERSION)
+	const summary = `WordPress published introspection ${received}`
+	if (!published || !understood) {
+		return `${summary}, and this kizlo understands ${WORDPRESS_INTROSPECTION_VERSION}. Update the kizlo package and the Kizlo plugin in WordPress.`
+	}
+	const ahead = published[0] - understood[0] || published[1] - understood[1]
+	return ahead > 0
+		? `${summary}, newer than the ${WORDPRESS_INTROSPECTION_VERSION} this kizlo understands. Update the kizlo package.`
+		: `${summary}, older than the ${WORDPRESS_INTROSPECTION_VERSION} this kizlo understands. Update the Kizlo plugin in WordPress.`
+}
+
+/** The document's own `version`, when it declares one as a string; anything else is left to the schema. */
+function declaredVersion(value: unknown): string | undefined {
+	if (typeof value !== "object" || value === null) return undefined
+	const version = (value as { version?: unknown }).version
+	return typeof version === "string" ? version : undefined
+}
+
 export function parseIntrospectionDocument(value: unknown): IntrospectionDocument {
+	// Ahead of the schema, so a document written to another version is answered with the upgrade that
+	// fixes it instead of a field-level report nobody can act on.
+	const version = declaredVersion(value)
+	if (version !== undefined && version !== WORDPRESS_INTROSPECTION_VERSION) throw new IntrospectionVersionError(version)
+
 	const result = document.safeParse(value)
 	if (result.success) return result.data
 	throw new InvalidIntrospectionDocumentError(`Invalid WordPress introspection document:\n${z.prettifyError(result.error)}`)
