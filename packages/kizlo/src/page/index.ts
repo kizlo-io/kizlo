@@ -31,8 +31,6 @@ export const PAGE_ROUTER_MAP = {
 						case "rest_post_invalid_id":
 						case "rest_no_route":
 							throw errors.PAGE_NOT_FOUND()
-						case "rest_post_incorrect_password":
-							throw errors.PAGE_PASSWORD_INVALID()
 						default:
 							context.logger.error("Get page preview unhandled error", response.error, { id: result.id, code: response.error.code })
 							throw errors.INTERNAL_SERVER_ERROR()
@@ -53,8 +51,6 @@ export const PAGE_ROUTER_MAP = {
 					case "rest_post_invalid_id":
 					case "rest_no_route":
 						throw errors.PAGE_NOT_FOUND()
-					case "rest_post_incorrect_password":
-						throw errors.PAGE_PASSWORD_INVALID()
 					default:
 						context.logger.error("Get page unhandled error", response.error, { identifier, code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()

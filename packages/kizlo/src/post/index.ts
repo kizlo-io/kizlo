@@ -32,8 +32,6 @@ export const POST_ROUTER_MAP = {
 						case "rest_post_invalid_id":
 						case "rest_no_route":
 							throw errors.POST_NOT_FOUND()
-						case "rest_post_incorrect_password":
-							throw errors.POST_PASSWORD_INVALID()
 						default:
 							context.logger.error("Get post preview unhandled error", response.error, { id: result.id, code: response.error.code })
 							throw errors.INTERNAL_SERVER_ERROR()
@@ -54,8 +52,6 @@ export const POST_ROUTER_MAP = {
 					case "rest_post_invalid_id":
 					case "rest_no_route":
 						throw errors.POST_NOT_FOUND()
-					case "rest_post_incorrect_password":
-						throw errors.POST_PASSWORD_INVALID()
 					default:
 						context.logger.error("Get post unhandled error", response.error, { identifier, code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()
