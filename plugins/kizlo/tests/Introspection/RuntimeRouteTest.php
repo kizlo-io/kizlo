@@ -120,6 +120,49 @@ class RuntimeRouteTest extends IntrospectionTestCase
         $this->assertErrorContains($this->errors(), 'arrays are not supported');
     }
 
+    public function test_a_supplied_permission_callback_is_reported_and_the_route_stays_admin_only(): void
+    {
+        $this->setExpectedIncorrectUsage('kizlo_register_route');
+
+        kizlo_register_route([
+            'route'               => '/open',
+            'method'              => 'GET',
+            'callback'            => static fn() => ['ok' => true],
+            'permission_callback' => '__return_true',
+        ]);
+
+        $this->boot();
+
+        $this->assertArrayHasKey('/kizlo/v1/open', $this->server->get_routes());
+        $this->assertErrorContains($this->errors(), '"permission_callback" is not supported');
+
+        wp_set_current_user(0);
+
+        $this->assertSame(
+            403,
+            $this->dispatch('GET', '/kizlo/v1/open')->get_status(),
+            'The supplied permission callback must not have replaced the admin-only check.',
+        );
+    }
+
+    public function test_a_route_without_a_callback_is_reported_and_registers_nothing(): void
+    {
+        $this->setExpectedIncorrectUsage('kizlo_register_route');
+
+        kizlo_register_route([
+            'id'        => 'acme.widgets',
+            'operation' => 'create',
+            'route'     => '/widgets',
+            'method'    => 'POST',
+        ]);
+
+        $this->boot();
+
+        $this->assertArrayNotHasKey('/kizlo/v1/widgets', $this->server->get_routes());
+        $this->assertArrayNotHasKey('acme.widgets', $this->document()['apis']);
+        $this->assertErrorContains($this->errors(), '"callback" is required');
+    }
+
     public function test_a_runtime_route_contributes_the_same_shape_as_a_standalone_spec(): void
     {
         $this->registerWidgets();
