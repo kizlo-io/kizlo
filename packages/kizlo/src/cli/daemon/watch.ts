@@ -49,15 +49,42 @@ async function watch(cfg: ResolvedConfig, credentials: WordPressCredentials): Pr
 }
 
 /**
- * One pass of the WordPress poll. `cfg` covers an app's client next to its contract; `wordpressClientDir`
- * covers a workspace that has only the client. A project has one or the other, but both are refreshed
- * together so the plugin's PHP changing is picked up either way.
+ * Report one generation's pass under its own name. The poll refreshes two, and one message for both sent
+ * a client-only workspace looking for a WordPress service its project does not have.
  *
- * The returned function carries the last failure it reported, because most of what can fail here cannot
- * clear without the user acting — WordPress down, credentials wrong, a document that will not parse, an
+ * Each reporter carries the last failure it reported, because most of what can fail here cannot clear
+ * without the user acting — WordPress down, credentials wrong, a document that will not parse, an
  * introspection version this package does not speak — and repeating the same line every few seconds says
  * nothing the first one did not. A failure that reads differently is a different answer and is reported.
- * The state is per refresh rather than per process, so restarting the watcher reports afresh.
+ * The state is per reporter rather than per process, so restarting the watcher reports afresh, and one
+ * generation failing never silences the other.
+ */
+function reportGeneration(subject: "service" | "client"): (run: () => Promise<"generated" | "unchanged">) => Promise<void> {
+	let reported: string | undefined
+	return async (run) => {
+		try {
+			if ((await run()) === "generated") log.success(`WordPress ${subject} updated`)
+			// Only after a report, so the line lands for the user who fixed the cause and never for one
+			// who has been running cleanly all along.
+			if (reported !== undefined) {
+				reported = undefined
+				log.success(`Updating the WordPress ${subject} again`)
+			}
+		} catch (error) {
+			// Keyed on the message: every pass constructs its own error, so the objects never match.
+			const message = error instanceof Error ? error.message : String(error)
+			if (message === reported) return
+			reported = message
+			reportGenerationError(`Failed to update the WordPress ${subject}:`, error)
+		}
+	}
+}
+
+/**
+ * One pass of the WordPress poll. `cfg` covers an app's client next to its contract; `wordpressClientDir`
+ * covers a workspace that has only the client. A project has one or the other, but both are refreshed
+ * together so the plugin's PHP changing is picked up either way. Each is refreshed independently, so a
+ * service that cannot generate does not cost the pass its client.
  */
 export function createWordPressRefresh(
 	cwd: string,
@@ -65,26 +92,11 @@ export function createWordPressRefresh(
 	wordpressClientDir: string | undefined,
 	options: GenerateWordPressOptions,
 ): () => Promise<void> {
-	let reported: string | undefined
+	const service = reportGeneration("service")
+	const client = reportGeneration("client")
 	return async () => {
-		try {
-			if (cfg && (await generateWordPressOnce(cfg, options)) === "generated") log.success("WordPress service updated")
-			if (wordpressClientDir && (await generateWorkspaceClientOnce(cwd, wordpressClientDir, options)) === "generated") {
-				log.success("WordPress client updated")
-			}
-			// Only after a report, so the line lands for the user who fixed the cause and never for one
-			// who has been running cleanly all along.
-			if (reported !== undefined) {
-				reported = undefined
-				log.success("Updating the WordPress service again")
-			}
-		} catch (error) {
-			// Keyed on the message: every pass constructs its own error, so the objects never match.
-			const message = error instanceof Error ? error.message : String(error)
-			if (message === reported) return
-			reported = message
-			reportGenerationError("Failed to update the WordPress service:", error)
-		}
+		if (cfg) await service(() => generateWordPressOnce(cfg, options))
+		if (wordpressClientDir) await client(() => generateWorkspaceClientOnce(cwd, wordpressClientDir, options))
 	}
 }
 
