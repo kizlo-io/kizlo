@@ -38,7 +38,24 @@ class RouteRegistrar
             return;
         }
 
-        $method = self::method($args, 'kizlo_register_route', isset($args['id']) ? ['api_id' => (string) $args['id']] : []);
+        $location = ['path' => $route] + (isset($args['id']) ? ['api_id' => (string) $args['id']] : []);
+
+        if (!is_callable($args['callback'] ?? null)) {
+            self::fail('kizlo_register_route', $location + ['keyword' => 'callback'], '"callback" is required.');
+            return;
+        }
+
+        // Reported rather than honoured: the admin-only boundary is the whole
+        // point of the namespace, so the supplied one is overwritten regardless.
+        if (isset($args['permission_callback'])) {
+            self::fail(
+                'kizlo_register_route',
+                $location + ['keyword' => 'permission_callback'],
+                '"permission_callback" is not supported; every Kizlo route is admin-only and the check is attached for you.',
+            );
+        }
+
+        $method = self::method($args, 'kizlo_register_route', $location);
 
         if ($method === null) {
             return;
