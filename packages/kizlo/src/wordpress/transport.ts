@@ -134,7 +134,7 @@ export class WordPressTransport {
 	}
 
 	public async request<TData, TCode extends string = never>(input: WP_RequestInput): Promise<WP_Result<TData, TCode>> {
-		const [transportErr, response] = await this.fetch(input)
+		const [transportErr, response] = await this.#fetch(input)
 
 		if (transportErr) {
 			return {
@@ -190,7 +190,7 @@ export class WordPressTransport {
 				data: null,
 				status: response.status,
 				headers: response.headers,
-				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.snippet(String(body)) }),
+				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.#snippet(String(body)) }),
 			}
 		}
 
@@ -199,7 +199,7 @@ export class WordPressTransport {
 				data: null,
 				status: response.status,
 				headers: response.headers,
-				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.snippet(String(body)) }),
+				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.#snippet(String(body)) }),
 			}
 		}
 
@@ -211,11 +211,11 @@ export class WordPressTransport {
 	 * too: a body that will not serialize, a path that will not resolve. Those are reported the way a
 	 * refused connection is rather than rejecting, so no call through a generated endpoint throws.
 	 */
-	private async fetch(input: WP_RequestInput): Promise<TryCatchResult<Response, Error>> {
-		return tryCatch(this.send(input))
+	async #fetch(input: WP_RequestInput): Promise<TryCatchResult<Response, Error>> {
+		return tryCatch(this.#send(input))
 	}
 
-	private async send(input: WP_RequestInput): Promise<Response> {
+	async #send(input: WP_RequestInput): Promise<Response> {
 		const url = this.resolveUrl(input)
 
 		if (input.searchParams) {
@@ -225,7 +225,7 @@ export class WordPressTransport {
 
 		if (!url.searchParams.has("context")) url.searchParams.set("context", "edit")
 
-		const body = this.serializeBody(input.body, input.requestContentType)
+		const body = this.#serializeBody(input.body, input.requestContentType)
 		const isFormData = body instanceof FormData
 
 		const headers: Record<string, string> = {
@@ -239,17 +239,17 @@ export class WordPressTransport {
 		return fetch(url.toString(), {
 			headers,
 			method: input.method,
-			signal: this.resolveSignal(input),
+			signal: this.#resolveSignal(input),
 			...(hasBody && body !== undefined ? { body } : {}),
 		})
 	}
 
-	private serializeBody(body: unknown, contentType: WP_RequestContentType | undefined): BodyInit | undefined {
+	#serializeBody(body: unknown, contentType: WP_RequestContentType | undefined): BodyInit | undefined {
 		if (body === undefined || body === null) return undefined
 		if (body instanceof FormData || body instanceof URLSearchParams || typeof body === "string" || body instanceof Blob) return body
 		if (contentType === "multipart/form-data") {
 			const form = new FormData()
-			this.appendFormData(form, "", body)
+			this.#appendFormData(form, "", body)
 			return form
 		}
 		if (contentType === "application/x-www-form-urlencoded") {
@@ -258,7 +258,7 @@ export class WordPressTransport {
 		return JSON.stringify(body)
 	}
 
-	private appendFormData(form: FormData, prefix: string, value: unknown): void {
+	#appendFormData(form: FormData, prefix: string, value: unknown): void {
 		if (value === undefined || value === null) return
 		if (value instanceof Blob) {
 			form.append(prefix, value)
@@ -266,20 +266,20 @@ export class WordPressTransport {
 		}
 		if (Array.isArray(value)) {
 			value.forEach((item, index) => {
-				this.appendFormData(form, `${prefix}[${index}]`, item)
+				this.#appendFormData(form, `${prefix}[${index}]`, item)
 			})
 			return
 		}
 		if (typeof value === "object") {
 			for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-				this.appendFormData(form, prefix ? `${prefix}[${key}]` : key, child)
+				this.#appendFormData(form, prefix ? `${prefix}[${key}]` : key, child)
 			}
 			return
 		}
 		form.append(prefix, String(value))
 	}
 
-	private resolveSignal(input: WP_RequestInput): AbortSignal {
+	#resolveSignal(input: WP_RequestInput): AbortSignal {
 		const timeoutSignal = AbortSignal.timeout(milliseconds(input.timeout ?? this.defaultTimeout))
 		return input.signal ? AbortSignal.any([input.signal, timeoutSignal]) : timeoutSignal
 	}
@@ -290,7 +290,7 @@ export class WordPressTransport {
 		return new URL(`${baseSegment}${pathSegment}`, this.siteBase)
 	}
 
-	private snippet(text: string): string {
+	#snippet(text: string): string {
 		return text.length > UNEXPECTED_BODY_SNIPPET_LENGTH ? `${text.slice(0, UNEXPECTED_BODY_SNIPPET_LENGTH)}…` : text
 	}
 }

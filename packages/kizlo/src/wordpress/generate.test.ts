@@ -5,6 +5,7 @@ import ts from "typescript"
 import { describe, expect, test } from "vitest"
 import { generateWordPressClient } from "./generate"
 import { INTROSPECTION_FIXTURE } from "./introspection.fixture"
+import { WordPressTransport } from "./transport"
 
 /** Enough of `kizlo` to compile generated output against, without building the package. */
 const KIZLO_MODULE = `declare module "kizlo" {
@@ -280,13 +281,31 @@ describe("generateWordPressClient", () => {
 		).toThrow(/TypeScript name WP_AcmeFooBar/)
 	})
 
-	test("fails clearly when a namespace would shadow a transport method", () => {
-		expect(() =>
-			generateWordPressClient({
-				...INTROSPECTION_FIXTURE,
-				apis: { ...INTROSPECTION_FIXTURE.apis, get: INTROSPECTION_FIXTURE.apis["post-types.book"] as never },
-			}),
-		).toThrow(/namespace get would shadow the transport method/)
+	test.each(Object.getOwnPropertyNames(WordPressTransport.prototype).filter((name) => name !== "constructor"))(
+		"fails clearly when a namespace would shadow the transport method %s",
+		(method) => {
+			expect(() =>
+				generateWordPressClient({
+					...INTROSPECTION_FIXTURE,
+					apis: { ...INTROSPECTION_FIXTURE.apis, [method]: INTROSPECTION_FIXTURE.apis["post-types.book"] as never },
+				}),
+			).toThrow(`namespace ${method} would shadow the transport method`)
+		},
+	)
+
+	test("derives the guard when the transport gains a public method", () => {
+		Object.defineProperty(WordPressTransport.prototype, "futureMethod", { configurable: true, value() {} })
+
+		try {
+			expect(() =>
+				generateWordPressClient({
+					...INTROSPECTION_FIXTURE,
+					apis: { ...INTROSPECTION_FIXTURE.apis, futureMethod: INTROSPECTION_FIXTURE.apis["post-types.book"] as never },
+				}),
+			).toThrow(/namespace futureMethod would shadow the transport method/)
+		} finally {
+			Reflect.deleteProperty(WordPressTransport.prototype, "futureMethod")
+		}
 	})
 
 	test("fails clearly when two operation names differ only in their separators", () => {
