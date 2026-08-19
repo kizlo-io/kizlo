@@ -86,7 +86,7 @@ export const PRODUCT_ROUTER = {
 		},
 		async ({ context, errors, input }) => {
 			const searchParams = serializeProductListInput(input.query)
-			const response = await context.wordpress.woocommerce.store.products.collection_data({
+			const response = await context.wordpress.woocommerce.store.products.collectionData({
 				...searchParams,
 				calculate_price_range: true,
 				calculate_rating_counts: input.query?.ratingFilters,

@@ -12663,7 +12663,7 @@ export const endpoints = {
 			/**
 			 * List one collection page of URLs
 			 */
-			list_urls: wpEndpoint<WP_SeoSitemapsListUrlsEndpointInput, WP_SeoSitemapsListUrlsEndpointResult>({ namespace: "kizlo/v1", path: "/seo/sitemaps/{type}/{key}", method: "GET", pathParameters: ["key", "type"], responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+			listUrls: wpEndpoint<WP_SeoSitemapsListUrlsEndpointInput, WP_SeoSitemapsListUrlsEndpointResult>({ namespace: "kizlo/v1", path: "/seo/sitemaps/{type}/{key}", method: "GET", pathParameters: ["key", "type"], responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 			/**
 			 * Retrieve the index, or a collection that has no key
 			 */
@@ -12721,11 +12721,11 @@ export const endpoints = {
 			/**
 			 * Delete the next batch of entries
 			 */
-			process_delete: wpEndpoint<WP_SettingsPostTypesProcessDeleteEndpointInput, WP_SettingsPostTypesProcessDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/post_types/{slug}/delete/process", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+			processDelete: wpEndpoint<WP_SettingsPostTypesProcessDeleteEndpointInput, WP_SettingsPostTypesProcessDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/post_types/{slug}/delete/process", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 			/**
 			 * Requeue the entries that failed to delete
 			 */
-			retry_delete: wpEndpoint<WP_SettingsPostTypesRetryDeleteEndpointInput, WP_SettingsPostTypesRetryDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/post_types/{slug}/delete/retry", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+			retryDelete: wpEndpoint<WP_SettingsPostTypesRetryDeleteEndpointInput, WP_SettingsPostTypesRetryDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/post_types/{slug}/delete/retry", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 			/**
 			 * Update a post type
 			 */
@@ -12757,11 +12757,11 @@ export const endpoints = {
 			/**
 			 * Delete the next batch of terms
 			 */
-			process_delete: wpEndpoint<WP_SettingsTaxonomiesProcessDeleteEndpointInput, WP_SettingsTaxonomiesProcessDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/taxonomies/{slug}/delete/process", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+			processDelete: wpEndpoint<WP_SettingsTaxonomiesProcessDeleteEndpointInput, WP_SettingsTaxonomiesProcessDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/taxonomies/{slug}/delete/process", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 			/**
 			 * Requeue the terms that failed to delete
 			 */
-			retry_delete: wpEndpoint<WP_SettingsTaxonomiesRetryDeleteEndpointInput, WP_SettingsTaxonomiesRetryDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/taxonomies/{slug}/delete/retry", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+			retryDelete: wpEndpoint<WP_SettingsTaxonomiesRetryDeleteEndpointInput, WP_SettingsTaxonomiesRetryDeleteEndpointResult>({ namespace: "kizlo/v1", path: "/settings/taxonomies/{slug}/delete/retry", method: "POST", pathParameters: ["slug"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 			/**
 			 * Update a taxonomy
 			 */
@@ -12938,7 +12938,7 @@ export const endpoints = {
 				/**
 				 * Reduce or increase the stock an order holds
 				 */
-				manage_stock: wpEndpoint<WP_WoocommerceKizloOrdersManageStockEndpointInput, WP_WoocommerceKizloOrdersManageStockEndpointResult>({ namespace: "kizlo/v1", path: "/orders/{order_id}/stock", method: "POST", pathParameters: ["order_id"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json", "404": "application/json", "409": "application/json" } }),
+				manageStock: wpEndpoint<WP_WoocommerceKizloOrdersManageStockEndpointInput, WP_WoocommerceKizloOrdersManageStockEndpointResult>({ namespace: "kizlo/v1", path: "/orders/{order_id}/stock", method: "POST", pathParameters: ["order_id"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json", "404": "application/json", "409": "application/json" } }),
 			},
 		},
 		products: {
@@ -12968,11 +12968,11 @@ export const endpoints = {
 				/**
 				 * Add an item to the cart
 				 */
-				add_item: wpEndpoint<WP_WoocommerceStoreCartAddItemEndpointInput, WP_WoocommerceStoreCartAddItemEndpointResult>({ namespace: "wc/store/v1", path: "/cart/add-item", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "201": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				addItem: wpEndpoint<WP_WoocommerceStoreCartAddItemEndpointInput, WP_WoocommerceStoreCartAddItemEndpointResult>({ namespace: "wc/store/v1", path: "/cart/add-item", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "201": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * Apply a coupon to the cart
 				 */
-				apply_coupon: wpEndpoint<WP_WoocommerceStoreCartApplyCouponEndpointInput, WP_WoocommerceStoreCartApplyCouponEndpointResult>({ namespace: "wc/store/v1", path: "/cart/apply-coupon", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				applyCoupon: wpEndpoint<WP_WoocommerceStoreCartApplyCouponEndpointInput, WP_WoocommerceStoreCartApplyCouponEndpointResult>({ namespace: "wc/store/v1", path: "/cart/apply-coupon", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * Retrieve the cart
 				 */
@@ -12980,23 +12980,23 @@ export const endpoints = {
 				/**
 				 * Remove a coupon from the cart
 				 */
-				remove_coupon: wpEndpoint<WP_WoocommerceStoreCartRemoveCouponEndpointInput, WP_WoocommerceStoreCartRemoveCouponEndpointResult>({ namespace: "wc/store/v1", path: "/cart/remove-coupon", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				removeCoupon: wpEndpoint<WP_WoocommerceStoreCartRemoveCouponEndpointInput, WP_WoocommerceStoreCartRemoveCouponEndpointResult>({ namespace: "wc/store/v1", path: "/cart/remove-coupon", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * Remove an item from the cart
 				 */
-				remove_item: wpEndpoint<WP_WoocommerceStoreCartRemoveItemEndpointInput, WP_WoocommerceStoreCartRemoveItemEndpointResult>({ namespace: "wc/store/v1", path: "/cart/remove-item", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				removeItem: wpEndpoint<WP_WoocommerceStoreCartRemoveItemEndpointInput, WP_WoocommerceStoreCartRemoveItemEndpointResult>({ namespace: "wc/store/v1", path: "/cart/remove-item", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * Choose a shipping rate for a package
 				 */
-				select_shipping_rate: wpEndpoint<WP_WoocommerceStoreCartSelectShippingRateEndpointInput, WP_WoocommerceStoreCartSelectShippingRateEndpointResult>({ namespace: "wc/store/v1", path: "/cart/select-shipping-rate", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				selectShippingRate: wpEndpoint<WP_WoocommerceStoreCartSelectShippingRateEndpointInput, WP_WoocommerceStoreCartSelectShippingRateEndpointResult>({ namespace: "wc/store/v1", path: "/cart/select-shipping-rate", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * Set the billing and shipping addresses on the cart
 				 */
-				update_customer: wpEndpoint<WP_WoocommerceStoreCartUpdateCustomerEndpointInput, WP_WoocommerceStoreCartUpdateCustomerEndpointResult>({ namespace: "wc/store/v1", path: "/cart/update-customer", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				updateCustomer: wpEndpoint<WP_WoocommerceStoreCartUpdateCustomerEndpointInput, WP_WoocommerceStoreCartUpdateCustomerEndpointResult>({ namespace: "wc/store/v1", path: "/cart/update-customer", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * Change the quantity of a cart item
 				 */
-				update_item: wpEndpoint<WP_WoocommerceStoreCartUpdateItemEndpointInput, WP_WoocommerceStoreCartUpdateItemEndpointResult>({ namespace: "wc/store/v1", path: "/cart/update-item", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				updateItem: wpEndpoint<WP_WoocommerceStoreCartUpdateItemEndpointInput, WP_WoocommerceStoreCartUpdateItemEndpointResult>({ namespace: "wc/store/v1", path: "/cart/update-item", method: "POST", pathParameters: [], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 			},
 			checkout: {
 				/**
@@ -13010,7 +13010,7 @@ export const endpoints = {
 				/**
 				 * The retry path for an order whose first payment attempt failed. Verified by the order key rather than the cart session.
 				 */
-				process_order: wpEndpoint<WP_WoocommerceStoreCheckoutProcessOrderEndpointInput, WP_WoocommerceStoreCheckoutProcessOrderEndpointResult>({ namespace: "wc/store/v1", path: "/checkout/{id}", method: "POST", pathParameters: ["id"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				processOrder: wpEndpoint<WP_WoocommerceStoreCheckoutProcessOrderEndpointInput, WP_WoocommerceStoreCheckoutProcessOrderEndpointResult>({ namespace: "wc/store/v1", path: "/checkout/{id}", method: "POST", pathParameters: ["id"], requestContentType: "application/json", responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * Per-field validation failures arrive inside `data.details` under a single `rest_invalid_param`, not as the top-level error code. The cart validation errors only fire when `__experimental_calc_totals` is set.
 				 */
@@ -13020,7 +13020,7 @@ export const endpoints = {
 				/**
 				 * Takes the same filters as the product list and answers with counts across the whole matching collection rather than a page of it.
 				 */
-				collection_data: wpEndpoint<WP_WoocommerceStoreProductsCollectionDataEndpointInput, WP_WoocommerceStoreProductsCollectionDataEndpointResult>({ namespace: "wc/store/v1", path: "/products/collection-data", method: "GET", pathParameters: [], responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
+				collectionData: wpEndpoint<WP_WoocommerceStoreProductsCollectionDataEndpointInput, WP_WoocommerceStoreProductsCollectionDataEndpointResult>({ namespace: "wc/store/v1", path: "/products/collection-data", method: "GET", pathParameters: [], responseContentTypes: { "200": "application/json", "400": "application/json", "401": "application/json", "403": "application/json" } }),
 				/**
 				 * List published products
 				 */

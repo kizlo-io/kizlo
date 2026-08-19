@@ -249,6 +249,24 @@ describe("generateWordPressClient", () => {
 		).toEqual([])
 	})
 
+	test("camelizes an operation name, so one call expression reads one way throughout", () => {
+		const client = generateWordPressClient(INTROSPECTION_FIXTURE)
+
+		expect(client).toContain("restoreRevision: wpEndpoint<WP_PostTypesBookRestoreRevisionEndpointInput,")
+		expect(client).not.toContain("restore_revision")
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": client,
+				"usage.ts": `import type { WordPressClient } from "./wordpress"
+				declare const wordpress: WordPressClient
+				wordpress.postTypes.book.restoreRevision({ identifier: "dune", revision: 3 })
+				// @ts-expect-error the name as declared is not the name the client publishes
+				wordpress.postTypes.book.restore_revision({ identifier: "dune", revision: 3 })`,
+			}),
+		).toEqual([])
+	})
+
 	test("fails clearly when different schema IDs normalize to the same TypeScript name", () => {
 		expect(() =>
 			generateWordPressClient({
@@ -269,5 +287,32 @@ describe("generateWordPressClient", () => {
 				apis: { ...INTROSPECTION_FIXTURE.apis, get: INTROSPECTION_FIXTURE.apis["post-types.book"] as never },
 			}),
 		).toThrow(/namespace get would shadow the transport method/)
+	})
+
+	test("fails clearly when two operation names differ only in their separators", () => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		const operations = document.apis["post-types.book"]?.paths["/post-types/book/{identifier}"]
+		if (!operations?.restore_revision) throw new Error("Fixture is missing post-types.book.restore_revision")
+
+		operations.restoreRevision = operations.restore_revision
+
+		expect(() => generateWordPressClient(document)).toThrow(
+			/client member postTypes\.book\.restoreRevision is already claimed by operation/,
+		)
+	})
+
+	test("fails clearly when a namespace claims the member an operation needs", () => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		const retrieve = document.apis["post-types.book"]?.paths["/post-types/book/{identifier}"]?.retrieve
+		if (!retrieve) throw new Error("Fixture is missing post-types.book.retrieve")
+
+		document.apis["post-types.book.restore-revision"] = {
+			namespace: "kizlo/v1",
+			paths: { "/post-types/book/{identifier}/revisions": { list: retrieve } },
+		}
+
+		expect(() => generateWordPressClient(document)).toThrow(
+			/Cannot generate post-types\.book\.restore_revision: client member postTypes\.book\.restoreRevision is already claimed by a namespace/,
+		)
 	})
 })

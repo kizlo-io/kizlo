@@ -175,7 +175,7 @@ export const CHECKOUT_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input, errors }) => {
-			const response = await context.wordpress.woocommerce.store.checkout.process_order(
+			const response = await context.wordpress.woocommerce.store.checkout.processOrder(
 				{
 					key: input.body.key,
 					id: input.params.orderId,

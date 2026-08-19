@@ -119,7 +119,7 @@ export const SEO_ROUTER_MAP = {
 			const response =
 				input.type === "author"
 					? await context.wordpress.seo.sitemaps.retrieve({ type: "author", page })
-					: await context.wordpress.seo.sitemaps.list_urls({ type: input.type, key: input.key, page })
+					: await context.wordpress.seo.sitemaps.listUrls({ type: input.type, key: input.key, page })
 
 			if (response.error) {
 				context.logger.error("List sitemap urls unhandled error", response.error)

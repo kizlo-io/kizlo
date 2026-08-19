@@ -9,6 +9,6 @@ export type WPK_RobotRule = WPK_Robots["rules"][number]
 
 export type WPK_Sitemap = WP_EndpointData<"seo.sitemaps.list">[number]
 
-export type WPK_SitemapUrl = WP_EndpointData<"seo.sitemaps.list_urls">[number]
+export type WPK_SitemapUrl = WP_EndpointData<"seo.sitemaps.listUrls">[number]
 
 export type WPK_SitemapUrlImage = WPK_SitemapUrl["images"][number]

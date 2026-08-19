@@ -15,4 +15,4 @@ export type WCK_Checkout = WP_EndpointData<"woocommerce.store.checkout.get">
  * minus what only a draft has, so the two are close enough to confuse and far enough apart that one
  * type would be wrong for the other.
  */
-export type WCK_CheckoutOrder = WP_EndpointData<"woocommerce.store.checkout.process_order">
+export type WCK_CheckoutOrder = WP_EndpointData<"woocommerce.store.checkout.processOrder">
