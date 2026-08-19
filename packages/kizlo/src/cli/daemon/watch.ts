@@ -4,7 +4,13 @@ import { resolveWordPressConnection } from "../../kizlo"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
 import { type ResolvedConfig, resolveConfig, resolveWordPressClientDir } from "./config"
-import { generateOnce, generateWordPressOnce, generateWorkspaceClientOnce, reportGenerationError } from "./generate"
+import {
+	type GenerateWordPressOptions,
+	generateOnce,
+	generateWordPressOnce,
+	generateWorkspaceClientOnce,
+	reportGenerationError,
+} from "./generate"
 import { acquire, isLocked, lockPath, release } from "./lock"
 import { log } from "./logger"
 
@@ -43,30 +49,60 @@ async function watch(cfg: ResolvedConfig, credentials: WordPressCredentials): Pr
 }
 
 /**
- * Poll WordPress for route changes. `cfg` covers an app's client next to its contract; `wordpressClientDir`
- * covers a workspace that has only the client. A project has one or the other, but both are polled on
- * the same timer so the plugin's PHP changing is picked up either way.
+ * One pass of the WordPress poll. `cfg` covers an app's client next to its contract; `wordpressClientDir`
+ * covers a workspace that has only the client. A project has one or the other, but both are refreshed
+ * together so the plugin's PHP changing is picked up either way.
+ *
+ * The returned function carries the last failure it reported, because most of what can fail here cannot
+ * clear without the user acting — WordPress down, credentials wrong, a document that will not parse, an
+ * introspection version this package does not speak — and repeating the same line every few seconds says
+ * nothing the first one did not. A failure that reads differently is a different answer and is reported.
+ * The state is per refresh rather than per process, so restarting the watcher reports afresh.
  */
+export function createWordPressRefresh(
+	cwd: string,
+	cfg: ResolvedConfig | undefined,
+	wordpressClientDir: string | undefined,
+	options: GenerateWordPressOptions,
+): () => Promise<void> {
+	let reported: string | undefined
+	return async () => {
+		try {
+			if (cfg && (await generateWordPressOnce(cfg, options)) === "generated") log.success("WordPress service updated")
+			if (wordpressClientDir && (await generateWorkspaceClientOnce(cwd, wordpressClientDir, options)) === "generated") {
+				log.success("WordPress client updated")
+			}
+			// Only after a report, so the line lands for the user who fixed the cause and never for one
+			// who has been running cleanly all along.
+			if (reported !== undefined) {
+				reported = undefined
+				log.success("Updating the WordPress service again")
+			}
+		} catch (error) {
+			// Keyed on the message: every pass constructs its own error, so the objects never match.
+			const message = error instanceof Error ? error.message : String(error)
+			if (message === reported) return
+			reported = message
+			reportGenerationError("Failed to update the WordPress service:", error)
+		}
+	}
+}
+
+/** Run {@link createWordPressRefresh} on a timer, skipping a tick while the previous one is still going. */
 function refreshWordPress(
 	cwd: string,
 	cfg: ResolvedConfig | undefined,
 	wordpressClientDir: string | undefined,
 	credentials: WordPressCredentials,
 ): NodeJS.Timeout {
+	const refresh = createWordPressRefresh(cwd, cfg, wordpressClientDir, { credentials })
 	let refreshing = false
-	const timer = setInterval(async () => {
+	const timer = setInterval(() => {
 		if (refreshing) return
 		refreshing = true
-		try {
-			if (cfg && (await generateWordPressOnce(cfg, { credentials })) === "generated") log.success("WordPress service updated")
-			if (wordpressClientDir && (await generateWorkspaceClientOnce(cwd, wordpressClientDir, { credentials })) === "generated") {
-				log.success("WordPress client updated")
-			}
-		} catch (error) {
-			reportGenerationError("Failed to update the WordPress service:", error)
-		} finally {
+		void refresh().finally(() => {
 			refreshing = false
-		}
+		})
 	}, 3_000)
 	timer.unref()
 	return timer
