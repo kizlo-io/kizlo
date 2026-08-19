@@ -167,7 +167,7 @@ final class Spec
         return is_string($id) && preg_match('/^' . self::SEGMENT . '(?:\.' . self::SEGMENT . ')*$/', $id) === 1;
     }
 
-    /** Operation names become generated client method names. */
+    /** Operation names are declared in snake_case and reach the generated client camelized. */
     public static function isValidOperationName(mixed $name): bool
     {
         return is_string($name) && preg_match('/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/', $name) === 1;

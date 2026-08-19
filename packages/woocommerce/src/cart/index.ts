@@ -78,7 +78,7 @@ export const CART_ROUTER = {
 				postcode: billing.postcode ?? connInfo?.postcode ?? "",
 			}
 
-			const response = await context.wordpress.woocommerce.store.cart.update_customer(
+			const response = await context.wordpress.woocommerce.store.cart.updateCustomer(
 				{
 					billing_address: { ...address, email: billing.email ?? "" },
 					...(input.shipping && {
@@ -123,7 +123,7 @@ export const CART_ROUTER = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input: { body }, errors }) => {
-			const response = await context.wordpress.woocommerce.store.cart.select_shipping_rate(
+			const response = await context.wordpress.woocommerce.store.cart.selectShippingRate(
 				{ rate_id: body.rateId, package_id: body.packageId },
 				{ headers: context.sessionHeaders },
 			)
@@ -156,7 +156,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { body: input }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.add_item(
+				const response = await context.wordpress.woocommerce.store.cart.addItem(
 					{
 						id: input.productId,
 						quantity: input.quantity,
@@ -207,7 +207,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { params, body }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.update_item(
+				const response = await context.wordpress.woocommerce.store.cart.updateItem(
 					{ key: params.key, quantity: body.quantity },
 					{ headers: context.sessionHeaders },
 				)
@@ -245,10 +245,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { params }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.remove_item(
-					{ key: params.key },
-					{ headers: context.sessionHeaders },
-				)
+				const response = await context.wordpress.woocommerce.store.cart.removeItem({ key: params.key }, { headers: context.sessionHeaders })
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -277,7 +274,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input: { body }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.apply_coupon(
+				const response = await context.wordpress.woocommerce.store.cart.applyCoupon(
 					{ code: body.code },
 					{ headers: context.sessionHeaders },
 				)
@@ -309,7 +306,7 @@ export const CART_ROUTER = {
 				middlewares: [sessionMiddleware()],
 			},
 			async ({ context, input, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.remove_coupon(
+				const response = await context.wordpress.woocommerce.store.cart.removeCoupon(
 					{ code: input.params.code },
 					{ headers: context.sessionHeaders },
 				)

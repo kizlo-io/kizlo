@@ -179,7 +179,7 @@ test("cart.coupons.apply maps an unknown coupon to its Kizlo error", async () =>
 
 /**
  * The plugin marks the cart mutation arguments WooCommerce registers as optional and then reads in
- * the handler anyway, which is what stops `remove_item()` compiling. Nothing in TypeScript can check
+ * the handler anyway, which is what stops `removeItem()` compiling. Nothing in TypeScript can check
  * that claim against WooCommerce, so these send each mutation without it and assert the failure. A
  * WooCommerce release that grows a default for one of them turns its case green in a way that reads
  * as an overlay to drop rather than a test to fix.
@@ -196,85 +196,85 @@ function session() {
 	return { headers: { "X-Kizlo-User-Id": String(getTestCredentials().users.user.id) } }
 }
 
-test("cart.add_item without a product cannot resolve one", async () => {
-	const response = await store().cart.add_item({} as { id: number }, session())
+test("cart.addItem without a product cannot resolve one", async () => {
+	const response = await store().cart.addItem({} as { id: number }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_product")
 })
 
-test("cart.remove_item without a key matches no cart item", async () => {
+test("cart.removeItem without a key matches no cart item", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.remove_item({} as { key: string }, session())
+	const response = await store().cart.removeItem({} as { key: string }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_key")
 })
 
-test("cart.update_item without a key changes nothing it can name", async () => {
+test("cart.updateItem without a key changes nothing it can name", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.update_item({ quantity: 3 } as { key: string; quantity: number }, session())
+	const response = await store().cart.updateItem({ quantity: 3 } as { key: string; quantity: number }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_key")
 })
 
-test("cart.apply_coupon without a code applies no coupon", async () => {
+test("cart.applyCoupon without a code applies no coupon", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.apply_coupon({} as { code: string }, session())
+	const response = await store().cart.applyCoupon({} as { code: string }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_coupon_error")
 })
 
-test("cart.remove_coupon without a code removes no coupon", async () => {
+test("cart.removeCoupon without a code removes no coupon", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.remove_coupon({} as { code: string }, session())
+	const response = await store().cart.removeCoupon({} as { code: string }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_coupon_error")
 })
 
 /**
- * The other half of the overlay: `add_item` takes a quantity and a variation and is marked as
+ * The other half of the overlay: `addItem` takes a quantity and a variation and is marked as
  * needing neither, because WooCommerce fills them. This is the call that would break if the overlay
  * were widened to every argument the handler reads.
  */
-test("cart.add_item without a quantity takes the product's minimum", async () => {
+test("cart.addItem without a quantity takes the product's minimum", async () => {
 	await emptyCart()
-	const response = await store().cart.add_item({ id: productId }, session())
+	const response = await store().cart.addItem({ id: productId }, session())
 
 	expect(response.error).toBeNull()
 	expect(response.data?.items_count).toBe(1)
 })
 
 /**
- * `add_item` is the one cart mutation WooCommerce answers `201` to, from `set_status( 201 )` in
+ * `addItem` is the one cart mutation WooCommerce answers `201` to, from `set_status( 201 )` in
  * `CartAddItem::get_route_post_response()`, and the contract declared `200` for all eight until
  * KIZ-106. A status is a discriminant a caller can narrow on, so it has to be the one the server
  * sends rather than the one the loop that built the declaration found convenient. The second call
  * is the other half: it pins a mutation that really is `200`, so a fix applied to the whole loop
  * rather than to the one operation fails here.
  */
-test("cart.add_item reports the item it created with 201", async () => {
+test("cart.addItem reports the item it created with 201", async () => {
 	await emptyCart()
-	const response = await store().cart.add_item({ id: productId, quantity: 1 }, session())
+	const response = await store().cart.addItem({ id: productId, quantity: 1 }, session())
 
 	expect(response.error).toBeNull()
 	expect(response.status).toBe(201)
 	expect(response.data?.items_count).toBe(1)
 })
 
-test("cart.update_item changes an item it did not create with 200", async () => {
+test("cart.updateItem changes an item it did not create with 200", async () => {
 	await emptyCart()
-	const added = await store().cart.add_item({ id: productId, quantity: 1 }, session())
+	const added = await store().cart.addItem({ id: productId, quantity: 1 }, session())
 	const key = added.data?.items[0]?.key
-	if (!key) throw new Error("cart.add_item returned no item to update.")
+	if (!key) throw new Error("cart.addItem returned no item to update.")
 
-	const response = await store().cart.update_item({ key, quantity: 2 }, session())
+	const response = await store().cart.updateItem({ key, quantity: 2 }, session())
 
 	expect(response.error).toBeNull()
 	expect(response.status).toBe(200)

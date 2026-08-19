@@ -282,6 +282,8 @@ interface WordPressEndpointEntry {
 	namespace: string
 	path: string
 	operationId: string
+	/** An operation is declared in snake_case, and reaches the client camelized like every path segment above it. */
+	member: string
 	operation: IntrospectionOperation
 }
 
@@ -305,7 +307,7 @@ function endpointTree(document: IntrospectionDocument): WordPressEndpointNode {
 		}
 		for (const [path, operations] of sortedEntries(api.paths)) {
 			for (const [operationId, operation] of sortedEntries(operations)) {
-				node.endpoints.push({ apiId, namespace: api.namespace, path, operationId, operation })
+				node.endpoints.push({ apiId, namespace: api.namespace, path, operationId, member: camel(operationId), operation })
 			}
 		}
 	}
@@ -317,7 +319,7 @@ function sortedChildren(node: WordPressEndpointNode): Array<[string, WordPressEn
 }
 
 function sortedEndpoints(node: WordPressEndpointNode): WordPressEndpointEntry[] {
-	return [...node.endpoints].sort((left, right) => left.operationId.localeCompare(right.operationId))
+	return [...node.endpoints].sort((left, right) => left.member.localeCompare(right.member))
 }
 
 function endpointDefinition(entry: WordPressEndpointEntry): WP_EndpointDefinition {
@@ -373,7 +375,7 @@ function renderEndpointNode(node: WordPressEndpointNode, indent: string): string
 		const result = endpointName(entry.apiId, entry.operationId, "EndpointResult")
 		const documentation = jsdoc(entry.operation.description ?? entry.operation.summary, entry.operation.deprecated, indent)
 		const definition = renderDefinition(endpointDefinition(entry))
-		entries.push(`${documentation}${indent}${property(entry.operationId)}: wpEndpoint<${input}, ${result}>(${definition}),`)
+		entries.push(`${documentation}${indent}${property(entry.member)}: wpEndpoint<${input}, ${result}>(${definition}),`)
 	}
 	if (entries.length === 0) return "{}"
 	return `{\n${entries.join("\n")}\n${indent.slice(0, -1)}}`
@@ -418,6 +420,28 @@ function assertUniqueGeneratedNames(document: IntrospectionDocument): void {
 	}
 }
 
+/**
+ * Namespaces and operations share one object at every level of the tree, and both reach it
+ * camelized, so two names differing only in their separators claim the same member. Generating them
+ * both would leave whichever came last as the only one a caller can reach.
+ */
+function assertUniqueClientMembers(node: WordPressEndpointNode, path: string[] = []): void {
+	const claimed = new Map<string, string>()
+	for (const [key, child] of node.children) {
+		claimed.set(key, "a namespace")
+		assertUniqueClientMembers(child, [...path, key])
+	}
+	for (const entry of sortedEndpoints(node)) {
+		const owner = claimed.get(entry.member)
+		if (owner) {
+			throw new Error(
+				`Cannot generate ${entry.apiId}.${entry.operationId}: client member ${[...path, entry.member].join(".")} is already claimed by ${owner}.`,
+			)
+		}
+		claimed.set(entry.member, `operation ${entry.operationId}`)
+	}
+}
+
 const RUNTIME_TYPES = ["WP_Failure", "WP_Success", "WP_TransportFailure"]
 
 const REGISTRY = `declare module "kizlo" {\n\tinterface WordPressClientRegistry {\n\t\tendpoints: typeof endpoints\n\t}\n}`
@@ -440,6 +464,8 @@ function generatedModule(hash: string, imports: string, body: string): string {
 }
 
 export function generateWordPressClient(document: IntrospectionDocument): string {
+	const tree = endpointTree(document)
+	assertUniqueClientMembers(tree)
 	assertUniqueGeneratedNames(document)
 	const names = new Map(Object.keys(document.schemas).map((id) => [id, schemaName(id)]))
 	const context = { names, schemas: new Map(Object.entries(document.schemas)) }
@@ -451,7 +477,6 @@ export function generateWordPressClient(document: IntrospectionDocument): string
 		}
 	}
 
-	const tree = endpointTree(document)
 	const body = declarations.join("\n\n")
 	const endpointBody = renderEndpointNode(tree, "\t")
 

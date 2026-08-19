@@ -8,8 +8,9 @@ attaches a permission check requiring the `manage_options` capability, so the ro
 authenticated administrators. Call it from your plugin. It's a global, so no import is needed.
 
 `method` accepts one HTTP method string. Arrays and the plural `methods` key are rejected. When a declaration opts
-into introspection with `id`, one operation becomes one generated client method. Register a separately named
-operation for each method when one path supports several methods.
+into introspection with `id`, one operation becomes one generated client method, camelized on the way out, so
+`bulk_delete` is called as `bulkDelete()`. Register a separately named operation for each method when one path
+supports several methods.
 
 ## Parameters
 
@@ -34,7 +35,7 @@ Set `id` to publish the route in `GET /kizlo/v1/introspect`:
 | Key | Type | Description |
 | --- | --- | --- |
 | `id` | `string` | API ID that groups related operations. |
-| `operation` | `string` | Operation name, such as `list`, `retrieve`, `create`, `update`, or `delete`. |
+| `operation` | `string` | Operation name in lowercase snake_case, such as `list`, `retrieve`, or `bulk_delete`. |
 | `input` | `array` | Request schema. Top-level properties become route arguments. |
 | `errors` | `string[]` | Handler-specific WordPress error codes the operation can return. |
 | `responses` | `array` | Status-keyed response contracts for success and error responses. |

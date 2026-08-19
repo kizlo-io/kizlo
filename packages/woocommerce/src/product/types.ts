@@ -17,7 +17,7 @@ export type WCK_Product = WP_EndpointData<"woocommerce.products.retrieve">
 export type WCSK_Product = WP_EndpointData<"woocommerce.store.products.list">[number]
 
 /** Collection counts, with the `kizlo` block the route interceptor adds. */
-export type WCSK_ProductCollectionData = WP_EndpointData<"woocommerce.store.products.collection_data">
+export type WCSK_ProductCollectionData = WP_EndpointData<"woocommerce.store.products.collectionData">
 
 export type WCSK_ProductCollectionDataTaxonomy = WCSK_ProductCollectionData["kizlo"]["taxonomy_counts"][number]
 

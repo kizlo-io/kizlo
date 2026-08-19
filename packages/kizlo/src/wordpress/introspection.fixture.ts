@@ -121,6 +121,23 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 							"404": { content_type: "application/json", body: { type: "object" } },
 						},
 					},
+					restore_revision: {
+						method: "POST",
+						summary: "Restore a book to one of its revisions",
+						errors: ["rest_not_found"],
+						input: {
+							type: "object",
+							content_type: "application/json",
+							properties: {
+								identifier: { type: "string", required: true, in: "path" },
+								revision: { type: "integer", required: true },
+							},
+						},
+						responses: {
+							"200": { content_type: "application/json", body: { $ref: "acme.book" } },
+							"404": { content_type: "application/json", body: { type: "object" } },
+						},
+					},
 				},
 			},
 		},
