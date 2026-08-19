@@ -102,12 +102,21 @@ class UserApi
         ];
     }
 
-    /** @return array<int, string> */
+    /**
+     * Shared by all three operations, because all three resolve the user the same
+     * way before they do anything else.
+     *
+     * None of the three declares a code core only raises from a
+     * `*_permissions_check()` method, for the reason {@see self::readUser()} gives.
+     * `rest_cannot_delete` survives that rule: `WP_REST_Users_Controller::delete_item()`
+     * raises it directly when `wp_delete_user()` fails.
+     *
+     * @return array<int, string>
+     */
     private static function retrieveErrors(): array
     {
         return [
             'invalid_field',
-            'rest_user_cannot_view',
             'rest_user_invalid_id',
             'user_not_found',
         ];
@@ -117,8 +126,6 @@ class UserApi
     private static function updateErrors(): array
     {
         return array_merge(self::retrieveErrors(), [
-            'rest_cannot_edit',
-            'rest_cannot_edit_roles',
             'rest_user_invalid_argument',
             'rest_user_invalid_email',
             'rest_user_invalid_password',
@@ -135,7 +142,6 @@ class UserApi
             'cannot_delete_self',
             'rest_cannot_delete',
             'rest_trash_not_supported',
-            'rest_user_cannot_delete',
             'rest_user_invalid_reassign',
         ]);
     }

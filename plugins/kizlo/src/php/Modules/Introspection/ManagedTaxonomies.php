@@ -199,7 +199,14 @@ class ManagedTaxonomies
         ];
     }
 
-    /** @return array<int, string> */
+    /**
+     * The same rule as {@see ManagedPostTypes::listErrors()}, against the term
+     * controller: `rest_cannot_create` and `rest_cannot_update` have no raise site
+     * outside a permission check, so they are not declared. `rest_cannot_delete`
+     * does, in `delete_item()` when `wp_delete_term()` fails, so it is.
+     *
+     * @return array<int, string>
+     */
     private static function listErrors(): array
     {
         return [
@@ -224,7 +231,6 @@ class ManagedTaxonomies
         return [
             'invalid_taxonomy',
             'kizlo_custom_fields_invalid',
-            'rest_cannot_create',
             'rest_taxonomy_not_hierarchical',
             'rest_term_invalid',
         ];
@@ -236,7 +242,6 @@ class ManagedTaxonomies
         return [
             'invalid_taxonomy',
             'kizlo_custom_fields_invalid',
-            'rest_cannot_update',
             'rest_taxonomy_not_hierarchical',
             'rest_term_invalid',
             'term_not_found',

@@ -230,7 +230,25 @@ class ManagedPostTypes
         return $routes;
     }
 
-    /** @return array<int, string> */
+    /**
+     * What a managed operation can actually answer.
+     *
+     * Core raises most of its `rest_cannot_*` codes from `*_permissions_check()`
+     * methods, and none of those run here: the route carries Kizlo's own
+     * `manage_options` callback and {@see \Kizlo\Modules\PostType\PostTypeApi}
+     * then calls the controller's data method directly. A code with no raise site
+     * outside a permission check is therefore not declared, and
+     * {@see \Kizlo\Tests\Introspection\PermissionErrorTest} sweeps for any that
+     * come back.
+     *
+     * Reading like a permission error is not the same as being one.
+     * `rest_forbidden_status` comes from the `status` sanitizer, which the derived
+     * arguments carry onto the route; `rest_cannot_publish` comes from
+     * `handle_status_param()`; `rest_user_cannot_delete_post` comes from
+     * `delete_item()` itself. All three stay.
+     *
+     * @return array<int, string>
+     */
     private static function listErrors(): array
     {
         return [
@@ -248,7 +266,6 @@ class ManagedPostTypes
         return [
             'invalid_post_type',
             'post_type_not_found',
-            'rest_post_incorrect_password',
             'rest_post_invalid_id',
         ];
     }
@@ -259,10 +276,6 @@ class ManagedPostTypes
         $errors = [
             'invalid_post_type',
             'kizlo_custom_fields_invalid',
-            'rest_cannot_assign_sticky',
-            'rest_cannot_assign_term',
-            'rest_cannot_create',
-            'rest_cannot_edit_others',
             'rest_cannot_publish',
             'rest_invalid_author',
             'rest_invalid_featured_media',
@@ -293,10 +306,6 @@ class ManagedPostTypes
             'invalid_post_type',
             'kizlo_custom_fields_invalid',
             'post_type_not_found',
-            'rest_cannot_assign_sticky',
-            'rest_cannot_assign_term',
-            'rest_cannot_edit',
-            'rest_cannot_edit_others',
             'rest_cannot_publish',
             'rest_invalid_author',
             'rest_invalid_featured_media',
