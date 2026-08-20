@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Reject API IDs that collide with generated client members

@@ -573,6 +573,35 @@ class RouteContractTest extends IntrospectionTestCase
         $this->assertArrayHasKey('list', $apis['acme.gadgets']['paths']['/gadgets']);
     }
 
+    /**
+     * @dataProvider nestedApiCollisionProvider
+     * @param array<string, mixed> $first
+     * @param array<string, mixed> $second
+     */
+    public function test_an_operation_cannot_claim_a_nested_api_member(array $first, array $second, string $winner, string $loser): void
+    {
+        $this->registerRouteSpec($this->operation($first));
+        $this->registerRouteSpec($this->operation($second));
+
+        $document = $this->document();
+
+        $this->assertErrorContains($document['diagnostics'], 'generated client member');
+        $this->assertArrayHasKey($winner, $document['apis']);
+        $this->assertArrayNotHasKey($loser, $document['apis']);
+    }
+
+    /** @return array<string, array{array<string, string>, array<string, string>, string, string}> */
+    public function nestedApiCollisionProvider(): array
+    {
+        $parent = ['id' => 'acme.thing', 'operation' => 'sub', 'route' => '/thing'];
+        $child  = ['id' => 'acme.thing.sub', 'operation' => 'get', 'route' => '/thing/sub'];
+
+        return [
+            'operation registered first' => [$parent, $child, 'acme.thing', 'acme.thing.sub'],
+            'nested API registered first' => [$child, $parent, 'acme.thing.sub', 'acme.thing'],
+        ];
+    }
+
     public function test_one_operation_name_cannot_be_split_across_methods(): void
     {
         $this->registerRouteSpec($this->operation(['operation' => 'update', 'method' => 'PUT']));
