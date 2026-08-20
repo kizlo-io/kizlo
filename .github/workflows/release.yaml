@@ -13,7 +13,7 @@ jobs:
   release:
     name: Release
     timeout-minutes: 10
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     permissions:
       id-token: write
