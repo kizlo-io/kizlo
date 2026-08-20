@@ -167,6 +167,15 @@ function renderType(schema: IntrospectionSchema, context: RenderContext, indent 
 	return withNullable(type || "unknown", schema)
 }
 
+/**
+ * Whether a named schema generates as an interface rather than a type alias, which is also the
+ * question of whether a child can name it in an `extends` clause. TypeScript extends an object
+ * type with statically known members and nothing else.
+ */
+function rendersAsInterface(schema: IntrospectionSchema | undefined): boolean {
+	return schema !== undefined && schema.type === "object" && !schema.nullable && !schema.anyOf && !schema.oneOf && !schema.$ref
+}
+
 function renderNamedSchema(id: string, schema: IntrospectionSchema, context: RenderContext): string {
 	const name = context.names.get(id) ?? schemaName(id)
 	const parents = schema.$extends ? (Array.isArray(schema.$extends) ? schema.$extends : [schema.$extends]) : []
@@ -177,8 +186,18 @@ function renderNamedSchema(id: string, schema: IntrospectionSchema, context: Ren
 			return `${documentation}export type ${name} = (${nonNullable}) | null`
 		}
 		const inherited = parents.map((parent) => context.names.get(parent) ?? schemaName(parent))
-		const extension = inherited.length ? ` extends ${inherited.join(", ")}` : ""
 		const body = renderObject({ ...schema, nullable: undefined }, context)
+
+		// A parent that generated as an alias, because it is nullable or a reference or a union, is
+		// still inheritable: an intersection states the same fields. `(T | null) & { own }` drops the
+		// null branch to `never`, leaving T's members beside this schema's own, which is what a child
+		// that did not declare itself nullable means. `extends` would be a compile error instead.
+		if (inherited.length && !parents.every((parent) => rendersAsInterface(context.schemas.get(parent)))) {
+			const own = body === UNDESCRIBED_OBJECT ? [] : [body]
+			return `${documentation}export type ${name} = ${[...inherited, ...own].join(" & ")}`
+		}
+
+		const extension = inherited.length ? ` extends ${inherited.join(", ")}` : ""
 		const declaration = body === UNDESCRIBED_OBJECT ? " {}" : ` ${body}`
 		return `${documentation}export interface ${name}${extension}${declaration}`
 	}
@@ -460,25 +479,45 @@ function kizloImports(body: string, hasEndpoints: boolean): string {
 		.join(", ")
 }
 
-function generatedModule(hash: string, imports: string, body: string): string {
-	return `${GENERATED_HEADER}// Introspection ${hash}\n\n${imports}\n\n${body}\n`
+/** Where one declaration landed in the generated source, and what produced it. */
+export interface GeneratedDeclaration {
+	/** The contribution to name in a message: `schema "acme.book"`. */
+	label: string
+	start: number
+	end: number
 }
 
-export function generateWordPressClient(document: IntrospectionDocument): string {
+/**
+ * The generated module and an index of it. A compiler diagnostic carries an offset and nothing
+ * else, so the index is what turns one back into the schema or endpoint whose declaration it
+ * landed in. {@link assertGeneratedClientCompiles} is the only reader.
+ */
+export interface GeneratedModule {
+	source: string
+	declarations: GeneratedDeclaration[]
+}
+
+const DECLARATION_SEPARATOR = "\n\n"
+
+export function generateWordPressModule(document: IntrospectionDocument): GeneratedModule {
 	const tree = endpointTree(document)
 	assertUniqueClientMembers(tree)
 	assertUniqueGeneratedNames(document)
 	const names = new Map(Object.keys(document.schemas).map((id) => [id, schemaName(id)]))
 	const context = { names, schemas: new Map(Object.entries(document.schemas)) }
-	const declarations = sortedEntries(document.schemas).map(([id, schema]) => renderNamedSchema(id, schema, context))
+	const rendered = sortedEntries(document.schemas).map(([id, schema]) => ({
+		label: `schema "${id}"`,
+		text: renderNamedSchema(id, schema, context),
+	}))
 	for (const [apiId, api] of sortedEntries(document.apis)) {
 		for (const [operationId, operation] of operationEntries(apiId, api)) {
-			declarations.push(renderInput(apiId, operationId, operation, context))
-			declarations.push(renderResult(apiId, operationId, operation, context))
+			const endpoint = `endpoint "${apiId}.${operationId}"`
+			rendered.push({ label: `${endpoint} input`, text: renderInput(apiId, operationId, operation, context) })
+			rendered.push({ label: `${endpoint} result`, text: renderResult(apiId, operationId, operation, context) })
 		}
 	}
 
-	const body = declarations.join("\n\n")
+	const body = rendered.map((declaration) => declaration.text).join(DECLARATION_SEPARATOR)
 	const endpointBody = renderEndpointNode(tree, "\t")
 
 	const moduleBody = [
@@ -486,7 +525,22 @@ export function generateWordPressClient(document: IntrospectionDocument): string
 		`export const endpoints = ${endpointBody}`,
 		`export type WordPressClient = WP_Client<typeof endpoints>`,
 		REGISTRY,
-	].join("\n\n")
+	].join(DECLARATION_SEPARATOR)
 
-	return generatedModule(document.hash, `import { ${kizloImports(moduleBody, endpointBody !== "{}")} } from "kizlo"`, moduleBody)
+	const imports = `import { ${kizloImports(moduleBody, endpointBody !== "{}")} } from "kizlo"`
+	// `moduleBody` opens with `body`, so the preamble's length is where the first declaration starts.
+	const preamble = `${GENERATED_HEADER}// Introspection ${document.hash}\n\n${imports}\n\n`
+
+	let cursor = preamble.length
+	const declarations = rendered.map(({ label, text }) => {
+		const start = cursor
+		cursor += text.length + DECLARATION_SEPARATOR.length
+		return { label, start, end: start + text.length }
+	})
+
+	return { source: `${preamble}${moduleBody}\n`, declarations }
+}
+
+export function generateWordPressClient(document: IntrospectionDocument): string {
+	return generateWordPressModule(document).source
 }
