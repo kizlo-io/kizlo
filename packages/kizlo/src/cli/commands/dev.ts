@@ -131,8 +131,8 @@ function updateWpEnv(cfg: ResolvedDevConfig, info: DevStackInfo): { siteSecret: 
  * The full fresh-install write goes through {@link updateWpEnv} instead; this covers the resume path it
  * skips. Returns true when it changed the file. The app still needs a restart to read the new value.
  */
-function syncLocalUrl(cfg: ResolvedDevConfig, url: string): boolean {
-	const envPath = join(cfg.configDir, ".env")
+export function syncLocalUrl(configDir: string, url: string): boolean {
+	const envPath = join(configDir, ".env")
 	if (!existsSync(envPath)) return false
 	const existing = readFileSync(envPath, "utf8")
 	if (readEnvValue(existing, "KIZLO_LOCAL_WP_URL") === url) return false
@@ -218,7 +218,7 @@ async function report(cfg: ResolvedDevConfig, creds: DevStackInfo, reloaded: boo
 					`Could not sync the site settings to WordPress (${sync.error}) — make sure the kizlo plugin is active, then set them from the Kizlo settings.`,
 				)
 		}
-	} else if (syncLocalUrl(cfg, creds.url)) {
+	} else if (syncLocalUrl(cfg.configDir, creds.url)) {
 		note("Updated .env WordPress URL to the current network address — restart your app to pick it up")
 	}
 	printSummary(creds)
