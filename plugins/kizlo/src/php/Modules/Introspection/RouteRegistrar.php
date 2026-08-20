@@ -38,7 +38,9 @@ class RouteRegistrar
             return;
         }
 
-        $location = ['path' => $route] + (isset($args['id']) ? ['api_id' => (string) $args['id']] : []);
+        $location = ['path' => $route]
+            + (isset($args['id']) ? ['api_id' => (string) $args['id']] : [])
+            + (is_string($args['operation'] ?? null) ? ['operation' => $args['operation']] : []);
 
         if (!is_callable($args['callback'] ?? null)) {
             self::fail('kizlo_register_route', $location + ['keyword' => 'callback'], '"callback" is required.');
@@ -158,7 +160,10 @@ class RouteRegistrar
             }
         }
 
-        $method = self::method($args, 'kizlo_register_route_spec', ['api_id' => $id]);
+        $location = ['api_id' => $id]
+            + (is_string($args['operation'] ?? null) ? ['operation' => $args['operation']] : []);
+
+        $method = self::method($args, 'kizlo_register_route_spec', $location);
 
         if ($method === null) {
             return;

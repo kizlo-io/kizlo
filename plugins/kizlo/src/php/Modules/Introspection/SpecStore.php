@@ -38,7 +38,7 @@ class SpecStore
     /** @var array<string, true> Fingerprints of entries registered from inside the plugin. */
     private static array $trusted = [];
 
-    /** @var array<int, array{location: array<string, string>, message: string}> */
+    /** @var array<string, array{location: array<string, string>, message: string}> */
     private static array $errors = [];
 
     /**
@@ -144,14 +144,20 @@ class SpecStore
     }
 
     /**
-     * Record a failure raised at registration time, so `/introspect` reports it
-     * alongside everything the registry finds rather than swallowing it.
+     * Record a failure raised outside the registry's own diagnostics bag, so
+     * `/introspect` reports it alongside everything the registry finds. A
+     * derivation runs on every build, so repeated location-message pairs are the
+     * same failure rather than new diagnostics.
      *
      * @param array<string, string> $location
      */
     public static function addError(array $location, string $message): void
     {
-        self::$errors[] = ['location' => $location, 'message' => $message];
+        ksort($location, SORT_STRING);
+
+        $error = ['location' => $location, 'message' => $message];
+
+        self::$errors[self::fingerprint('error', $error)] = $error;
     }
 
     /**

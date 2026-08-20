@@ -332,8 +332,13 @@ class DerivedParametersTest extends IntrospectionTestCase
             return $params;
         });
 
-        $this->assertArrayNotHasKey('acme_broken', $this->listProperties('post-types.post', '/post-types/post'));
-        $this->assertErrorContains($this->errors(), 'acme_broken');
+        $first  = $this->document();
+        $second = $this->document();
+
+        $this->assertArrayNotHasKey('acme_broken', $first['apis']['post-types.post']['paths']['/post-types/post']['list']['input']['properties']);
+        $this->assertErrorContains($first['diagnostics'], 'acme_broken');
+        $this->assertSame($first['diagnostics'], $second['diagnostics']);
+        $this->assertSame($first['hash'], $second['hash']);
 
         $this->boot();
 
