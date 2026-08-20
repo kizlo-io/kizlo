@@ -82,6 +82,23 @@ final class StoreApiRoutes
         'woocommerce_rest_unknown_server_error',
     ];
 
+    /**
+     * Arguments cart handlers require even though WooCommerce marks them optional.
+     *
+     * Kept as a named map so the PHPUnit suite can compare every overlay entry
+     * against the route object WooCommerce currently registers. That comparison
+     * is the alarm for an upstream rename.
+     *
+     * @var array<string, array<int, string>>
+     */
+    private const REQUIRED_ARGUMENTS = [
+        'cart-add-item'      => ['id'],
+        'cart-update-item'   => ['key', 'quantity'],
+        'cart-remove-item'   => ['key'],
+        'cart-apply-coupon'  => ['code'],
+        'cart-remove-coupon' => ['code'],
+    ];
+
     public static function register(): void
     {
         for ($index = 0; $index < 14; $index++) {
@@ -260,19 +277,19 @@ final class StoreApiRoutes
      * status across the loop published a discriminant a caller could narrow on and
      * get a wrong answer from, which is the whole of KIZ-106.
      *
-     * The last column of each row names the arguments the operation cannot run
-     * without, which WooCommerce registers as optional. It is deliberately shorter
-     * than the argument list: `add_item` takes a quantity and a variation and needs
-     * neither, because `CartController::add_to_cart()` fills a null quantity with
-     * the product's minimum and a variation is only meaningful on a variable
-     * product, which is a condition no flat flag can carry.
+     * {@see self::REQUIRED_ARGUMENTS} names the arguments each operation cannot
+     * run without, which WooCommerce registers as optional. It is deliberately
+     * shorter than the argument list: `add_item` takes a quantity and a variation
+     * and needs neither, because `CartController::add_to_cart()` fills a null
+     * quantity with the product's minimum and a variation is only meaningful on a
+     * variable product, which is a condition no flat flag can carry.
      *
      * @return array<int, array<string, mixed>>
      */
     private static function cart(RoutesController $routes): array
     {
         $operations = [
-            ['cart', 'get', 'GET', 'Retrieve the cart', '200', [], []],
+            ['cart', 'get', 'GET', 'Retrieve the cart', '200', []],
             ['cart-add-item', 'add_item', 'POST', 'Add an item to the cart', '201', [
                 'woocommerce_rest_cart_invalid_parent_product',
                 'woocommerce_rest_cart_invalid_product',
@@ -285,37 +302,37 @@ final class StoreApiRoutes
                 'woocommerce_rest_product_out_of_stock',
                 'woocommerce_rest_product_partially_out_of_stock',
                 'woocommerce_rest_variation_id_from_variation_data',
-            ], ['id']],
+            ]],
             ['cart-update-item', 'update_item', 'POST', 'Change the quantity of a cart item', '200', [
                 'woocommerce_rest_cart_invalid_key',
                 'woocommerce_rest_cart_invalid_product',
                 'woocommerce_rest_product_invalid_quantity',
                 'woocommerce_rest_product_out_of_stock',
                 'woocommerce_rest_product_partially_out_of_stock',
-            ], ['key', 'quantity']],
+            ]],
             ['cart-remove-item', 'remove_item', 'POST', 'Remove an item from the cart', '200', [
                 'woocommerce_rest_cart_invalid_key',
-            ], ['key']],
+            ]],
             ['cart-apply-coupon', 'apply_coupon', 'POST', 'Apply a coupon to the cart', '200', [
                 'woocommerce_rest_cart_coupon_disabled',
                 'woocommerce_rest_cart_coupon_error',
-            ], ['code']],
+            ]],
             ['cart-remove-coupon', 'remove_coupon', 'POST', 'Remove a coupon from the cart', '200', [
                 'woocommerce_rest_cart_coupon_disabled',
                 'woocommerce_rest_cart_coupon_error',
                 'woocommerce_rest_cart_coupon_invalid_code',
-            ], ['code']],
+            ]],
             ['cart-select-shipping-rate', 'select_shipping_rate', 'POST', 'Choose a shipping rate for a package', '200', [
                 'woocommerce_rest_cart_missing_rate_id',
                 'woocommerce_rest_cart_shipping_rate_not_found',
                 'woocommerce_rest_shipping_disabled',
-            ], []],
-            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', '200', [], []],
+            ]],
+            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', '200', []],
         ];
 
         $declarations = [];
 
-        foreach ($operations as [$identifier, $operation, $method, $summary, $status, $errors, $required]) {
+        foreach ($operations as [$identifier, $operation, $method, $summary, $status, $errors]) {
             $declarations[] = self::declaration(
                 routes: $routes,
                 identifier: $identifier,
@@ -327,7 +344,7 @@ final class StoreApiRoutes
                 responses: [
                     $status => ['description' => 'The cart.', 'body' => ['$ref' => WooCommerceSchemas::STORE_CART]],
                 ],
-                required: $required,
+                required: self::REQUIRED_ARGUMENTS[$identifier] ?? [],
             );
         }
 
@@ -564,8 +581,8 @@ final class StoreApiRoutes
      *
      * A name with no argument behind it is left alone, because a WooCommerce release
      * that renames an argument should cost this operation its overlay and not its
-     * whole declaration. Nothing here notices that happening, which is the case
-     * KIZ-111 is opened to cover.
+     * whole declaration. The PHPUnit suite compares every name above with the live
+     * WooCommerce route objects so that change cannot pass unnoticed.
      *
      * @param array<string, array<string, mixed>> $args
      * @param array<int, string>                  $names
