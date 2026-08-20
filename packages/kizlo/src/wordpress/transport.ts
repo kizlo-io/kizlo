@@ -17,6 +17,13 @@ export interface WordPressTransportOptions {
 	credentials: WordPressCredentials
 	timeout?: Duration
 	onResponse?: (headers: Headers) => void
+	onResult?: (result: WordPressTransportResult) => void
+}
+
+export interface WordPressTransportResult {
+	url: string
+	status: number
+	headers: Headers
 }
 
 export class WordPressTransport {
@@ -26,6 +33,8 @@ export class WordPressTransport {
 	/** Called with the response headers of every non-transport-error response, so callers can observe
 	 * per-response signals (e.g. the plugin version header) without threading them through every method. */
 	private readonly onResponse?: (headers: Headers) => void
+	/** Called after every request attempt, including transport failures, with the URL and response metadata. */
+	private readonly onResult?: (result: WordPressTransportResult) => void
 
 	constructor(context: WordPressTransportOptions) {
 		const credentialBytes = new TextEncoder().encode(`${context.credentials.username}:${context.credentials.password}`)
@@ -36,6 +45,7 @@ export class WordPressTransport {
 		this.siteBase = context.credentials.url.endsWith("/") ? context.credentials.url : `${context.credentials.url}/`
 		this.defaultTimeout = context.timeout ?? SAFE_REQUEST_TIMEOUT
 		this.onResponse = context.onResponse
+		this.onResult = context.onResult
 	}
 
 	public async post<TData, TCode extends string = never>(
@@ -134,18 +144,22 @@ export class WordPressTransport {
 	}
 
 	public async request<TData, TCode extends string = never>(input: WP_RequestInput): Promise<WP_Result<TData, TCode>> {
-		const [transportErr, response] = await this.#fetch(input)
+		const { outcome, url } = await this.#fetch(input)
+		const [transportErr, response] = outcome
 
 		if (transportErr) {
-			return {
+			const result = {
 				data: null,
 				status: 0,
 				headers: new Headers(),
 				error: new WP_Error<TCode>({ code: "unknown_error", message: transportErr.message }),
 			}
+			this.onResult?.({ url, status: result.status, headers: result.headers })
+			return result
 		}
 
 		this.onResponse?.(response.headers)
+		this.onResult?.({ url, status: response.status, headers: response.headers })
 
 		const expectedContentType = input.responseContentTypes?.[String(response.status)] ?? input.responseContentTypes?.default
 		const contentType =
@@ -211,18 +225,23 @@ export class WordPressTransport {
 	 * too: a body that will not serialize, a path that will not resolve. Those are reported the way a
 	 * refused connection is rather than rejecting, so no call through a generated endpoint throws.
 	 */
-	async #fetch(input: WP_RequestInput): Promise<TryCatchResult<Response, Error>> {
-		return tryCatch(this.#send(input))
+	async #fetch(input: WP_RequestInput): Promise<{ outcome: TryCatchResult<Response, Error>; url: string }> {
+		let url = this.siteBase
+		const outcome = await tryCatch(
+			(async () => {
+				const resolved = this.resolveUrl(input)
+				if (input.searchParams) {
+					const params = new URLSearchParams(stringifyQueryString(input.searchParams))
+					for (const [key, value] of params) resolved.searchParams.append(key, value)
+				}
+				url = resolved.toString()
+				return this.#send(input, resolved)
+			})(),
+		)
+		return { outcome, url }
 	}
 
-	async #send(input: WP_RequestInput): Promise<Response> {
-		const url = this.resolveUrl(input)
-
-		if (input.searchParams) {
-			const params = new URLSearchParams(stringifyQueryString(input.searchParams))
-			for (const [k, v] of params) url.searchParams.append(k, v)
-		}
-
+	async #send(input: WP_RequestInput, url: URL): Promise<Response> {
 		const body = this.#serializeBody(input.body, input.requestContentType)
 		const isFormData = body instanceof FormData
 

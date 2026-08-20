@@ -22,8 +22,46 @@ import type { ServiceAdapters } from "./kizlo"
 import { SettingsService } from "./settings/service"
 import { compare, hmac } from "./shared/crypto"
 import { PreviewTokenData, type PreviewTokenPayload } from "./shared/schema"
-import type { ActiveWordPressClient, WordPressCredentials } from "./wordpress"
+import type { ActiveWordPressClient, WordPressCredentials, WordPressTransportResult } from "./wordpress"
 import { createWordPressClient, WordPressTransport } from "./wordpress"
+
+const warningRegistryKey = Symbol.for("kizlo.reportedWordPressWarnings")
+const warningRegistry = globalThis as typeof globalThis & Record<symbol, Set<string> | undefined>
+
+/** Runtime setup warnings already printed, shared by every bundled copy in this JavaScript realm. */
+const reportedWordPressWarnings = warningRegistry[warningRegistryKey] ?? new Set<string>()
+warningRegistry[warningRegistryKey] = reportedWordPressWarnings
+
+/**
+ * Claim a warning once in this realm and, when running in a child-process worker pool, once across
+ * sibling workers. Next.js prerenders pages in forked workers that cannot share `globalThis`, but do
+ * share a parent PID. The short-lived lock disappears with the worker pool; if the runtime cannot
+ * create it, keep the warning visible rather than failing application work or hiding the problem.
+ */
+function claimWordPressWarning(key: string): boolean {
+	if (reportedWordPressWarnings.has(key)) return false
+	reportedWordPressWarnings.add(key)
+	if (typeof process === "undefined" || typeof process.send !== "function") return true
+
+	try {
+		const crypto = process.getBuiltinModule("node:crypto")
+		const fs = process.getBuiltinModule("node:fs")
+		const os = process.getBuiltinModule("node:os")
+		const path = process.getBuiltinModule("node:path")
+		const digest = crypto.createHash("sha256").update(`${process.cwd()}\0${process.ppid}\0${key}`).digest("hex")
+		const lockPath = path.join(os.tmpdir(), `kizlo-warning-${digest}`)
+		const descriptor = fs.openSync(lockPath, "wx", 0o600)
+		fs.closeSync(descriptor)
+		process.on("exit", () => {
+			try {
+				fs.unlinkSync(lockPath)
+			} catch {}
+		})
+		return true
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== "EEXIST"
+	}
+}
 
 export interface ContextConfig {
 	siteSecret: string
@@ -82,7 +120,7 @@ export class Context {
 
 	constructor(config: ContextConfig) {
 		this.config = config
-		const options = { credentials: config.credentials, onResponse: (headers: Headers) => this.warnIfOutdated(headers) }
+		const options = { credentials: config.credentials, onResult: (result: WordPressTransportResult) => this.warnIfOutdated(result) }
 		const transport = new WordPressTransport(options)
 		// The generated endpoints are inert data, so the client is the pair: the tree overlaid on the
 		// transport it runs against. The cast hands back whatever shape that project's `wordpress.ts` declares.
@@ -93,15 +131,22 @@ export class Context {
 	}
 
 	/**
-	 * Warn when the WordPress side is older than the client needs, read from the `X-Kizlo-Version` and
-	 * `X-Kizlo-Extensions` headers the plugin stamps on every response. A version mismatch is a serious
-	 * contract break, so this fires on every WordPress response rather than once — the headers ride
-	 * responses the runtime already makes, so they cost no extra request. Emitted through `console.warn`
-	 * rather than the logger adapter on purpose: the adapter is optional (it defaults to a no-op), and
-	 * this is a setup problem every user must see regardless of whether they've wired up logging.
+	 * Report a request that did not reach Kizlo WordPress, or a WordPress side older than the client
+	 * needs. The transport supplies the URL and status even when fetch itself failed; a Kizlo response
+	 * supplies the version headers. Emitted through `console.warn` rather than the logger adapter on
+	 * purpose: the adapter is optional (it defaults to a no-op), and this is a setup problem every user
+	 * must see regardless of whether they've wired up logging.
 	 */
-	private warnIfOutdated(headers: Headers): void {
-		const installed = headers.get(PLUGIN_VERSION_HEADER)
+	private warnIfOutdated(result: WordPressTransportResult): void {
+		const installed = result.headers.get(PLUGIN_VERSION_HEADER)
+		if (!installed) {
+			const message =
+				result.status === 0
+					? `Nothing answered the WordPress request to ${result.url}. Check that the URL is correct and reachable.`
+					: `The response from ${result.url} did not identify a Kizlo WordPress plugin. Check that the URL is correct and the Kizlo plugin is active.`
+			this.warn(message, `connection:${this.config.credentials.url}`)
+			return
+		}
 		if (!isPluginVersionSupported(installed)) this.warn(pluginUpdateMessage(installed))
 
 		const plugins = this.config.extensionPlugins
@@ -109,7 +154,7 @@ export class Context {
 
 		// A plugin whose own requirements failed did not start and is absent from the header, so the
 		// same check covers both "too old" and "installed but not running".
-		const active = parseExtensionVersions(headers.get(EXTENSION_VERSIONS_HEADER))
+		const active = parseExtensionVersions(result.headers.get(EXTENSION_VERSIONS_HEADER))
 		for (const plugin of plugins) {
 			if (satisfiesVersion(active[plugin.slug], plugin.version)) continue
 			this.warn(extensionUpdateMessage(plugin, active[plugin.slug]))
@@ -117,7 +162,8 @@ export class Context {
 	}
 
 	/** Bold yellow, boxed in dashes so it stands out in a busy dev console. */
-	private warn(message: string): void {
+	private warn(message: string, key = message): void {
+		if (!claimWordPressWarning(key)) return
 		const inner = ` ${message} `
 		const border = "-".repeat(inner.length + 2)
 		console.warn(`\n\x1b[1m\x1b[33m${border}\n|${inner}|\n${border}\x1b[0m\n`)
