@@ -320,10 +320,11 @@ class Registry
     /**
      * Drop operations that cannot coexist.
      *
-     * Three ways two operations collide, all of which leave a consumer with no
+     * Four ways two operations collide, all of which leave a consumer with no
      * way to choose between them: the same method on one path, the same name
-     * within one API, or two APIs claiming the same URL in one namespace. The
-     * first one registered wins, and the loser is reported.
+     * within one API, an operation claiming a child API's generated member, or
+     * two APIs claiming the same URL in one namespace. The first one registered
+     * wins, and the loser is reported.
      *
      * @param array<string, array<string, mixed>> $grouped
      * @return array<string, array<string, mixed>>
@@ -331,6 +332,7 @@ class Registry
     private static function dropClashes(array $grouped, Diagnostics $errors): array
     {
         $methods = [];
+        $members = [];
         $names   = [];
         $routes  = [];
 
@@ -352,6 +354,42 @@ class Registry
             }
 
             $nameKey = implode("\0", [$operation['api_id'], $operation['operation']]);
+            $claims  = self::clientMemberClaims((string) $operation['api_id'], (string) $operation['operation']);
+
+            if ($claims !== null) {
+                foreach ($claims['namespaces'] as $claim) {
+                    $owner = $members[$claim['key']] ?? null;
+
+                    if (($owner['kind'] ?? null) === 'operation') {
+                        $errors->error(
+                            $location + ['keyword' => 'id'],
+                            sprintf(
+                                'API "%s" needs the generated client member "%s", already claimed by the "%s" operation on API "%s".',
+                                (string) $operation['api_id'],
+                                $claim['path'],
+                                $owner['operation'],
+                                $owner['api_id'],
+                            ),
+                        );
+                        continue 2;
+                    }
+                }
+
+                $owner = $members[$claims['operation']['key']] ?? null;
+
+                if (($owner['kind'] ?? null) === 'namespace') {
+                    $errors->error(
+                        $location + ['keyword' => 'operation'],
+                        sprintf(
+                            'Operation "%s" needs the generated client member "%s", already claimed by child API "%s".',
+                            (string) $operation['operation'],
+                            $claims['operation']['path'],
+                            $owner['api_id'],
+                        ),
+                    );
+                    continue;
+                }
+            }
 
             if (isset($names[$nameKey])) {
                 $errors->error(
@@ -390,11 +428,77 @@ class Registry
             $methods[$methodKey] = (string) $operation['operation'];
             $routes[$routeKey]   = (string) $operation['api_id'];
 
+            if ($claims !== null) {
+                foreach ($claims['namespaces'] as $claim) {
+                    $members[$claim['key']] ??= [
+                        'kind'   => 'namespace',
+                        'api_id' => (string) $operation['api_id'],
+                    ];
+                }
+
+                $members[$claims['operation']['key']] ??= [
+                    'kind'      => 'operation',
+                    'api_id'    => (string) $operation['api_id'],
+                    'operation' => (string) $operation['operation'],
+                ];
+            }
+
             $names[$nameKey] = (string) $operation['path'];
             $kept[$key]      = $operation;
         }
 
         return $kept;
+    }
+
+    /**
+     * The generated client camelizes every API segment and operation name, then
+     * puts namespaces and operations in the same object. Return every member an
+     * operation needs so dropClashes() can preserve its first-registration rule.
+     *
+     * @return array{
+     *     namespaces: array<int, array{key: string, path: string}>,
+     *     operation: array{key: string, path: string}
+     * }|null
+     */
+    private static function clientMemberClaims(string $apiId, string $operation): ?array
+    {
+        if (!Spec::isValidApiId($apiId) || !Spec::isValidOperationName($operation)) {
+            return null;
+        }
+
+        $path       = [];
+        $namespaces = [];
+
+        foreach (explode('.', $apiId) as $segment) {
+            $path[]       = self::clientMember($segment);
+            $namespaces[] = [
+                'key'  => implode("\0", $path),
+                'path' => implode('.', $path),
+            ];
+        }
+
+        $operationPath = [...$path, self::clientMember($operation)];
+
+        return [
+            'namespaces' => $namespaces,
+            'operation'  => [
+                'key'  => implode("\0", $operationPath),
+                'path' => implode('.', $operationPath),
+            ],
+        ];
+    }
+
+    /** Mirror the generated client's member normalization. */
+    private static function clientMember(string $value): string
+    {
+        $words  = preg_split('/[^A-Za-z0-9]+/', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $pascal = implode('', array_map(static fn(string $word): string => ucfirst($word), $words));
+
+        if (preg_match('/^[0-9]/', $pascal) === 1) {
+            $pascal = 'N' . $pascal;
+        }
+
+        return lcfirst($pascal ?: 'Anonymous');
     }
 
     /**
