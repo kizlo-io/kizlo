@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { basename, dirname, resolve } from "node:path"
 import { CONFIG_FILES, CREDENTIALS_REL, SEED_MARKER_OPTION, SEED_VERSION } from "./constants"
 import { compose, wpCli } from "./docker"
-import { type DevPluginSource, isLocalPlugin, type PluginSource, type TestCredentials } from "./types"
+import { type DevPluginSource, type Fixture, isLocalPlugin, type PluginSource, type SettleContext, type TestCredentials } from "./types"
 
 /**
  * True only when the stack is already seeded: the credentials artifact exists on
@@ -72,6 +72,19 @@ export async function ensurePlugins(plugins: DevPluginSource[]): Promise<void> {
 	for (const plugin of plugins) {
 		if (isLocalPlugin(plugin)) await activateLocalPlugin(plugin.path)
 	}
+}
+
+/**
+ * Run each fixture's `settle` step, in fixture order, after activation and before
+ * seeding. Activating a plugin is not the same as finishing its install: WooCommerce
+ * schedules Action Scheduler's move off the legacy post store a minute out and leaves
+ * cron to run it, and until it lands the site registers two extra post statuses. A
+ * generated client read inside that window differs from one read outside it, which is
+ * a property of when the stack booted rather than of anything committed. Settling
+ * closes the window before anything reads the site.
+ */
+export async function settleFixtures(fixtures: Fixture[] | undefined, ctx: SettleContext): Promise<void> {
+	for (const fixture of fixtures ?? []) await fixture.settle?.(ctx)
 }
 
 /**

@@ -173,3 +173,6 @@ export const composeStop = (opts?: { detached?: boolean }): Promise<void> => act
 
 /** Run a wp-cli command against the active stack's warm `wp-cli` container. */
 export const wpCli = (args: string[]): Promise<string> => activeStack().wpCli(args)
+
+/** Run PHP inside the active stack's loaded WordPress. */
+export const wpEval = (php: string): Promise<string> => wpCli(["eval", php])

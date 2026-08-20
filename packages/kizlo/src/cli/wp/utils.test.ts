@@ -3,8 +3,9 @@ import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { githubRelease, kizloRelease } from "./constants"
+import type { Fixture, SettleContext } from "./types"
 import { isLocalPlugin } from "./types"
-import { credentialsPath, findConfigDir, recordedPort, resolvePluginSource } from "./utils"
+import { credentialsPath, findConfigDir, recordedPort, resolvePluginSource, settleFixtures } from "./utils"
 
 describe("githubRelease", () => {
 	test("builds a release-zip URL where the asset is named after the tag", () => {
@@ -114,5 +115,47 @@ describe("recordedPort", () => {
 
 	test("is undefined when nothing has been seeded here", () => {
 		expect(recordedPort("kizlo-shop-main-test")).toBeUndefined()
+	})
+})
+
+describe("settleFixtures", () => {
+	function context(calls: string[]): SettleContext {
+		return {
+			wpCli: async (args) => {
+				calls.push(`cli:${args.join(" ")}`)
+				return ""
+			},
+			wpEval: async (php) => {
+				calls.push(`eval:${php}`)
+				return ""
+			},
+		}
+	}
+
+	test("settles each fixture that asks to, in fixture order", async () => {
+		const calls: string[] = []
+		const fixtures: Fixture[] = [
+			{ name: "woocommerce", settle: async ({ wpEval }) => void (await wpEval("first")) },
+			{ name: "cf7", settle: async ({ wpEval }) => void (await wpEval("second")) },
+		]
+
+		await settleFixtures(fixtures, context(calls))
+
+		expect(calls).toEqual(["eval:first", "eval:second"])
+	})
+
+	test("leaves a fixture with nothing to settle alone", async () => {
+		const calls: string[] = []
+
+		await settleFixtures([{ name: "kizlo-core" }], context(calls))
+
+		expect(calls).toEqual([])
+	})
+
+	test("accepts a config that declares no fixtures at all", async () => {
+		const calls: string[] = []
+
+		await expect(settleFixtures(undefined, context(calls))).resolves.toBeUndefined()
+		expect(calls).toEqual([])
 	})
 })

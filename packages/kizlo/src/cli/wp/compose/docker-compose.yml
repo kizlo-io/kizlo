@@ -24,7 +24,12 @@ services:
       start_period: 20s
 
   wordpress:
-    image: wordpress:latest
+    # Pinned, because the generated WordPress client is derived from whatever this
+    # image serves: a `latest` that moves under a checkout makes a committed client
+    # stale on the day WordPress ships, on whichever PR happens to run next. Bumping
+    # this is how a core release enters the repo — as a reviewed diff of the schema
+    # it changed, rather than as a surprise in unrelated CI.
+    image: wordpress:7.1.0-apache
     depends_on:
       mysql:
         condition: service_healthy

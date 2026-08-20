@@ -1,4 +1,4 @@
-import { type DevPluginSource, defineFixture, kizloRelease, type SeedContext } from "kizlo/test"
+import { type DevPluginSource, defineFixture, kizloRelease, type SeedContext, type SettleContext } from "kizlo/test"
 import { WC_CORE_BASE, WC_STORE_BASE } from "../constants"
 import type { WC_Product, WC_ProductCreateInput } from "../product/types.wc"
 
@@ -42,6 +42,24 @@ async function enableBankTransfer(service: SeedContext["service"]): Promise<void
 }
 
 /**
+ * WooCommerce bundles Action Scheduler, which keeps its actions in the posts table until it
+ * migrates to its own tables, and registers two global post statuses (`in-progress`, `failed`)
+ * for as long as that legacy store is live. The migration is scheduled a minute after activation
+ * and left to cron, so a WordPress reports those two statuses for roughly its first minute and
+ * never again. Every post type's status enum is built from the global list, so a client generated
+ * inside that window carries two statuses that one generated outside it does not.
+ *
+ * Firing Action Scheduler's own migration callback settles it: the runner finds nothing to move
+ * on a fresh install and marks the migration complete itself, so this is its cron path run now
+ * rather than its bookkeeping written by hand.
+ */
+async function settleActionScheduler(wpEval: SettleContext["wpEval"]): Promise<void> {
+	await wpEval(
+		'if (class_exists("ActionScheduler_DataController") && !ActionScheduler_DataController::is_migration_complete()) { do_action("action_scheduler/migration_hook"); }',
+	)
+}
+
+/**
  * WooCommerce test fixture: installs WooCommerce + the kizlo-woocommerce plugin, seeds
  * products/coupons. Pass `plugins` to override the defaults — e.g. bind-mount your local
  * source with `{ path: "plugins/kizlo-woocommerce" }` to develop/test against live files.
@@ -56,6 +74,9 @@ export function woocommerce(opts: { plugins?: DevPluginSource[] } = {}) {
 				source: kizloRelease("kizlo-woocommerce"),
 			},
 		],
+		async settle({ wpEval }) {
+			await settleActionScheduler(wpEval)
+		},
 		async seed({ service }) {
 			let productId = 0
 			for (const product of PRODUCTS) {
