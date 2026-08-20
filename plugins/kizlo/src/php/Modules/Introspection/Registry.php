@@ -86,11 +86,11 @@ class Registry
 
         $diagnostics = new Diagnostics();
 
-        SpecStore::applyDiagnostics($diagnostics);
-
         $schemas    = self::cleanSchemas(self::collectSchemas($diagnostics), $diagnostics);
         $resolver   = new SchemaResolver($schemas);
         $operations = self::cleanOperations(self::collectOperations($diagnostics), $resolver, $diagnostics);
+
+        SpecStore::applyDiagnostics($diagnostics);
 
         return self::document($schemas, $operations, $diagnostics);
     }
