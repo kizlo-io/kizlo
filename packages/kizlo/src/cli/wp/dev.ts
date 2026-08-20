@@ -6,9 +6,9 @@ import { WordPressTransport } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
 import { createAdminAppPassword, seedUsers } from "./bootstrap"
 import { DEFAULT_PLUGINS, TEST_ADMIN } from "./constants"
-import { compose, composePull, composeUp, wpCli } from "./docker"
+import { compose, composePull, composeUp, wpCli, wpEval } from "./docker"
 import type { SeedContext } from "./types"
-import { ensurePlugins } from "./utils"
+import { ensurePlugins, settleFixtures } from "./utils"
 
 /** What `bootstrapDev` reports back so the command can print a connection summary. */
 export interface DevStackInfo {
@@ -127,6 +127,7 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 	}
 
 	await ensurePlugins([...DEFAULT_PLUGINS, ...cfg.fixtures.flatMap((fixture) => fixture.plugins ?? [])])
+	await settleFixtures(cfg.fixtures, { wpCli, wpEval })
 
 	const seeded = !installed && cfg.fixtures.length ? await seedDevFixtures(cfg, url) : 0
 

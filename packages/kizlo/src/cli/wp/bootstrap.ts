@@ -1,7 +1,7 @@
 import { DEFAULT_PLUGINS, DEFAULT_PORT, SEED_MARKER_OPTION, SEED_VERSION, TEST_ADMIN, TEST_USER } from "./constants"
-import { compose, composeUp, wpCli } from "./docker"
+import { compose, composeUp, wpCli, wpEval } from "./docker"
 import type { Fixture, TestCredentials } from "./types"
-import { ensurePlugins } from "./utils"
+import { ensurePlugins, settleFixtures } from "./utils"
 
 export interface BootstrapConfig {
 	/** Published WP port (default 8080). */
@@ -63,6 +63,7 @@ export async function bootstrapWp(config: BootstrapConfig): Promise<TestCredenti
 	await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
 
 	await ensurePlugins([...DEFAULT_PLUGINS, ...(config.fixtures?.flatMap((f) => f.plugins ?? []) ?? [])])
+	await settleFixtures(config.fixtures, { wpCli, wpEval })
 
 	const adminId = Number(await wpCli(["user", "get", TEST_ADMIN.username, "--field=ID"]))
 	const userId = await seedUsers()

@@ -77,7 +77,20 @@ export function isLocalPlugin(plugin: DevPluginSource): plugin is LocalPlugin {
 	return typeof plugin === "object" && "path" in plugin
 }
 
+/**
+ * Handed to each `Fixture.settle` so it can finish what its plugins started. wp-cli
+ * rather than REST, because work a plugin defers to cron is not reachable over HTTP.
+ */
+export interface SettleContext {
+	/** Run a wp-cli command against the stack's warm `wp-cli` container. */
+	wpCli: (args: string[]) => Promise<string>
+	/** Run PHP inside a loaded WordPress (`wp eval`). */
+	wpEval: (php: string) => Promise<string>
+}
+
 export type FixtureSeedFn = (ctx: SeedContext) => Promise<Record<string, JsonValue>>
+
+export type FixtureSettleFn = (ctx: SettleContext) => Promise<void>
 
 export type FixtureCleanupFn = (ctx: SeedContext) => Promise<void>
 
@@ -93,6 +106,14 @@ export interface Fixture {
 	 * and it behaves identically in the dev and test stacks (no build/zip step).
 	 */
 	plugins?: DevPluginSource[]
+	/**
+	 * Finish whatever this fixture's plugins start in the background, after activation
+	 * and before seeding. A plugin that defers part of its install to cron reports one
+	 * shape until that work lands and another after, so anything read from WordPress in
+	 * between depends on how soon it was read. Settling here is what makes a stack booted
+	 * a minute ago and one booted last week describe the same WordPress.
+	 */
+	settle?: FixtureSettleFn
 	/** Build this extension's world once during seeding; return created handles. */
 	seed?: FixtureSeedFn
 	/** Revert per-test mutations (teardown); does NOT uninstall plugins or seeded data. */
