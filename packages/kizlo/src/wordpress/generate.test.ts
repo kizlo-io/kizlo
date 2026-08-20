@@ -334,4 +334,41 @@ describe("generateWordPressClient", () => {
 			/Cannot generate post-types\.book\.restore_revision: client member postTypes\.book\.restoreRevision is already claimed by a namespace/,
 		)
 	})
+
+	/**
+	 * A parent that generated as an alias cannot be named in an `extends` clause, and is inherited
+	 * from as an intersection instead. `(T | null) & { own }` collapses the null branch away, so the
+	 * child ends up with the parent's members beside its own and none of its nullability.
+	 */
+	test.each([
+		["a nullable parent", { type: "object", nullable: true, properties: { city: { type: "string", required: true } } }],
+		["a reference to one", { $ref: "acme.source" }],
+	])("inherits from %s as an intersection rather than an extends clause", (_label, parent) => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		document.schemas["acme.source"] = { type: "object", nullable: true, properties: { city: { type: "string", required: true } } }
+		document.schemas["acme.address"] = parent as (typeof document.schemas)[string]
+		document.schemas["acme.billing"] = {
+			type: "object",
+			$extends: "acme.address",
+			properties: { vat_number: { type: "string" } },
+		}
+
+		const client = generateWordPressClient(document)
+
+		expect(client).toContain("export type WP_AcmeBilling = WP_AcmeAddress & {")
+		expect(client).not.toContain("interface WP_AcmeBilling")
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": client,
+				"usage.ts": `import type { WP_AcmeBilling } from "./wordpress"
+				declare const billing: WP_AcmeBilling
+				const city: string = billing.city
+				const vat: string | undefined = billing.vat_number
+				// @ts-expect-error the child never declared itself nullable
+				const nothing: WP_AcmeBilling = null
+				export { city, vat, nothing }`,
+			}),
+		).toEqual([])
+	})
 })

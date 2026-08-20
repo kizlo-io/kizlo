@@ -5,9 +5,31 @@ import { MIN_PLUGIN_VERSION, pluginUpdateMessage } from "@kizlo/shared"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import type { IntrospectionDocument } from "../../wordpress/introspection"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
+import { assertGeneratedClientCompiles, GeneratedClientTypeError } from "../../wordpress/typecheck"
+import { WORDPRESS_CLIENT_META_REL } from "../wp/constants"
 import type { ResolvedConfig } from "./config"
-import { generateWordPressOnce, generateWordPressSource, PartialContractError } from "./generate"
+import {
+	generateWordPressOnce,
+	generateWordPressSource,
+	generateWorkspaceClientOnce,
+	PartialContractError,
+	reportGenerationError,
+} from "./generate"
 import { log } from "./logger"
+
+/**
+ * Compiling the fixture is {@link assertGeneratedClientCompiles}'s own suite's job, and doing it
+ * per test here would cost a program build each time. These tests drive it from the outside: what
+ * reaches disk when it passes, and what does not when it throws.
+ */
+vi.mock("../../wordpress/typecheck", async (importActual) => ({
+	...(await importActual<typeof import("../../wordpress/typecheck")>()),
+	assertGeneratedClientCompiles: vi.fn(),
+}))
+
+function refused(): GeneratedClientTypeError {
+	return new GeneratedClientTypeError([`schema "acme.book": Interface 'WP_AcmeBook' incorrectly extends interface 'WP_AcmeEntity'.`])
+}
 
 function config(cwd: string): ResolvedConfig {
 	return {
@@ -25,6 +47,11 @@ function config(cwd: string): ResolvedConfig {
 
 function modified(document = INTROSPECTION_FIXTURE, etag = '"fixture"'): Response {
 	return Response.json(document, { headers: { etag } })
+}
+
+/** The fixture under a hash of its own, so a second generation is a fresh document rather than a 304. */
+function altered(): IntrospectionDocument {
+	return { ...INTROSPECTION_FIXTURE, hash: `sha256:${"d".repeat(64)}` }
 }
 
 function seedEnv(cwd: string): void {
@@ -288,5 +315,54 @@ describe("the plugin version WordPress stamps on the contract", () => {
 		watchLog()
 		await generateWordPressOnce(project(), { fetch: responder(served(MIN_PLUGIN_VERSION)) })
 		expect(transcript("warn")).not.toContain("Kizlo plugin outdated")
+	})
+})
+
+describe("a document that would not compile", () => {
+	test("refuses it, leaving the client and its ETag cache as they were", async () => {
+		const cfg = project()
+		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+
+		const client = path.resolve(cfg.cwd, cfg.wordpressPath)
+		const meta = path.resolve(cfg.cwd, cfg.wordpressMetaPath)
+		const before = { client: fs.readFileSync(client, "utf8"), meta: fs.readFileSync(meta, "utf8") }
+
+		vi.mocked(assertGeneratedClientCompiles).mockRejectedValueOnce(refused())
+		await expect(generateWordPressOnce(cfg, { fetch: responder(modified(altered(), '"altered"')) })).rejects.toThrow(
+			GeneratedClientTypeError,
+		)
+
+		expect(fs.readFileSync(client, "utf8")).toBe(before.client)
+		expect(fs.readFileSync(meta, "utf8")).toBe(before.meta)
+	})
+
+	/**
+	 * The workspace client stamps its ETag cache and writes the file separately. Stamping it for a
+	 * generation that was then refused would answer the next poll with a 304 and never retry.
+	 */
+	test("refuses the workspace client without stamping its ETag cache", async () => {
+		const cfg = project()
+		const meta = path.resolve(cfg.cwd, WORDPRESS_CLIENT_META_REL)
+
+		vi.mocked(assertGeneratedClientCompiles).mockRejectedValueOnce(refused())
+		await expect(generateWorkspaceClientOnce(cfg.cwd, "src/generated", { fetch: responder(modified()) })).rejects.toThrow(
+			GeneratedClientTypeError,
+		)
+
+		expect(fs.existsSync(meta)).toBe(false)
+		expect(fs.existsSync(path.resolve(cfg.cwd, "src/generated/wordpress.ts"))).toBe(false)
+	})
+
+	test("reports it as a diagnosis, naming the schema, without a stack", async () => {
+		watchLog()
+		const cfg = project()
+
+		vi.mocked(assertGeneratedClientCompiles).mockRejectedValueOnce(refused())
+		await generateWordPressOnce(cfg, { fetch: responder(modified()) }).catch((error: unknown) => {
+			reportGenerationError("WordPress client generation failed", error)
+		})
+
+		expect(transcript("error")).toContain(`schema "acme.book"`)
+		expect(transcript("error")).not.toContain("WordPress client generation failed")
 	})
 })

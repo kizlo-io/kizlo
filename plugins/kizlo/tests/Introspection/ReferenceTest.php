@@ -208,6 +208,129 @@ class ReferenceTest extends IntrospectionTestCase
         $this->assertErrorContains($this->errors(), 'is not an object schema');
     }
 
+    /**
+     * "That shape, or nothing" still has a shape to inherit. The child takes the parent's
+     * properties and not its nullability, since it did not declare itself nullable.
+     */
+    public function test_extending_a_nullable_parent_is_accepted(): void
+    {
+        $this->registerRouteSchema('acme.address', [
+            'type'       => 'object',
+            'nullable'   => true,
+            'properties' => ['city' => ['type' => 'string', 'required' => true]],
+        ]);
+
+        $this->registerRouteSchema('acme.billing-address', [
+            '$extends'   => 'acme.address',
+            'type'       => 'object',
+            'properties' => ['vat_number' => ['type' => 'string']],
+        ]);
+
+        $this->assertSame([], $this->errors(), 'Expected a clean contract.');
+        $this->assertArrayHasKey('acme.billing-address', $this->document()['schemas']);
+    }
+
+    public function test_making_an_inherited_property_optional_fails_introspection(): void
+    {
+        $this->registerPost();
+
+        $this->registerRouteSchema('acme.article', [
+            '$extends'   => 'acme.post',
+            'type'       => 'object',
+            'properties' => ['title' => ['type' => 'string']],
+        ]);
+
+        $this->assertErrorContains(
+            $this->errors(),
+            'Property "title" is required in "acme.post" but optional in the extending schema',
+        );
+    }
+
+    public function test_making_an_inherited_property_nullable_fails_introspection(): void
+    {
+        $this->registerPost();
+
+        $this->registerRouteSchema('acme.article', [
+            '$extends'   => 'acme.post',
+            'type'       => 'object',
+            'properties' => ['title' => ['type' => 'string', 'required' => true, 'nullable' => true]],
+        ]);
+
+        $this->assertErrorContains(
+            $this->errors(),
+            'Property "title" is not nullable in "acme.post" but nullable in the extending schema',
+        );
+    }
+
+    public function test_widening_an_inherited_enum_fails_introspection(): void
+    {
+        $this->registerRouteSchema('acme.entry', [
+            'type'       => 'object',
+            'properties' => ['status' => ['type' => 'string', 'required' => true, 'enum' => ['draft', 'publish']]],
+        ]);
+
+        $this->registerRouteSchema('acme.article', [
+            '$extends'   => 'acme.entry',
+            'type'       => 'object',
+            'properties' => ['status' => ['type' => 'string', 'required' => true]],
+        ]);
+
+        $this->assertErrorContains(
+            $this->errors(),
+            'Property "status" is limited to "draft", "publish" in "acme.entry" but unrestricted in the extending schema',
+        );
+    }
+
+    /**
+     * An interface member has to stay assignable to the one it overrides, which leaves the
+     * extending schema free to move in the other direction.
+     */
+    public function test_narrowing_an_inherited_property_is_accepted(): void
+    {
+        $this->registerRouteSchema('acme.entry', [
+            'type'       => 'object',
+            'properties' => [
+                'status' => ['type' => 'string', 'enum' => ['draft', 'publish']],
+                'title'  => ['type' => 'string', 'nullable' => true],
+            ],
+        ]);
+
+        $this->registerRouteSchema('acme.article', [
+            '$extends'   => 'acme.entry',
+            'type'       => 'object',
+            'properties' => [
+                'status' => ['type' => 'string', 'required' => true, 'enum' => ['draft']],
+                'title'  => ['type' => 'string'],
+            ],
+        ]);
+
+        $this->assertSame([], $this->errors(), 'Expected a clean contract.');
+    }
+
+    /**
+     * Narrowing is the extending schema's alone. TypeScript needs a property shared across two
+     * bases to be identical in each, so one parent cannot narrow another's.
+     */
+    public function test_one_parent_narrowing_anothers_property_fails_introspection(): void
+    {
+        $this->registerRouteSchema('acme.left', ['type' => 'object', 'properties' => ['ref' => ['type' => 'string']]]);
+        $this->registerRouteSchema('acme.right', [
+            'type'       => 'object',
+            'properties' => ['ref' => ['type' => 'string', 'required' => true]],
+        ]);
+
+        $this->registerRouteSchema('acme.article', [
+            '$extends'   => ['acme.left', 'acme.right'],
+            'type'       => 'object',
+            'properties' => [],
+        ]);
+
+        $this->assertErrorContains(
+            $this->errors(),
+            'Property "ref" is optional in "acme.left" but required in "acme.right"',
+        );
+    }
+
     public function test_circular_inheritance_fails_introspection(): void
     {
         $this->registerRouteSchema('acme.a', ['$extends' => 'acme.b', 'type' => 'object', 'properties' => []]);
@@ -250,7 +373,9 @@ class ReferenceTest extends IntrospectionTestCase
         $this->registerRouteSchema('acme.article', [
             '$extends'   => 'acme.post',
             'type'       => 'object',
-            'properties' => ['title' => ['type' => 'string', 'maxLength' => 60]],
+            // Restating the property means restating `required` with it. Absent, the override
+            // reads as optional, which is the one thing an interface member may not become.
+            'properties' => ['title' => ['type' => 'string', 'required' => true, 'maxLength' => 60]],
         ]);
 
         $this->assertSame([], $this->errors(), 'Expected a clean contract.');

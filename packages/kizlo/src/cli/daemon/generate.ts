@@ -5,8 +5,9 @@ import { resolveWordPressConnection } from "../../kizlo"
 import { generateContract } from "../../shared/contract"
 import type { AnyProcedureRouter } from "../../shared/procedure"
 import { fetchIntrospection } from "../../wordpress/fetch-introspection"
-import { generateWordPressClient } from "../../wordpress/generate"
+import { generateWordPressModule } from "../../wordpress/generate"
 import { type IntrospectionDiagnostic, type IntrospectionDocument, IntrospectionVersionError } from "../../wordpress/introspection"
+import { assertGeneratedClientCompiles, GeneratedClientTypeError } from "../../wordpress/typecheck"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
 import { WORDPRESS_CLIENT_META_REL } from "../wp/constants"
@@ -144,6 +145,7 @@ export class PartialContractError extends Error {
  */
 export function reportGenerationError(message: string, error: unknown): void {
 	if (error instanceof IntrospectionVersionError || error instanceof PartialContractError) log.error(error.message)
+	else if (error instanceof GeneratedClientTypeError) log.error(error.message)
 	else log.error(message, error)
 }
 
@@ -223,7 +225,10 @@ async function fetchDocument(
 export async function generateWordPressSource(cwd: string, options: GenerateWordPressOptions = {}): Promise<string> {
 	const result = await fetchDocument(cwd, options)
 	if (!result?.document) throw new Error("WordPress introspection returned no document.")
-	return generateWordPressClient(result.document)
+
+	const generated = generateWordPressModule(result.document)
+	await assertGeneratedClientCompiles(generated)
+	return generated.source
 }
 
 export async function generateWordPressOnce(
@@ -235,7 +240,10 @@ export async function generateWordPressOnce(
 	const result = await fetchDocument(cfg.cwd, options, etag)
 	if (!result?.document) return "unchanged"
 
-	writeGeneratedWordPress(cfg, generateWordPressClient(result.document), wordPressMeta(result.etag, result.document.hash))
+	const generated = generateWordPressModule(result.document)
+	await assertGeneratedClientCompiles(generated)
+
+	writeGeneratedWordPress(cfg, generated.source, wordPressMeta(result.etag, result.document.hash))
 	return "generated"
 }
 
@@ -257,7 +265,12 @@ export async function generateWorkspaceClientOnce(
 	const result = await fetchDocument(cwd, options, readWordPressMeta(metaPath, file)?.etag)
 	if (!result?.document) return "unchanged"
 
-	const contents = generateWordPressClient(result.document)
+	// Before the ETag cache, not only before the client: a refused generation that had already
+	// stamped the cache would answer its own next poll with a 304 and never retry.
+	const generated = generateWordPressModule(result.document)
+	await assertGeneratedClientCompiles(generated)
+
+	const contents = generated.source
 	fs.mkdirSync(path.dirname(metaPath), { recursive: true })
 	atomicWrite(metaPath, wordPressMeta(result.etag, result.document.hash))
 	if (fs.existsSync(file) && fs.readFileSync(file, "utf8") === contents) return "unchanged"

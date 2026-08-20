@@ -87,6 +87,9 @@ class SchemaResolver
                 continue;
             }
 
+            // A nullable parent is inherited from, not refused: the child takes its properties and
+            // not its nullability, which is what it means to extend "that shape, or nothing".
+
             $resolved = $this->mergeExtends($resolved, $errors, $location, array_merge($stack, [$parent]));
 
             if (($resolved['type'] ?? 'object') !== 'object') {
@@ -194,6 +197,14 @@ class SchemaResolver
     }
 
     /**
+     * Reject a redeclared property the merged schema cannot generate.
+     *
+     * Two rules, because TypeScript enforces two. The extending schema restates a
+     * property beneath its parents, so it may narrow one and may not widen one: an
+     * interface member has to stay assignable to the member it overrides. Two parents
+     * merging into the same interface have to agree outright, narrower included,
+     * because TypeScript needs a property shared across bases to be identical in each.
+     *
      * @param array<string, mixed>|null $existing
      * @param array<string, mixed>      $incoming
      * @param array<string, string>     $location
@@ -211,30 +222,103 @@ class SchemaResolver
             return;
         }
 
-        $before = $this->typeSignature($existing);
-        $after  = $this->typeSignature($incoming);
+        $mayNarrow = $incomingOrigin === '';
 
-        if ($before === $after) {
+        foreach (self::facets($existing, $incoming) as [$before, $after, $narrows]) {
+            if ($before === $after || ($narrows && $mayNarrow)) {
+                continue;
+            }
+
+            $errors->error(
+                $location + ['keyword' => '$extends'],
+                sprintf(
+                    'Property "%s" is %s in "%s" but %s in %s.',
+                    $name,
+                    $before,
+                    $existingOrigin,
+                    $after,
+                    $incomingOrigin === '' ? 'the extending schema' : sprintf('"%s"', $incomingOrigin),
+                ),
+            );
+
             return;
         }
+    }
 
-        $errors->error(
-            $location + ['keyword' => '$extends'],
-            sprintf(
-                'Property "%s" is %s in "%s" but %s in %s.',
-                $name,
-                $before,
-                $existingOrigin,
-                $after,
-                $incomingOrigin === '' ? 'the extending schema' : sprintf('"%s"', $incomingOrigin),
-            ),
+    /**
+     * Every way two declarations of one property can differ: how each side reads, and
+     * whether the second narrows the first.
+     *
+     * The type itself never counts as narrowed. A property that changes type is a
+     * different property whichever direction it moved, and saying so is this check's
+     * oldest job.
+     *
+     * @param array<string, mixed> $existing
+     * @param array<string, mixed> $incoming
+     * @return array<int, array{0: string, 1: string, 2: bool}>
+     */
+    private static function facets(array $existing, array $incoming): array
+    {
+        $wasRequired = (bool) ($existing['required'] ?? false);
+        $isRequired  = (bool) ($incoming['required'] ?? false);
+        $wasNullable = (bool) ($existing['nullable'] ?? false);
+        $isNullable  = (bool) ($incoming['nullable'] ?? false);
+        $wasEnum     = self::enumValues($existing);
+        $isEnum      = self::enumValues($incoming);
+
+        return [
+            [self::typeSignature($existing), self::typeSignature($incoming), false],
+            [
+                $wasRequired ? 'required' : 'optional',
+                $isRequired ? 'required' : 'optional',
+                !$wasRequired && $isRequired,
+            ],
+            [
+                $wasNullable ? 'nullable' : 'not nullable',
+                $isNullable ? 'nullable' : 'not nullable',
+                $wasNullable && !$isNullable,
+            ],
+            [
+                self::enumeration($wasEnum),
+                self::enumeration($isEnum),
+                $isEnum !== null && ($wasEnum === null || array_diff($isEnum, $wasEnum) === []),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $schema
+     * @return array<int, mixed>|null
+     */
+    private static function enumValues(array $schema): ?array
+    {
+        if (!isset($schema['enum']) || !is_array($schema['enum'])) {
+            return null;
+        }
+
+        return array_values($schema['enum']);
+    }
+
+    /** @param array<int, mixed>|null $values */
+    private static function enumeration(?array $values): string
+    {
+        if ($values === null) {
+            return 'unrestricted';
+        }
+
+        return sprintf(
+            'limited to %s',
+            implode(', ', array_map(
+                static fn(mixed $value): string => (string) json_encode($value),
+                $values,
+            )),
         );
     }
 
     /**
      * @param array<string, mixed> $schema
      */
-    private function typeSignature(array $schema): string
+    private static function typeSignature(array $schema): string
     {
         if (isset($schema['$ref']) && is_string($schema['$ref'])) {
             return sprintf('a reference to "%s"', $schema['$ref']);
