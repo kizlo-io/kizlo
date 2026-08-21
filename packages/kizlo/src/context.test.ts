@@ -86,3 +86,45 @@ describe("WordPress setup warnings", () => {
 		expect(String(warn.mock.calls[0]?.[0])).toContain(pluginUpdateMessage("0.7.0"))
 	})
 })
+
+describe("REST cookie storage", () => {
+	function restContext(cookieHeader?: string) {
+		const headers = cookieHeader ? { cookie: cookieHeader } : undefined
+		return createContext("https://cookies.example").createRestContext(new Request("https://app.example", { headers }))
+	}
+
+	function sentCookieHeader(headers: Headers): string {
+		return headers
+			.getSetCookie()
+			.map((header) => header.split(";")[0])
+			.join("; ")
+	}
+
+	test("round-trips a value holding characters the writer percent-encodes", async () => {
+		const value = "Jeff & Sons, Ltd."
+		const writer = restContext()
+
+		await writer.cookies.set({ name: "kizlo_display", value })
+		const wire = sentCookieHeader(writer.headers)
+
+		expect(wire).toBe("kizlo_display=Jeff%20%26%20Sons%2C%20Ltd.")
+		await expect(restContext(wire).cookies.get("kizlo_display")).resolves.toBe(value)
+	})
+
+	test("leaves a token-style value untouched in both directions", async () => {
+		const value = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0="
+		const writer = restContext()
+
+		await writer.cookies.set({ name: "kizlo_session", value })
+		const wire = sentCookieHeader(writer.headers)
+
+		expect(wire).toBe(`kizlo_session=${value}`)
+		await expect(restContext(wire).cookies.get("kizlo_session")).resolves.toBe(value)
+	})
+
+	test("skips a pair carrying no value and keeps the first of a repeated name", async () => {
+		const cookies = await restContext("stray; kizlo_session=first; kizlo_session=second").cookies.get()
+
+		expect(cookies).toEqual([{ name: "kizlo_session", value: "first" }])
+	})
+})
