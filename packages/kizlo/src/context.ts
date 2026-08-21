@@ -12,7 +12,7 @@ import {
 	satisfiesVersion,
 	tryCatchSync,
 } from "@kizlo/shared"
-import { stringifySetCookie } from "cookie"
+import { parseCookie, stringifySetCookie } from "cookie"
 import type { AuthUser } from "./adapters/auth"
 import type { ConnInfo } from "./adapters/geo"
 import { type Logger, type LogLevel, noopAdapter } from "./adapters/logger"
@@ -211,16 +211,17 @@ export class Context {
 
 	private createRestCookieStorage(request: Request, headers: Headers): CookiesStorage {
 		return new CookiesStorage({
+			// Read through the same package that writes, so the decode on the way in is by construction the
+			// inverse of the encode `stringifySetCookie` applies on the way out.
 			getAll: async () => {
 				const cookieHeader = request.headers.get("cookie")
 				if (!cookieHeader) return []
 
 				const cookies: Cookie[] = []
 
-				for (const cookie of cookieHeader.split(";")) {
-					const [name, ...valueParts] = cookie.trim().split("=")
-					if (!name?.trim()) continue
-					cookies.push({ name: name.trim(), value: valueParts.join("=").trim() })
+				for (const [name, value] of Object.entries(parseCookie(cookieHeader))) {
+					if (value === undefined) continue
+					cookies.push({ name, value })
 				}
 
 				return cookies
