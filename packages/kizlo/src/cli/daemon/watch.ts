@@ -1,6 +1,7 @@
 import path from "node:path"
 import { FSWatcher } from "chokidar"
 import { resolveWordPressConnection } from "../../kizlo"
+import { IntrospectionFetchError } from "../../wordpress/fetch-introspection"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
 import { type ResolvedConfig, resolveConfig, resolveWordPressClientDir } from "./config"
@@ -59,11 +60,16 @@ async function watch(cfg: ResolvedConfig, credentials: WordPressCredentials): Pr
  * The state is per reporter rather than per process, so restarting the watcher reports afresh, and one
  * generation failing never silences the other.
  */
-function reportGeneration(subject: "service" | "client"): (run: () => Promise<"generated" | "unchanged">) => Promise<void> {
+function reportGeneration(
+	subject: "service" | "client",
+	stack?: StackGuard,
+): (run: () => Promise<"generated" | "unchanged">) => Promise<void> {
 	let reported: string | undefined
 	return async (run) => {
 		try {
 			if ((await run()) === "generated") log.success(`WordPress ${subject} updated`)
+			// Reaching here at all means WordPress answered, whatever it answered with.
+			stack?.answered()
 			// Only after a report, so the line lands for the user who fixed the cause and never for one
 			// who has been running cleanly all along.
 			if (reported !== undefined) {
@@ -71,6 +77,9 @@ function reportGeneration(subject: "service" | "client"): (run: () => Promise<"g
 				log.success(`Updating the WordPress ${subject} again`)
 			}
 		} catch (error) {
+			// Nothing answered, which is the one failure that can mean WordPress is no longer there at
+			// all. Every other failure is WordPress telling us something, so it cannot be.
+			if (error instanceof IntrospectionFetchError && error.unreachable && (await stack?.ended())) return
 			// Keyed on the message: every pass constructs its own error, so the objects never match.
 			const message = error instanceof Error ? error.message : String(error)
 			if (message === reported) return
@@ -81,19 +90,83 @@ function reportGeneration(subject: "service" | "client"): (run: () => Promise<"g
 }
 
 /**
+ * The local stack behind the WordPress this poll talks to, for the sessions that boot one. A project
+ * pointing at its own WordPress has no stack to lose and passes nothing, which leaves every failure on
+ * the retry path.
+ */
+export interface StackWatch {
+	/** Whether the stack's containers are still up. Asked only once a poll has found nothing answering. */
+	status: () => Promise<"running" | "stopped" | "unknown">
+	/** End the session. Called once, after {@link status} has confirmed the stack is gone. */
+	onStopped: () => void
+}
+
+/**
+ * How often the guard may ask Docker while the poll keeps failing. The poll retries every 3 seconds,
+ * and asking on every failing pass would spawn a subprocess that often for as long as WordPress is
+ * unreachable — which, when the stack is up and WordPress is merely broken, is indefinitely. A stack
+ * does not stop and restart between two passes, so the slower clock costs at most one interval before
+ * the session ends and saves the other four probes.
+ */
+const STACK_PROBE_INTERVAL_MS = 15_000
+
+/**
+ * Turn "nothing answered" into a verdict, by asking Docker rather than inferring it from the fetch.
+ * A stack that is still up makes this a hiccup the poll should keep retrying, which is what an
+ * `unknown` answer is treated as too: ending a live session over a subprocess that failed to run is
+ * a worse outcome than polling a little longer. Answers whether it took the session down, so the
+ * caller can skip reporting a failure the user is about to stop caring about.
+ *
+ * The first failure after a healthy poll is always probed, so a stack that stops under a working
+ * session is caught on the next pass rather than a quarter of a minute later.
+ */
+interface StackGuard {
+	/** WordPress answered, so the stack is up and the next failure deserves a fresh probe. */
+	answered: () => void
+	/** Nothing answered. True when this ended the session, so the caller stops reporting. */
+	ended: () => Promise<boolean>
+}
+
+function endOnStoppedStack(stack: StackWatch, now: () => number = Date.now): StackGuard {
+	let done = false
+	let probedAt: number | undefined
+	return {
+		answered: () => {
+			probedAt = undefined
+		},
+		ended: async () => {
+			if (done) return true
+			const at = now()
+			if (probedAt !== undefined && at - probedAt < STACK_PROBE_INTERVAL_MS) return false
+			probedAt = at
+			if ((await stack.status()) !== "stopped") return false
+			done = true
+			log.error("Local WordPress is no longer running. Ending the dev session.")
+			stack.onStopped()
+			return true
+		},
+	}
+}
+
+/**
  * One pass of the WordPress poll. `cfg` covers an app's client next to its contract; `wordpressClientDir`
  * covers a workspace that has only the client. A project has one or the other, but both are refreshed
  * together so the plugin's PHP changing is picked up either way. Each is refreshed independently, so a
  * service that cannot generate does not cost the pass its client.
+ *
+ * Both reporters share one stack guard, so a stopped stack ends the session once rather than once per
+ * generation the pass refreshes.
  */
 export function createWordPressRefresh(
 	cwd: string,
 	cfg: ResolvedConfig | undefined,
 	wordpressClientDir: string | undefined,
 	options: GenerateWordPressOptions,
+	stack?: StackWatch,
 ): () => Promise<void> {
-	const service = reportGeneration("service")
-	const client = reportGeneration("client")
+	const guard = stack ? endOnStoppedStack(stack) : undefined
+	const service = reportGeneration("service", guard)
+	const client = reportGeneration("client", guard)
 	return async () => {
 		if (cfg) await service(() => generateWordPressOnce(cfg, options))
 		if (wordpressClientDir) await client(() => generateWorkspaceClientOnce(cwd, wordpressClientDir, options))
@@ -106,8 +179,9 @@ function refreshWordPress(
 	cfg: ResolvedConfig | undefined,
 	wordpressClientDir: string | undefined,
 	credentials: WordPressCredentials,
+	stack?: StackWatch,
 ): NodeJS.Timeout {
-	const refresh = createWordPressRefresh(cwd, cfg, wordpressClientDir, { credentials })
+	const refresh = createWordPressRefresh(cwd, cfg, wordpressClientDir, { credentials }, stack)
 	let refreshing = false
 	const timer = setInterval(() => {
 		if (refreshing) return
@@ -128,7 +202,7 @@ function refreshWordPress(
  * the caller carries on without watching. Used by `kizlo dev`, both when it boots a local
  * stack and when it runs the watcher alone, so a single terminal covers the whole dev loop.
  */
-export async function startWatcher(cwd: string, opts?: { dir?: string }): Promise<(() => void) | undefined> {
+export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: StackWatch }): Promise<(() => void) | undefined> {
 	const lock = lockPath(cwd)
 	if (!(await acquire(lock))) {
 		log.info("Watcher already running — skipping the contract watcher.")
@@ -176,7 +250,7 @@ export async function startWatcher(cwd: string, opts?: { dir?: string }): Promis
 
 		// Only a server has sources worth watching; a workspace with just the client rides the poll below.
 		const watcher = cfg ? await watch(cfg, credentials) : undefined
-		const wordpressRefresh = refreshWordPress(cwd, cfg, wordpressClientDir, credentials)
+		const wordpressRefresh = refreshWordPress(cwd, cfg, wordpressClientDir, credentials, opts?.stack)
 		let stopped = false
 		handedOver = true
 		return () => {

@@ -61,4 +61,14 @@ describe("fetchIntrospection", () => {
 	])("throws on %s", async (_label, response, expected) => {
 		await expect(fetchIntrospection(CREDENTIALS, { fetch: responds(response) })).rejects.toThrow(expected)
 	})
+
+	test.each([
+		["nothing answered", new Error("fetch failed"), true],
+		["WordPress refused the request", new Response("no", { status: 403 }), false],
+		["WordPress answered with something that is not JSON", new Response("<html>", { status: 200 }), false],
+	])("marks %s unreachable: %s", async (_label, response, unreachable) => {
+		const error = await fetchIntrospection(CREDENTIALS, { fetch: responds(response) }).catch((thrown: unknown) => thrown)
+		expect(error).toBeInstanceOf(IntrospectionFetchError)
+		expect((error as IntrospectionFetchError).unreachable).toBe(unreachable)
+	})
 })

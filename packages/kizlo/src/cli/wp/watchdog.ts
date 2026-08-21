@@ -29,12 +29,27 @@ async function stopStack(): Promise<void> {
 if (!parentPid || !parentPort || !parentToken || !project) process.exit(1)
 const parent: ProcessOwner = { pid: parentPid, port: parentPort, token: parentToken }
 
+/**
+ * Missed probes before the parent counts as gone. The probe is answered on the parent's own event
+ * loop, which its typecheck of the generated client blocks for the better part of a second, so a
+ * single miss says the parent was busy at least as often as it says the parent died. Stopping the
+ * stack is not recoverable from here, and the cost of being slow about it is a few seconds of
+ * containers outliving a dead session, which the next `kizlo dev` reaps anyway.
+ */
+const MISSES_BEFORE_STOP = 3
+
 let checking = false
+let missed = 0
 const timer = setInterval(() => {
 	if (checking) return
 	checking = true
 	void ownerAlive(parent).then((alive) => {
 		if (alive) {
+			missed = 0
+			checking = false
+			return
+		}
+		if (++missed < MISSES_BEFORE_STOP) {
 			checking = false
 			return
 		}

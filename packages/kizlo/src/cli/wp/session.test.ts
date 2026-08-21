@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events"
 import fs from "node:fs"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
@@ -27,6 +28,20 @@ vi.mock("node:child_process", async (importOriginal) => {
 
 import { reapOrphans, registerSession, spawnWatchdog } from "./session"
 
+/** A finished `docker` invocation, delivered the way `spawn` delivers one. */
+function exited(code: number, stdout = ""): unknown {
+	const child = Object.assign(new EventEmitter(), {
+		stdout: new EventEmitter(),
+		stderr: new EventEmitter(),
+		stdin: { end: () => {} },
+	})
+	setImmediate(() => {
+		if (stdout) child.stdout.emit("data", stdout)
+		child.emit("close", code)
+	})
+	return child
+}
+
 function registryPath(): string {
 	return path.join(mocks.home, ".cache", "kizlo", "dev-sessions.json")
 }
@@ -40,6 +55,8 @@ describe("dev session liveness", () => {
 		mocks.home = fs.mkdtempSync(path.join(process.cwd(), ".kizlo-session-"))
 		mocks.execFile.mockClear()
 		mocks.spawn.mockReset()
+		// The container helpers reach docker through `spawn`; the watchdog test overrides this.
+		mocks.spawn.mockImplementation(() => exited(0))
 	})
 
 	afterEach(() => {
@@ -63,11 +80,7 @@ describe("dev session liveness", () => {
 
 		await expect(reapOrphans()).resolves.toEqual(["site"])
 		expect(readRegistry()).toEqual({})
-		expect(mocks.execFile).toHaveBeenCalledWith(
-			"docker",
-			["ps", "-q", "--filter", "label=com.docker.compose.project=site"],
-			expect.any(Function),
-		)
+		expect(mocks.spawn).toHaveBeenCalledWith("docker", ["ps", "-q", "--filter", "label=com.docker.compose.project=site"], expect.anything())
 	})
 
 	test("passes the full owner identity to the detached watchdog", async () => {

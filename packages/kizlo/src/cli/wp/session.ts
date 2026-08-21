@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { currentProcessOwner, ownerAlive, type ProcessOwner, type StoredProcessOwner } from "../process-owner"
+import { stopProjectContainers } from "./docker"
 
 const exec = promisify(execFile)
 
@@ -34,17 +35,6 @@ function writeRegistry(registry: Registry): void {
 	const file = registryPath()
 	mkdirSync(dirname(file), { recursive: true })
 	writeFileSync(file, JSON.stringify(registry, null, 2))
-}
-
-/**
- * Stop a compose project's containers by label, without needing its compose files.
- * Used for orphans whose recorded owner is gone. We can't assume we're in that project's
- * directory, so we target the running containers directly rather than via compose.
- */
-async function stopByProject(project: string): Promise<void> {
-	const { stdout } = await exec("docker", ["ps", "-q", "--filter", `label=com.docker.compose.project=${project}`])
-	const ids = stdout.split("\n").filter(Boolean)
-	if (ids.length) await exec("docker", ["stop", ...ids])
 }
 
 /**
@@ -124,7 +114,7 @@ export async function reapOrphans(): Promise<string[]> {
 	for (const [project, session] of Object.entries(registry)) {
 		if (await ownerAlive(session)) continue
 		try {
-			await stopByProject(project)
+			await stopProjectContainers(project)
 			reaped.push(project)
 		} catch {}
 		delete registry[project]

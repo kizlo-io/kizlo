@@ -2,7 +2,14 @@ import { randomUUID } from "node:crypto"
 import { createConnection, createServer, type Server } from "node:net"
 
 const HOST = "127.0.0.1"
-const PROBE_TIMEOUT_MS = 250
+
+/**
+ * How long to wait for an owner to answer its liveness probe. A dead owner refuses the connection
+ * at once and never reaches this, so the timeout only decides how long a *live* owner may be too
+ * busy to answer before it is read as gone. The dev session answers on the same event loop it
+ * typechecks the generated client on, which blocks it for the better part of a second.
+ */
+const PROBE_TIMEOUT_MS = 1_000
 
 /** A process identity that stays unique when the operating system recycles its PID. */
 export interface ProcessOwner {

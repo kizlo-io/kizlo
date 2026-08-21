@@ -7,7 +7,7 @@ import type { WordPressCredentials } from "../../wordpress/types"
 import type { ResolvedConfig } from "./config"
 import { lockPath } from "./lock"
 import { log } from "./logger"
-import { createWordPressRefresh, startWatcher } from "./watch"
+import { createWordPressRefresh, type StackWatch, startWatcher } from "./watch"
 
 const SKIPPED = "Watcher already running — skipping the contract watcher."
 
@@ -60,17 +60,36 @@ function config(cwd: string): ResolvedConfig {
 	}
 }
 
+/** A transport that answers, the way WordPress does when it is up but unwilling. */
+function answering(response: () => Response): typeof globalThis.fetch {
+	return vi.fn(async () => response()) as unknown as typeof globalThis.fetch
+}
+
 /** A refresh whose transport can be swapped between passes, the way a poll's answer changes under it. */
-function poll(cwd: string, cfg?: ResolvedConfig): (fetch: typeof globalThis.fetch) => Promise<void> {
+function poll(cwd: string, cfg?: ResolvedConfig, stack?: StackWatch): (fetch: typeof globalThis.fetch) => Promise<void> {
 	let current: typeof globalThis.fetch = serving()
-	const refresh = createWordPressRefresh(cwd, cfg, CLIENT_DIR, {
-		credentials: CREDENTIALS,
-		fetch: ((input, init) => current(input, init)) as typeof globalThis.fetch,
-	})
+	const refresh = createWordPressRefresh(
+		cwd,
+		cfg,
+		CLIENT_DIR,
+		{
+			credentials: CREDENTIALS,
+			fetch: ((input, init) => current(input, init)) as typeof globalThis.fetch,
+		},
+		stack,
+	)
 	return async (fetch) => {
 		current = fetch
 		await refresh()
 	}
+}
+
+/** A stack watch reporting a fixed status, recording how often it was asked and whether it ended the session. */
+function watching(status: "running" | "stopped" | "unknown"): {
+	status: ReturnType<typeof vi.fn>
+	onStopped: ReturnType<typeof vi.fn>
+} & StackWatch {
+	return { status: vi.fn(async () => status), onStopped: vi.fn() }
 }
 
 describe("createWordPressRefresh", () => {
@@ -122,6 +141,92 @@ describe("createWordPressRefresh", () => {
 
 		expect(lines("error")).toHaveLength(0)
 		expect(lines("success")).not.toContain("Updating the WordPress client again")
+	})
+
+	test("ends the session when nothing answered and the stack has stopped", async () => {
+		watchLog()
+		const stack = watching("stopped")
+		const pass = poll(workspace(), undefined, stack)
+
+		await pass(refusing("fetch failed"))
+
+		expect(stack.onStopped).toHaveBeenCalledTimes(1)
+		expect(lines("error")).toEqual(["Local WordPress is no longer running. Ending the dev session."])
+	})
+
+	test("keeps retrying when nothing answered but the stack is still up", async () => {
+		watchLog()
+		const stack = watching("running")
+		const pass = poll(workspace(), undefined, stack)
+
+		await pass(refusing("fetch failed"))
+		await pass(refusing("fetch failed"))
+		await pass(serving())
+
+		expect(stack.onStopped).not.toHaveBeenCalled()
+		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
+		expect(lines("success")).toContain("Updating the WordPress client again")
+	})
+
+	test("keeps retrying when docker could not say whether the stack is up", async () => {
+		watchLog()
+		const stack = watching("unknown")
+		const pass = poll(workspace(), undefined, stack)
+
+		await pass(refusing("fetch failed"))
+
+		expect(stack.onStopped).not.toHaveBeenCalled()
+		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
+	})
+
+	test.each([
+		["WordPress refuses the request", () => new Response("no", { status: 403 })],
+		["WordPress answers with something that will not parse", () => new Response("<html>", { status: 200 })],
+	])("never ends the session when %s", async (_case, response) => {
+		watchLog()
+		const stack = watching("stopped")
+		const pass = poll(workspace(), undefined, stack)
+
+		await pass(answering(response))
+
+		expect(stack.onStopped).not.toHaveBeenCalled()
+		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
+	})
+
+	test("asks docker once while the poll goes on failing", async () => {
+		watchLog()
+		const stack = watching("running")
+		const pass = poll(workspace(), undefined, stack)
+
+		await pass(refusing("fetch failed"))
+		await pass(refusing("fetch failed"))
+		await pass(refusing("fetch failed"))
+
+		expect(stack.status).toHaveBeenCalledTimes(1)
+	})
+
+	test("asks again on the first failure after WordPress answered", async () => {
+		watchLog()
+		const stack = watching("running")
+		const pass = poll(workspace(), undefined, stack)
+
+		await pass(refusing("fetch failed"))
+		await pass(serving())
+		await pass(refusing("fetch failed"))
+
+		expect(stack.status).toHaveBeenCalledTimes(2)
+	})
+
+	test("ends the session once when a pass refreshes both generations", async () => {
+		watchLog()
+		const cwd = workspace()
+		const stack = watching("stopped")
+		const pass = poll(cwd, config(cwd), stack)
+
+		await pass(refusing("fetch failed"))
+		await pass(refusing("fetch failed"))
+
+		expect(stack.onStopped).toHaveBeenCalledTimes(1)
 	})
 
 	test("names each generation in its own failure, and repeats neither", async () => {
