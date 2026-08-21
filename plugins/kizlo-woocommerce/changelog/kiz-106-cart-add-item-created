@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Describe the cart add-item response as the HTTP 201 WooCommerce sends, so the generated client narrows on the real status
