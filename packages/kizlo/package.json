@@ -136,7 +136,8 @@
 		"react-dom": "catalog:react19",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"vitest": "catalog:",
+		"yaml": "^2.9.0"
 	},
 	"peerDependencies": {
 		"@tanstack/react-router": "^1.130.0",

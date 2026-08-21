@@ -162,13 +162,13 @@ importers:
         version: 1.14.6(@opentelemetry/api@1.9.1)
       '@orpc/openapi':
         specifier: ^1.14.3
-        version: 1.14.6(@opentelemetry/api@1.9.1)(ws@8.21.0)
+        version: 1.14.6(@opentelemetry/api@1.9.1)(crossws@0.3.5)(ws@8.21.0)
       '@orpc/openapi-client':
         specifier: ^1.14.3
         version: 1.14.6(@opentelemetry/api@1.9.1)
       '@orpc/server':
         specifier: ^1.14.3
-        version: 1.14.6(@opentelemetry/api@1.9.1)(ws@8.21.0)
+        version: 1.14.6(@opentelemetry/api@1.9.1)(crossws@0.3.5)(ws@8.21.0)
       '@tanstack/react-router':
         specifier: ^1.130.0
         version: 1.170.18(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -242,6 +242,9 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 3.2.6(@types/debug@4.1.13)(@types/node@22.19.21)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.101.0)(terser@5.48.0)(yaml@2.9.0)
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
 
   packages/shared:
     dependencies:
@@ -15862,13 +15865,13 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/openapi@1.14.6(@opentelemetry/api@1.9.1)(ws@8.21.0)':
+  '@orpc/openapi@1.14.6(@opentelemetry/api@1.9.1)(crossws@0.3.5)(ws@8.21.0)':
     dependencies:
       '@orpc/client': 1.14.6(@opentelemetry/api@1.9.1)
       '@orpc/contract': 1.14.6(@opentelemetry/api@1.9.1)
       '@orpc/interop': 1.14.6
       '@orpc/openapi-client': 1.14.6(@opentelemetry/api@1.9.1)
-      '@orpc/server': 1.14.6(@opentelemetry/api@1.9.1)(ws@8.21.0)
+      '@orpc/server': 1.14.6(@opentelemetry/api@1.9.1)(crossws@0.3.5)(ws@8.21.0)
       '@orpc/shared': 1.14.6(@opentelemetry/api@1.9.1)
       '@orpc/standard-server': 1.14.6(@opentelemetry/api@1.9.1)
       json-schema-typed: 8.0.2
@@ -15879,7 +15882,7 @@ snapshots:
       - fastify
       - ws
 
-  '@orpc/server@1.14.6(@opentelemetry/api@1.9.1)(ws@8.21.0)':
+  '@orpc/server@1.14.6(@opentelemetry/api@1.9.1)(crossws@0.3.5)(ws@8.21.0)':
     dependencies:
       '@orpc/client': 1.14.6(@opentelemetry/api@1.9.1)
       '@orpc/contract': 1.14.6(@opentelemetry/api@1.9.1)
@@ -15893,6 +15896,7 @@ snapshots:
       '@orpc/standard-server-peer': 1.14.6(@opentelemetry/api@1.9.1)
       cookie: 1.1.1
     optionalDependencies:
+      crossws: 0.3.5
       ws: 8.21.0
     transitivePeerDependencies:
       - '@opentelemetry/api'

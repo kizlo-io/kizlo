@@ -40,25 +40,40 @@ interface ServiceBlock {
 	volumes?: string[]
 }
 
+/**
+ * Quote a host path or env value for the generated override. Two layers read it,
+ * in this order, and each needs something different:
+ *
+ * 1. YAML. Single-quoted is the only style that processes no backslash escapes, so a
+ *    Windows path survives it. In a double-quoted scalar the `\U` of `C:\Users` is an
+ *    escape code expecting eight hex digits, and the whole file fails to parse.
+ * 2. Compose, which interpolates `$` in every file passed with `-f`, this one included.
+ *    Quoting has no say in what happens after the parse: a literal `$` reaches Docker
+ *    only when written `$$` (the base compose file does the same by hand).
+ */
+function q(value: string): string {
+	return `'${value.replaceAll("'", "''").replaceAll("$", () => "$$")}'`
+}
+
 function renderService(name: string, block: ServiceBlock): string {
 	const lines = [`  ${name}:`]
-	if (block.user) lines.push(`    user: "${block.user}"`)
-	if (block.entrypoint) lines.push(`    entrypoint: ${JSON.stringify(block.entrypoint)}`)
+	if (block.user) lines.push(`    user: ${q(block.user)}`)
+	if (block.entrypoint) lines.push(`    entrypoint: [${block.entrypoint.map(q).join(", ")}]`)
 	if (block.env) {
 		lines.push("    environment:")
-		for (const [key, value] of Object.entries(block.env)) lines.push(`      ${key}: "${value}"`)
+		for (const [key, value] of Object.entries(block.env)) lines.push(`      ${key}: ${q(value)}`)
 	}
-	if (block.ports?.length) lines.push("    ports:", ...block.ports.map((p) => `      - "${p}"`))
+	if (block.ports?.length) lines.push("    ports:", ...block.ports.map((p) => `      - ${q(p)}`))
 	if (block.volumes?.length) lines.push("    volumes:", ...block.volumes)
 	return lines.join("\n")
 }
 
 /**
- * A compose volume line (`- "host:container"`). `:ro` marks it read-only — the
+ * A compose volume line (`- 'host:container'`). `:ro` marks it read-only: the
  * container can read it but never write back to the host file.
  */
 function bind(host: string, container: string, readOnly = false): string {
-	return `      - "${host}:${container}${readOnly ? ":ro" : ""}"`
+	return `      - ${q(`${host}:${container}${readOnly ? ":ro" : ""}`)}`
 }
 
 /** Resolve each local-plugin dir to a volume bind under `wp-content/plugins`, layered by basename. */
