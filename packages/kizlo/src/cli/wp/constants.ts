@@ -4,6 +4,17 @@ import type { PluginSource, TestAdminUser, TestUser } from "./types"
 
 export const DEFAULT_PORT = 8080
 
+/**
+ * WordPress image tag the stacks boot when `dev.version` / `test.version` is unset, kept in step
+ * with the `image:` default in `compose/docker-compose.yml`. Compose reads that file's default when
+ * it runs standalone; every path through the CLI supplies this one as `WP_IMAGE_TAG`.
+ *
+ * `latest` on purpose: a project that has said nothing about WordPress wants current WordPress, and
+ * a version baked in here would decide for every consumer at the moment Kizlo was published. A
+ * project that needs the version to hold still says so with `dev.version` / `test.version`.
+ */
+export const DEFAULT_WORDPRESS_TAG = "latest"
+
 /** Build a GitHub release-zip URL for `PluginSource.source` (asset named `<tag>.zip`). */
 export function githubRelease(repo: string, tag: string): string {
 	return `https://github.com/${repo}/releases/download/${tag}/${tag}.zip`

@@ -3,9 +3,10 @@ import path from "node:path"
 import z from "zod/v4"
 import type { KizloGlobalConfig } from "../../config"
 import { detectPackageManager, type PackageManager } from "../utils"
-import { LOCAL_DIR_REL, WORDPRESS_META_REL } from "../wp/constants"
+import { DEFAULT_WORDPRESS_TAG, LOCAL_DIR_REL, WORDPRESS_META_REL } from "../wp/constants"
 import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
+import { WORDPRESS_TAG_PATTERN } from "../wp/version"
 import { importIgnoringVirtualModules } from "./jiti"
 import { log } from "./logger"
 
@@ -13,6 +14,15 @@ const fixtureSchema = z.custom<Fixture>(
 	(value) => typeof value === "object" && value !== null && typeof (value as { name?: unknown }).name === "string",
 	{ message: "must be a fixture object with a string `name` (use defineFixture)" },
 )
+
+/**
+ * `dev.version` / `test.version`. Validated against Docker's tag grammar here rather than at boot,
+ * so `"wordpress:7.1.0"`, which would resolve to `wordpress:wordpress:7.1.0`, is named as a config
+ * mistake instead of surfacing as a pull failure seconds into starting a stack.
+ */
+const versionSchema = z
+	.string()
+	.regex(WORDPRESS_TAG_PATTERN, 'must be a WordPress image tag, like "7.1.0" or "7.1.0-php8.3-apache" (no "wordpress:" prefix)')
 
 /** Runtime shape of `kizlo.config.*` — mirrors {@link KizloGlobalConfig}. */
 const configSchema = z.object({
@@ -25,6 +35,7 @@ const configSchema = z.object({
 		.object({
 			local: z.boolean().optional(),
 			port: z.number().int().positive().optional(),
+			version: versionSchema.optional(),
 			dbPort: z.number().int().positive().optional(),
 			fixtures: z.array(fixtureSchema).optional(),
 		})
@@ -33,6 +44,7 @@ const configSchema = z.object({
 		.object({
 			local: z.boolean().optional(),
 			port: z.number().int().positive().optional(),
+			version: versionSchema.optional(),
 			fixtures: z.array(fixtureSchema).optional(),
 			packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]).optional(),
 			command: z.string().optional(),
@@ -210,6 +222,11 @@ export interface ResolvedTestConfig {
 	 * Always false under `worktrees`: a pinned port names one stack, and there is a stack per branch.
 	 */
 	portExplicit: boolean
+	/**
+	 * WordPress image tag the stack boots (`wordpress:<tag>`), from `test.version` or the version
+	 * Kizlo pins. Supplied to compose as `WP_IMAGE_TAG`.
+	 */
+	wordpressTag: string
 	fixtures: Fixture[]
 	packageManager: PackageManager
 	/** Explicit override; when unset, callers run `<packageManager> test`. */
@@ -233,6 +250,7 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 		command: test.command,
 		port: test.port ?? DEFAULT_TEST_PORT,
 		portExplicit: test.port !== undefined && !fileConfig?.worktrees,
+		wordpressTag: test.version ?? DEFAULT_WORDPRESS_TAG,
 		fixtures: test.fixtures ?? [],
 		credentialsPath: credentialsPath(cwd),
 		packageManager: test.packageManager ?? (await detectPackageManager(configDir)) ?? "npm",
@@ -257,6 +275,11 @@ export interface ResolvedDevConfig {
 	 * Always false under `worktrees`, for the same reason as {@link ResolvedDevConfig.portExplicit}.
 	 */
 	dbPortExplicit: boolean
+	/**
+	 * WordPress image tag the stack boots (`wordpress:<tag>`), from `dev.version` or the version
+	 * Kizlo pins. Supplied to compose as `WP_IMAGE_TAG`.
+	 */
+	wordpressTag: string
 	/** Fixtures to seed on a fresh install; also carry the plugins they need. */
 	fixtures: Fixture[]
 	/** Fixed repo-relative folder holding the install (`.kizlo/local`). */
@@ -305,6 +328,7 @@ export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> 
 		portExplicit: dev.port !== undefined && !fileConfig?.worktrees,
 		dbPort: dev.dbPort ?? DEFAULT_DEV_DB_PORT,
 		dbPortExplicit: dev.dbPort !== undefined && !fileConfig?.worktrees,
+		wordpressTag: dev.version ?? DEFAULT_WORDPRESS_TAG,
 		fixtures: dev.fixtures ?? [],
 		wordpressPath: LOCAL_DIR_REL,
 		wordpressDir: path.resolve(configDir, LOCAL_DIR_REL),

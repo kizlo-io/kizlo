@@ -21,7 +21,7 @@ import {
 	writeFileIfAbsent,
 } from "../utils"
 import { createAdminAppPassword } from "../wp/bootstrap"
-import { LOCAL_DIR_REL } from "../wp/constants"
+import { DEFAULT_WORDPRESS_TAG, LOCAL_DIR_REL } from "../wp/constants"
 import { bootstrapDev } from "../wp/dev"
 import { composeStop, createStack, dockerHint, dockerStatus } from "../wp/docker"
 import { removeProjectContainers } from "../wp/session"
@@ -345,6 +345,7 @@ function devConfigFor(cwd: string): ResolvedDevConfig {
 		portExplicit: false,
 		dbPort: DEFAULT_DEV_DB_PORT,
 		dbPortExplicit: false,
+		wordpressTag: DEFAULT_WORDPRESS_TAG,
 		fixtures: [],
 		wordpressPath: LOCAL_DIR_REL,
 		wordpressDir: path.resolve(cwd, LOCAL_DIR_REL),

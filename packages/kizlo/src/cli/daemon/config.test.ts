@@ -2,7 +2,8 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { resolveStackName, stackProject } from "./config"
+import { DEFAULT_WORDPRESS_TAG } from "../wp/constants"
+import { resolveDevConfig, resolveStackName, resolveTestConfig, stackProject } from "./config"
 
 describe("resolveStackName", () => {
 	let dir: string
@@ -135,5 +136,42 @@ describe("stackProject", () => {
 	test("prefixes with kizlo- and suffixes with the kind", () => {
 		expect(stackProject("my-app", "dev")).toBe("kizlo-my-app-dev")
 		expect(stackProject("my-app", "test")).toBe("kizlo-my-app-test")
+	})
+})
+
+describe("wordpressTag", () => {
+	let dir: string
+
+	beforeEach(() => {
+		dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-version-")))
+	})
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
+	function writeConfig(body: string): void {
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), `export default ${body}\n`)
+	}
+
+	test("boots current WordPress when no version is configured", async () => {
+		// An unconfigured project gets current WordPress; a version baked into Kizlo would
+		// otherwise decide for every consumer at the moment Kizlo was published.
+		expect(DEFAULT_WORDPRESS_TAG).toBe("latest")
+
+		writeConfig("{ dev: { local: true }, test: { local: true } }")
+		expect((await resolveDevConfig(dir)).wordpressTag).toBe(DEFAULT_WORDPRESS_TAG)
+		expect((await resolveTestConfig(dir)).wordpressTag).toBe(DEFAULT_WORDPRESS_TAG)
+	})
+
+	test("takes the configured version, letting dev and test differ", async () => {
+		writeConfig('{ dev: { version: "7.1.0" }, test: { version: "6.8.2" } }')
+		expect((await resolveDevConfig(dir)).wordpressTag).toBe("7.1.0")
+		expect((await resolveTestConfig(dir)).wordpressTag).toBe("6.8.2")
+	})
+
+	test("takes a full tag, for a caller pinning a specific PHP", async () => {
+		writeConfig('{ test: { version: "6.8.2-php8.3-apache" } }')
+		expect((await resolveTestConfig(dir)).wordpressTag).toBe("6.8.2-php8.3-apache")
 	})
 })

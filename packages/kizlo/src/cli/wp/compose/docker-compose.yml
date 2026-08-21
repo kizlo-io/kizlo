@@ -24,12 +24,12 @@ services:
       start_period: 20s
 
   wordpress:
-    # Pinned, because the generated WordPress client is derived from whatever this
-    # image serves: a `latest` that moves under a checkout makes a committed client
-    # stale on the day WordPress ships, on whichever PR happens to run next. Bumping
-    # this is how a core release enters the repo — as a reviewed diff of the schema
-    # it changed, rather than as a surprise in unrelated CI.
-    image: wordpress:7.1.0-apache
+    # Supplied by the CLI from `dev.version` / `test.version` in `kizlo.config.*`. The
+    # fallback is `latest` so a project that has configured nothing gets current
+    # WordPress. Worth pinning once a repo commits a generated WordPress client, which
+    # is derived from whatever this image serves: on `latest` that client goes stale the
+    # day WordPress ships, on whichever PR happens to run next.
+    image: wordpress:${WP_IMAGE_TAG:-latest}
     depends_on:
       mysql:
         condition: service_healthy
@@ -66,7 +66,11 @@ services:
       start_period: 30s
 
   wp-cli:
-    image: wordpress:cli
+    # Pinned for the same reason, one layer down: wp-cli drives install, plugin
+    # activation and every option write during bootstrap, so a tag that moves changes
+    # how the stack is provisioned. It is the tool, not the core, so it tracks its own
+    # releases rather than `WP_IMAGE_TAG`.
+    image: wordpress:cli-2.12.0-php8.3
     depends_on:
       wordpress:
         condition: service_healthy
