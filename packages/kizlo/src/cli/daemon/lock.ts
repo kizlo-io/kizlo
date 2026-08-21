@@ -6,7 +6,7 @@ export function lockPath(cwd: string): string {
 }
 
 /** True when a live daemon already owns the lock. Stale locks are ignored. */
-export function isLocked(file: string): boolean {
+function isLocked(file: string): boolean {
 	if (!fs.existsSync(file)) return false
 	const pid = Number(fs.readFileSync(file, "utf8").trim())
 	if (!pid) return false
@@ -18,9 +18,33 @@ export function isLocked(file: string): boolean {
 	}
 }
 
-export function acquire(file: string): void {
+/** Claim the file for this process, or report that it was already there. */
+function claim(file: string): boolean {
+	try {
+		fs.writeFileSync(file, String(process.pid), { flag: "wx" })
+		return true
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+		return false
+	}
+}
+
+/**
+ * Take the lock for this process, answering false when a live daemon already holds it. The file is
+ * created with `wx`, so two `kizlo dev` starting together cannot both come away believing they won —
+ * the loser's create fails on the file the winner made. Testing liveness and then writing left a
+ * window where both passed the test.
+ *
+ * A lock whose owner has died is removed and taken over, which is the only reason the second claim
+ * exists. Losing that one means another process reached the same stale lock first, so this one
+ * stands down rather than trying again.
+ */
+export function acquire(file: string): boolean {
 	fs.mkdirSync(path.dirname(file), { recursive: true })
-	fs.writeFileSync(file, String(process.pid))
+	if (claim(file)) return true
+	if (isLocked(file)) return false
+	fs.rmSync(file, { force: true })
+	return claim(file)
 }
 
 export function release(file: string): void {

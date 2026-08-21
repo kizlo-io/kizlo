@@ -5,8 +5,11 @@ import { afterEach, describe, expect, test, vi } from "vitest"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import type { WordPressCredentials } from "../../wordpress/types"
 import type { ResolvedConfig } from "./config"
+import { lockPath } from "./lock"
 import { log } from "./logger"
-import { createWordPressRefresh } from "./watch"
+import { createWordPressRefresh, startWatcher } from "./watch"
+
+const SKIPPED = "Watcher already running — skipping the contract watcher."
 
 const CREDENTIALS: WordPressCredentials = { url: "https://wp.example", username: "admin", password: "secret" }
 
@@ -15,6 +18,7 @@ const CLIENT_DIR = "src/generated"
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 function workspace(): string {
@@ -22,7 +26,7 @@ function workspace(): string {
 }
 
 /** Every line the CLI said through `method`, one entry per call. */
-function lines(method: "error" | "success"): string[] {
+function lines(method: "error" | "success" | "info"): string[] {
 	return (log[method] as unknown as ReturnType<typeof vi.fn>).mock.calls.map((call: unknown[]) => call.join(" "))
 }
 
@@ -30,6 +34,7 @@ function watchLog(): void {
 	vi.spyOn(log, "error").mockImplementation(() => {})
 	vi.spyOn(log, "success").mockImplementation(() => {})
 	vi.spyOn(log, "warn").mockImplementation(() => {})
+	vi.spyOn(log, "info").mockImplementation(() => {})
 }
 
 function refusing(message: string): typeof globalThis.fetch {
@@ -131,5 +136,58 @@ describe("createWordPressRefresh", () => {
 		expect(errors).toHaveLength(2)
 		expect(errors[0]).toContain("Failed to update the WordPress service:")
 		expect(errors[1]).toContain("Failed to update the WordPress client:")
+	})
+})
+
+/**
+ * A workspace the watcher can start in but never finish starting in. The config carries it past the
+ * "nothing to generate" exit, and the blank credentials make `resolveWordPressConnection` throw on
+ * the next line, which is the first thing to run after the lock is taken.
+ */
+function unstartable(): string {
+	const cwd = workspace()
+	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { wordpressClientDir: "${CLIENT_DIR}" }\n`)
+	for (const key of ["KIZLO_CONNECT", "KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD", "KIZLO_CONTRACT_GENERATION"]) {
+		vi.stubEnv(key, "")
+	}
+	return cwd
+}
+
+describe("startWatcher", () => {
+	test("gives the lock back when setup throws", async () => {
+		watchLog()
+		const cwd = unstartable()
+
+		await expect(startWatcher(cwd)).rejects.toThrow("KIZLO_WP_URL")
+		expect(fs.existsSync(lockPath(cwd))).toBe(false)
+	})
+
+	test("gives the lock back when there is nothing to generate", async () => {
+		watchLog()
+		const cwd = workspace()
+
+		await expect(startWatcher(cwd)).resolves.toBeUndefined()
+		expect(fs.existsSync(lockPath(cwd))).toBe(false)
+	})
+
+	test("does not mistake a failed start of its own for another watcher", async () => {
+		watchLog()
+		const cwd = unstartable()
+
+		await expect(startWatcher(cwd)).rejects.toThrow()
+		await expect(startWatcher(cwd)).rejects.toThrow()
+
+		expect(lines("info")).not.toContain(SKIPPED)
+	})
+
+	test("skips the watcher while a live process holds the lock", async () => {
+		watchLog()
+		const cwd = unstartable()
+		const lock = lockPath(cwd)
+		fs.mkdirSync(path.dirname(lock), { recursive: true })
+		fs.writeFileSync(lock, String(process.pid))
+
+		await expect(startWatcher(cwd)).resolves.toBeUndefined()
+		expect(lines("info")).toContain(SKIPPED)
 	})
 })

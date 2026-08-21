@@ -11,7 +11,7 @@ import {
 	generateWorkspaceClientOnce,
 	reportGenerationError,
 } from "./generate"
-import { acquire, isLocked, lockPath, release } from "./lock"
+import { acquire, lockPath, release } from "./lock"
 import { log } from "./logger"
 
 function debounce<T extends (...args: never[]) => Promise<void>>(fn: T, delay: number): T {
@@ -130,53 +130,63 @@ function refreshWordPress(
  */
 export async function startWatcher(cwd: string, opts?: { dir?: string }): Promise<(() => void) | undefined> {
 	const lock = lockPath(cwd)
-	if (isLocked(lock)) {
+	if (!acquire(lock)) {
 		log.info("Watcher already running — skipping the contract watcher.")
 		return undefined
 	}
 
-	const cfg = await resolveConfig(cwd, { dir: opts?.dir })
-	const wordpressClientDir = await resolveWordPressClientDir(cwd)
-	if (!cfg && !wordpressClientDir) {
-		log.info("skipping the contract generation.")
-		return undefined
-	}
-	acquire(lock)
+	// Once the lock is held, `stop()` is the only thing that gives it back, so every other way out of
+	// here has to release it first. Setup throws for ordinary reasons — a project with no WordPress
+	// credentials in its environment cannot resolve them — and a lock left behind reads as this live
+	// PID owning it, which silently costs the session its watcher: `dev`'s reload calls back in, finds
+	// the lock held, and skips.
+	let handedOver = false
+	try {
+		const cfg = await resolveConfig(cwd, { dir: opts?.dir })
+		const wordpressClientDir = await resolveWordPressClientDir(cwd)
+		if (!cfg && !wordpressClientDir) {
+			log.info("skipping the contract generation.")
+			return undefined
+		}
 
-	// Credentials come from the environment and cannot change while the dev server runs, so they are
-	// resolved once here rather than on every regeneration.
-	loadEnvFiles(cwd)
-	const { credentials } = resolveWordPressConnection(undefined)
+		// Credentials come from the environment and cannot change while the dev server runs, so they are
+		// resolved once here rather than on every regeneration.
+		loadEnvFiles(cwd)
+		const { credentials } = resolveWordPressConnection(undefined)
 
-	if (wordpressClientDir) {
-		try {
-			if ((await generateWorkspaceClientOnce(cwd, wordpressClientDir, { credentials })) === "generated") {
-				log.success("WordPress client generated")
+		if (wordpressClientDir) {
+			try {
+				if ((await generateWorkspaceClientOnce(cwd, wordpressClientDir, { credentials })) === "generated") {
+					log.success("WordPress client generated")
+				}
+			} catch (error) {
+				reportGenerationError("Failed to generate the WordPress client:", error)
 			}
-		} catch (error) {
-			reportGenerationError("Failed to generate the WordPress client:", error)
 		}
-	}
 
-	if (cfg) {
-		try {
-			const ok = await generateOnce(cfg, { credentials })
-			if (ok) log.success("Contract generated")
-			else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
-		} catch (error) {
-			reportGenerationError("Failed to generate the Kizlo contract:", error)
+		if (cfg) {
+			try {
+				const ok = await generateOnce(cfg, { credentials })
+				if (ok) log.success("Contract generated")
+				else log.warn(`No Kizlo server found in ${cfg.serverEntry}`)
+			} catch (error) {
+				reportGenerationError("Failed to generate the Kizlo contract:", error)
+			}
 		}
-	}
 
-	// Only a server has sources worth watching; a workspace with just the client rides the poll below.
-	const watcher = cfg ? await watch(cfg, credentials) : undefined
-	const wordpressRefresh = refreshWordPress(cwd, cfg, wordpressClientDir, credentials)
-	let stopped = false
-	return () => {
-		if (stopped) return
-		stopped = true
-		release(lock)
-		clearInterval(wordpressRefresh)
-		void watcher?.close()
+		// Only a server has sources worth watching; a workspace with just the client rides the poll below.
+		const watcher = cfg ? await watch(cfg, credentials) : undefined
+		const wordpressRefresh = refreshWordPress(cwd, cfg, wordpressClientDir, credentials)
+		let stopped = false
+		handedOver = true
+		return () => {
+			if (stopped) return
+			stopped = true
+			release(lock)
+			clearInterval(wordpressRefresh)
+			void watcher?.close()
+		}
+	} finally {
+		if (!handedOver) release(lock)
 	}
 }
