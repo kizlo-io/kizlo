@@ -1,5 +1,17 @@
 # @kizlo/shared
 
+## 0.7.0
+
+### Minor Changes
+
+- [#107](https://github.com/kizlo-io/kizlo/pull/107) [`cb1648e`](https://github.com/kizlo-io/kizlo/commit/cb1648eff6e3d1813afb8b54956ac3e78f2ad94a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add Kizlo-owned post type and taxonomy registration fields to the settings contract.
+
+- [#126](https://github.com/kizlo-io/kizlo/pull/126) [`5671c01`](https://github.com/kizlo-io/kizlo/commit/5671c01960d173e26276c37f81d7e6f2d276a17d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add the extension plugin version header and its comparison helpers, so a client extension can check the WordPress half it depends on.
+
+- [#122](https://github.com/kizlo-io/kizlo/pull/122) [`9c64887`](https://github.com/kizlo-io/kizlo/commit/9c648873d0e245923d3984efc731d1f9b0815652) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add `listed()`, which collapses an `arrayable()` value to the array form a WordPress list filter declares.
+
+- [#120](https://github.com/kizlo-io/kizlo/pull/120) [`0907c34`](https://github.com/kizlo-io/kizlo/commit/0907c34c824fb022973d1625f0f999f88063067c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Match the settings types to what the WordPress plugin publishes: title separators, breadcrumb entries, and the nullable organization name and `seo_enabled`.
+
 ## 0.6.0
 
 ### Minor Changes
