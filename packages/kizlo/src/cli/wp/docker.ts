@@ -100,6 +100,47 @@ export async function dockerAvailable(): Promise<boolean> {
 	return (await dockerStatus()) === "running"
 }
 
+/**
+ * The running container ids for a compose project, found by label rather than through compose, so
+ * this works from any directory and without the project's compose files. Throws when docker itself
+ * could not answer, which the callers tell apart from an empty answer.
+ */
+export async function runningProjectContainers(project: string): Promise<string[]> {
+	const res = await run("docker", ["ps", "-q", "--filter", `label=com.docker.compose.project=${project}`], process.env)
+	if (res.code !== 0) throw new Error(`docker ps failed:\n${res.stderr || res.stdout}`)
+	return res.stdout.split("\n").filter(Boolean)
+}
+
+/**
+ * Stop every running container for a compose project, targeted by label so this needs neither the
+ * project's compose files nor its directory. Both are out of reach for a stack whose owning session
+ * is gone, which is the case this exists for.
+ */
+export async function stopProjectContainers(project: string): Promise<void> {
+	const ids = await runningProjectContainers(project)
+	if (!ids.length) return
+	const res = await run("docker", ["stop", ...ids], process.env)
+	if (res.code !== 0) throw new Error(`docker stop failed:\n${res.stderr || res.stdout}`)
+}
+
+/**
+ * Whether a stack is still up, in the three answers a caller acting on it needs:
+ * - `running` — at least one of the project's containers is up.
+ * - `stopped` — none are, or the daemon that would run them is itself gone. Both mean the stack is
+ *   not serving, and a daemon that is down cannot be hiding a running container.
+ * - `unknown` — the daemon is up but the query failed, so this is no evidence either way. Callers
+ *   retry rather than act, because acting on it would end a session over a flaked subprocess.
+ */
+export type StackStatus = "running" | "stopped" | "unknown"
+
+export async function stackStatus(project: string): Promise<StackStatus> {
+	try {
+		return (await runningProjectContainers(project)).length ? "running" : "stopped"
+	} catch {
+		return (await dockerStatus()) === "running" ? "unknown" : "stopped"
+	}
+}
+
 function bind(stack: Stack): DockerStack {
 	const base = ["compose", "-p", stack.project, ...stack.composeFiles.flatMap((file) => ["-f", file])]
 	const env = { ...process.env, WP_PORT: String(stack.port), WP_IMAGE_TAG: stack.wordpressTag }

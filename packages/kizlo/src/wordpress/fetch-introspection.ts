@@ -21,9 +21,17 @@ export interface IntrospectionFetchResult {
  * this function's. It reports; {@link generateWordPressOnce} decides.
  */
 export class IntrospectionFetchError extends Error {
-	constructor(message: string) {
+	/**
+	 * Nothing answered at the configured URL, as against WordPress answering with something this
+	 * cannot use. Only the first is evidence that WordPress may no longer be there at all, which is
+	 * what lets a caller tell a stack that has stopped from a WordPress that is merely unhappy.
+	 */
+	readonly unreachable: boolean
+
+	constructor(message: string, options: { unreachable?: boolean } = {}) {
 		super(message)
 		this.name = "IntrospectionFetchError"
+		this.unreachable = options.unreachable === true
 	}
 }
 
@@ -50,7 +58,9 @@ export async function fetchIntrospection(
 			signal: options.signal ?? AbortSignal.timeout(30_000),
 		})
 	} catch (error) {
-		throw new IntrospectionFetchError(`Could not fetch ${url}: ${error instanceof Error ? error.message : String(error)}`)
+		throw new IntrospectionFetchError(`Could not fetch ${url}: ${error instanceof Error ? error.message : String(error)}`, {
+			unreachable: true,
+		})
 	}
 
 	// Stamped on every REST response the plugin dispatches, the 304 included, so a revalidated contract

@@ -6,10 +6,10 @@ import { palette } from "../banner"
 import { type ResolvedDevConfig, resolveDevConfig, usesLocalWordPress } from "../daemon/config"
 import { log } from "../daemon/logger"
 import { watchReload } from "../daemon/reload"
-import { startWatcher } from "../daemon/watch"
+import { type StackWatch, startWatcher } from "../daemon/watch"
 import { DEFAULT_ENV_KEYS, ensureGitignored, envGroups, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
-import { createStack, type DockerStack, dockerHint, dockerStatus } from "../wp/docker"
+import { createStack, type DockerStack, dockerHint, dockerStatus, stackStatus } from "../wp/docker"
 import { reapOrphans, registerSession, removeProjectContainers, spawnWatchdog, unregisterSession } from "../wp/session"
 import { syncSiteSettings } from "../wp/settings"
 import { devStack } from "../wp/stack"
@@ -156,27 +156,36 @@ export function syncLocalUrl(configDir: string, url: string): boolean {
  * Ctrl+C / `kill`), and an stdin/TTY-close watch (for a closed terminal, whose SIGHUP
  * an `npm`/`pnpm` wrapper silently swallows — leaving us orphaned but alive otherwise).
  */
-async function armForegroundTeardown(cfg: ResolvedDevConfig): Promise<void> {
+async function armForegroundTeardown(cfg: ResolvedDevConfig): Promise<(line?: string) => void> {
 	const owner = await registerSession(cfg.project)
 	spawnWatchdog(cfg.project, owner)
 
 	let exiting = false
-	const shutdown = (reason: string): void => {
+	// `line` is optional so a caller that has already said why it is ending the session does not have
+	// this print a second line saying it again.
+	const shutdown = (line?: string): void => {
 		if (exiting) return
 		exiting = true
 		unregisterSession(cfg.project)
 		try {
-			note(`Stopping local WordPress (${reason})…`)
+			if (line) note(line)
 		} catch {}
 		process.exit(0)
 	}
 
-	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => shutdown(signal))
+	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => shutdown(stopping(signal)))
 
 	if (process.stdin.isTTY) {
 		process.stdin.resume()
-		for (const event of ["end", "close", "error"] as const) process.stdin.on(event, () => shutdown("terminal closed"))
+		for (const event of ["end", "close", "error"] as const) process.stdin.on(event, () => shutdown(stopping("terminal closed")))
 	}
+
+	return shutdown
+}
+
+/** The teardown line for a session leaving while its stack is still up, which this one is stopping. */
+function stopping(reason: string): string {
+	return `Stopping local WordPress (${reason})…`
 }
 
 /**
@@ -272,10 +281,18 @@ async function rebootStack(cwd: string, label: string): Promise<ResolvedDevConfi
 async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	const cwd = process.cwd()
 	let ready = await prepareStack(cfg)
-	await armForegroundTeardown(ready)
+	const shutdown = await armForegroundTeardown(ready)
 	await bootAndReport(ready)
 
-	let stopContract = await startWatcher(ready.configDir)
+	// The poll is the only thing here that talks to WordPress, so it is where a stopped stack shows up
+	// first. It ends the session through the same teardown the signal handlers use, which drops the
+	// registry entry and lets the `exit` handler below give back the watcher lock. It reports the stack
+	// itself, so the teardown adds no line of its own.
+	const stack: StackWatch = {
+		status: () => stackStatus(ready.project),
+		onStopped: () => shutdown(),
+	}
+	let stopContract = await startWatcher(ready.configDir, { stack })
 
 	let reloading = false
 	const reload = async (changed: string): Promise<void> => {
@@ -284,7 +301,7 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 		try {
 			stopContract?.()
 			ready = await rebootStack(cwd, `${changed} changed — restarting the session`)
-			stopContract = await startWatcher(ready.configDir)
+			stopContract = await startWatcher(ready.configDir, { stack })
 		} catch (error) {
 			log.error("Failed to reload the dev session:", error)
 		} finally {
