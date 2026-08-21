@@ -136,6 +136,13 @@ test("menus.items.groupList conforms to MenuGroupItemList and nests children und
 	expect(result.items.some((item) => item.name === CHILD_NAME)).toBe(false)
 })
 
+test("menus.items.groupList clears the parent of an item promoted to a root", async () => {
+	const result = await kizlo.client.menus.items.groupList.call({ query: { include: [childId] } })
+
+	expect(result.items).toHaveLength(1)
+	expect(result.items[0]).toMatchObject({ id: childId, parent: null })
+})
+
 test("menus.items.groupList excludes unpublished items", async () => {
 	const result = await kizlo.client.menus.items.groupList.call({ query: {} })
 	expect(result.items.some((item) => item.name === DRAFT_NAME)).toBe(false)

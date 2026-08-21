@@ -105,7 +105,7 @@ export const MENU_ROUTER_MAP = {
 
 				return {
 					meta: deserializeListMetadata(context.wordpress.resolveList({ data: found, headers: response.headers, searchParams }).meta),
-					items: rootItems.map((rootItem) => buildMenuGroupItem(rootItem, found)),
+					items: rootItems.map((rootItem) => buildMenuGroupItem(rootItem, found, null)),
 				}
 			},
 		),
