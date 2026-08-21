@@ -9,12 +9,14 @@ import { createReadStream } from "node:fs"
  */
 type RunInput = { input?: string; inputFile?: string; detached?: boolean }
 
-/** A docker-compose stack: project id (`-p`), published port, and compose files (`-f`). */
+/** A docker-compose stack: project id (`-p`), published port, image tag, and compose files (`-f`). */
 export interface Stack {
 	/** Compose project name — isolates this stack's containers + volumes. */
 	project: string
 	/** Host port published for WordPress (exported as `WP_PORT`). */
 	port: number
+	/** WordPress image tag this stack boots, `wordpress:<tag>` (exported as `WP_IMAGE_TAG`). */
+	wordpressTag: string
 	/** Compose files, base first then any generated override. */
 	composeFiles: string[]
 }
@@ -22,7 +24,7 @@ export interface Stack {
 /** Stack-bound docker helpers. */
 export interface DockerStack {
 	compose(args: string[], opts?: RunInput): Promise<RunResult>
-	/** Pull the latest images for the named services (all when omitted) — refreshes a cached tag like `wordpress:latest`. */
+	/** Pull the named services' images (all when omitted), refreshing a cached tag that moves, like `latest`. */
 	composePull(services?: string[]): Promise<RunResult>
 	composeUp(): Promise<void>
 	composeStop(opts?: { detached?: boolean }): Promise<void>
@@ -100,7 +102,7 @@ export async function dockerAvailable(): Promise<boolean> {
 
 function bind(stack: Stack): DockerStack {
 	const base = ["compose", "-p", stack.project, ...stack.composeFiles.flatMap((file) => ["-f", file])]
-	const env = { ...process.env, WP_PORT: String(stack.port) }
+	const env = { ...process.env, WP_PORT: String(stack.port), WP_IMAGE_TAG: stack.wordpressTag }
 
 	const compose: DockerStack["compose"] = (args, opts) => run("docker", [...base, ...args], env, opts)
 

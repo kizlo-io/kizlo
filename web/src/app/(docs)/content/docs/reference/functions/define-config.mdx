@@ -72,6 +72,20 @@ export default defineConfig({
 })
 ```
 
+Both stacks boot current WordPress unless you say otherwise. `version` takes a Docker Hub tag, and each
+command reads its own, so you can build against current WordPress while the suite proves the oldest version
+you support:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dir: "src/lib/kizlo",
+  dev: { local: true, version: "7.1.0" },
+  test: { local: true, version: "6.8.2-php8.3-apache" },
+})
+```
+
 Seed both from shared fixtures, and override ports where they clash:
 
 ```ts title="kizlo.config.ts"

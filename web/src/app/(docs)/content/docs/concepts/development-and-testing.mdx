@@ -86,6 +86,30 @@ Each stack holds its own database, so a new branch starts from your fixtures rat
 left on the last one, and a branch you never return to keeps its containers until you remove them. Switching
 branches inside one checkout moves it to that branch's stack for the same reason.
 
+### Choosing the WordPress version
+
+Both stacks boot current WordPress. Set `version` to hold one still, or to run an older release:
+
+```ts title="kizlo.config.ts"
+export default defineConfig({
+  dev: { local: true, version: "7.1.0" },
+  test: { local: true, version: "6.8.2" },
+})
+```
+
+The value is the tag after `wordpress:` on Docker Hub. A bare version covers most cases; use a full tag like
+`6.8.2-php8.3-apache` when you need a specific PHP. Each command reads its own, so you can build against
+current WordPress while your suite proves you still work on the oldest version you support.
+
+Pin it once you commit a generated [WordPress client](/docs/concepts/wordpress-client). That client describes
+the WordPress it was generated from, so on a moving version it goes stale the day WordPress ships, and the
+failure lands on whichever change you make next. A pinned version turns a core release into a diff you review.
+
+<Callout>
+  An existing stack keeps the core files it was installed with, so changing `version` takes effect on the next
+  `kizlo dev reset` or `kizlo test reset`. Kizlo warns you when a running stack and its config disagree.
+</Callout>
+
 ## Fixtures
 
 A **fixture** is the unit of that shared content: a `seed` function that creates known records over the typed

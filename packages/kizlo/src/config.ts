@@ -13,6 +13,19 @@ export interface KizloDevConfig {
 	port?: number
 
 	/**
+	 * WordPress version the local stack boots, given as the tag after `wordpress:` on Docker
+	 * Hub: a bare version (`"7.1.0"`), or a full tag (`"7.1.0-php8.3-apache"`) when you need
+	 * a specific PHP. Defaults to `latest`, so an unconfigured project gets current WordPress.
+	 *
+	 * Worth setting once you commit a generated WordPress client, which is derived from
+	 * whatever the stack serves: on `latest` that client goes stale the day WordPress ships.
+	 *
+	 * An existing install keeps the core files it was provisioned with, so changing this
+	 * takes effect on the next `kizlo dev reset` and Kizlo says so when the two disagree.
+	 */
+	version?: string
+
+	/**
 	 * Host port the local WordPress MySQL is published on (default 3307), bound to `127.0.0.1` so
 	 * you can point a SQL client (TablePlus, DBeaver, `mysql`) at the database to
 	 * inspect or edit tables directly. Connect with db `wordpress`, user `wordpress`,
@@ -43,6 +56,18 @@ export interface KizloTestConfig {
 	local?: boolean
 	/** Published WP port (default 8889). */
 	port?: number
+	/**
+	 * WordPress version the local stack boots, given as the tag after `wordpress:` on Docker
+	 * Hub: a bare version (`"7.1.0"`), or a full tag (`"7.1.0-php8.3-apache"`) when you need
+	 * a specific PHP. Defaults to `latest`, so an unconfigured project gets current WordPress.
+	 *
+	 * Worth setting once you commit a generated WordPress client, which is derived from
+	 * whatever the stack serves: on `latest` that client goes stale the day WordPress ships.
+	 *
+	 * An existing install keeps the core files it was provisioned with, so changing this
+	 * takes effect on the next `kizlo test reset` and Kizlo says so when the two disagree.
+	 */
+	version?: string
 	/** Extension fixtures to install + seed. */
 	fixtures?: Fixture[]
 	/**

@@ -4,11 +4,13 @@ import { networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { WordPressTransport } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
+import { log } from "../daemon/logger"
 import { createAdminAppPassword, seedUsers } from "./bootstrap"
 import { DEFAULT_PLUGINS, TEST_ADMIN } from "./constants"
 import { compose, composePull, composeUp, wpCli, wpEval } from "./docker"
 import type { SeedContext } from "./types"
 import { ensurePlugins, settleFixtures } from "./utils"
+import { warnVersionDrift } from "./version"
 
 /** What `bootstrapDev` reports back so the command can print a connection summary. */
 export interface DevStackInfo {
@@ -98,12 +100,13 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 
 	const fresh = !existsSync(join(cfg.wordpressDir, "wp-includes", "version.php"))
 
-	// A fresh install copies WordPress out of the `wordpress:latest` image into the empty bind
-	// mount, so the version we get is whatever that tag resolves to locally. Docker won't re-pull a
-	// cached `latest`, which would pin new installs to a stale WordPress — so refresh it here, but
-	// only on a fresh install (a warm resume reuses the existing files and never pays this cost).
-	// Docker's own layer cache keeps this a cheap digest check when the tag hasn't moved, and it's
-	// best-effort: an offline pull failure falls back to the cached image so dev still works.
+	// A fresh install copies WordPress out of the configured image into the empty bind mount, so
+	// the version we get is whatever that tag resolves to locally. Docker won't re-pull a cached
+	// tag, which for a moving one like `latest` would pin new installs to a stale WordPress. So
+	// refresh it here, but only on a fresh install (a warm resume reuses the existing files and
+	// never pays this cost). Docker's own layer cache keeps this a cheap digest check whenever the
+	// tag hasn't moved, which for a pinned one is always. Best-effort: an offline pull failure
+	// falls back to the cached image so dev still works.
 	if (fresh) await composePull(["wordpress", "wp-cli"]).catch(() => undefined)
 
 	await composeUp()
@@ -124,6 +127,16 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 			"--skip-email",
 		])
 		await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
+	}
+
+	// Only a warm install can disagree: a fresh one is copied out of the configured image above.
+	if (installed) {
+		await warnVersionDrift({
+			wpCli,
+			tag: cfg.wordpressTag,
+			resetCommand: "kizlo dev reset",
+			warn: (message) => log.warn(message),
+		})
 	}
 
 	await ensurePlugins([...DEFAULT_PLUGINS, ...cfg.fixtures.flatMap((fixture) => fixture.plugins ?? [])])

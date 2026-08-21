@@ -20,7 +20,7 @@ function localMounts(fixtures: Fixture[]): string[] {
 export function testStack(cfg: ResolvedTestConfig): Stack {
 	const mounts = localMounts(cfg.fixtures)
 	const composeFiles = mounts.length ? [COMPOSE_FILE, writeTestOverride(cfg.configDir, mounts)] : [COMPOSE_FILE]
-	return { project: cfg.project, port: cfg.port, composeFiles }
+	return { project: cfg.project, port: cfg.port, wordpressTag: cfg.wordpressTag, composeFiles }
 }
 
 /**
@@ -48,5 +48,5 @@ export function devStack(cfg: ResolvedDevConfig): Stack {
 		hostUser: detectHostUser(),
 		dbPort: cfg.dbPort,
 	})
-	return { project: cfg.project, port: cfg.port, composeFiles: [COMPOSE_FILE, override] }
+	return { project: cfg.project, port: cfg.port, wordpressTag: cfg.wordpressTag, composeFiles: [COMPOSE_FILE, override] }
 }

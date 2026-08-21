@@ -9,6 +9,7 @@ import { isFree } from "../wp/ports"
 import { runSeeds } from "../wp/setup"
 import { testStack } from "../wp/stack"
 import { isSeeded, recordedPort } from "../wp/utils"
+import { warnVersionDrift } from "../wp/version"
 
 async function resolve(cwd: string): Promise<{ cfg: ResolvedTestConfig; stack: DockerStack }> {
 	const cfg = await resolveTestConfig(cwd)
@@ -57,6 +58,16 @@ async function bringUp(cfg: ResolvedTestConfig, stack: DockerStack, fresh = fals
 	const bound = port === cfg.port ? stack : createStack(testStack({ ...cfg, port }))
 
 	await withSpinner("Starting test WordPress", () => bound.composeUp(), "Test WordPress ready")
+
+	// After `up`, not before: a warm stack is the only one that can disagree with the config, and
+	// this is the one place every `test` run passes through, since seeding is skipped once seeded.
+	await warnVersionDrift({
+		wpCli: bound.wpCli,
+		tag: cfg.wordpressTag,
+		resetCommand: "kizlo test reset",
+		warn: (message) => log.warn(message),
+	})
+
 	if (await isSeeded()) log.info("Test WordPress already seeded — skipping seed.")
 	else await withSpinner("Seeding WordPress", () => runSeeds({ port, project: cfg.project, fixtures: cfg.fixtures }), "WordPress seeded")
 
