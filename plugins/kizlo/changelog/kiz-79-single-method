@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Require each introspection operation to declare one scalar HTTP method

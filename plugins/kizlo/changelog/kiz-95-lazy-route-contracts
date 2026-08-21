@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Rename the spec registration helpers and defer each callable factory until its route contract is needed

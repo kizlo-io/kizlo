@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Add kizlo_translate_spec_properties() and kizlo_translate_spec_schema() so a plugin can describe another API's routes from its own schemas

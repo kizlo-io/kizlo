@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Report the callback and permission_callback arguments kizlo_register_route requires or discards

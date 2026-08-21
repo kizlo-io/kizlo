@@ -1,4 +1,0 @@
-Significance: patch
-Type: changed
-
-Stop declaring the permission-check errors that kizlo/v1 routes cannot raise

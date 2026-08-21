@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Gate extension plugins on a Kizlo Requires header, so one built for a newer Kizlo reports what it needs instead of fataling

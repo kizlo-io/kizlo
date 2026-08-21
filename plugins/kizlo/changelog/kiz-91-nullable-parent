@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Reject an override that widens an inherited property, which generated a type the client could not compile

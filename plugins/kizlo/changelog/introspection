@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Add a Kizlo API contract system and the GET /kizlo/v1/introspect endpoint that serves it

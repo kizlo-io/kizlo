@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Report contract problems as typed diagnostics and exclude only what is broken, instead of failing the whole document

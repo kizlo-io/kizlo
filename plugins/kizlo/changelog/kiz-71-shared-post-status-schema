@@ -1,4 +1,0 @@
-Significance: minor
-Type: fixed
-
-Describe post status as a shared schema and enforce it on list, create and update

@@ -1,4 +1,0 @@
-Significance: minor
-Type: fixed
-
-Derive managed list parameters from the WordPress controller that serves the route, so filters like tax_relation and search_columns are described and usable
