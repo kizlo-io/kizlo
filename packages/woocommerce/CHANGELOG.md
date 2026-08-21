@@ -1,5 +1,22 @@
 # @kizlo/woocommerce
 
+## 0.2.0
+
+### Minor Changes
+
+- [#123](https://github.com/kizlo-io/kizlo/pull/123) [`aea0646`](https://github.com/kizlo-io/kizlo/commit/aea0646e4bd91e59ef1ece274ebe8f1a5f694864) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Read every WooCommerce cart, checkout, product and customer route through generated endpoints.
+
+- [#126](https://github.com/kizlo-io/kizlo/pull/126) [`5671c01`](https://github.com/kizlo-io/kizlo/commit/5671c01960d173e26276c37f81d7e6f2d276a17d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Require the Kizlo WooCommerce plugin 0.2.0 and `kizlo` 0.15.0, and say which is missing when the store's endpoints are absent.
+
+- [#127](https://github.com/kizlo-io/kizlo/pull/127) [`106e118`](https://github.com/kizlo-io/kizlo/commit/106e118978d88490e0a1a5eb92ad91a2b37ad954) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Keep the address a checkout retry omitted instead of replacing it with a blank one.
+
+### Patch Changes
+
+- [#152](https://github.com/kizlo-io/kizlo/pull/152) [`2506231`](https://github.com/kizlo-io/kizlo/commit/2506231f61b20ab74ca7ba013f6d0607529ea651) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Settle background plugin work during bootstrap so a fresh stack and a warm one generate the same client
+
+- Updated dependencies [[`cb1648e`](https://github.com/kizlo-io/kizlo/commit/cb1648eff6e3d1813afb8b54956ac3e78f2ad94a), [`5671c01`](https://github.com/kizlo-io/kizlo/commit/5671c01960d173e26276c37f81d7e6f2d276a17d), [`9c64887`](https://github.com/kizlo-io/kizlo/commit/9c648873d0e245923d3984efc731d1f9b0815652), [`0907c34`](https://github.com/kizlo-io/kizlo/commit/0907c34c824fb022973d1625f0f999f88063067c)]:
+  - @kizlo/shared@0.7.0
+
 ## 0.1.9
 
 ### Patch Changes

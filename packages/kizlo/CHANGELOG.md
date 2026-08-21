@@ -1,5 +1,94 @@
 # kizlo
 
+## 0.15.0
+
+### Minor Changes
+
+- [#126](https://github.com/kizlo-io/kizlo/pull/126) [`5671c01`](https://github.com/kizlo-io/kizlo/commit/5671c01960d173e26276c37f81d7e6f2d276a17d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Let an extension declare the WordPress plugin and endpoints it needs, and fail at startup naming them instead of inside the first request.
+
+- [#144](https://github.com/kizlo-io/kizlo/pull/144) [`f07cdd1`](https://github.com/kizlo-io/kizlo/commit/f07cdd1849fbe258ebd9c7b9bd403ccc91e242ea) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Check generated WordPress clients against their live contract without changing files
+
+- [#147](https://github.com/kizlo-io/kizlo/pull/147) [`d8b2031`](https://github.com/kizlo-io/kizlo/commit/d8b203185393979bb83b10a7ca250392179833fe) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Resolve a call to an endpoint the generated client does not have to a `rest_no_route` failure naming the path, instead of throwing `is not a function`.
+
+- [#135](https://github.com/kizlo-io/kizlo/pull/135) [`b5e025a`](https://github.com/kizlo-io/kizlo/commit/b5e025a3cae52aee989e5c368734ab9541e45878) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Camelize generated operation names, so a multi-word endpoint is called as `cart.addItem()` rather than `cart.add_item()`.
+
+- [#156](https://github.com/kizlo-io/kizlo/pull/156) [`f05dfbd`](https://github.com/kizlo-io/kizlo/commit/f05dfbd8b557044d0cb5ed2c62495a91e14df3f2) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Choose the WordPress version the local stacks boot with `dev.version` and `test.version` in `kizlo.config.*`, defaulting to current WordPress.
+
+- [#122](https://github.com/kizlo-io/kizlo/pull/122) [`9c64887`](https://github.com/kizlo-io/kizlo/commit/9c648873d0e245923d3984efc731d1f9b0815652) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Read comments and menu items through generated endpoints; the comment submission route moves to `kizlo.comments.create`.
+
+- [#120](https://github.com/kizlo-io/kizlo/pull/120) [`0907c34`](https://github.com/kizlo-io/kizlo/commit/0907c34c824fb022973d1625f0f999f88063067c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Accept per-request headers on generated WordPress endpoint calls, alongside signal and timeout.
+
+- [#119](https://github.com/kizlo-io/kizlo/pull/119) [`792337d`](https://github.com/kizlo-io/kizlo/commit/792337dcb3e21e981c866ffdb1938d24db49fde6) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Generate a typed WordPress client from the active introspection document. Replace `wordpress.posts.*` and `wordpress.pages.*` with `wordpress.postTypes.post.*` and `wordpress.postTypes.page.*`, replace `wordpress.categories.*` and `wordpress.tags.*` with `wordpress.taxonomies.category.*` and `wordpress.taxonomies.postTag.*`, move `wordpress.menus.items.*` to `wordpress.menuItems.*`, and rename resource `.get()` calls to `.retrieve()`.
+
+- [#133](https://github.com/kizlo-io/kizlo/pull/133) [`74c614d`](https://github.com/kizlo-io/kizlo/commit/74c614d7f0db78dc7efd355553befa690432e797) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Resolve a generated WordPress call to an `invalid_path_parameter` failure instead of throwing when a path parameter is missing or unusable.
+
+- [#119](https://github.com/kizlo-io/kizlo/pull/119) [`792337d`](https://github.com/kizlo-io/kizlo/commit/792337dcb3e21e981c866ffdb1938d24db49fde6) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Allow calling a WordPress endpoint without an input when none of its fields are required.
+
+- [#124](https://github.com/kizlo-io/kizlo/pull/124) [`768153f`](https://github.com/kizlo-io/kizlo/commit/768153f3997a2bec95e4fff6113d0fac424f634b) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Generate the routes WordPress could publish when another plugin's declaration was excluded, and add `kizlo generate --strict` to refuse a partial contract instead.
+
+- [#110](https://github.com/kizlo-io/kizlo/pull/110) [`3acf960`](https://github.com/kizlo-io/kizlo/commit/3acf960ac4c7176a6462aa34e05067825a3bbbbd) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Return a not-found error instead of a server error when a post type or taxonomy is not exposed through the Kizlo API.
+
+- [#131](https://github.com/kizlo-io/kizlo/pull/131) [`d427542`](https://github.com/kizlo-io/kizlo/commit/d42754222ee839181e2a6c622dd1d444292f6368) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Stop exporting the WordPress base-path constants the generated endpoints replaced.
+
+- [#130](https://github.com/kizlo-io/kizlo/pull/130) [`2be895e`](https://github.com/kizlo-io/kizlo/commit/2be895e0725bd9cf1ceab514dddfbcf5927603a9) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add `worktrees` to give each branch its own local dev and test WordPress instead of sharing one across every checkout.
+
+### Patch Changes
+
+- [#157](https://github.com/kizlo-io/kizlo/pull/157) [`e1dbe9b`](https://github.com/kizlo-io/kizlo/commit/e1dbe9bafdb9ccca32eda2999abbac2683a08fd3) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Reclaim orphaned dev stacks and stale watcher locks after PID reuse
+
+- [#165](https://github.com/kizlo-io/kizlo/pull/165) [`2733dbe`](https://github.com/kizlo-io/kizlo/commit/2733dbedc91d9197b73a0f81419861868f1a7c49) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Report comment `postedAt` as the correct UTC timestamp regardless of server timezone
+
+- [#132](https://github.com/kizlo-io/kizlo/pull/132) [`ecc1fd7`](https://github.com/kizlo-io/kizlo/commit/ecc1fd7982ebcc765ad5fc145da8abd096b36e60) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Autocomplete declared response headers and type required values as present
+
+- [#134](https://github.com/kizlo-io/kizlo/pull/134) [`c430187`](https://github.com/kizlo-io/kizlo/commit/c4301877721c13d3018c1280acbb4b8656831dea) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Format generated WordPress clients like hand-written TypeScript
+
+- [#160](https://github.com/kizlo-io/kizlo/pull/160) [`df97e7d`](https://github.com/kizlo-io/kizlo/commit/df97e7d7fa2cb90c7cc7be0326b01dc0308b8930) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Route unexpected request errors through the configured logger adapter
+
+- [#138](https://github.com/kizlo-io/kizlo/pull/138) [`c92cf87`](https://github.com/kizlo-io/kizlo/commit/c92cf870a9743861ff5c76180216d57d84376ce1) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Reject generated API namespaces that shadow any public WordPress transport method
+
+- [#164](https://github.com/kizlo-io/kizlo/pull/164) [`ef5f7de`](https://github.com/kizlo-io/kizlo/commit/ef5f7defdffd007dca1db619be91f8009404c889) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Decode cookie values when reading them over HTTP, so an encoded value round-trips back to what was stored
+
+- [#120](https://github.com/kizlo-io/kizlo/pull/120) [`0907c34`](https://github.com/kizlo-io/kizlo/commit/0907c34c824fb022973d1625f0f999f88063067c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Resolve a successful transactional email send instead of throwing `Failed to send email`.
+
+- [#166](https://github.com/kizlo-io/kizlo/pull/166) [`2b06317`](https://github.com/kizlo-io/kizlo/commit/2b06317cdc5541cb9305303597be31e3b40fb48f) Thanks [@IDJGILL](https://github.com/IDJGILL)! - End `kizlo dev` when its local WordPress stops instead of polling a dead address indefinitely
+
+- [#139](https://github.com/kizlo-io/kizlo/pull/139) [`2e2601a`](https://github.com/kizlo-io/kizlo/commit/2e2601aacccd38c5edf3eec4082f2019c6f42d3d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Report an introspection version mismatch as the upgrade that fixes it, and name an outdated WordPress plugin at generation
+
+- [#141](https://github.com/kizlo-io/kizlo/pull/141) [`1ce44f4`](https://github.com/kizlo-io/kizlo/commit/1ce44f419643267231a1a865cc5812ed951647aa) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Name the generation that failed in the dev poll's error line, so a workspace with only the client no longer reports a WordPress service failure.
+
+- [#140](https://github.com/kizlo-io/kizlo/pull/140) [`ec115df`](https://github.com/kizlo-io/kizlo/commit/ec115df24e162feb97abe90dc0b58aa9cc39a98a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Report a repeated `kizlo dev` generation failure once rather than once every poll
+
+- [#161](https://github.com/kizlo-io/kizlo/pull/161) [`852acfd`](https://github.com/kizlo-io/kizlo/commit/852acfd8b7a9621b7ae7b1638f5c3958fe14a0ee) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Quote host paths in the generated Docker Compose override so `kizlo dev` and `kizlo test` work from a Windows path
+
+- [#150](https://github.com/kizlo-io/kizlo/pull/150) [`b9c1770`](https://github.com/kizlo-io/kizlo/commit/b9c1770e06b495d8a7c278ff616bc208222b3f2f) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Inherit from a nullable parent schema instead of generating an `extends` clause TypeScript rejects, and refuse to write a client that does not compile.
+
+- [#158](https://github.com/kizlo-io/kizlo/pull/158) [`c9206d5`](https://github.com/kizlo-io/kizlo/commit/c9206d5cb1c7bec47e22e737f625d0ee475cc3cb) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Keep the contract watcher available after a failed `kizlo dev` start instead of leaving the lock held
+
+- [#143](https://github.com/kizlo-io/kizlo/pull/143) [`cb59901`](https://github.com/kizlo-io/kizlo/commit/cb59901343b530762fbc6c4ad59618848f0f8ccf) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Stop appending `context=edit` to every WordPress request, so a route receives only what its contract declares
+
+- [#123](https://github.com/kizlo-io/kizlo/pull/123) [`aea0646`](https://github.com/kizlo-io/kizlo/commit/aea0646e4bd91e59ef1ece274ebe8f1a5f694864) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Type an object with undescribed contents as `Record<string, unknown>` rather than one that admits no keys.
+
+- [#145](https://github.com/kizlo-io/kizlo/pull/145) [`5e2dc82`](https://github.com/kizlo-io/kizlo/commit/5e2dc82481ddb06c3ceea50fc3df635d9c90b937) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Narrow the generated error unions to drop `rest_forbidden_context` where a route can no longer answer it
+
+- [#146](https://github.com/kizlo-io/kizlo/pull/146) [`106fba5`](https://github.com/kizlo-io/kizlo/commit/106fba565cb9aeb8479fd04f958b99bbc0fe1d72) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Narrow the generated error unions to drop the permission-check codes a `kizlo/v1` route cannot answer
+
+- [#166](https://github.com/kizlo-io/kizlo/pull/166) [`2b06317`](https://github.com/kizlo-io/kizlo/commit/2b06317cdc5541cb9305303597be31e3b40fb48f) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Stop the dev watchdog from shutting down local WordPress while the session is busy generating
+
+- [#153](https://github.com/kizlo-io/kizlo/pull/153) [`c3448e4`](https://github.com/kizlo-io/kizlo/commit/c3448e49f5b1a67a6b3c9a0668f010a132682dd3) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Report unreachable WordPress URLs without blaming the plugin
+
+- [#152](https://github.com/kizlo-io/kizlo/pull/152) [`2506231`](https://github.com/kizlo-io/kizlo/commit/2506231f61b20ab74ca7ba013f6d0607529ea651) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Pin the WordPress image the local stack boots so a core release cannot make a committed client stale
+
+- [#162](https://github.com/kizlo-io/kizlo/pull/162) [`5f2dc36`](https://github.com/kizlo-io/kizlo/commit/5f2dc36f4c4f461bc526c669bc817503a991e1d0) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Clear missing parent references from roots in grouped menu results
+
+- [#152](https://github.com/kizlo-io/kizlo/pull/152) [`2506231`](https://github.com/kizlo-io/kizlo/commit/2506231f61b20ab74ca7ba013f6d0607529ea651) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Settle background plugin work during bootstrap so a fresh stack and a warm one generate the same client
+
+- [#159](https://github.com/kizlo-io/kizlo/pull/159) [`97bc53e`](https://github.com/kizlo-io/kizlo/commit/97bc53e34633287b273f7ae845b814e3877b3b6b) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Prefer physical private-LAN addresses for local WordPress URLs
+
+- [#163](https://github.com/kizlo-io/kizlo/pull/163) [`2739d94`](https://github.com/kizlo-io/kizlo/commit/2739d945c6109e467707f4ca8b58692a515053c8) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Forward every response cookie exactly once
+
+- Updated dependencies [[`cb1648e`](https://github.com/kizlo-io/kizlo/commit/cb1648eff6e3d1813afb8b54956ac3e78f2ad94a), [`5671c01`](https://github.com/kizlo-io/kizlo/commit/5671c01960d173e26276c37f81d7e6f2d276a17d), [`9c64887`](https://github.com/kizlo-io/kizlo/commit/9c648873d0e245923d3984efc731d1f9b0815652), [`0907c34`](https://github.com/kizlo-io/kizlo/commit/0907c34c824fb022973d1625f0f999f88063067c)]:
+  - @kizlo/shared@0.7.0
+
 ## 0.14.1
 
 ### Patch Changes
