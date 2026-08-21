@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { existsSync } from "node:fs"
-import { networkInterfaces } from "node:os"
+import { type NetworkInterfaceInfo, networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { WordPressTransport } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
@@ -40,14 +40,19 @@ function generatePassword(): string {
 	return randomBytes(18).toString("base64url")
 }
 
-/** First non-internal IPv4 address — the router-assigned LAN address (undefined when offline). */
-function lanAddress(): string | undefined {
-	for (const ifaces of Object.values(networkInterfaces())) {
+const VIRTUAL_INTERFACE = /^(?:docker|br-|veth|utun|tun|tap)/i
+const PRIVATE_IPV4 = /^(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/
+
+/** Preferred private IPv4 address on a physical interface (undefined when offline). */
+export function lanAddress(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces()): string | undefined {
+	const candidates: string[] = []
+	for (const [name, ifaces] of Object.entries(interfaces)) {
+		if (VIRTUAL_INTERFACE.test(name)) continue
 		for (const iface of ifaces ?? []) {
-			if (iface.family === "IPv4" && !iface.internal) return iface.address
+			if (iface.family === "IPv4" && !iface.internal) candidates.push(iface.address)
 		}
 	}
-	return undefined
+	return candidates.find((address) => PRIVATE_IPV4.test(address)) ?? candidates[0]
 }
 
 /**
