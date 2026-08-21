@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { resolveKizloConfig } from "./kizlo"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+import { Kizlo, resolveKizloConfig } from "./kizlo"
 
 const KEYS = [
 	"KIZLO_CONNECT",
@@ -84,5 +84,38 @@ describe("resolveKizloConfig connect selection", () => {
 	test("a missing local key throws an error naming the resolved key", () => {
 		delete process.env.KIZLO_LOCAL_WP_URL
 		expect(() => resolve({ connect: "local" })).toThrow(/KIZLO_LOCAL_WP_URL/)
+	})
+})
+
+describe("request error interceptor", () => {
+	test("reports unexpected errors through the logger and preserves the thrown error", async () => {
+		const failure = new Error("unexpected failure")
+		const logger = vi.fn()
+		const kizlo = new Kizlo({
+			baseUrl: "https://app.example",
+			siteSecret: "site-secret",
+			environment: "test",
+			connect: "remote",
+			adapters: { logger },
+			credentials: { url: "https://wp.example", username: "admin", password: "secret" },
+		})
+		const interceptor = (
+			kizlo as unknown as {
+				errorInterceptor(): (options: {
+					context: ReturnType<typeof kizlo.context.createServerContext>
+					next: () => Promise<never>
+				}) => Promise<never>
+			}
+		).errorInterceptor()
+
+		await expect(interceptor({ context: kizlo.context.createServerContext(), next: () => Promise.reject(failure) })).rejects.toBe(failure)
+		expect(logger).toHaveBeenCalledOnce()
+		expect(logger).toHaveBeenCalledWith(
+			expect.objectContaining({
+				level: "error",
+				message: "Request handler failed",
+				error: failure,
+			}),
+		)
 	})
 })

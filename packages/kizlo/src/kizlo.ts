@@ -128,7 +128,7 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 	}
 
 	private errorInterceptor() {
-		return async ({ next }: { next: () => Promise<any> }) => {
+		return async ({ context, next }: { context: ProcedureContext; next: () => Promise<any> }) => {
 			const [err, data] = await tryCatch(next())
 
 			if (err) {
@@ -140,7 +140,7 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 					})
 				}
 
-				console.log(err)
+				context.logger.error("Request handler failed", err)
 
 				throw err
 			}
