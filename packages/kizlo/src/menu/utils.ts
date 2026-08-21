@@ -57,15 +57,15 @@ export function extractPath(url: string, isCustom: boolean): string {
 	return trimmed
 }
 
-export function buildMenuGroupItem(wpItem: WPK_MenuItem, items: WPK_MenuItem[]): MenuGroupItem {
+export function buildMenuGroupItem(wpItem: WPK_MenuItem, items: WPK_MenuItem[], parent: number | null): MenuGroupItem {
 	const children = items
 		.filter((item) => item.parent === wpItem.id)
 		.sort((a, b) => a.menu_order - b.menu_order)
-		.map((child) => buildMenuGroupItem(child, items))
+		.map((child) => buildMenuGroupItem(child, items, wpItem.id))
 
 	return {
 		id: wpItem.id,
-		parent: wpItem.parent === 0 ? null : wpItem.parent,
+		parent,
 		type: wpItem.object,
 		objectId: wpItem.object_id,
 		href: extractPath(wpItem.url, wpItem.object === "custom"),
