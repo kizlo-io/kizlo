@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+import type { ProcedureContext } from "./context"
 import { Kizlo, resolveKizloConfig } from "./kizlo"
 
 const KEYS = [
@@ -117,5 +118,35 @@ describe("request error interceptor", () => {
 				error: failure,
 			}),
 		)
+	})
+})
+
+describe("response headers", () => {
+	test("forwards each cookie once when a response sets multiple cookies", async () => {
+		const kizlo = new Kizlo({
+			baseUrl: "https://app.example",
+			siteSecret: "site-secret",
+			environment: "test",
+			connect: "remote",
+			credentials: { url: "https://wp.example", username: "admin", password: "secret" },
+		})
+		const openapiHandler = (
+			kizlo as unknown as {
+				openapiHandler: {
+					handle: (request: Request, options: { context: ProcedureContext }) => Promise<{ matched: true; response: Response }>
+				}
+			}
+		).openapiHandler
+		vi.spyOn(openapiHandler, "handle").mockImplementation(async (_request, { context }) => {
+			context.headers?.append("Set-Cookie", "session=one; Path=/")
+			context.headers?.append("Set-Cookie", "preference=two; Path=/")
+			context.headers?.set("X-Context", "forwarded")
+			return { matched: true, response: new Response(null) }
+		})
+
+		const response = await kizlo.handler(new Request("https://app.example/test"))
+
+		expect(response.headers.getSetCookie()).toEqual(["session=one; Path=/", "preference=two; Path=/"])
+		expect(response.headers.get("X-Context")).toBe("forwarded")
 	})
 })

@@ -114,14 +114,11 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 		if (!result.matched) return new Response("Not Found", { status: 404 })
 
 		for (const [key, value] of context.headers.entries()) {
-			if (key.toLowerCase() === "set-cookie") {
-				const cookies = context.headers.getSetCookie()
-				cookies.forEach((cookie) => {
-					result.response.headers.append("Set-Cookie", cookie)
-				})
-			} else {
-				result.response.headers.set(key, value)
-			}
+			if (key.toLowerCase() === "set-cookie") continue
+			result.response.headers.set(key, value)
+		}
+		for (const cookie of context.headers.getSetCookie()) {
+			result.response.headers.append("Set-Cookie", cookie)
 		}
 
 		return result.response
