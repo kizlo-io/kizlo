@@ -149,16 +149,16 @@ export function syncLocalUrl(configDir: string, url: string): boolean {
  * `next dev` child server — nothing stops them automatically when we die. A dying process
  * also can't be trusted to finish async work (a closed terminal breaks its stdout
  * mid-write), so this process does no docker work on the way out. It only needs to
- * *exit*; the watchdog, watching our PID from its own session, stops it the moment
- * we're gone — by Ctrl+C, SIGTERM, a closed tab, SIGKILL, or a crash alike.
+ * *exit*; the watchdog verifies our process identity from its own session and stops it
+ * the moment we're gone, by Ctrl+C, SIGTERM, a closed tab, SIGKILL, or a crash alike.
  *
  * We trigger that exit two ways, because neither alone is enough: signal handlers (for
  * Ctrl+C / `kill`), and an stdin/TTY-close watch (for a closed terminal, whose SIGHUP
  * an `npm`/`pnpm` wrapper silently swallows — leaving us orphaned but alive otherwise).
  */
-function armForegroundTeardown(cfg: ResolvedDevConfig): void {
-	registerSession(cfg.project)
-	spawnWatchdog(cfg.project)
+async function armForegroundTeardown(cfg: ResolvedDevConfig): Promise<void> {
+	const owner = await registerSession(cfg.project)
+	spawnWatchdog(cfg.project, owner)
 
 	let exiting = false
 	const shutdown = (reason: string): void => {
@@ -264,15 +264,15 @@ async function rebootStack(cwd: string, label: string): Promise<ResolvedDevConfi
  * teardown first (so a mid-startup cancel still stops partial containers), boots and prints the
  * summary, then parks. While parked it watches `.env` and `kizlo.config.*`: a change reboots the whole
  * stack in place so a new port, connection, or fixture takes effect without rerunning the command. The
- * reboot runs in the same process — the watchdog and session keep watching this PID throughout — and is
- * guarded so the credential/URL writes it makes to `.env` don't trigger another reboot. A referenced
+ * reboot runs in the same process. The watchdog and session keep watching this owner throughout, and it
+ * is guarded so the credential/URL writes it makes to `.env` don't trigger another reboot. A referenced
  * timer holds the event loop open — an unresolved promise alone would not, so without it Node would
  * empty its loop and exit straight after printing.
  */
 async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	const cwd = process.cwd()
 	let ready = await prepareStack(cfg)
-	armForegroundTeardown(ready)
+	await armForegroundTeardown(ready)
 	await bootAndReport(ready)
 
 	let stopContract = await startWatcher(ready.configDir)

@@ -4,6 +4,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
+import { currentProcessOwner, ownerAlive, type ProcessOwner, type StoredProcessOwner } from "../process-owner"
 
 const exec = promisify(execFile)
 
@@ -16,12 +17,8 @@ function registryPath(): string {
 	return join(homedir(), ".cache", "kizlo", "dev-sessions.json")
 }
 
-/** A live foreground session: the compose project and the PID that owns it. */
-interface Session {
-	pid: number
-}
-
-type Registry = Record<string, Session>
+/** A live foreground session, including the discriminator that survives PID reuse. */
+type Registry = Record<string, StoredProcessOwner>
 
 function readRegistry(): Registry {
 	const file = registryPath()
@@ -39,19 +36,9 @@ function writeRegistry(registry: Registry): void {
 	writeFileSync(file, JSON.stringify(registry, null, 2))
 }
 
-/** True when a process with this PID is still alive (signal 0 probes without killing). */
-function pidAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0)
-		return true
-	} catch {
-		return false
-	}
-}
-
 /**
  * Stop a compose project's containers by label, without needing its compose files.
- * Used for orphans owned by a dead PID — we can't assume we're in that project's
+ * Used for orphans whose recorded owner is gone. We can't assume we're in that project's
  * directory, so we target the running containers directly rather than via compose.
  */
 async function stopByProject(project: string): Promise<void> {
@@ -89,10 +76,10 @@ export async function removeProjectContainers(project: string): Promise<boolean>
  * being stopped, so the watchdog would have nothing to do). Best effort: a failure
  * here just means we fall back to signal handlers + the startup reaper.
  */
-export function spawnWatchdog(project: string): number | undefined {
+export function spawnWatchdog(project: string, owner: ProcessOwner): number | undefined {
 	try {
 		const watchdog = fileURLToPath(new URL("./watchdog.js", import.meta.url))
-		const child = spawn(process.execPath, [watchdog, String(process.pid), project], {
+		const child = spawn(process.execPath, [watchdog, String(owner.pid), String(owner.port), owner.token, project], {
 			detached: true,
 			stdio: "ignore",
 		})
@@ -104,10 +91,12 @@ export function spawnWatchdog(project: string): number | undefined {
 }
 
 /** Record this process as the owner of `project`'s foreground stack. */
-export function registerSession(project: string): void {
+export async function registerSession(project: string): Promise<ProcessOwner> {
+	const owner = await currentProcessOwner()
 	const registry = readRegistry()
-	registry[project] = { pid: process.pid }
+	registry[project] = owner
 	writeRegistry(registry)
+	return owner
 }
 
 /** Drop `project` from the registry (graceful teardown). Best effort. */
@@ -133,7 +122,7 @@ export async function reapOrphans(): Promise<string[]> {
 	let changed = false
 
 	for (const [project, session] of Object.entries(registry)) {
-		if (pidAlive(session.pid)) continue
+		if (await ownerAlive(session)) continue
 		try {
 			await stopByProject(project)
 			reaped.push(project)

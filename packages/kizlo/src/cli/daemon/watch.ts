@@ -130,7 +130,7 @@ function refreshWordPress(
  */
 export async function startWatcher(cwd: string, opts?: { dir?: string }): Promise<(() => void) | undefined> {
 	const lock = lockPath(cwd)
-	if (!acquire(lock)) {
+	if (!(await acquire(lock))) {
 		log.info("Watcher already running — skipping the contract watcher.")
 		return undefined
 	}
