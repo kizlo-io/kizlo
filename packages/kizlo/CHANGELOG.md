@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.15.1
+
+### Patch Changes
+
+- [#167](https://github.com/kizlo-io/kizlo/pull/167) [`d88c350`](https://github.com/kizlo-io/kizlo/commit/d88c350ef814834bf1f9bdef8c17cdb6a3b2f615) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Resolve import aliases against the project's tsconfig instead of assuming the template's alias exists
+
 ## 0.15.0
 
 ### Minor Changes
