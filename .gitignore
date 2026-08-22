@@ -72,7 +72,10 @@ debug.txt
 
 .temp
 # agent worktrees (one isolated checkout per session)
-# .agents/ is where the workflow skill puts them; harnesses that pick their own
-# location keep using it, so both are ignored.
+# .worktrees/ is where the workflow skill puts them; harnesses that pick their
+# own location keep using theirs, so all of them are ignored. .agents/worktrees/
+# is the skill's old location, kept here so a session still running the old
+# instructions cannot commit a checkout.
+.worktrees/
 .agents/worktrees/
 .claude/worktrees/

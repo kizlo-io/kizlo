@@ -132,11 +132,52 @@ git status --porcelain
 
 **If it prints anything, name what is dirty and pause for a one-word confirm.** Nothing here touches those files, so the pause exists only so the user can say "that is work in progress, carry on" rather than discovering later that they expected it to come along. A clean tree needs no pause.
 
+### Sweep what is finished first
+
+Merged work leaves three things behind: a worktree, a local branch, and a branch on `origin`. All three go together, and a few dozen abandoned worktrees is tens of gigabytes held for issues that shipped weeks ago. Clear the finished ones before adding another.
+
+**`.worktrees/` is the entire scope.** A worktree under it was created by this skill and belongs to it, so it is the one thing safe to reclaim automatically. A branch with no worktree is somebody's, made by hand or on another machine or before this workflow existed. So enumerate the directory and work outward to the branch it holds. **Never enumerate branches or PRs and work inward**, which is what turns a cleanup into deleting other people's work.
+
+```bash
+git worktree list --porcelain |
+  awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}' |
+  grep '/.worktrees/'
+```
+
+Each line is a branch and the worktree holding it. Look up the PR for each:
+
+```bash
+gh pr list --head fix/kiz-70-<slug> --state all \
+  --json number,state,mergedAt,headRefOid
+```
+
+**Age on its own is not the signal.** A branch untouched for a week can still be waiting on review, and taking its worktree takes the place those comments get fixed. What makes work disposable is its own PR being merged, and the 24 hour delay after that merge is the grace period.
+
+Five checks. **Any of them means leave the entry alone**, worktree and both branches, and say so in the report:
+
+- **No merged PR, or merged under 24 hours ago.** Let `jq` compare the timestamps, `select((.mergedAt | fromdateiso8601) < (now - 86400))`. Never compute the age with `date`, which on macOS reads the trailing `Z` as local time and quietly hands back an age hours off.
+- **An open PR on the same branch.** A branch can hold an old merged PR and a live one at once, which is what `changeset-release/main` does every release. Deleting the remote closes the open PR.
+- **A dirty worktree**, `git -C <path> status --porcelain` printing anything, holding edits that were never in the PR.
+- **Unpushed commits**, `%(upstream:track)` saying `ahead`. Ask while the remote is still there, since deleting it turns the answer into `[gone]`.
+- **A remote tip that is not `headRefOid`**, from `git ls-remote --heads origin <branch>`, meaning someone pushed after the merge and that commit has never been reviewed.
+
+What survives all five goes, remote last:
+
+```bash
+git worktree remove .worktrees/kiz-70
+git branch -D fix/kiz-70-<slug>
+git push origin --delete fix/kiz-70-<slug>
+```
+
+**`-D`, not `-d`.** The repo squash-merges, so a merged branch is never an ancestor of `main` and `-d` refuses every single one of them. The checks above are what make it safe.
+
+This is a write, which is why it sits here rather than in step 1, and it runs without a pause since the go-ahead already covers it. **Report it in one line** with the count and anything skipped, then carry on. Nothing here touches the branch about to be created.
+
 Then, from the main checkout:
 
 ```bash
 git fetch origin main
-git worktree add .agents/worktrees/kiz-70 -b fix/kiz-70-derive-list-parameters origin/main
+git worktree add .worktrees/kiz-70 -b fix/kiz-70-derive-list-parameters origin/main
 ```
 
 **Branch off `origin/main`, never local `main` and never `HEAD`.** This session may have been open for hours while `main` moved, and a branch cut from a stale ref is a merge conflict you handed yourself.
@@ -146,7 +187,7 @@ The branch is `<type>/kiz-<number>-<short-slug>`. Type is the Conventional Commi
 A worktree is a fresh checkout with none of the gitignored files, so carry them across before entering:
 
 ```bash
-cp .env .agents/worktrees/kiz-70/.env    # skip if the repo has no .env
+cp .env .worktrees/kiz-70/.env    # skip if the repo has no .env
 ```
 
 Then move the session into that directory, by whatever the harness running this offers: a tool that takes the path, or a change of working directory. Creating the worktree with git first, rather than letting a harness create one, is what keeps the branch name under this skill's control.
@@ -164,7 +205,7 @@ The install is what the pre-commit hook and step 6 need. The build is what `kizl
 
 Two cases that are not a fresh start:
 
-- **Step 1 found a `kiz-<number>` branch with no worktree.** Attach one to it rather than starting a second branch: `git worktree add .agents/worktrees/kiz-70 fix/kiz-70-<slug>`, no `-b`, no `origin/main`. Then rebase onto fresh `main` from inside it, since the point of step 3 is a current base: `git rebase origin/main`.
+- **Step 1 found a `kiz-<number>` branch with no worktree.** Attach one to it rather than starting a second branch: `git worktree add .worktrees/kiz-70 fix/kiz-70-<slug>`, no `-b`, no `origin/main`. Then rebase onto fresh `main` from inside it, since the point of step 3 is a current base: `git rebase origin/main`.
 - **This session is already in a worktree.** Do not nest one inside another. If it is this issue's worktree, carry on in it. If it is another issue's, stop and tell the user to run the workflow from a session in the main checkout.
 
 If the issue is in `Backlog` or `Todo`, `save_issue` it to `In Progress`. Linear cannot see a local branch, so this is the only time you set this issue's status by hand. Filing new issues from `Also found` is a different write and stays allowed.
@@ -358,10 +399,6 @@ Left to decide: move taxonomy registration to `rest_api_init` in this PR, or spl
 
 Step 3 set `In Progress` and the integration takes it from there: review activity moves it to `In Review`, merge to `Done`. Never touch this issue's status again, never set `Done` yourself, and do not claim the status moved. Say the PR is open, and whether it is still a draft.
 
-**Stay in the worktree.** Do not leave it and do not remove it: review comments land on this branch, and this is where they get fixed. The user ends the session when they are done with it. Removal is theirs to run from the main checkout once the PR merges:
-
-```bash
-git worktree remove .agents/worktrees/kiz-70
-```
+**Stay in the worktree.** Do not leave it and do not remove it: review comments land on this branch, and this is where they get fixed. The user ends the session when they are done with it. Removing it is not their job either, since step 3 of the next issue sweeps it 24 hours after this PR merges.
 
 If the issue never moves once the PR is ready, the `kiz-<number>` token is wrong or the PR did not attach. Say so instead of fixing it by hand.
