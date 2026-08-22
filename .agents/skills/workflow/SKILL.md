@@ -136,42 +136,27 @@ git status --porcelain
 
 Merged work leaves three things behind: a worktree, a local branch, and a branch on `origin`. All three go together, and a few dozen abandoned worktrees is tens of gigabytes held for issues that shipped weeks ago. Clear the finished ones before adding another.
 
-**`.worktrees/` is the entire scope.** A worktree under it was created by this skill and belongs to it, so it is the one thing safe to reclaim automatically. A branch with no worktree is somebody's, made by hand or on another machine or before this workflow existed. So enumerate the directory and work outward to the branch it holds. **Never enumerate branches or PRs and work inward**, which is what turns a cleanup into deleting other people's work.
-
 ```bash
-git worktree list --porcelain |
-  awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}' |
-  grep '/.worktrees/'
+pnpm worktree:sweep
 ```
 
-Each line is a branch and the worktree holding it. Look up the PR for each:
+**That command is the only way this workflow deletes anything.** Never enumerate worktrees, look up PRs, or run `git worktree remove` yourself. Doing it by hand costs a round trip per branch and gets slower every week; `scripts/sweep-worktrees.mjs` decides for every worktree at once off one `gh pr list`, one `git ls-remote`, and one batched `git push --delete`, in about the time a single `gh` call takes.
 
-```bash
-gh pr list --head fix/kiz-70-<slug> --state all \
-  --json number,state,mergedAt,headRefOid
-```
+It prints one `Swept` line and one `Kept` line. **Report those as they stand** and carry on. Add `--dry-run` to see the decision without acting on it, and `--grace-hours <n>` to move the grace period from its default of 24.
 
-**Age on its own is not the signal.** A branch untouched for a week can still be waiting on review, and taking its worktree takes the place those comments get fixed. What makes work disposable is its own PR being merged, and the 24 hour delay after that merge is the grace period.
+Two things about what it does, because you have to be able to answer for them:
 
-Five checks. **Any of them means leave the entry alone**, worktree and both branches, and say so in the report:
+- **`.worktrees/` is the entire scope.** A worktree under it was created by this skill and belongs to it, so it is the one thing safe to reclaim automatically. A branch with no worktree is somebody's, made by hand or on another machine or before this workflow existed, and the script never sees it.
+- **Age on its own is not the signal.** A branch untouched for a week can still be waiting on review, and taking its worktree takes the place those comments get fixed. What makes work disposable is its own PR being merged, and the grace period runs from that merge.
 
-- **No merged PR, or merged under 24 hours ago.** Let `jq` compare the timestamps, `select((.mergedAt | fromdateiso8601) < (now - 86400))`. Never compute the age with `date`, which on macOS reads the trailing `Z` as local time and quietly hands back an age hours off.
-- **An open PR on the same branch.** A branch can hold an old merged PR and a live one at once, which is what `changeset-release/main` does every release. Deleting the remote closes the open PR.
-- **A dirty worktree**, `git -C <path> status --porcelain` printing anything, holding edits that were never in the PR.
-- **Unpushed commits**, `%(upstream:track)` saying `ahead`. Ask while the remote is still there, since deleting it turns the answer into `[gone]`.
-- **A remote tip that is not `headRefOid`**, from `git ls-remote --heads origin <branch>`, meaning someone pushed after the merge and that commit has never been reviewed.
+Every kept entry names its reason. Two of them are a question for the user rather than something that clears on its own:
 
-What survives all five goes, remote last:
+- **`unpushed commits`**, meaning local commits that never reached the PR. Ask now, while the remote still exists, since deleting it turns the answer into `[gone]`.
+- **`origin tip <sha> was pushed after PR #n merged`**, meaning a commit on that branch has never been reviewed.
 
-```bash
-git worktree remove .worktrees/kiz-70
-git branch -D fix/kiz-70-<slug>
-git push origin --delete fix/kiz-70-<slug>
-```
+The rest (`open PR`, inside the grace period, `no merged PR`, `uncommitted changes`) resolve themselves, and need nothing from you beyond the report.
 
-**`-D`, not `-d`.** The repo squash-merges, so a merged branch is never an ancestor of `main` and `-d` refuses every single one of them. The checks above are what make it safe.
-
-This is a write, which is why it sits here rather than in step 1, and it runs without a pause since the go-ahead already covers it. **Report it in one line** with the count and anything skipped, then carry on. Nothing here touches the branch about to be created.
+This is a write, which is why it sits here rather than in step 1, and it runs without a pause since the go-ahead already covers it. Nothing here touches the branch about to be created.
 
 Then, from the main checkout:
 
