@@ -11,6 +11,7 @@ import {
 	detectImportAlias,
 	detectInvokingPackageManager,
 	detectPackageManager,
+	effectiveAlias,
 	ensureGitignored,
 	envKeysPresent,
 	findWorkspaceRoot,
@@ -271,6 +272,16 @@ describe("detectImportAlias", () => {
 	test("returns undefined when there is no tsconfig", () => {
 		expect(detectImportAlias(dir, "src/lib/kizlo")).toBeUndefined()
 	})
+
+	test("prefers the requested prefix over an earlier-declared one", () => {
+		writeTsconfig({ "#/*": ["./src/*"], "@/*": ["./src/*"] })
+		expect(detectImportAlias(dir, "src/lib/kizlo/server", "@")).toEqual({ prefix: "@", importPath: "@/lib/kizlo/server" })
+	})
+
+	test("falls back to a declared alias when the requested prefix is absent", () => {
+		writeTsconfig({ "~/*": ["./src/*"] })
+		expect(detectImportAlias(dir, "src/lib/kizlo/server", "@")).toEqual({ prefix: "~", importPath: "~/lib/kizlo/server" })
+	})
 })
 
 describe("resolveModuleImport", () => {
@@ -283,7 +294,12 @@ describe("resolveModuleImport", () => {
 		expect(resolveModuleImport(dir, "src/lib/kizlo/server", "src/app/api", "@")).toBe("@/lib/kizlo/server")
 	})
 
-	test("falls back to stripping src/ when the alias has no tsconfig mapping", () => {
+	test("falls back to a relative import when the alias has no tsconfig mapping", () => {
+		expect(resolveModuleImport(dir, "src/lib/kizlo/server", "src/app/api", "@")).toBe("../../lib/kizlo/server")
+	})
+
+	test("prefers the requested alias over an earlier-declared one", () => {
+		writeTsconfig({ "#/*": ["./src/*"], "@/*": ["./src/*"] })
 		expect(resolveModuleImport(dir, "src/lib/kizlo/server", "src/app/api", "@")).toBe("@/lib/kizlo/server")
 	})
 
@@ -294,6 +310,27 @@ describe("resolveModuleImport", () => {
 
 	test("falls back to a relative import when nothing is configured", () => {
 		expect(resolveModuleImport(dir, "src/lib/kizlo/server", "src/app/api")).toBe("../../lib/kizlo/server")
+	})
+})
+
+describe("effectiveAlias", () => {
+	test("keeps the deliberate relative-imports choice", () => {
+		writeTsconfig({ "@/*": ["./src/*"] })
+		expect(effectiveAlias(dir, "src/lib/kizlo", "")).toBe("")
+	})
+
+	test("keeps a requested alias the tsconfig declares", () => {
+		writeTsconfig({ "@/*": ["./src/*"] })
+		expect(effectiveAlias(dir, "src/lib/kizlo", "@")).toBe("@")
+	})
+
+	test("drops a requested alias the tsconfig does not declare", () => {
+		writeTsconfig({ "components/*": ["./src/components/*"] })
+		expect(effectiveAlias(dir, "src/lib/kizlo", "@")).toBe("")
+	})
+
+	test("returns nothing when there is no tsconfig at all", () => {
+		expect(effectiveAlias(dir, "src/lib/kizlo", "@")).toBe("")
 	})
 })
 

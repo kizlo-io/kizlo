@@ -54,7 +54,13 @@ const configSchema = z.object({
 	 * Absent on templates whose client resolves the backend URL itself. See {@link withApiPath}.
 	 */
 	apiPath: z.string().optional(),
-	/** Import alias prefix the template's files use, e.g. `@` (empty rewrites cross-file imports to relative). */
+	/**
+	 * Import alias prefix the template's files are written against, e.g. `@` (empty rewrites cross-file
+	 * imports to relative). Two jobs: the authoring convention {@link rewriteAliasImports} matches on to
+	 * find those imports, and a *preference* for the output. It is not a guarantee the scaffolded project
+	 * declares it — the bootstrapping CLI owns tsconfig — so `create` checks it against the real `paths`
+	 * and falls back to relative imports when nothing backs it up.
+	 */
 	alias: z.string(),
 	/** Kizlo home directory in the template, e.g. `src/lib/kizlo`; retargeted to the user's chosen Kizlo dir on apply. */
 	kizloPath: z.string(),
