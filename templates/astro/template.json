@@ -81,11 +81,6 @@
 			},
 			{
 				"kind": "file",
-				"role": "tsconfig",
-				"path": "tsconfig.json"
-			},
-			{
-				"kind": "file",
 				"role": "root-layout",
 				"path": "src/layouts/Layout.astro"
 			},

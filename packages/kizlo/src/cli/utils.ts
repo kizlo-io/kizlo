@@ -86,9 +86,14 @@ function relativeImport(targetRel: string, fromDirRel: string): string {
  * Detects an import alias from tsconfig `paths` that covers `targetRel`, returning
  * `{ prefix, importPath }`. The prefix is what `init` persists to kizlo.config;
  * the import path is the full specifier. Returns undefined when no alias matches.
+ * `preferred` (with or without its trailing slash) names the prefix the caller would
+ * rather have and wins over an earlier-declared one — a project mapping both `#/*` and
+ * `@/*` onto the same root would otherwise silently switch to whichever it declares first.
  */
-export function detectImportAlias(cwd: string, targetRel: string): { prefix: string; importPath: string } | undefined {
+export function detectImportAlias(cwd: string, targetRel: string, preferred?: string): { prefix: string; importPath: string } | undefined {
 	const target = targetRel.split(path.sep).join("/").replace(/\/+$/, "")
+	const want = preferred?.replace(/\/+$/, "")
+	let fallback: { prefix: string; importPath: string } | undefined
 
 	for (const [alias, mappings] of Object.entries(readTsconfigPaths(cwd) ?? {})) {
 		if (!alias.endsWith("/*")) continue
@@ -97,10 +102,13 @@ export function detectImportAlias(cwd: string, targetRel: string): { prefix: str
 			if (!mapping.endsWith("/*")) continue
 			const base = mapping.slice(0, -2).replace(/^\.\//, "").replace(/^\.$/, "").replace(/\/+$/, "")
 			const baseSlash = base ? `${base}/` : ""
-			if (target === base || target.startsWith(baseSlash)) return { prefix, importPath: `${prefix}/${target.slice(baseSlash.length)}` }
+			if (target !== base && !target.startsWith(baseSlash)) continue
+			const match = { prefix, importPath: `${prefix}/${target.slice(baseSlash.length)}` }
+			if (prefix === want) return match
+			fallback ??= match
 		}
 	}
-	return undefined
+	return fallback
 }
 
 /**
@@ -113,21 +121,25 @@ export function aliasWithSlash(alias: string | undefined): string {
 }
 
 /**
- * Builds an import specifier for `targetRel` from `fromDirRel`. With an explicit
- * `alias` prefix (from kizlo.config), builds `<alias>/<target>`; an empty alias
- * forces a relative import. Without one, detects from tsconfig, else relative.
+ * Builds an import specifier for `targetRel` from `fromDirRel`. An empty `alias` forces a relative
+ * import; any other value is a preference, checked against tsconfig `paths` rather than asserted.
+ * An alias the project never declares falls back to relative, which always resolves — writing
+ * `@/lib/kizlo/server` into a project with no `@` mapping breaks its typecheck and its build.
  */
 export function resolveModuleImport(cwd: string, targetRel: string, fromDirRel: string, alias?: string): string {
-	const target = targetRel.split(path.sep).join("/").replace(/\/+$/, "")
+	if (alias === "") return relativeImport(targetRel, fromDirRel)
+	return detectImportAlias(cwd, targetRel, alias)?.importPath ?? relativeImport(targetRel, fromDirRel)
+}
 
-	if (alias !== undefined) {
-		if (alias === "") return relativeImport(targetRel, fromDirRel)
-		const prefix = alias.replace(/\/+$/, "")
-		const base = detectImportAlias(cwd, targetRel)
-		return base && base.prefix === prefix ? base.importPath : `${prefix}/${target.replace(/^src\//, "")}`
-	}
-
-	return detectImportAlias(cwd, targetRel)?.importPath ?? relativeImport(targetRel, fromDirRel)
+/**
+ * The alias imports will really be written through, once the requested one is checked against the
+ * project's tsconfig — `""` when nothing declared there covers `targetRel`. The single answer
+ * `create` and `init` persist to kizlo.config, show in their summary and warn from, so all three
+ * agree with what {@link resolveModuleImport} goes on to emit.
+ */
+export function effectiveAlias(cwd: string, targetRel: string, requested: string | undefined): string {
+	if (requested === "") return ""
+	return detectImportAlias(cwd, targetRel, requested)?.prefix ?? ""
 }
 
 /**

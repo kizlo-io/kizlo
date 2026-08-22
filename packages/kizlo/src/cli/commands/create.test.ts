@@ -382,7 +382,7 @@ describe("applyManifestWiring (astro)", () => {
 		fs.rmSync(dir, { recursive: true, force: true })
 	})
 
-	it("scaffolds Astro wiring, owns the SSR config + tsconfig alias, and records the node adapter", async () => {
+	it("scaffolds Astro wiring, owns the SSR config, and records the node adapter", async () => {
 		await applyManifestWiring(dir, astroTemplateDir, manifest, { includeExamples: true })
 
 		// Wiring lands under the Astro conventions (src/pages, src/lib/kizlo, src/components).
@@ -402,9 +402,8 @@ describe("applyManifestWiring (astro)", () => {
 		expect(config).toContain('output: "server"')
 		expect(config).toContain("@astrojs/node")
 
-		// And the tsconfig, so the scaffolded `@/*` imports resolve.
-		const tsconfig = fs.readFileSync(path.join(dir, "tsconfig.json"), "utf8")
-		expect(tsconfig).toContain("@/*")
+		// The tsconfig belongs to the framework CLI — Kizlo leaves the seeded one exactly as it found it.
+		expect(JSON.parse(fs.readFileSync(path.join(dir, "tsconfig.json"), "utf8"))).toEqual({ extends: "astro/tsconfigs/strict" })
 
 		// The kizlo + node adapter deps are recorded without installing.
 		const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"))
@@ -415,6 +414,27 @@ describe("applyManifestWiring (astro)", () => {
 		// The root layout renders the SEO head component.
 		const layout = fs.readFileSync(path.join(dir, "src/layouts/Layout.astro"), "utf8")
 		expect(layout).toContain("BaseHead")
+	})
+
+	it("writes relative imports when create-astro declared no alias", async () => {
+		// create-astro leaves no `paths`, and Kizlo no longer supplies a tsconfig that would add one, so
+		// every import — the server entry and the template's own `@/layouts/…` — must resolve relatively.
+		await applyManifestWiring(dir, astroTemplateDir, manifest, { includeExamples: true })
+
+		expect(fs.readFileSync(path.join(dir, "src/pages/api/kizlo/[...rest].ts"), "utf8")).toContain('"../../../lib/kizlo/server"')
+		expect(fs.readFileSync(path.join(dir, "src/pages/index.astro"), "utf8")).toContain('"../layouts/Layout.astro"')
+		expect(fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")).toContain('alias: ""')
+	})
+
+	it("uses the alias when the project itself declares one", async () => {
+		fs.writeFileSync(
+			path.join(dir, "tsconfig.json"),
+			JSON.stringify({ extends: "astro/tsconfigs/strict", compilerOptions: { paths: { "@/*": ["./src/*"] } } }),
+		)
+		await applyManifestWiring(dir, astroTemplateDir, manifest, { includeExamples: true })
+
+		expect(fs.readFileSync(path.join(dir, "src/pages/api/kizlo/[...rest].ts"), "utf8")).toContain('"@/lib/kizlo/server"')
+		expect(fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")).toContain('alias: "@/"')
 	})
 
 	it("skips only the example pages when declined, still writing the core config and layout", async () => {

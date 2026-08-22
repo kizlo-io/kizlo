@@ -148,7 +148,7 @@ method, and Kizlo's handler dispatches on the request internally:
 ```ts title="src/routes/api/kizlo/$.ts"
 import { createFileRoute } from "@tanstack/solid-router"
 import { createApiHandlers } from "kizlo/tanstack-start/server"
-import { handler } from "@/lib/kizlo/server"
+import { handler } from "../../../lib/kizlo/server"
 
 export const Route = createFileRoute("/api/kizlo/$")({
   server: {
@@ -202,7 +202,7 @@ import { createServerFn } from "@tanstack/solid-start"
 import { resolveRootHead } from "kizlo/tanstack-start/server"
 import { type JSX, Suspense } from "solid-js"
 import { HydrationScript } from "solid-js/web"
-import { client } from "@/lib/kizlo/server"
+import { client } from "../lib/kizlo/server"
 
 const getRootHead = createServerFn({ method: "GET" }).handler(() => resolveRootHead(client))
 
@@ -240,7 +240,7 @@ Each is a server route that refetches live from WordPress on every request. Crea
 ```ts title="src/routes/robots[.]txt.ts"
 import { createFileRoute } from "@tanstack/solid-router"
 import { createRobotsRoute } from "kizlo/tanstack-start/server"
-import { client } from "@/lib/kizlo/server"
+import { client } from "../lib/kizlo/server"
 
 export const Route = createFileRoute("/robots.txt")({
   server: { handlers: { GET: createRobotsRoute(client) } },
@@ -260,7 +260,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 ```ts title="src/routes/sitemaps/$.ts"
 import { createFileRoute } from "@tanstack/solid-router"
 import { createSitemapRoute } from "kizlo/tanstack-start/server"
-import { client } from "@/lib/kizlo/server"
+import { client } from "../../lib/kizlo/server"
 
 // Splat route so /sitemaps/index.xml and every /sitemaps/{key}.xml page resolve to one handler.
 export const Route = createFileRoute("/sitemaps/$")({
@@ -271,7 +271,7 @@ export const Route = createFileRoute("/sitemaps/$")({
 ```ts title="src/routes/site[.]webmanifest.ts"
 import { createFileRoute } from "@tanstack/solid-router"
 import { createManifestRoute } from "kizlo/tanstack-start/server"
-import { client } from "@/lib/kizlo/server"
+import { client } from "../lib/kizlo/server"
 
 export const Route = createFileRoute("/site.webmanifest")({
   server: { handlers: { GET: createManifestRoute(client) } },
@@ -333,7 +333,7 @@ Each route renders on demand for its slug, so there's no build-time list step.
 import { createFileRoute, notFound } from "@tanstack/solid-router"
 import { createServerFn } from "@tanstack/solid-start"
 import { renderJsonLd, resolvePageHead } from "kizlo/tanstack-start"
-import { client } from "@/lib/kizlo/server"
+import { client } from "../../lib/kizlo/server"
 
 // Return only what the page renders (title, content, SEO) — a lean, serializable payload, not the
 // whole WordPress post. JSON-LD is rendered to a string here so the loader payload stays serializable.

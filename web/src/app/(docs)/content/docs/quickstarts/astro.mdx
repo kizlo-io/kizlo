@@ -83,7 +83,7 @@ root layout's `<head>`.
 
 ```astro title="src/layouts/Layout.astro"
 ---
-import BaseHead from "@/components/BaseHead.astro"
+import BaseHead from "../components/BaseHead.astro"
 ---
 <head>
 	<BaseHead />
@@ -173,7 +173,7 @@ At `src/pages/api/kizlo/[...rest].ts` — `ALL` forwards every HTTP method to th
 
 ```ts title="src/pages/api/kizlo/[...rest].ts"
 import type { APIRoute } from "astro"
-import { handler } from "@/lib/kizlo/server"
+import { handler } from "../../../lib/kizlo/server"
 
 export const ALL: APIRoute = ({ request }) => handler(request)
 ```
@@ -259,8 +259,8 @@ Each route renders on demand for its slug, so there's no build-time list step.
 ```astro title="src/pages/blog/[slug].astro"
 ---
 import { resolvePageHead } from "kizlo/astro/server"
-import Layout from "@/layouts/Layout.astro"
-import { client } from "@/lib/kizlo/server"
+import Layout from "../../layouts/Layout.astro"
+import { client } from "../../lib/kizlo/server"
 
 const { slug } = Astro.params
 const { data } = await client.posts.get({ params: { identifier: slug ?? "" } })

@@ -32,6 +32,7 @@ import {
 	detectInvokingPackageManager,
 	detectPackageManager,
 	type EnvKeys,
+	effectiveAlias,
 	ensureGitignored,
 	getVersion,
 	loadEnvFiles,
@@ -361,14 +362,20 @@ export const init = defineCommand({
 			const persistedAlias = readPersistedAlias(cwd)
 			const aliasCtx = { cwd, hasSrcDir, apiPath, persistedAlias, flagAlias }
 			const setup = yes ? collectFromEnv({ ...aliasCtx, envKeys }) : await collectInteractively(aliasCtx)
-			setup.alias = aliasWithSlash(setup.alias)
+			const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
+
+			// Whatever the alias came from, it is only a preference until the project's tsconfig backs it up.
+			// Resolving it here makes what gets persisted, summarized and printed as manual steps all agree
+			// with the imports actually written, since every one of them reads `setup.alias` below.
+			const requestedAlias = aliasWithSlash(setup.alias)
+			setup.alias = aliasWithSlash(effectiveAlias(cwd, dirRel, setup.alias))
+			const droppedAlias = requestedAlias && !setup.alias ? requestedAlias : undefined
 			if (apiPath && setup.baseUrl) setup.baseUrl = withApiPath(setup.baseUrl, apiPath)
 
 			const includeExamples = yes ? true : orCancel(await p.confirm({ message: "Add example pages?", initialValue: true }))
 
 			// Build the file plan in memory (no writes yet) so existing files can be surfaced before anything
 			// runs — the overwrite decision is made here, during collection, not asked mid-checklist.
-			const dirRel = setup.dir.replace(/^\.\//, "").replace(/\/+$/, "")
 			const serverDirRel = path.join(dirRel, "server")
 			const clientUrl = setup.siteUrl && !sameOrigin(setup.siteUrl, setup.baseUrl) ? setup.baseUrl : undefined
 			const scaffold = buildScaffoldContext(cwd, { dirRel, hasSrcDir, alias: setup.alias, clientUrl })
@@ -422,6 +429,10 @@ export const init = defineCommand({
 			// ── Execute as a checklist ──────────────────────────────────────────────────────────────────
 			if (shouldPersistPm) persistPackageManagerField(cwd, pm)
 			const warnings: string[] = []
+			if (droppedAlias)
+				warnings.push(
+					`No tsconfig path maps \`${droppedAlias}\` onto ${dirRel}, so relative imports were written instead. Add \`"${droppedAlias}*": ["./${hasSrcDir ? "src/" : ""}*"]\` to your tsconfig \`paths\` and re-run to use the alias.`,
+				)
 			const scaffolded: { file: ScaffoldFile; result: ScaffoldResult }[] = []
 			let gitignore: ReturnType<typeof ensureGitignored> = "present"
 			const kizloSpec = `kizlo@${manifest.dependencies?.kizlo ?? `^${getVersion()}`}`

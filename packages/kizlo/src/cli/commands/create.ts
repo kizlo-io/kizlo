@@ -15,10 +15,12 @@ import {
 	type TemplateManifest,
 } from "../presets/template"
 import {
+	aliasWithSlash,
 	approveBuildsCommand,
 	cleanupWorkspaceArtifacts,
 	detectInvokingPackageManager,
 	detectPackageManager,
+	effectiveAlias,
 	ensureGitignored,
 	findWorkspaceRoot,
 	initGitRepository,
@@ -250,9 +252,18 @@ export async function applyManifestWiring(
 	manifest: TemplateManifest,
 	opts: { includeExamples?: boolean; localDev?: boolean },
 ): Promise<void> {
-	const { alias, kizloPath } = manifest.config
+	const { kizloPath } = manifest.config
 	const hasSrcDir = fs.existsSync(path.join(dir, "src"))
+
+	// The manifest's alias is the template author's preference, not a promise the bootstrap kept: the
+	// TanStack Solid and Astro CLIs declare no `paths` at all. Check it against the tsconfig they just
+	// wrote — Kizlo never writes one itself — so what lands in the files is what the project resolves.
+	const alias = aliasWithSlash(effectiveAlias(dir, kizloPath, manifest.config.alias))
 	const scaffold = buildScaffoldContext(dir, { dirRel: kizloPath, hasSrcDir, alias, clientUrl: undefined })
+	if (manifest.config.alias && !alias)
+		p.log.warn(
+			`The ${manifest.name ?? manifest.id} scaffold declares no tsconfig path for \`${aliasWithSlash(manifest.config.alias)}\`, so Kizlo wrote relative imports instead.`,
+		)
 
 	recordDependencies(dir, manifest)
 
