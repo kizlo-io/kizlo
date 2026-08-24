@@ -1,4 +1,5 @@
-import { getKizloTestInstance, getTestCredentials } from "kizlo/test-harness"
+import { type CookiesAdapter, createAuthAdapter } from "kizlo"
+import { getKizloClientTestInstance, getKizloTestInstance, getTestCredentials } from "kizlo/test-harness"
 import { afterAll, beforeAll, expect, test } from "vitest"
 import { Cart } from "./cart/schema"
 import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
@@ -139,6 +140,54 @@ test("the cart survives between calls, so the session header carries identity", 
 
 	expect(result?.lineItems).toHaveLength(1)
 	expect(result?.totalItems).toBe(1)
+})
+
+test("an API guest cart is available to a server-rendered storefront request", async () => {
+	const apiUrl = "http://test.local/api/kizlo"
+	const guestAuth = createAuthAdapter({ getUser: () => null })
+	const guestApi = getKizloTestInstance({ baseUrl: apiUrl, extensions: [woocommerce()], adapters: { auth: guestAuth } })
+	let guestSetCookie: string | undefined
+
+	const browser = await getKizloClientTestInstance(guestApi, {
+		url: apiUrl,
+		fetch: async (request) => {
+			const response = await guestApi.handler(request)
+			guestSetCookie ??= response.headers.getSetCookie().find((header) => header.startsWith("guest-session="))
+			return response
+		},
+	})
+	const added = await browser.client.woocommerce.cart.items.add({ body: { productId, quantity: 1 } })
+
+	expect(added.success).toBe(true)
+	if (!added.success) throw added.error
+	if (!guestSetCookie) throw new Error("The guest cart response set no session cookie.")
+	expect(guestSetCookie).toContain("Path=/")
+	expect(guestSetCookie).toContain("HttpOnly")
+	expect(guestSetCookie).toContain("SameSite=Lax")
+
+	const cookieHeader = guestSetCookie.split(";", 1)[0]
+	if (!cookieHeader) throw new Error("The guest session cookie had no name/value pair.")
+	const storefrontRequest = new Request("http://test.local/cart", { headers: { cookie: cookieHeader } })
+	const storefrontCookies = guestApi.context.createRestContext(storefrontRequest).cookies
+	const cookies: CookiesAdapter = {
+		deleteAll: () => {},
+		getAll: () => storefrontCookies.get(),
+		setAll: () => {},
+	}
+	const storefront = getKizloTestInstance({ extensions: [woocommerce()], adapters: { auth: guestAuth, cookies } })
+
+	const serverCart = await storefront.client.woocommerce.cart.get.call()
+	expect(serverCart?.lineItems).toEqual(expect.arrayContaining([expect.objectContaining({ productId, quantity: 1 })]))
+
+	await emptyCart()
+	const signedInApi = getKizloTestInstance({ baseUrl: apiUrl, extensions: [woocommerce()] })
+	const merged = await signedInApi.handler(new Request(`${apiUrl}/cart`, { headers: { cookie: cookieHeader } }))
+	const deletedCookie = merged.headers.getSetCookie().find((header) => header.startsWith("guest-session="))
+
+	expect(merged.status).toBe(200)
+	expect(deletedCookie).toContain("Path=/")
+	expect(deletedCookie).toContain("Max-Age=0")
+	await emptyCart()
 })
 
 test("cart.items.add maps an unknown product to its Kizlo error", async () => {

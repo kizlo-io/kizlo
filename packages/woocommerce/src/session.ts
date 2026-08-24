@@ -8,6 +8,12 @@ interface TokenPayload {
 	exp: number
 }
 
+const GUEST_COOKIE_OPTIONS = {
+	httpOnly: true,
+	path: "/",
+	sameSite: "lax",
+} as const
+
 async function mintGuestToken(secret: string, ttlSeconds: number): Promise<{ jwt: string; sub: string }> {
 	const sub = random({ length: 32, prefix: "t" })
 
@@ -57,14 +63,14 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 		if (!auth) {
 			if (!foundToken) {
 				const { jwt, sub } = await mintGuestToken(context.config.siteSecret, ttlSeconds)
-				await context.cookies.set({ name: cookieName, value: jwt, options: { httpOnly: true, sameSite: "lax" } })
+				await context.cookies.set({ name: cookieName, value: jwt, options: GUEST_COOKIE_OPTIONS })
 				return next({ context: { sessionHeaders: getCartHeaders({ token: sub, connInfo }) } })
 			}
 
 			const [err, data] = await tryCatch(verifyToken(foundToken, context.config.siteSecret))
 			if (err) {
 				const { jwt } = await mintGuestToken(context.config.siteSecret, ttlSeconds)
-				await context.cookies.set({ name: cookieName, value: jwt, options: { httpOnly: true, sameSite: "lax" } })
+				await context.cookies.set({ name: cookieName, value: jwt, options: GUEST_COOKIE_OPTIONS })
 				throw new KizloError("CART_SESSION_EXPIRED")
 			}
 
@@ -82,7 +88,7 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 				if (response.error) context.logger.error("CART_MERGE_FAILED", response.error)
 			}
 
-			await context.cookies.delete(cookieName)
+			await context.cookies.delete(cookieName, GUEST_COOKIE_OPTIONS)
 		}
 
 		return next({ context: { sessionHeaders: getCartHeaders({ userId: auth.id, connInfo }) } })
