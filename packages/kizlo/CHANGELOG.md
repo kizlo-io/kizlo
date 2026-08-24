@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.15.2
+
+### Patch Changes
+
+- [#169](https://github.com/kizlo-io/kizlo/pull/169) [`4c2e408`](https://github.com/kizlo-io/kizlo/commit/4c2e408679b1d6ef852634310e3cec45ffab467b) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Make guest cart sessions available to server-rendered storefront pages
+
 ## 0.15.1
 
 ### Patch Changes
