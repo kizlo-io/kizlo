@@ -2,7 +2,7 @@ import { endpoints } from "../../../../wordpress"
 import { geoMock } from "../adapters/geo"
 import { consoleLog } from "../adapters/logger"
 import { getTestCredentials } from "../cli/wp/utils"
-import { Kizlo } from "../kizlo"
+import { Kizlo, type ServiceAdapters } from "../kizlo"
 import type { AnyExtension } from "../shared/extension"
 import { testAuthAdapter } from "./auth"
 import { captchaMock } from "./captcha"
@@ -13,11 +13,15 @@ import { toTestUser } from "./users"
  * the test-credentials artifact, with mock geo, auth, and captcha adapters and a
  * warn/error logger. Call procedures directly through its `client` in integration tests.
  */
-export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>(options?: { extensions?: TExts }) {
+export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>(options?: {
+	adapters?: Partial<ServiceAdapters>
+	baseUrl?: string
+	extensions?: TExts
+}) {
 	const creds = getTestCredentials()
 
 	return new Kizlo({
-		baseUrl: "http://test.local",
+		baseUrl: options?.baseUrl ?? "http://test.local",
 		siteSecret: "test-secret",
 		environment: "test",
 		connect: "remote",
@@ -32,6 +36,7 @@ export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>
 			auth: testAuthAdapter(toTestUser(creds.users.user)),
 			captcha: captchaMock(),
 			logger: consoleLog({ levels: ["warn", "error"] }),
+			...options?.adapters,
 		},
 		extensions: options?.extensions,
 	})

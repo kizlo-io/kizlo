@@ -21,7 +21,7 @@ export function createNextCookiesInterface(): CookiesAdapter {
 			const cookieJar = await cookies()
 
 			try {
-				for (const cookie of cookieList) cookieJar.delete(cookie.name)
+				for (const cookie of cookieList) cookieJar.delete({ name: cookie.name, ...cookie.options })
 			} catch {}
 		},
 	}
