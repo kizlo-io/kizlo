@@ -43,7 +43,7 @@
 		"dev": "tsdown -w",
 		"build": "tsdown",
 		"clean": "git clean -xdf .cache .turbo dist node_modules",
-		"prepack": "bun ../../.github/replace-workspace-protocol.ts",
+		"prepack": "bun ../../scripts/prepare-package-for-publish.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run --passWithNoTests"
 	},
