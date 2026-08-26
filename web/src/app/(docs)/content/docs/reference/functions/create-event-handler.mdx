@@ -1,11 +1,11 @@
 ---
 title: createEventHandler
-description: Handle a WordPress webhook event inside an extension.
+description: Handle a WordPress webhook event inside an integration.
 ---
 
 `createEventHandler` builds a handler that runs when WordPress emits a webhook event: a post published, a term
 deleted, or a custom event from your own plugin. Put the result in an
-[extension](/docs/reference/functions/create-extension)'s `init` `events` array. Kizlo dispatches each incoming
+[integration](/docs/reference/functions/create-integration)'s `events` array. Kizlo dispatches each incoming
 event to every handler that matches.
 
 Events are one-way and fire-and-forget. The handler runs server-side after WordPress notifies Kizlo, returns
@@ -42,7 +42,7 @@ it to receive every built-in WordPress event instead. Each entry:
 
 ## Returns
 
-An `EventHandler`. List it in an extension's `init` `events` array.
+An `EventHandler`. List it in an integration's `events` array.
 
 ## Examples
 

@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Kizlo WooCommerce
  * Plugin URI: https://kizlo.io/plugins/kizlo-woocommerce
- * Description: Connects woocommerce plugin with @kizlo/woocommerce extension.
+ * Description: Connects WooCommerce with the @kizlo/woocommerce integration.
  * Version: 0.2.0
  * Author: Kizlo Developers
  * Author URI: https://kizlo.io

@@ -37,7 +37,7 @@ function isExempt(file: string): boolean {
  *
  * It is empty, and the intent is that it stays that way. It held the WooCommerce Store API and REST
  * v3 routes while the plugin had yet to describe them, and each dropped off as its spec landed.
- * Every route a framework-owned router or service reaches for now has a generated endpoint.
+ * Every route framework-owned procedures or services reach for now has a generated endpoint.
  */
 const ALLOWED: Record<string, string[]> = {}
 
@@ -62,7 +62,7 @@ export function findRawCalls(source: string): string[] {
 }
 
 describe("raw WordPress calls", () => {
-	test("production routers and services go through the generated endpoints", () => {
+	test("production procedures and services go through the generated endpoints", () => {
 		const found: Record<string, string[]> = {}
 
 		for (const file of sourceFiles(PACKAGES)) {

@@ -1,40 +1,38 @@
 import { describe, expectTypeOf, it } from "vitest"
 import z from "zod/v4"
 import { createKizloClient } from "./client"
-import type { Kizlo, RootRouter, S2SClient } from "./kizlo"
-import { createExtension } from "./shared/extension"
+import type { Kizlo, RootProcedures, S2SClient } from "./kizlo"
+import { createIntegration } from "./shared/integration"
 import { createProcedure } from "./shared/procedure"
 
 type ResultOf<T> = T extends (...args: never[]) => Promise<infer R> ? R : never
 type SuccessData<R> = R extends { success: true; data: infer D } ? D : never
 type DataOf<T> = SuccessData<ResultOf<T>>
 
-const billing = createExtension({
+const billing = createIntegration({
 	id: "billing",
-	init: () => ({
-		router: {
-			invoices: {
-				get: createProcedure({ scope: "api", path: "/invoices/{id}", output: z.object({ total: z.number() }) }, async () => ({
-					total: 1,
-				})),
-			},
+	procedures: {
+		invoices: {
+			get: createProcedure({ scope: "api", path: "/invoices/{id}", output: z.object({ total: z.number() }) }, async () => ({
+				total: 1,
+			})),
 		},
-	}),
+	},
 })
 
-type Exts = [typeof billing]
+type Integrations = [typeof billing]
 
-declare const kizlo: Kizlo<Exts>
-declare const rootRouter: RootRouter<Exts>
-const browser = createKizloClient(rootRouter)
+declare const kizlo: Kizlo<Integrations>
+declare const rootProcedures: RootProcedures<Integrations>
+const browser = createKizloClient(rootProcedures)
 
 // ====================================================
 // SERVER-TO-SERVER CLIENT
 // ====================================================
 
 describe("Kizlo server-to-server client", () => {
-	it("exposes its type as `S2SClient` over the assembled root router", () => {
-		expectTypeOf(kizlo.client).toEqualTypeOf<S2SClient<Exts>>()
+	it("exposes its type as `S2SClient` over the assembled root procedures", () => {
+		expectTypeOf(kizlo.client).toEqualTypeOf<S2SClient<Integrations>>()
 	})
 
 	it("resolves core api procedure output to the real type, never `any`", () => {
@@ -47,7 +45,7 @@ describe("Kizlo server-to-server client", () => {
 		expectTypeOf<RobotsData>().not.toBeAny()
 	})
 
-	it("mounts an extension's procedures under its id with typed output", () => {
+	it("mounts an integration's procedures under its id with typed output", () => {
 		type GetData = DataOf<typeof kizlo.client.billing.invoices.get>
 		expectTypeOf<GetData>().toEqualTypeOf<{ total: number }>()
 		expectTypeOf<GetData>().not.toBeAny()
@@ -55,7 +53,7 @@ describe("Kizlo server-to-server client", () => {
 })
 
 // ====================================================
-// BROWSER CLIENT — scope filtering
+// BROWSER CLIENT: scope filtering
 // ====================================================
 
 describe("createKizloClient browser client", () => {
@@ -63,7 +61,7 @@ describe("createKizloClient browser client", () => {
 		expectTypeOf(browser.client.posts.list).toBeFunction()
 	})
 
-	it("exposes api-scoped extension procedures", () => {
+	it("exposes api-scoped integration procedures", () => {
 		expectTypeOf(browser.client.billing.invoices.get).toBeFunction()
 	})
 

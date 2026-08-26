@@ -1,4 +1,5 @@
-import { createKizlo } from "kizlo/tanstack-start/server"
+import { createKizlo } from "kizlo"
+import { tanstackStart } from "kizlo/tanstack-start/server"
 import { endpoints } from "./generated"
 
-export const { router, client, context, handler } = createKizlo({ wordpress: { endpoints } })
+export const { procedures, client, context, handler } = createKizlo({ integrations: [tanstackStart()], wordpress: { endpoints } })

@@ -5,7 +5,7 @@ description: Define a single API operation with its scope, schemas, errors, midd
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
-`createProcedure` builds one procedure: a single operation you place as a key in an extension's `router`, where
+`createProcedure` builds one procedure: a single operation you place as a key in an integration's `procedures`, where
 that key becomes a client method typed from the procedure's `output`. It takes an **options** object that
 describes the operation and a **handler** that runs it. See [Examples](#examples) for the full setup.
 
@@ -71,70 +71,68 @@ for the full, type-checked shape:
 
 ## Returns
 
-A `Procedure` object, the value you assign to a `router` key. It's never called directly.
+A `Procedure` object, the value you assign inside a procedure tree. It's never called directly.
 
 Its output type depends on scope. `api` serializes to JSON, so a `Date` arrives as a `string`. `remote` and
 `internal` preserve your original types end to end.
 
 ## Examples
 
-One extension can group procedures of every scope in its `router`. Here an `internal` server-only operation,
+One integration can group procedures of every scope in `procedures`. Here an `internal` server-only operation,
 a `remote` call, and an `api` endpoint, exposed as `client.content.sitemap` / `.search` / `.get`:
 
 ```ts title="src/lib/kizlo/server/content/index.ts"
-import { createExtension, createProcedure } from "kizlo"
+import { createIntegration, createProcedure } from "kizlo"
 import { z } from "zod"
 
 export const content = () =>
-  createExtension({
+  createIntegration({
     id: "content",
-    init: () => ({
-      router: {
-        // internal: server-only, left out of the browser client
-        sitemap: createProcedure(
-          {
-            scope: "internal",
-            output: z.array(z.object({ loc: z.string(), lastmod: z.string() })),
-          },
-          async ({ context }) => buildSitemap(context),
-        ),
+    procedures: {
+      // internal: server-only, left out of the browser client
+      sitemap: createProcedure(
+        {
+          scope: "internal",
+          output: z.array(z.object({ loc: z.string(), lastmod: z.string() })),
+        },
+        async ({ context }) => buildSitemap(context),
+      ),
 
-        // remote: RPC-style, one input schema, types preserved on the client
-        search: createProcedure(
-          {
-            scope: "remote",
-            method: "POST",
-            input: z.object({ term: z.string() }),
-            output: z.array(z.object({ id: z.number(), title: z.string() })),
-          },
-          async ({ input, context, errors }) => {
-            const { data, error } = await context.wordpress.postTypes.post.list({ search: input.term })
-            if (error) throw errors.INTERNAL_SERVER_ERROR()
+      // remote: RPC-style, one input schema, types preserved on the client
+      search: createProcedure(
+        {
+          scope: "remote",
+          method: "POST",
+          input: z.object({ term: z.string() }),
+          output: z.array(z.object({ id: z.number(), title: z.string() })),
+        },
+        async ({ input, context, errors }) => {
+          const { data, error } = await context.wordpress.postTypes.post.list({ search: input.term })
+          if (error) throw errors.INTERNAL_SERVER_ERROR()
 
-            return data.map((post) => ({ id: post.id, title: post.title.rendered }))
-          },
-        ),
+          return data.map((post) => ({ id: post.id, title: post.title.rendered }))
+        },
+      ),
 
-        // api: a REST endpoint with typed params, callable over HTTP from anywhere
-        get: createProcedure(
-          {
-            scope: "api",
-            method: "GET",
-            path: "/featured/{id}",
-            params: z.object({ id: z.coerce.number() }),
-            output: z.object({ id: z.number(), headline: z.string() }),
-            errors: { FEATURED_NOT_FOUND: { status: 404, message: "Featured item not found" } },
-          },
-          async ({ input, context, errors }) => {
-            const { data, error } = await context.wordpress.postTypes.post.retrieve({
-              identifier: String(input.params.id),
-            })
-            if (error) throw errors.FEATURED_NOT_FOUND()
+      // api: a REST endpoint with typed params, callable over HTTP from anywhere
+      get: createProcedure(
+        {
+          scope: "api",
+          method: "GET",
+          path: "/featured/{id}",
+          params: z.object({ id: z.coerce.number() }),
+          output: z.object({ id: z.number(), headline: z.string() }),
+          errors: { FEATURED_NOT_FOUND: { status: 404, message: "Featured item not found" } },
+        },
+        async ({ input, context, errors }) => {
+          const { data, error } = await context.wordpress.postTypes.post.retrieve({
+            identifier: String(input.params.id),
+          })
+          if (error) throw errors.FEATURED_NOT_FOUND()
 
-            return { id: data.id, headline: data.title.rendered }
-          },
-        ),
-      },
-    }),
+          return { id: data.id, headline: data.title.rendered }
+        },
+      ),
+    },
   })
 ```

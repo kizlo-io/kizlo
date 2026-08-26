@@ -6,7 +6,7 @@ description: Learn how the kizlo CLI scaffolds a project, generates the typed co
 
 The **`kizlo` CLI** is the tool you run alongside your project. It **scaffolds** Kizlo into a new or existing
 app, **generates the contract** that types your [client](/docs/concepts/client) against your
-[server](/docs/concepts/extension), runs **local WordPress** you can build against, and **runs
+[server](/docs/concepts/integration), runs **local WordPress** you can build against, and **runs
 your tests** against a real, disposable WordPress.
 
 It ships with the `kizlo` package, so there's nothing extra to install. Reach for it through your package
@@ -71,14 +71,14 @@ detail. Past the defaults, a few flags tune the run:
 
 The plugin delivers webhook events to your Kizlo backend, so `init` records where it's reachable. A detected
 framework mounts the handler at a known path (`/api/kizlo` for Next.js), so `init` asks one question: your
-app's public URL. It derives the backend from it and writes it to `NEXT_PUBLIC_KIZLO_API_URL`.
+app's public URL. It derives the backend from it and writes it to `NEXT_PUBLIC_KIZLO_BASE_URL`.
 
 The **base** preset has no known mount, so `init` asks two URLs: your public **site URL** (what the plugin
-points back at) and the **backend URL** where you've mounted the handler (written to `KIZLO_API_URL`).
+points back at) and the **backend URL** where you've mounted the handler (written to `KIZLO_BASE_URL`).
 
 The generated `client.ts` routes to that backend. Same-origin deploys default to the page origin; a backend on
 a different origin is inlined into `createKizloClient(contract, { url })`. Swap that for your bundler's own
-public env var (e.g. `import.meta.env.VITE_KIZLO_API_URL`) to set it per environment.
+public env var (e.g. `import.meta.env.VITE_KIZLO_BASE_URL`) to set it per environment.
 
 ## `kizlo check`
 
@@ -109,6 +109,18 @@ imports it.
 ```package-install
 npx kizlo generate
 ```
+
+Your configured server entry must export `procedures`. `generate` reads that procedure tree and writes a JSON
+contract whose generated barrel is typed as `typeof procedures`:
+
+```ts title="src/lib/kizlo/server/index.ts"
+export const { procedures, client, context, handler } = createKizlo({ integrations: [nextjs()] })
+```
+
+<Callout type="warn">
+  A legacy `router` export is not used as a fallback. Rename it to `procedures`; the CLI reports this migration
+  directly instead of saying that no Kizlo server was found.
+</Callout>
 
 It exits non-zero if it can't find a Kizlo server in your entry file or if generation fails, so a stale or
 broken contract fails the build rather than slipping through. It accepts `--dir` to point at a Kizlo
@@ -320,6 +332,6 @@ export default defineConfig({
 | `dev.fixtures` | `dev` | [Fixtures](/docs/concepts/development-and-testing#fixtures) to build local WordPress from, matching the test environment. Each declares the plugins it needs (wp.org slugs / zip sources to install, or `{ path }` local dirs bind-mounted live into `wp-content/plugins` by basename) and is seeded on a **fresh** install (first `kizlo dev` / after `reset`) |
 | `test.local` | `test` | Run local WordPress under `kizlo test`. When `true`, `kizlo test` boots a disposable Docker WordPress, seeds it, and runs your suite against it; unset or `false` just runs your test script. Set by `create`/`init` when you choose local WordPress |
 | `test.port` | `test` | Port test WordPress listens on. Defaults to `8889` |
-| `test.fixtures` | `test` | Fixtures to install and seed onto test WordPress: core content plus any extension's fixtures |
+| `test.fixtures` | `test` | Fixtures to install and seed onto test WordPress: core content plus any integration's fixtures |
 | `test.packageManager` | `test` | Package manager for the test command. Auto-detected from your lockfile when unset |
 | `test.command` | `test` | Override the test command entirely, instead of `<packageManager> test` |

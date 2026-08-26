@@ -42,7 +42,7 @@ describe("WordPress setup warnings", () => {
 		vi.stubGlobal("fetch", vi.fn<FetchFn>().mockRejectedValue(new Error("fetch failed")))
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
 		const first = createContext("https://missing.example", {
-			extensionPlugins: [{ slug: "kizlo-woocommerce", name: "Kizlo WooCommerce", version: "0.2.0" }],
+			integrationPlugins: [{ name: "kizlo-woocommerce", version: "0.2.0" }],
 		})
 		const second = createContext("https://missing.example")
 
@@ -56,7 +56,7 @@ describe("WordPress setup warnings", () => {
 		const message = String(warn.mock.calls[0]?.[0])
 		expect(message).toContain("Nothing answered the WordPress request to https://missing.example/wp-json/kizlo/v1/settings")
 		expect(message).not.toContain("plugin outdated")
-		expect(message).not.toContain("Kizlo WooCommerce")
+		expect(message).not.toContain("kizlo-woocommerce")
 	})
 
 	test("distinguishes an unrelated HTTP response from an outdated plugin", async () => {

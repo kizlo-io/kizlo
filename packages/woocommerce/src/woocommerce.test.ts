@@ -10,7 +10,7 @@ import { Product, ProductFilters, ProductList } from "./product/schema"
 import type { BillingAddress } from "./schema"
 
 /**
- * The WooCommerce extension against a real WooCommerce, calling every route through the endpoints
+ * The WooCommerce integration against a real WooCommerce, calling every route through the endpoints
  * the plugin describes and the generator emits.
  *
  * These reach WooCommerce over HTTP, so they are a check on the contract as much as on the
@@ -27,7 +27,7 @@ let productId = 0
 let productSlug = ""
 
 function instance() {
-	return getKizloTestInstance({ extensions: [woocommerce()] })
+	return getKizloTestInstance({ integrations: [woocommerce()] })
 }
 
 beforeAll(async () => {
@@ -47,7 +47,7 @@ afterAll(async () => {
 	await emptyCart()
 })
 
-/** The extension's routers, so the tests below read as calls rather than as lookups. */
+/** The integration's procedures, so the tests below read as calls rather than as lookups. */
 function client() {
 	return kizlo.client.woocommerce
 }
@@ -60,7 +60,7 @@ async function emptyCart(): Promise<void> {
 }
 
 // ==================================================
-// PRODUCTS — wc/store/v1 and wc/v3
+// PRODUCTS: wc/store/v1 and wc/v3
 // ==================================================
 
 test("products.list reads the Store API through the generated endpoint", async () => {
@@ -111,7 +111,7 @@ test("products.filters aggregates the collection through the generated endpoint"
 })
 
 // ==================================================
-// CART — wc/store/v1
+// CART: wc/store/v1
 // ==================================================
 
 test("cart.get returns a cart conforming to Cart", async () => {
@@ -145,7 +145,7 @@ test("the cart survives between calls, so the session header carries identity", 
 test("an API guest cart is available to a server-rendered storefront request", async () => {
 	const apiUrl = "http://test.local/api/kizlo"
 	const guestAuth = createAuthAdapter({ getUser: () => null })
-	const guestApi = getKizloTestInstance({ baseUrl: apiUrl, extensions: [woocommerce()], adapters: { auth: guestAuth } })
+	const guestApi = getKizloTestInstance({ baseUrl: apiUrl, integrations: [woocommerce()], adapters: { auth: guestAuth } })
 	let guestSetCookie: string | undefined
 
 	const browser = await getKizloClientTestInstance(guestApi, {
@@ -174,13 +174,13 @@ test("an API guest cart is available to a server-rendered storefront request", a
 		getAll: () => storefrontCookies.get(),
 		setAll: () => {},
 	}
-	const storefront = getKizloTestInstance({ extensions: [woocommerce()], adapters: { auth: guestAuth, cookies } })
+	const storefront = getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth: guestAuth, cookies } })
 
 	const serverCart = await storefront.client.woocommerce.cart.get.call()
 	expect(serverCart?.lineItems).toEqual(expect.arrayContaining([expect.objectContaining({ productId, quantity: 1 })]))
 
 	await emptyCart()
-	const signedInApi = getKizloTestInstance({ baseUrl: apiUrl, extensions: [woocommerce()] })
+	const signedInApi = getKizloTestInstance({ baseUrl: apiUrl, integrations: [woocommerce()] })
 	const merged = await signedInApi.handler(new Request(`${apiUrl}/cart`, { headers: { cookie: cookieHeader } }))
 	const deletedCookie = merged.headers.getSetCookie().find((header) => header.startsWith("guest-session="))
 
@@ -223,7 +223,7 @@ test("cart.coupons.apply maps an unknown coupon to its Kizlo error", async () =>
 })
 
 // ==================================================
-// CART — the arguments the contract calls required
+// CART: the arguments the contract calls required
 // ==================================================
 
 /**
@@ -233,7 +233,7 @@ test("cart.coupons.apply maps an unknown coupon to its Kizlo error", async () =>
  * WooCommerce release that grows a default for one of them turns its case green in a way that reads
  * as an overlay to drop rather than a test to fix.
  *
- * These reach the generated endpoints rather than the extension's procedures, because the procedures
+ * These reach the generated endpoints rather than the integration's procedures, because the procedures
  * are the layer whose schemas already refuse the call.
  */
 function store() {
@@ -330,7 +330,7 @@ test("cart.updateItem changes an item it did not create with 200", async () => {
 })
 
 // ==================================================
-// CHECKOUT — wc/store/v1
+// CHECKOUT: wc/store/v1
 // ==================================================
 
 test("checkout.get returns a checkout carrying the cart WooCommerce does not declare", async () => {
@@ -458,7 +458,7 @@ test("checkout.retry refuses a body with no billing address", async () => {
 })
 
 // ==================================================
-// CUSTOMERS — wc/v3
+// CUSTOMERS: wc/v3
 // ==================================================
 
 test("customers.get reads the signed-in customer through the generated endpoint", async () => {

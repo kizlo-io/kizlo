@@ -1,0 +1,90 @@
+---
+title: createIntegration
+description: Define an integration block with procedures, events, adapters, environment values, and requirements.
+---
+
+`createIntegration` defines one integration block. A provider can ship its
+[procedures](/docs/reference/functions/create-procedure), webhook events, service adapters, and WordPress
+requirements together, then the app registers that one integration through `createKizlo`.
+
+## Parameters
+
+```ts
+createIntegration(integration)
+```
+
+### `id`
+
+The integration's namespace: a string literal, unique across registered integrations. It becomes the key on the
+client when the integration has procedures. IDs cannot duplicate another integration or collide with a core namespace
+such as `posts`, `settings`, or `webhooks`.
+
+### Integration fields
+
+Every contribution is optional, so an integration can be procedure-only, event-only, adapter-only, or any mix:
+
+<AutoTypeTable
+  path="../packages/kizlo/src/shared/integration.ts"
+  name="Integration"
+  type={`Integration<string, AnyProcedureTree>`}
+/>
+
+- **`procedures`**: a nested procedure tree mounted below `id`. An absent or empty tree adds no client namespace.
+- **`events`**: webhook handlers created with `createEventHandler`.
+- **`adapters`**: auth, captcha, geo, logger, or cookies implementations. See
+  [Adapter precedence](/docs/concepts/adapter#which-adapter-wins).
+- **`env`**: a typed, runtime-neutral record or reader composed from left to right. `KizloEnv` exposes
+  `baseUrl`, `mode`, `remote`, and `local`. Runtime integrations only map these values.
+  Kizlo selects the active WordPress connection after composition. Custom provider keys are also accepted.
+  Concrete leaf values replace earlier values; `undefined` is ignored.
+- **`requires`**: environment values and generated endpoint subtrees checked when the server starts, plus plugin
+  versions checked from WordPress response headers. Nested environment values use dotted paths such as
+  `remote.wordpressUrl`.
+
+## Returns
+
+The same integration object, with its literal `id` and procedure tree preserved for client inference.
+
+## Examples
+
+Keep provider setup inside the integration factory. Consumers register the result without importing or wiring the
+provider's adapter separately:
+
+```ts title="src/lib/kizlo/server/provider/index.ts"
+import { createIntegration, createProcedure } from "kizlo"
+import { z } from "zod"
+import { providerAuth } from "./auth"
+import type { ProviderOptions } from "./types"
+
+export const provider = (options: ProviderOptions) =>
+  createIntegration({
+    id: "provider",
+    env: { providerRegion: process.env.PROVIDER_REGION },
+    adapters: { auth: providerAuth(options) },
+    requires: {
+      env: ["providerRegion"],
+      plugins: [{ name: "provider-plugin", version: "1.2.0" }],
+      endpoints: ["provider.profile"],
+    },
+    procedures: {
+      profile: createProcedure(
+        { scope: "remote", output: z.object({ id: z.number(), email: z.string().optional() }) },
+        async ({ context, errors }) => {
+          const user = await context.getAuthUser()
+          if (!user) throw errors.UNAUTHORIZED()
+          return { id: user.id, email: user.email }
+        },
+      ),
+    },
+  })
+```
+
+Register it, and `client.provider.profile()` is typed from the procedure's `output`:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { provider } from "./provider"
+
+export const { client, handler } = createKizlo({
+  integrations: [provider({ secret: process.env.PROVIDER_SECRET! })],
+})
+```

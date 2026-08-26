@@ -4,11 +4,10 @@ description: Build a custom logger adapter that receives Kizlo's log records.
 ---
 
 `createLoggerAdapter` declares a custom logger adapter, typed against the `LoggerAdapter` contract. Kizlo calls it
-with a structured record for every log; forward each one to your platform's logging SDK. Register the result on
-[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.logger`.
+with a structured record for every log; forward each one to your platform's logging SDK. Provide the result through
+an [integration](/docs/reference/functions/create-integration)'s `adapters.logger`.
 
-Reach for this to ship logs somewhere specific. To print to the console, use the prebuilt `consoleLog` adapter
-instead. That one lives in the adapter guides, not here.
+Reach for this to ship logs somewhere specific. To print to the console, set `logging` on `createKizlo` instead.
 
 ## Parameters
 
@@ -52,10 +51,12 @@ export const logger = createLoggerAdapter((payload) => {
 Register it:
 
 ```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo } from "kizlo"
+import { createIntegration, createKizlo } from "kizlo"
 import { logger } from "../adapters/logger"
 
+const observability = createIntegration({ id: "observability", adapters: { logger } })
+
 export const { client, handler } = createKizlo({
-  adapters: { logger },
+  integrations: [observability],
 })
 ```

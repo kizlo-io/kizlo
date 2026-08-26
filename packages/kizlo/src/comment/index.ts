@@ -5,7 +5,7 @@ import { GET_COMMENT_ERROR_MAP, LIST_COMMENT_ERROR_MAP, SUBMIT_COMMENT_ERROR_MAP
 import { Comment, CommentList, GetCommentInput, ListCommentInput, SubmitCommentInput } from "./schema"
 import { deserializeComment } from "./utils"
 
-export const COMMENT_ROUTER_MAP = {
+export const COMMENT_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

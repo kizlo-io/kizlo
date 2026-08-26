@@ -14,14 +14,14 @@ export const PLUGINS = {
 	},
 	"kizlo-cf7": {
 		name: "Kizlo Contact Form 7",
-		description: "Connects contact form 7 plugin with @kizlo/cf7 extension.",
+		description: "Connects contact form 7 plugin with @kizlo/cf7 integration.",
 		requires: "6.5",
 		tested: "6.7",
 		requires_php: "8.2",
 	},
 	"kizlo-woocommerce": {
 		name: "Kizlo WooCommerce",
-		description: "Connects woocommerce plugin with @kizlo/woocommerce extension.",
+		description: "Connects woocommerce plugin with @kizlo/woocommerce integration.",
 		requires: "6.5",
 		tested: "6.7",
 		requires_php: "8.2",

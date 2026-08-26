@@ -7,8 +7,8 @@ import { Step, Steps } from 'fumadocs-ui/components/steps'
 import { File, Folder, Files } from 'fumadocs-ui/components/files'
 
 <Callout>
-  This quickstart covers the app side. Make sure WordPress is ready first (see
-  [Installation](/docs/installation)) — either connect your own WordPress with the plugin and an
+  This quickstart covers the app side. Make sure WordPress is ready first; see
+  [Installation](/docs/installation). Either connect your own WordPress with the plugin and an
   Application Password, or let Kizlo run one locally in Docker.
 </Callout>
 
@@ -25,8 +25,8 @@ finishes, `cd my-app`.
 
 ## Set up Kizlo in an existing project
 
-Add Kizlo to an app you already have. Use the CLI (recommended) or wire the files by hand —
-both produce the same result.
+Add Kizlo to an app you already have. Use the CLI (recommended) or wire the files by hand. Both
+produce the same result.
 
 ### CLI setup (recommended)
 
@@ -67,11 +67,11 @@ It detects your framework, `src` dir (if present), package manager, import alias
 </Files>
 
 Along the way it asks whether to run WordPress locally in Docker or connect your own, writes
-the matching credentials to `.env`, and generates the contract — so when `init` finishes you're
+the matching credentials to `.env`, and generates the contract. When `init` finishes, you're
 ready to make your first call.
 
 <Callout>
-  Feel free to customize this folder structure however you like — just point the `dir` option in
+  Feel free to customize this folder structure however you like. Point the `dir` option in
   `kizlo.config.ts` at it, so kizlo knows where your server files and kizlo instance live and can
   generate the server contract.
 </Callout>
@@ -96,7 +96,7 @@ npm install kizlo@latest
 
 #### Add `kizlo.config.ts`
 
-At your project root — it tells the CLI where Kizlo lives and which import alias to use:
+Add this at your project root. It tells the CLI where Kizlo lives and which import alias to use:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo"
@@ -113,12 +113,15 @@ export default defineConfig({
 
 #### Create the server
 
-At `src/lib/kizlo/server/index.ts`. `createKizlo()` reads your credentials and `KIZLO_WP_SECRET` from `.env`:
+At `src/lib/kizlo/server/index.ts`. `nextjs()` reads the framework environment and maps its Kizlo values:
 
 ```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo } from "kizlo/nextjs/server"
+import { createKizlo } from "kizlo"
+import { nextjs } from "kizlo/nextjs/server"
 
-export const { router, client, context, handler } = createKizlo()
+export const { procedures, client, context, handler } = createKizlo({
+  integrations: [nextjs()],
+})
 ```
 
 </Step>
@@ -127,7 +130,7 @@ export const { router, client, context, handler } = createKizlo()
 
 #### Mount the route handler
 
-Next.js, at `src/app/api/kizlo/[[...rest]]/route.ts` — re-export the server's `handler` for every method:
+At `src/app/api/kizlo/[[...rest]]/route.ts`, re-export the server's `handler` for every method:
 
 ```ts title="src/app/api/kizlo/[[...rest]]/route.ts"
 import { handler } from "@/lib/kizlo/server"
@@ -153,7 +156,7 @@ npx kizlo generate
 
 #### Create the client
 
-At `src/lib/kizlo/client.ts` from the generated contract — it's typed automatically:
+Create `src/lib/kizlo/client.ts` from the generated contract. It is typed automatically:
 
 ```ts title="src/lib/kizlo/client.ts"
 import { createKizloClient } from "kizlo/nextjs"
@@ -168,18 +171,18 @@ export const client = createKizloClient(contract)
 
 #### Environment
 
-Finally, connect WordPress — a local stack while you build, your hosted WordPress in production.
+Finally, connect WordPress. Use a local stack while you build and your hosted WordPress in production.
 
 #### Local
 
-Let Kizlo run WordPress for you — nothing to fill in:
+Let Kizlo run WordPress for you. There is nothing to fill in:
 
 ```package-install
 npx kizlo dev
 ```
 
 It starts WordPress in Docker, writes its dev credentials to `.env` for you, and watches your server files
-to keep the contract in sync — one command for the whole local loop.
+to keep the contract in sync. This gives you one command for the whole local loop.
 
 #### Remote
 
@@ -190,7 +193,7 @@ KIZLO_WP_URL=https://your-site.com
 KIZLO_WP_USERNAME=admin
 KIZLO_WP_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
 KIZLO_WP_SECRET=                   # a long random string
-NEXT_PUBLIC_KIZLO_API_URL=http://localhost:3000/api/kizlo
+NEXT_PUBLIC_KIZLO_BASE_URL=http://localhost:3000/api/kizlo
 ```
 
 Generate `KIZLO_WP_SECRET` with `openssl rand -hex 32`. While developing, run `npx kizlo dev` to keep
@@ -202,12 +205,12 @@ the generated contract in sync as you edit your server files.
 
 ## Render a post
 
-That's it 🎉 — here's the payoff: a complete dynamic blog post route. A single Server Component fetches
+Here is a complete dynamic blog post route. A single Server Component fetches
 the post by slug and, alongside the markup, wires up everything a real post page needs:
 
-- **`generateMetadata`** — title, description, canonical, Open Graph, and Twitter tags. Kizlo's
+- **`generateMetadata`**: title, description, canonical, Open Graph, and Twitter tags. Kizlo's
   `createPageMetadata` maps the post's SEO straight into Next.js `Metadata`, so you don't hand-write tags.
-- **JSON-LD** — the post already carries `schema.org` structured data at `post.seo.schema`; render it
+- **JSON-LD**: the post already carries `schema.org` structured data at `post.seo.schema`; render it
   with `<SeoSchema />` for rich results.
 
 Each route renders on demand for its slug, so there's no build-time list step.
@@ -244,5 +247,5 @@ export default async function PostPage({ params }: Props) {
 }
 ```
 
-From here, head to [Concepts](/docs/concepts/extension) to see how procedures, extensions, and adapters
+From here, head to [Concepts](/docs/concepts/integration) to see how procedures, integrations, and adapters
 compose into something production-ready.

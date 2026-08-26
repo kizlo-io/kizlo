@@ -4,8 +4,8 @@ description: Build a custom geo adapter that describes the caller's connection.
 ---
 
 `createGeoAdapter` declares a custom geo adapter, typed against the `GeoAdapter` contract. Kizlo calls it to describe
-the connection (IP, location, and user agent) for the current request. Register the result on
-[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.geo`.
+the connection (IP, location, and user agent) for the current request. Provide the result through an
+[integration](/docs/reference/functions/create-integration)'s `adapters.geo`.
 
 Reach for this when your platform exposes geo data Kizlo doesn't read out of the box. For Vercel's edge headers,
 use the prebuilt adapter instead. That one lives in the adapter guides, not here.
@@ -58,10 +58,12 @@ export const geo = createGeoAdapter({
 Register it:
 
 ```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo } from "kizlo"
+import { createIntegration, createKizlo } from "kizlo"
 import { geo } from "../adapters/geo"
 
+const platform = createIntegration({ id: "platform", adapters: { geo } })
+
 export const { client, handler } = createKizlo({
-  adapters: { geo },
+  integrations: [platform],
 })
 ```

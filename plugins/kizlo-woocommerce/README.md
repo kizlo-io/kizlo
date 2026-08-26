@@ -14,7 +14,7 @@
 <h3 align="center">Kizlo WooCommerce</h3>
 
 <p align="center">
-Connects woocommerce plugin with @kizlo/woocommerce extension.
+Connects WooCommerce with the @kizlo/woocommerce integration.
 </p>
 
 ---
@@ -26,7 +26,7 @@ Connects woocommerce plugin with @kizlo/woocommerce extension.
 - [Kizlo](../kizlo) core plugin, active
 - [WooCommerce](https://wordpress.org/plugins/woocommerce/), active
 
-WordPress 6.5+'s `Requires Plugins:` header enforces both dependencies — this extension will not activate unless Kizlo core and WooCommerce are already active.
+WordPress 6.5+'s `Requires Plugins:` header enforces both dependencies. This companion plugin will not activate unless Kizlo core and WooCommerce are already active.
 
 ## Install
 
@@ -37,11 +37,11 @@ WordPress 6.5+'s `Requires Plugins:` header enforces both dependencies — this 
 
 ### From this monorepo (development)
 
-See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `CONTRIBUTING.md` — `pnpm kizlo dev` bind-mounts this directory into your local WP install, so PHP edits show up live without a build or symlink step.
+See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `CONTRIBUTING.md`. `pnpm kizlo dev` bind-mounts this directory into your local WP install, so PHP edits show up live without a build or symlink step.
 
 ## Auth
 
-This extension's REST endpoints are gated by the same Application Password auth as Kizlo core. See [Kizlo core's auth section](../kizlo/README.md#auth) for setup.
+The companion plugin's REST endpoints use the same Application Password auth as Kizlo core. See [Kizlo core's auth section](../kizlo/README.md#auth) for setup.
 
 Cart and Store API requests additionally carry identity headers (`X-Kizlo-User-Id`, `X-Kizlo-Guest-Token`, …) that the headless session handler uses to resolve the cart owner without cookies.
 
@@ -51,4 +51,4 @@ Dev loop, linting, tests, and PR conventions live in the monorepo's [CONTRIBUTIN
 
 ## License
 
-GPLv2 or later — see the plugin header in [`kizlo-woocommerce.php`](kizlo-woocommerce.php).
+GPLv2 or later. See the plugin header in [`kizlo-woocommerce.php`](kizlo-woocommerce.php).

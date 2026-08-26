@@ -4,7 +4,7 @@ import { defineConfig } from "vite"
 import viteSolid from "vite-plugin-solid"
 
 // No `.env` wiring needed here: the server entry (src/lib/kizlo/server/index.ts) reads secrets through
-// `process.env` on the server, and the browser client reads `import.meta.env.VITE_KIZLO_API_URL`, which
+// `process.env` on the server, and the browser client reads `import.meta.env.VITE_KIZLO_BASE_URL`, which
 // Vite inlines from `.env` in dev and the host environment in production.
 //
 // Kizlo renders on demand (SSR) so robots.txt, sitemaps, the web manifest, and pages always reflect the

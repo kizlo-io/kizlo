@@ -12,7 +12,7 @@ Bring your WooCommerce store into any JavaScript runtime.
 
 == Description ==
 
-Connects woocommerce plugin with @kizlo/woocommerce extension.
+Connects WooCommerce with the @kizlo/woocommerce integration.
 
 Requires the Kizlo core plugin and WooCommerce to be active.
 

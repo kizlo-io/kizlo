@@ -2,7 +2,7 @@ import { createProcedure } from "kizlo"
 import { Customer } from "./schema"
 import { deserializeCustomer } from "./utils"
 
-export const CUSTOMER_ROUTER = {
+export const CUSTOMER_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

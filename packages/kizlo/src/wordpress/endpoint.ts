@@ -163,7 +163,7 @@ function proxyNode(node: object, transport: WordPressTransport, path: string): u
 				resolved = isEndpoint(value) ? createCaller(value, transport) : proxyNode(value, transport, dotted)
 			} else if (value === undefined && !isInertKey(key)) {
 				// Endpoints shadow the transport, so this only runs for a key the generated tree lacks:
-				// `get`, `post`, `resolveList` and the rest stay reachable on the client an extension holds.
+				// `get`, `post`, `resolveList` and the rest stay reachable on the client an integration holds.
 				const member = root ? transportMember(transport, key) : undefined
 				resolved = member ?? missingEndpoint(dotted)
 			} else resolved = value

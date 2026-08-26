@@ -1,7 +1,7 @@
 import type { SchemaOutput } from "@kizlo/shared"
 import type { NestedClient } from "@orpc/client"
 import { type DefinedErrorMapLike, type KizloError, toKizloError, type WithCommonErrorMap } from "./error"
-import type { AnyProcedureRouter, Procedure } from "./procedure"
+import type { AnyProcedureTree, Procedure } from "./procedure"
 
 export type MaybeCallerOptions<UInput> = unknown extends UInput
 	? []
@@ -28,15 +28,15 @@ export type KizloResult<TOutput, TErrors extends DefinedErrorMapLike = DefinedEr
 			success: false
 	  }
 
-export type ResultClient<T extends AnyProcedureRouter> = {
+export type ResultClient<T extends AnyProcedureTree> = {
 	[K in keyof T]: T[K] extends Procedure<infer _Scope, infer Input, infer Output, infer Errors>
 		? ProcedureMethod<Input, Output, Errors>
-		: T[K] extends AnyProcedureRouter
+		: T[K] extends AnyProcedureTree
 			? ResultClient<T[K]>
 			: never
 }
 
-export function createResultClient<T extends AnyProcedureRouter>(client: NestedClient<any>): ResultClient<T> {
+export function createResultClient<T extends AnyProcedureTree>(client: NestedClient<any>): ResultClient<T> {
 	const cache = new Map<string | symbol, unknown>()
 
 	const proxy = new Proxy(typeof client === "function" ? client : () => {}, {

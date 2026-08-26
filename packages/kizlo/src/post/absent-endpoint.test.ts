@@ -3,7 +3,7 @@ import { Kizlo } from "../kizlo"
 
 /**
  * What an introspection document looks like once an admin switches off API access for `post`:
- * every other managed type is still described, and the one Kizlo's own router calls is gone.
+ * every other managed type is still described, and the one Kizlo's own procedures call is gone.
  */
 const ENDPOINTS = { postTypes: { page: {}, attachment: {} }, taxonomies: { category: {}, postTag: {} } }
 
@@ -11,8 +11,6 @@ function kizlo() {
 	return new Kizlo({
 		baseUrl: "https://app.example",
 		siteSecret: "site-secret",
-		environment: "test",
-		connect: "remote",
 		credentials: { url: "https://wp.example", username: "admin", password: "secret" },
 		wordpressEndpoints: ENDPOINTS,
 	})

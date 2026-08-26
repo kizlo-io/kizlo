@@ -22,7 +22,7 @@ import {
 } from "./schema"
 import { deserializeCart } from "./utils"
 
-export const CART_ROUTER = {
+export const CART_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

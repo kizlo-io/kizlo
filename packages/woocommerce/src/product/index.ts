@@ -3,7 +3,7 @@ import { GET_PRODUCT_ERROR_MAP, LIST_PRODUCT_ERROR_MAP } from "./error"
 import { ListProductInput, Product, ProductFilters, ProductList, RetrieveProductFiltersInput, RetrieveProductInput } from "./schema"
 import { deserializeProduct, deserializeProductFilters, deserializeStoreProduct, serializeProductListInput } from "./utils"
 
-export const PRODUCT_ROUTER = {
+export const PRODUCT_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

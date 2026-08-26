@@ -94,7 +94,7 @@ export type FixtureSettleFn = (ctx: SettleContext) => Promise<void>
 
 export type FixtureCleanupFn = (ctx: SeedContext) => Promise<void>
 
-/** The serializable test layer an extension ships alongside its live extension. */
+/** The serializable test layer an integration ships alongside its live code. */
 export interface Fixture {
 	/** Namespace key under `TestCredentials.fixtures`. */
 	name: string
@@ -114,7 +114,7 @@ export interface Fixture {
 	 * a minute ago and one booted last week describe the same WordPress.
 	 */
 	settle?: FixtureSettleFn
-	/** Build this extension's world once during seeding; return created handles. */
+	/** Build this integration's world once during seeding; return created handles. */
 	seed?: FixtureSeedFn
 	/** Revert per-test mutations (teardown); does NOT uninstall plugins or seeded data. */
 	cleanup?: FixtureCleanupFn

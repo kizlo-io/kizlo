@@ -14,15 +14,15 @@ export type ServerRoute = (context: ServerRouteContext) => Promise<Response> | R
 
 /**
  * The public Kizlo API base URL, read from `process.env` as a last-resort fallback for a client built
- * without an explicit `url`. Client-side code passes `import.meta.env.VITE_KIZLO_API_URL` at the call
+ * without an explicit `url`. Client-side code passes `import.meta.env.VITE_KIZLO_BASE_URL` at the call
  * site (see the template's `client.ts`) so Vite inlines it into the browser bundle; this fallback only
  * matters when neither is supplied.
  */
 export function getServerBaseUrl(): string {
-	const baseUrl = process.env.VITE_KIZLO_API_URL?.trim()
+	const baseUrl = process.env.VITE_KIZLO_BASE_URL?.trim()
 	if (!baseUrl) {
 		throw new KizloError("MISSING_ENV_VARIABLE", {
-			message: "Please define VITE_KIZLO_API_URL in your .env file.",
+			message: "Please define VITE_KIZLO_BASE_URL in your .env file.",
 		})
 	}
 	return baseUrl

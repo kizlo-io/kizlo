@@ -1,0 +1,4 @@
+Significance: patch
+Type: changed
+
+Call the companion package an integration in plugin metadata and documentation

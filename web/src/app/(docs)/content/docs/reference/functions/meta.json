@@ -13,7 +13,7 @@
 		"create-cookies-adapter",
 		"create-geo-adapter",
 		"create-logger-adapter",
-		"create-extension",
+		"create-integration",
 		"create-procedure",
 		"schema-type",
 		"create-middleware",

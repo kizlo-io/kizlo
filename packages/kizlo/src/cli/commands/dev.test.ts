@@ -20,7 +20,7 @@ describe("syncLocalUrl", () => {
 		fs.writeFileSync(
 			envPath,
 			[
-				"KIZLO_CONNECT=local",
+				"KIZLO_MODE=local",
 				"KIZLO_LOCAL_WP_URL=http://192.168.0.5:8080",
 				"KIZLO_LOCAL_WP_USERNAME=local-user",
 				"KIZLO_WP_URL=https://wp.example.com",
@@ -33,7 +33,7 @@ describe("syncLocalUrl", () => {
 		expect(syncLocalUrl(dir, "http://192.168.0.9:8080")).toBe(true)
 		expect(fs.readFileSync(envPath, "utf8")).toBe(
 			[
-				"KIZLO_CONNECT=local",
+				"KIZLO_MODE=local",
 				"KIZLO_LOCAL_WP_URL=http://192.168.0.9:8080",
 				"KIZLO_LOCAL_WP_USERNAME=local-user",
 				"KIZLO_WP_URL=https://wp.example.com",

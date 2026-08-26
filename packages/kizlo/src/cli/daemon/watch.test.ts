@@ -252,7 +252,7 @@ describe("createWordPressRefresh", () => {
 function unstartable(): string {
 	const cwd = workspace()
 	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { wordpressClientDir: "${CLIENT_DIR}" }\n`)
-	for (const key of ["KIZLO_CONNECT", "KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD", "KIZLO_CONTRACT_GENERATION"]) {
+	for (const key of ["KIZLO_MODE", "KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD"]) {
 		vi.stubEnv(key, "")
 	}
 	return cwd
@@ -263,7 +263,7 @@ describe("startWatcher", () => {
 		watchLog()
 		const cwd = unstartable()
 
-		await expect(startWatcher(cwd)).rejects.toThrow("KIZLO_WP_URL")
+		await expect(startWatcher(cwd)).rejects.toThrow("wordpressUrl")
 		expect(fs.existsSync(lockPath(cwd))).toBe(false)
 	})
 

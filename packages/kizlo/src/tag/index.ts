@@ -6,7 +6,7 @@ import { GET_TAG_ERROR_MAP, LIST_TAG_ERROR_MAP } from "./error"
 import { ListTagInput, RetrieveTagInput, Tag, TagList } from "./schema"
 import { deserializeTag } from "./utils"
 
-export const TAG_ROUTER_MAP = {
+export const TAG_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

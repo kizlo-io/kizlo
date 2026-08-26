@@ -494,12 +494,12 @@ export interface EnvGroup {
  * from the connection.
  */
 export interface EnvKeys {
-	/** Public Kizlo API URL key, e.g. `KIZLO_API_URL` or a framework-prefixed `NEXT_PUBLIC_KIZLO_API_URL`. */
+	/** Public Kizlo base URL key, e.g. `KIZLO_BASE_URL` or a framework-prefixed `NEXT_PUBLIC_KIZLO_BASE_URL`. */
 	baseUrl: string
 	/** Keys a real remote deploy reads. */
 	remote: { siteSecret: string; wpUrl: string; wpUsername: string; wpPassword: string }
-	/** Keys local WordPress (`kizlo dev`) manages, plus the `local | remote` connect switch. */
-	local: { connect: string; siteSecret: string; wpUrl: string; wpUsername: string; wpPassword: string }
+	/** Keys local WordPress (`kizlo dev`) manages, plus the `local | remote` mode switch. */
+	local: { mode: string; siteSecret: string; wpUrl: string; wpUsername: string; wpPassword: string }
 }
 
 /**
@@ -508,7 +508,7 @@ export interface EnvKeys {
  * first stamped release). Real templates carry their own `env`, so this is the standard `KIZLO_*` set.
  */
 export const DEFAULT_ENV_KEYS: EnvKeys = {
-	baseUrl: "KIZLO_API_URL",
+	baseUrl: "KIZLO_BASE_URL",
 	remote: {
 		siteSecret: "KIZLO_WP_SECRET",
 		wpUrl: "KIZLO_WP_URL",
@@ -516,7 +516,7 @@ export const DEFAULT_ENV_KEYS: EnvKeys = {
 		wpPassword: "KIZLO_WP_APP_PASSWORD",
 	},
 	local: {
-		connect: "KIZLO_CONNECT",
+		mode: "KIZLO_MODE",
 		siteSecret: "KIZLO_LOCAL_WP_SECRET",
 		wpUrl: "KIZLO_LOCAL_WP_URL",
 		wpUsername: "KIZLO_LOCAL_WP_USERNAME",
@@ -526,15 +526,15 @@ export const DEFAULT_ENV_KEYS: EnvKeys = {
 
 /**
  * The grouped `.env` layout shared by `init` and `dev`, so both write the same sectioned file:
- * a connect switch, the API URL, then the remote and local connection blocks. The key names come from
+ * a mode switch, the base URL, then the remote and local connection blocks. The key names come from
  * the resolved {@link EnvKeys} (the template's `env` contract), so the sections stay labelled correctly
  * whatever a template calls them. Only sections whose keys are actually being appended get a header, so
  * a remote run skips the local block and vice versa.
  */
 export function envGroups(envKeys: EnvKeys): EnvGroup[] {
 	return [
-		{ comment: "Kizlo Connect (local | remote)", keys: [envKeys.local.connect] },
-		{ comment: "Kizlo API URL", keys: [envKeys.baseUrl] },
+		{ comment: "Kizlo Mode (local | remote)", keys: [envKeys.local.mode] },
+		{ comment: "Kizlo Base URL", keys: [envKeys.baseUrl] },
 		{
 			comment: "Kizlo Remote",
 			keys: [envKeys.remote.siteSecret, envKeys.remote.wpUrl, envKeys.remote.wpUsername, envKeys.remote.wpPassword],

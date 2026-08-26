@@ -1,84 +1,72 @@
-import type { ExtensionPluginRequirement } from "@kizlo/shared"
+import type { IntegrationPluginRequirement } from "@kizlo/shared"
 import { tryCatch } from "@kizlo/shared"
 import { OpenAPIHandler } from "@orpc/openapi/fetch"
 import { createRouterClient, ORPCError } from "@orpc/server"
 import { RPCHandler } from "@orpc/server/fetch"
-import type { AuthAdapter } from "./adapters/auth"
-import type { CaptchaAdapter } from "./adapters/captcha"
-import type { GeoAdapter } from "./adapters/geo"
-import type { Environment, LoggerAdapter } from "./adapters/logger"
+import { consoleLog, type LogLevel } from "./adapters/logger"
+import { mergeServiceAdapters } from "./adapters/types"
 import { Context, type ProcedureContext } from "./context"
-import { ROUTER_MAP, type RouterMap } from "./router"
-import { CONTRACT_GENERATION_ENV, RPC_PROTOCOL_HEADER } from "./shared/constants"
+import { CORE_PROCEDURES, type CoreProcedures } from "./procedures"
+import { RPC_PROTOCOL_HEADER } from "./shared/constants"
+import { isContractGeneration } from "./shared/contract-generation"
 import { KizloError } from "./shared/error"
-import { type AnyExtension, assertExtensionEndpoints, type InferExtensionRouter } from "./shared/extension"
+import {
+	type AnyIntegration,
+	assertIntegrationEndpoints,
+	assertIntegrationEnv,
+	type EnvReader,
+	type InferIntegrationProcedures,
+	readEnv,
+} from "./shared/integration"
 import type { InvocationScope } from "./shared/procedure"
 import { createResultClient, type ResultClient } from "./shared/result"
 import { createOrpcRouter } from "./shared/router"
-import type { CookiesAdapter } from "./shared/types"
 import { isTypescriptObject } from "./shared/utils"
 import { createWebhookRouter, type EventHandler } from "./webhook"
 import type { WordPressCredentials } from "./wordpress"
 
 export type AnyKizloConfig = KizloConfig<any>
 
-/**
- * Which credential set to read from the environment. Independent of `environment`
- * (which carries logging semantics off `NODE_ENV`): `"local"` reads the `KIZLO_LOCAL_WP_*`
- * / `KIZLO_LOCAL_WP_SECRET` keys local WordPress manages, `"remote"` reads `KIZLO_WP_*` / `KIZLO_WP_SECRET`.
- */
-export type KizloConnect = "local" | "remote"
-
-export interface KizloConfig<TExts extends readonly AnyExtension[]> {
+export interface KizloConfig<TIntegrations extends readonly AnyIntegration[]> {
 	baseUrl: string
 	siteSecret: string
-	extensions?: TExts
-	environment: Environment
-	connect: KizloConnect
-	adapters?: ServiceAdapters
+	integrations?: TIntegrations
+	logging?: false | LogLevel
 	credentials: WordPressCredentials
 	wordpressEndpoints?: object
 }
 
-export interface ServiceAdapters {
-	geo?: GeoAdapter
-	auth?: AuthAdapter
-	logger?: LoggerAdapter
-	captcha?: CaptchaAdapter
-	cookies?: CookiesAdapter
-}
+export type RootProcedures<TIntegrations extends readonly AnyIntegration[]> = InferIntegrationProcedures<TIntegrations> & CoreProcedures
 
-export type RootRouter<TExts extends readonly AnyExtension[]> = InferExtensionRouter<TExts> & RouterMap
+export type S2SClient<TIntegrations extends readonly AnyIntegration[]> = ResultClient<RootProcedures<TIntegrations>>
 
-export type S2SClient<TExts extends readonly AnyExtension[]> = ResultClient<RootRouter<TExts>>
-
-export class Kizlo<TExts extends readonly AnyExtension[] = []> {
+export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
 	public readonly context: Context
-	public readonly client: S2SClient<TExts>
-	public readonly router: RootRouter<TExts>
+	public readonly client: S2SClient<TIntegrations>
+	public readonly procedures: RootProcedures<TIntegrations>
 	private readonly remoteHandler: RPCHandler<ProcedureContext>
 	private readonly openapiHandler: OpenAPIHandler<ProcedureContext>
-	private readonly config: KizloConfig<TExts>
+	private readonly config: KizloConfig<TIntegrations>
 
-	constructor(config: KizloConfig<TExts>) {
+	constructor(config: KizloConfig<TIntegrations>) {
 		this.config = config
-		const extensions = this.registerExtensions()
+		const integrations = this.registerIntegrations()
 
 		this.context = new Context({
-			adapters: config.adapters,
+			adapters: integrations.adapters,
 			siteSecret: config.siteSecret,
 			credentials: config.credentials,
 			wordpressEndpoints: config.wordpressEndpoints,
-			extensionPlugins: extensions.plugins,
+			integrationPlugins: integrations.plugins,
 		})
 
-		this.router = Object.assign(Object.assign({}, { ...extensions.router, ...ROUTER_MAP }), {
+		this.procedures = Object.assign(Object.assign({}, { ...integrations.procedures, ...CORE_PROCEDURES }), {
 			webhooks: createWebhookRouter({
-				events: extensions.events,
+				events: integrations.events,
 			}),
 		})
 
-		const orpcRouter = createOrpcRouter(this.router)
+		const orpcRouter = createOrpcRouter(this.procedures)
 		this.client = createResultClient(createRouterClient(orpcRouter, { context: () => this.context.createServerContext() } as never))
 
 		this.remoteHandler = new RPCHandler(orpcRouter, {
@@ -150,145 +138,154 @@ export class Kizlo<TExts extends readonly AnyExtension[] = []> {
 		return isTypescriptObject(value) && "scope" in value && value.scope === scope
 	}
 
-	private registerExtensions() {
-		const router: Record<string, any> = {}
+	private registerIntegrations() {
+		const procedures: Record<string, any> = {}
 		const events: EventHandler[] = []
-		const plugins: ExtensionPluginRequirement[] = []
+		const plugins: IntegrationPluginRequirement[] = []
+		let adapters = mergeServiceAdapters(
+			this.config.logging ? { logger: consoleLog({ levels: levelsFrom(this.config.logging) }) } : undefined,
+		)
+		const reservedIds = new Set([...Object.keys(CORE_PROCEDURES), "webhooks"])
+		const integrationIds = new Set<string>()
 
-		// Contract generation imports this module for the router's exported shape alone, with no
+		// Contract generation imports this module for the procedure tree's exported shape alone, with no
 		// generated tree to check against and no request that could reach a missing endpoint.
-		const generating = Boolean(process.env[CONTRACT_GENERATION_ENV])
+		const generating = isContractGeneration()
 
-		for (const extension of this.config.extensions ?? []) {
-			if (!generating) assertExtensionEndpoints(extension, this.config.wordpressEndpoints ?? {})
-			if (extension.requires?.plugin) plugins.push(extension.requires.plugin)
+		for (const integration of this.config.integrations ?? []) {
+			if (reservedIds.has(integration.id)) {
+				throw new KizloError("INTEGRATION_ID_CONFLICT", {
+					message: `The integration id "${integration.id}" is reserved by Kizlo. Choose a different integration id.`,
+				})
+			}
+			if (integrationIds.has(integration.id)) {
+				throw new KizloError("INTEGRATION_ID_CONFLICT", {
+					message: `The integration id "${integration.id}" is registered more than once. Give every integration a unique id.`,
+				})
+			}
+			integrationIds.add(integration.id)
 
-			const data = extension.init({ context: { something: "" } })
-			if (data.router) router[extension.id] = data.router
-			for (const handler of data.events ?? []) events.push(handler)
+			if (!generating) assertIntegrationEndpoints(integration, this.config.wordpressEndpoints ?? {})
+			plugins.push(...(integration.requires?.plugins ?? []))
+			if (integration.procedures && Object.keys(integration.procedures).length > 0) procedures[integration.id] = integration.procedures
+			for (const handler of integration.events ?? []) events.push(handler)
+			adapters = mergeServiceAdapters(adapters, integration.adapters)
 		}
 
 		return {
+			adapters,
 			events,
 			plugins,
-			router: router as InferExtensionRouter<TExts>,
+			procedures: procedures as InferIntegrationProcedures<TIntegrations>,
 		}
 	}
 }
 
-export interface CreateKizloOptions<TExts extends readonly AnyExtension[] = []> {
-	/** Public base URL of your Kizlo server, used to route requests. Falls back to the `KIZLO_API_URL` env var. */
+export interface CreateKizloOptions<TIntegrations extends readonly AnyIntegration[] = []> {
+	/** Public base URL of your Kizlo server. Falls back to the `baseUrl` value contributed by an integration. */
 	baseUrl?: string
-	/** Secret shared with the WordPress plugin to sign and verify webhooks. Falls back to the `KIZLO_WP_SECRET` env var (connect-selected). */
+	/** Secret shared with WordPress. Falls back to the `siteSecret` value contributed by an integration. */
 	siteSecret?: string
-	/** Extensions to register, built with `createExtension` — mounts their namespaces on the client and their routes and event handlers on the handler. */
-	extensions?: TExts
-	/** Runtime environment. Falls back to `NODE_ENV`, then `"development"`. */
-	environment?: Environment
+	/** Integrations to compose, built with `createIntegration`. */
+	integrations?: TIntegrations
+	/** Enable Kizlo's built-in console logger at this level. */
+	logging?: false | LogLevel
 	/**
-	 * Which credential set to use. Falls back to the `KIZLO_CONNECT` env var, then `"remote"`.
-	 * Independent of `environment`: `"local"` reads `KIZLO_LOCAL_WP_*` / `KIZLO_LOCAL_WP_SECRET` (the keys
-	 * local WordPress manages), `"remote"` reads `KIZLO_WP_*` / `KIZLO_WP_SECRET`.
-	 */
-	connect?: KizloConnect
-	/** Service adapters: auth, captcha, geo, logger, and cookies. */
-	adapters?: ServiceAdapters
-	/**
-	 * The generated endpoints to run against WordPress, plus the connection to run them on. Pass the
-	 * `endpoints` export of your generated barrel. Each credential falls back to a connect-selected
-	 * env var: with the default `"remote"` connect to `KIZLO_WP_URL` / `KIZLO_WP_USERNAME` /
-	 * `KIZLO_WP_APP_PASSWORD`, and with the `"local"` connect to their `KIZLO_LOCAL_WP_*` counterparts.
+	 * The generated endpoints to run against WordPress, plus optional explicit credentials. Pass the
+	 * `endpoints` export of your generated barrel. Missing credentials fall back to the `wordpressUrl`,
+	 * `wordpressUsername`, and `wordpressPassword` values contributed by integrations.
 	 */
 	wordpress?: { endpoints?: object; credentials?: Partial<WordPressCredentials> }
 }
 
+const WORDPRESS_ENV_VALUES = new Set(["siteSecret", "wordpressUrl", "wordpressUsername", "wordpressPassword"])
+
 /**
- * Reads a single environment variable by name. Defaults to `process.env`, but framework factories can
- * pass their own source: the Astro factory hands in `getSecret` from `astro:env/server`, so `.env` is
- * resolved the Astro-native way (through the dev server / adapter) rather than through `process.env`.
+ * Compose environment sources without letting `undefined` erase an earlier value, then resolve
+ * Kizlo's active WordPress connection from the canonical `mode` value.
  */
-export type EnvReader = (name: string) => string | undefined
+export function integrationEnv(integrations: readonly AnyIntegration[]): EnvReader {
+	const composed: EnvReader = (name) => {
+		let value: string | undefined
+		for (const integration of integrations) {
+			if (!integration.env) continue
+			const contribution = readEnv(integration.env, name)
+			if (contribution !== undefined) value = contribution
+		}
+		return value
+	}
 
-const processEnvReader: EnvReader = (name) => process.env[name]
-
-function requireEnv(name: string, env: EnvReader): string {
-	const value = env(name)?.trim()
-	if (value) return value
-	// Contract generation imports this module only for the router's exported shape, which no env
-	// value affects. A placeholder lets the import complete; a real request never runs in this mode.
-	if (process.env[CONTRACT_GENERATION_ENV]) return ""
-	throw new KizloError("MISSING_ENV_VARIABLE", { message: `Please define ${name} in your .env file.` })
-}
-
-function resolveConnect(option: KizloConnect | undefined, env: EnvReader): KizloConnect {
-	if (option) return option
-	const value = env("KIZLO_CONNECT")?.trim()
-	if (!value) return "remote"
-	if (value !== "local" && value !== "remote") {
-		throw new KizloError("INVALID_ENV_VARIABLE", {
-			message: `KIZLO_CONNECT must be "local" or "remote", got "${value}".`,
+	const mode = composed("mode")?.trim()
+	if (mode && mode !== "local" && mode !== "remote") {
+		throw new KizloError("INVALID_ENV_VALUE", {
+			message: `The "mode" environment value must be "local" or "remote", got "${mode}".`,
 		})
 	}
-	return value
+	const profile = mode === "local" ? "local" : "remote"
+
+	return (name) => {
+		return WORDPRESS_ENV_VALUES.has(name) ? composed(`${profile}.${name}`) : composed(name)
+	}
 }
 
-/** Env var names for a credential set: `KIZLO_LOCAL_WP_URL` / `KIZLO_LOCAL_WP_SECRET` for local, `KIZLO_WP_URL` / `KIZLO_WP_SECRET` for remote. */
-function connectEnvKeys(connect: KizloConnect) {
-	const prefix = connect === "local" ? "KIZLO_LOCAL_" : "KIZLO_"
-	return {
-		siteSecret: `${prefix}WP_SECRET`,
-		url: `${prefix}WP_URL`,
-		username: `${prefix}WP_USERNAME`,
-		password: `${prefix}WP_APP_PASSWORD`,
-	}
+function levelsFrom(level: LogLevel): LogLevel[] {
+	const levels: LogLevel[] = ["debug", "info", "warn", "error"]
+	return levels.slice(levels.indexOf(level))
+}
+
+function requireEnvValue(name: string, env: EnvReader): string {
+	const value = env(name)?.trim()
+	if (value) return value
+	// Contract generation imports this module only for the procedure tree's exported shape, which no env
+	// value affects. A placeholder lets the import complete; a real request never runs in this mode.
+	if (isContractGeneration()) return ""
+	throw new KizloError("MISSING_ENV_VALUE", {
+		message: `Kizlo requires the "${name}" environment value. Provide it through an integration or an explicit createKizlo option.`,
+	})
 }
 
 export function resolveWordPressConnection(
-	options: Pick<CreateKizloOptions, "connect" | "wordpress"> | undefined,
-	env: EnvReader = processEnvReader,
-): { connect: KizloConnect; credentials: WordPressCredentials } {
+	options: Pick<CreateKizloOptions, "wordpress"> | undefined,
+	env: EnvReader,
+): { credentials: WordPressCredentials } {
 	const credentials = options?.wordpress?.credentials
-	const connect = resolveConnect(options?.connect, env)
-	const keys = connectEnvKeys(connect)
 	return {
-		connect,
 		credentials: {
-			url: credentials?.url ?? requireEnv(keys.url, env),
-			username: credentials?.username ?? requireEnv(keys.username, env),
-			password: credentials?.password ?? requireEnv(keys.password, env),
+			url: credentials?.url ?? requireEnvValue("wordpressUrl", env),
+			username: credentials?.username ?? requireEnvValue("wordpressUsername", env),
+			password: credentials?.password ?? requireEnvValue("wordpressPassword", env),
 		},
 	}
 }
 
 /**
- * Resolves a full `KizloConfig` from options and the environment. Shared by the
- * base `createKizlo` and each framework factory — the single place env values
- * and credentials are read. `baseUrlEnvKey` is the only framework-varying part.
+ * Resolves a full `KizloConfig` from explicit options and the composed integration environment.
  */
-export function resolveKizloConfig<TExts extends readonly AnyExtension[]>(
-	options: CreateKizloOptions<TExts> | undefined,
-	defaults: { baseUrlEnvKey: string; adapters?: ServiceAdapters; env?: EnvReader },
-): KizloConfig<TExts> {
-	const env = defaults.env ?? processEnvReader
-	const { connect, credentials } = resolveWordPressConnection(options, env)
-	const keys = connectEnvKeys(connect)
+export function resolveKizloConfig<TIntegrations extends readonly AnyIntegration[]>(
+	options: CreateKizloOptions<TIntegrations> | undefined,
+): KizloConfig<TIntegrations> {
+	const integrations = options?.integrations ?? ([] as unknown as TIntegrations)
+	const env = integrationEnv(integrations)
+	if (!isContractGeneration()) {
+		for (const integration of integrations) assertIntegrationEnv(integration, env)
+	}
+	const { credentials } = resolveWordPressConnection(options, env)
 	return {
-		baseUrl: options?.baseUrl ?? requireEnv(defaults.baseUrlEnvKey, env),
-		siteSecret: options?.siteSecret ?? requireEnv(keys.siteSecret, env),
-		environment: options?.environment ?? (process.env.NODE_ENV as Environment) ?? "development",
-		connect,
-		extensions: options?.extensions,
-		adapters: { ...defaults.adapters, ...options?.adapters },
+		baseUrl: options?.baseUrl ?? requireEnvValue("baseUrl", env),
+		siteSecret: options?.siteSecret ?? requireEnvValue("siteSecret", env),
+		integrations,
+		logging: options?.logging,
 		credentials,
 		wordpressEndpoints: options?.wordpress?.endpoints,
 	}
 }
 
 /**
- * Creates a Kizlo server from the environment (`KIZLO_API_URL`, `KIZLO_WP_SECRET`,
- * `KIZLO_WP_*`), with options taking precedence. Framework packages wrap this
- * with their own URL convention and adapters.
+ * Creates a Kizlo server from integration-contributed environment values, with explicit options
+ * taking precedence.
  */
-export function createKizlo<TExts extends readonly AnyExtension[] = []>(options?: CreateKizloOptions<TExts>): Kizlo<TExts> {
-	return new Kizlo(resolveKizloConfig(options, { baseUrlEnvKey: "KIZLO_API_URL" }))
+export function createKizlo<TIntegrations extends readonly AnyIntegration[] = []>(
+	options?: CreateKizloOptions<TIntegrations>,
+): Kizlo<TIntegrations> {
+	return new Kizlo(resolveKizloConfig(options))
 }

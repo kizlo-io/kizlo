@@ -45,7 +45,7 @@ function resolveUpdate<TData>(
 	return response.data
 }
 
-export const SETTINGS_ROUTER_MAP = {
+export const SETTINGS_PROCEDURES = {
 	get: createProcedure({ scope: "internal", output: schemaType<Settings>() }, async ({ context, errors }) => {
 		const response = await context.settings.get()
 

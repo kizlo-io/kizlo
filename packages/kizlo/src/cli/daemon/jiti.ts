@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { createJiti } from "jiti"
-import { CONTRACT_GENERATION_ENV } from "../../shared/constants"
+import { isContractGeneration, setContractGeneration } from "../../shared/contract-generation"
 
 /**
  * Loads a TypeScript module through jiti while tolerating framework virtual modules
@@ -21,15 +21,14 @@ export async function importIgnoringVirtualModules<T>(cwd: string, entry: string
 	const virtualModules: Record<string, unknown> = {}
 
 	// This import reads the module's exported *shape* only, never runtime values. Signal that to the
-	// Kizlo server factory so its eager env resolution (`requireEnv`) yields placeholders instead of
-	// throwing on connection env vars that a real request would need but shape extraction never touches.
-	const previousGenerationFlag = process.env[CONTRACT_GENERATION_ENV]
-	process.env[CONTRACT_GENERATION_ENV] = "1"
+	// Kizlo server factory so its eager value resolution yields placeholders instead of throwing on
+	// connection values that a real request would need but shape extraction never touches.
+	const previousGenerationFlag = isContractGeneration()
+	setContractGeneration(true)
 	try {
 		return await importLoop<T>(cwd, entry, deps, virtualModules)
 	} finally {
-		if (previousGenerationFlag === undefined) delete process.env[CONTRACT_GENERATION_ENV]
-		else process.env[CONTRACT_GENERATION_ENV] = previousGenerationFlag
+		setContractGeneration(previousGenerationFlag)
 	}
 }
 

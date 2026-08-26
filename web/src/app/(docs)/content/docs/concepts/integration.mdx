@@ -1,51 +1,48 @@
 ---
-title: Extension
+title: Integration
 icon: PuzzlePiece
-description: Learn how extensions group procedures and events into a unit of API under their own namespace.
+description: Compose procedures, events, adapters, environment values, and WordPress requirements.
 ---
 
-An **extension** is a self-contained unit of API that adds its own namespace to the client. A
-[procedure](#procedures) is a single operation, exposed as an HTTP endpoint or kept as a server-only function
-depending on its [scope](#scope). An extension is the container that groups a set of related procedures under
-one name.
+An **integration** is a standalone block that connects Kizlo to a framework, provider, or feature. It can
+contribute [procedures](#procedures), [events](#events), [adapters](/docs/concepts/adapter), environment values,
+and WordPress requirements. When it has procedures, its `id` becomes their namespace on the client.
 
-An extension can be **maintained by Kizlo**, built by the **community**, or written by **you**. All are
+An integration can be **maintained by Kizlo**, built by the **community**, or written by **you**. All are
 registered the same way, with the matching [companion plugin](#companion-plugins) active in WordPress when one
 is required.
 
-## Your first extension
+## Your first integration
 
-Here's a complete extension. It reads a WordPress post through the [**WordPress client**](/docs/concepts/wordpress-client) at
+Here's a complete integration. It reads a WordPress post through the [**WordPress client**](/docs/concepts/wordpress-client) at
 `context.wordpress` and returns a shape that's yours, not WordPress's:
 
 ```ts title="src/lib/kizlo/server/featured.ts"
-import { createExtension, createProcedure } from "kizlo"
+import { createIntegration, createProcedure } from "kizlo"
 import { z } from "zod"
 
 export const featured = () =>
-  createExtension({
+  createIntegration({
     id: "featured",
-    init: () => ({
-      router: {
-        get: createProcedure(
-          {
-            scope: "api",
-            method: "GET",
-            path: "/featured/{id}",
-            params: z.object({ id: z.coerce.number() }),
-            output: z.object({ id: z.number(), headline: z.string() }),
-          },
-          async ({ input, context }) => {
-            const { data, error } = await context.wordpress.postTypes.post.retrieve({
-              identifier: String(input.params.id),
-            })
-            if (error) throw error
+    procedures: {
+      get: createProcedure(
+        {
+          scope: "api",
+          method: "GET",
+          path: "/featured/{id}",
+          params: z.object({ id: z.coerce.number() }),
+          output: z.object({ id: z.number(), headline: z.string() }),
+        },
+        async ({ input, context }) => {
+          const { data, error } = await context.wordpress.postTypes.post.retrieve({
+            identifier: String(input.params.id),
+          })
+          if (error) throw error
 
-            return { id: data.id, headline: data.title.rendered }
-          },
-        ),
-      },
-    }),
+          return { id: data.id, headline: data.title.rendered }
+        },
+      ),
+    },
   })
 ```
 
@@ -54,39 +51,82 @@ Register it on your server:
 ```ts title="src/lib/kizlo/server/index.ts"
 import { featured } from "./featured"
 
-export const { client, handler } = createKizlo({
-  extensions: [featured()],
+export const { procedures, client, handler } = createKizlo({
+  integrations: [featured()],
 })
 ```
 
-That's a working extension. `client.featured.get(...)` is now on the client, typed from the procedure's
-`output`. The rest of this page breaks down each piece: an extension's [anatomy](#anatomy-of-an-extension),
+That's a working integration. `client.featured.get(...)` is now on the client, typed from the procedure's
+`output`. The rest of this page breaks down each piece: an integration's [anatomy](#anatomy-of-an-integration),
 the [procedures](#procedures) inside it, and the [events](#events) it can react to.
 
-## Anatomy of an extension
+## Anatomy of an integration
 
-You just saw `createExtension` in action. It has two parts: a unique **`id`** that becomes its namespace on
-the client, and an **`init`** function that returns what the extension contributes.
+`createIntegration` takes an `id` and any contributions the provider owns:
 
 ```ts
-createExtension({
+createIntegration({
   id: "featured", // → client.featured
-  init: () => ({
-    router: { get, list }, // procedures, grouped
-    events: [/* webhook handlers */],
-  }),
+  procedures: { get, list },
+  events: [/* webhook handlers */],
+  adapters: { auth },
+  env: {
+    baseUrl: process.env.NEXT_PUBLIC_KIZLO_BASE_URL,
+    mode: process.env.KIZLO_MODE,
+    remote: {
+      siteSecret: process.env.KIZLO_WP_SECRET,
+      wordpressUrl: process.env.KIZLO_WP_URL,
+      wordpressUsername: process.env.KIZLO_WP_USERNAME,
+      wordpressPassword: process.env.KIZLO_WP_APP_PASSWORD,
+    },
+    local: {
+      siteSecret: process.env.KIZLO_LOCAL_WP_SECRET,
+      wordpressUrl: process.env.KIZLO_LOCAL_WP_URL,
+      wordpressUsername: process.env.KIZLO_LOCAL_WP_USERNAME,
+      wordpressPassword: process.env.KIZLO_LOCAL_WP_APP_PASSWORD,
+    },
+    providerRegion: process.env.PROVIDER_REGION,
+  },
+  requires: {
+    env: ["providerRegion"],
+    plugins: [{ name: "provider-plugin", version: "1.2.0" }],
+    endpoints: ["provider.profile"],
+  },
 })
 ```
 
-`init` returns two things, **both optional**. An extension can expose a router, handle events, or do both:
+Every contribution is optional:
 
-- **`router`**: the procedures the extension exposes. Each entry is a [procedure](#procedures) (or a
-  nested group of them) and becomes a method under the namespace.
-- **`events`**: the [webhook handlers](#events) the extension reacts to.
+- **`procedures`**: procedures or nested groups mounted below `id`. An absent or empty tree adds no namespace.
+- **`events`**: [webhook handlers](#events) the integration reacts to.
+- **`adapters`**: auth, captcha, geo, logger, or cookies implementations. Later integrations replace earlier
+  adapter values; see [Which adapter wins?](/docs/concepts/adapter#which-adapter-wins).
+- **`env`**: runtime-neutral Kizlo connection values plus any provider-specific values. Later concrete values
+  replace earlier leaf values; `undefined` is ignored. WordPress values live under `remote` and `local`.
+  Kizlo never reads a runtime environment directly.
+- **`requires`**: environment values and generated endpoint subtrees checked when the server starts, plus
+  companion plugin versions checked from WordPress response headers. Environment requirements accept dotted
+  paths such as `remote.wordpressUrl` and run after every integration's `env` contribution is composed.
+
+This shape lets a provider keep its SDK and adapter setup inside the integration factory. The consumer imports
+one integration instead of coordinating a separate adapter configuration.
+
+Frameworks use the same shape. Import `createKizlo` from `kizlo`, then register the framework integration.
+It only maps the framework's environment onto camel-case values. Kizlo selects the local or remote WordPress
+values after every integration is composed:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+import { nextjs } from "kizlo/nextjs/server"
+
+export const { procedures, client, handler } = createKizlo({
+  integrations: [nextjs(), provider()],
+})
+```
 
 ## Procedures
 
-A **procedure** is a single operation that lives inside an extension's `router`, the only place you ever
+A **procedure** is a single operation that lives inside an integration's `procedures`, the only place you ever
 author one. Its [scope](#scope) decides whether it's exposed as an HTTP endpoint or stays a server-only
 function. You create it with `createProcedure`, which takes an **options** object describing the operation
 and a **handler** that runs it:
@@ -323,14 +363,14 @@ Middlewares run in the order listed, so put broad guards (auth) before narrower 
 
 ## Events
 
-**Events** let an extension react to things happening in WordPress: a post published, a term deleted,
+**Events** let an integration react to things happening in WordPress: a post published, a term deleted,
 settings saved. WordPress sends these as signed webhooks, and Kizlo dispatches each one to the handlers your
-extensions registered.
+integrations registered.
 
-Register them through the `events` array returned from `init`, building each with `createEventHandler`:
+Register them through the integration's `events` array, building each with `createEventHandler`:
 
 ```ts title="src/lib/kizlo/server/cache/index.ts"
-import { createEventHandler, createExtension } from "kizlo"
+import { createEventHandler, createIntegration } from "kizlo"
 
 const onContentChange = createEventHandler(async (event, context) => {
   if (!event) return
@@ -346,9 +386,9 @@ const onContentChange = createEventHandler(async (event, context) => {
 })
 
 export const cache = () =>
-  createExtension({
+  createIntegration({
     id: "cache",
-    init: () => ({ events: [onContentChange] }),
+    events: [onContentChange],
   })
 ```
 
@@ -379,7 +419,7 @@ The Kizlo plugin ships these events out of the box:
 
 ### Custom events
 
-Your own plugin can emit its own events for your extension to handle, the same one-way flow of
+Your own plugin can emit its own events for your integration to handle, the same one-way flow of
 WordPress → Kizlo. There are two sides.
 
 **Emit from WordPress.** The Kizlo plugin exposes a global `kizlo_emit_event($type, $data)` helper. Call it from
@@ -392,7 +432,7 @@ kizlo_emit_event('review.created', [
 ]);
 ```
 
-**Handle in your extension.** Declare the event's type and a matching `data` schema as the first argument to
+**Handle in your integration.** Declare the event's type and a matching `data` schema as the first argument to
 `createEventHandler`, and the handler is then typed to that union:
 
 ```ts
@@ -408,31 +448,31 @@ const onReview = createEventHandler(
 )
 ```
 
-## Prebuilt extensions
+## Prebuilt integrations
 
-Not every extension is one you write. Kizlo and the community publish extensions as npm packages. Install one,
+Not every integration is one you write. Kizlo and the community publish integrations as npm packages. Install one,
 register it exactly like your own, and its namespace lands on the client:
 
 ```bash
-npm install @kizlo/example-extension
+npm install @kizlo/example-integration
 ```
 
 ```ts title="src/lib/kizlo/server/index.ts"
-import { exampleExtension } from "@kizlo/example-extension"
+import { exampleIntegration } from "@kizlo/example-integration"
 
 export const { client, handler } = createKizlo({
-  extensions: [exampleExtension()],
+  integrations: [exampleIntegration()],
 })
 ```
 
-Now `client.exampleExtension.*` is on the client, typed the same as the core namespaces. A published
-extension that bridges a third-party WordPress plugin also ships a companion plugin you activate in
+Now `client.exampleIntegration.*` is on the client, typed the same as the core namespaces. A published
+integration that bridges a third-party WordPress plugin also ships a companion plugin you activate in
 WordPress, covered next.
 
 ## Companion plugins
 
-Everything above is the **app side** of an extension. Some extensions also have a **WordPress side**: when an
-extension bridges a third-party WordPress plugin, it ships with a matching **companion plugin** that
+Everything above is the **app side** of an integration. Some integrations also have a **WordPress side**: when an
+integration bridges a third-party WordPress plugin, it ships with a matching **companion plugin** that
 makes that plugin reachable, and can add features on top.
 
 When a companion plugin is needed, and why the WordPress side splits into the required Kizlo plugin plus

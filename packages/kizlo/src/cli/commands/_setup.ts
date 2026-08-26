@@ -75,18 +75,18 @@ export interface Connection {
 
 /**
  * The `.env` keys setup manages and the values to write, branched on the connection mode. Local
- * WordPress writes the `KIZLO_LOCAL_WP_*` / `KIZLO_LOCAL_WP_SECRET` set plus `KIZLO_CONNECT=local`,
+ * WordPress writes the `KIZLO_LOCAL_WP_*` / `KIZLO_LOCAL_WP_SECRET` set plus `KIZLO_MODE=local`,
  * so it never touches the remote keys (a user can point those at a real site). A remote site writes
- * the bare remote keys exactly as before — no `KIZLO_CONNECT`, since `"remote"` is the default.
+ * the bare remote keys exactly as before — no `KIZLO_MODE`, since `"remote"` is the default.
  */
 export function managedEnv(envKeys: EnvKeys, conn: Connection): { keys: string[]; values: Record<string, string> } {
 	if (conn.mode === "local") {
-		const { connect, siteSecret, wpUrl, wpUsername, wpPassword } = envKeys.local
+		const { mode, siteSecret, wpUrl, wpUsername, wpPassword } = envKeys.local
 		return {
-			keys: [envKeys.baseUrl, connect, siteSecret, wpUrl, wpUsername, wpPassword],
+			keys: [envKeys.baseUrl, mode, siteSecret, wpUrl, wpUsername, wpPassword],
 			values: {
 				[envKeys.baseUrl]: conn.baseUrl,
-				[connect]: "local",
+				[mode]: "local",
 				[siteSecret]: conn.siteSecret,
 				[wpUrl]: conn.wpUrl,
 				[wpUsername]: conn.wpUsername,
@@ -415,7 +415,7 @@ export async function provisionLocalWordPress(cwd: string, conn: Connection): Pr
 
 /**
  * The template's own `.env.example`, when it ships one. Templates own the framework-specific key names
- * (e.g. `NEXT_PUBLIC_KIZLO_API_URL`) and the shared section layout, so their file is the source of the
+ * (e.g. `NEXT_PUBLIC_KIZLO_BASE_URL`) and the shared section layout, so their file is the source of the
  * scaffold's `.env.example` — see {@link writeEnv}. Undefined for the base preset (no template dir).
  */
 export function readEnvExample(templateDir: string): string | undefined {
@@ -425,7 +425,7 @@ export function readEnvExample(templateDir: string): string | undefined {
 
 /**
  * The `.env.example` body for the base preset, which ships no template file. Lists the API URL and the
- * remote connection keys, then the commented `KIZLO_CONNECT=local` toggle for the local-dev path. Real
+ * remote connection keys, then the commented `KIZLO_MODE=local` toggle for the local-dev path. Real
  * templates carry their own `.env.example` (passed to {@link writeEnv}) so its structure and comments
  * stay consistent with the `.env` the scaffold writes.
  */
@@ -433,7 +433,7 @@ function generatedEnvExample(envKeys: EnvKeys): string {
 	const exampleKeys = [envKeys.baseUrl, ...remoteKeys(envKeys)]
 	const exampleValues = Object.fromEntries(exampleKeys.map((key) => [key, ""]))
 	const { content } = mergeEnv("", exampleValues, new Set(exampleKeys), envGroups(envKeys))
-	return `${content}\n# Point the app at local WordPress (managed by \`kizlo dev\`) instead of the keys above:\n# ${envKeys.local.connect}=local\n`
+	return `${content}\n# Point the app at local WordPress (managed by \`kizlo dev\`) instead of the keys above:\n# ${envKeys.local.mode}=local\n`
 }
 
 /**

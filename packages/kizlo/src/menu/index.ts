@@ -6,7 +6,7 @@ import { ListMenuInput, MenuGroupItemList, MenuItemList } from "./schema"
 import type { WPK_MenuItem } from "./types"
 import { buildMenuGroupItem, deserializeListMenuInput, extractPath } from "./utils"
 
-export const MENU_ROUTER_MAP = {
+export const MENU_PROCEDURES = {
 	items: {
 		list: createProcedure(
 			{

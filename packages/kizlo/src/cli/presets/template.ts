@@ -243,10 +243,10 @@ const changesSchema = z.object({
  * the CLI still fills each value (generate a secret, provision Docker, prompt for a remote URL).
  */
 const envSchema = z.object({
-	/** Public Kizlo API URL key, e.g. `NEXT_PUBLIC_KIZLO_API_URL`. */
+	/** Public Kizlo base URL key, e.g. `NEXT_PUBLIC_KIZLO_BASE_URL`. */
 	baseUrl: z.string(),
 	remote: z.object({ siteSecret: z.string(), wpUrl: z.string(), wpUsername: z.string(), wpPassword: z.string() }),
-	local: z.object({ connect: z.string(), siteSecret: z.string(), wpUrl: z.string(), wpUsername: z.string(), wpPassword: z.string() }),
+	local: z.object({ mode: z.string(), siteSecret: z.string(), wpUrl: z.string(), wpUsername: z.string(), wpPassword: z.string() }),
 }) satisfies z.ZodType<EnvKeys>
 
 /** A package name → version-range map, package.json's own vocabulary. */

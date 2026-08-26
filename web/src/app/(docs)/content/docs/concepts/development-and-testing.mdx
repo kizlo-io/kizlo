@@ -155,8 +155,9 @@ Some setup the REST API can't express, like pretty permalinks or an option flag.
 `kizlo/test` and call it inside `seed` to run any wp-cli command against WordPress.
 
 <Callout>
-  An [extension](/docs/concepts/extension) ships its data the same way: it exports a fixture that installs its
-  plugin and seeds what its procedures expect. Drop it into your config and both have a world to run in.
+  An [integration package](/docs/concepts/integration) can export a fixture beside its integration factory. The
+  fixture stays a separate config value: drop it into `dev.fixtures` or `test.fixtures` to install the plugin
+  and seed what the integration's procedures expect.
 </Callout>
 
 ## The development loop
@@ -165,7 +166,7 @@ You build against local WordPress like a site you installed yourself: it persist
 table above).
 
 What keeps that loop tight is [`kizlo dev`](/docs/concepts/cli#kizlo-dev): edit a
-[procedure](/docs/concepts/extension) and it regenerates the typed [contract](/docs/concepts/client) before you
+[procedure](/docs/concepts/integration) and it regenerates the typed [contract](/docs/concepts/client) before you
 call it; change content in `wp-admin` and your app reads it on the next request. Nothing to restart to stay in
 sync.
 
@@ -222,3 +223,17 @@ WordPress-backed ones worth trusting.
   [adapters](/docs/concepts/adapter), and each ships a mock so a test can pin a known user without a real
   provider. WordPress itself is never mocked.
 </Callout>
+
+When a provider integration bundles an adapter, append an adapter-only test integration to replace it. Integration
+adapters resolve left to right, so the last concrete value wins:
+
+```ts title="provider.test.ts"
+const testAdapters = createIntegration({
+  id: "test-adapters",
+  adapters: { auth: authMock({ mockUserId: 1 }) },
+})
+
+const kizlo = getKizloTestInstance({
+  integrations: [provider(), testAdapters],
+})
+```

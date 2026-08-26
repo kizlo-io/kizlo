@@ -11,7 +11,7 @@
   </a>
 </p>
 
-<h3 align="center">Contact Form 7 Extension</h3>
+<h3 align="center">Contact Form 7 Integration</h3>
 
 <p align="center">
   Type-safe form submissions using the Contact Form 7 WordPress plugin

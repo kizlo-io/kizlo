@@ -1,10 +1,10 @@
 import type { AnyRouter } from "@orpc/server"
-import { type AnyProcedure, type AnyProcedureRouter, buildProcedure } from "./procedure"
+import { type AnyProcedure, type AnyProcedureTree, buildProcedure } from "./procedure"
 
-export function createOrpcRouter(router: AnyProcedureRouter): AnyRouter {
+export function createOrpcRouter(procedures: AnyProcedureTree): AnyRouter {
 	const cache = new Map<string, unknown>()
 
-	return new Proxy(router, {
+	return new Proxy(procedures, {
 		get: (target, p) => {
 			if (typeof p === "symbol") return (target as any)[p]
 			if (cache.has(p)) return cache.get(p)
@@ -16,7 +16,7 @@ export function createOrpcRouter(router: AnyProcedureRouter): AnyRouter {
 			if (isProcedure(value)) {
 				resolved = buildProcedure(value)
 			} else if (typeof value === "object" && value !== null) {
-				resolved = createOrpcRouter(value as AnyProcedureRouter)
+				resolved = createOrpcRouter(value as AnyProcedureTree)
 			} else {
 				resolved = value
 			}

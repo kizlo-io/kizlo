@@ -1,15 +1,15 @@
-import { createExtension } from "kizlo"
-import { CART_ROUTER } from "./cart"
-import { CHECKOUT_ROUTER } from "./checkout"
-import { CUSTOMER_ROUTER } from "./customer"
-import { PRODUCT_ROUTER } from "./product"
+import { createIntegration } from "kizlo"
+import { CART_PROCEDURES } from "./cart"
+import { CHECKOUT_PROCEDURES } from "./checkout"
+import { CUSTOMER_PROCEDURES } from "./customer"
+import { PRODUCT_PROCEDURES } from "./product"
 
 export function woocommerce() {
-	return createExtension({
+	return createIntegration({
 		id: "woocommerce",
 		requires: {
-			plugin: { slug: "kizlo-woocommerce", name: "Kizlo WooCommerce", version: "0.2.0" },
-			// The `wc/v3` and `wc/store/v1` operations this extension calls. WooCommerce serves them, but
+			plugins: [{ name: "kizlo-woocommerce", version: "0.2.0" }],
+			// The `wc/v3` and `wc/store/v1` operations this integration calls. WooCommerce serves them, but
 			// only the Kizlo WooCommerce plugin describes them, so an absent subtree means that plugin is
 			// missing or predates the contract rather than anything being wrong with WooCommerce.
 			endpoints: [
@@ -21,15 +21,11 @@ export function woocommerce() {
 				"woocommerce.store.products",
 			],
 		},
-		init: () => {
-			return {
-				router: {
-					cart: CART_ROUTER,
-					products: PRODUCT_ROUTER,
-					checkout: CHECKOUT_ROUTER,
-					customers: CUSTOMER_ROUTER,
-				},
-			}
+		procedures: {
+			cart: CART_PROCEDURES,
+			products: PRODUCT_PROCEDURES,
+			checkout: CHECKOUT_PROCEDURES,
+			customers: CUSTOMER_PROCEDURES,
 		},
 	})
 }

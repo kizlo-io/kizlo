@@ -1,5 +1,5 @@
-import type { router } from ".."
+import type { procedures } from ".."
 import contractJson from "./contract.json"
 
-export const contract = contractJson as unknown as typeof router
+export const contract = contractJson as unknown as typeof procedures
 export { endpoints, type WordPressClient } from "./wordpress"

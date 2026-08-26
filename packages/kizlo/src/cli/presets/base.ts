@@ -8,9 +8,10 @@ export const base: Fallback = {
 				label: "Kizlo server instance",
 				relPath: ctx.serverEntryPath,
 				contents: `import { createKizlo } from "kizlo"
+import { node } from "kizlo/node"
 import { endpoints } from "./generated"
 
-export const { router, client, context, handler } = createKizlo({ wordpress: { endpoints } })
+export const { procedures, client, context, handler } = createKizlo({ integrations: [node()], wordpress: { endpoints } })
 `,
 			},
 			{ label: "Browser client", relPath: ctx.clientPath, contents: clientEntry(ctx) },
@@ -24,7 +25,7 @@ function clientEntry(ctx: ScaffoldContext): string {
 import { contract } from "./${ctx.serverDirName}/generated"
 
 // Your Kizlo backend runs on a different origin than this app. Swap in your bundler's
-// public env var (e.g. import.meta.env.VITE_KIZLO_API_URL) to set it per environment.
+// public env var (e.g. import.meta.env.VITE_KIZLO_BASE_URL) to set it per environment.
 export const client = createKizloClient(contract, { url: "${ctx.clientUrl}" })
 `
 	}

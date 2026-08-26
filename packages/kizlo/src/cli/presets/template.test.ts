@@ -1,3 +1,4 @@
+import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
@@ -74,7 +75,7 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 		expect(file.contents).not.toContain('"@/lib/kizlo/server/')
 	})
 
-	it("retargets every template-alias import — not just the server — to the chosen alias", () => {
+	it("retargets every template-alias import, not just the server, to the chosen alias", () => {
 		// Astro's blog page imports both its layout (`@/layouts/Layout.astro`) and the server
 		// (`@/lib/kizlo/server`) through the template's `@` alias. A project that chose a `~` alias must
 		// get every one rewritten, or the non-server imports keep pointing at a `@` the project lacks.
@@ -106,6 +107,20 @@ describe("readManifest / adaptFile / resolvePatch", () => {
 		expect(resolved.relPath).toBe("app/layout.tsx")
 		expect(resolved.imports.some((i) => i.module === "@/lib/kizlo/server" && i.names.includes("client"))).toBe(true)
 		expect(resolved.exports.map((e) => e.name)).toEqual(["generateMetadata", "generateViewport"])
+	})
+})
+
+describe.each(["nextjs", "astro", "tanstack-start-react", "tanstack-start-solid"])("%s template", (template) => {
+	it("exports procedures and types the generated contract from them", () => {
+		const dir = path.resolve(here, `../../../../../templates/${template}/src/lib/kizlo/server`)
+		const server = fs.readFileSync(path.join(dir, "index.ts"), "utf8")
+		const generated = fs.readFileSync(path.join(dir, "generated/index.ts"), "utf8")
+
+		expect(server).toContain("export const { procedures, client, context, handler }")
+		expect(server).not.toContain("router")
+		expect(generated).toContain('import type { procedures } from ".."')
+		expect(generated).toContain("typeof procedures")
+		expect(generated).not.toContain("router")
 	})
 })
 
