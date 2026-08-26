@@ -204,12 +204,11 @@ folder to pick: the install location is fixed.
   (it provisions their own `.kizlo/local`). The install and credentials stay per-machine and gitignored.
 </Callout>
 
-On first install, `kizlo dev` mints a **random** admin password (not a guessable default) and prints it once
-so you can log into `wp-admin`. Save it then; it isn't stored on disk. Later runs are idempotent and leave
-that login untouched.
+Fresh local WordPress installs use `admin` for both the `wp-admin` username and password. Existing installs
+keep their current login. Run `kizlo dev reset` to rebuild an existing dev site with the default credentials.
 
-Local WordPress mints no application password. That's a test concern. To point an app at it over
-REST, create one in `wp-admin → Users → Profile → Application Passwords`.
+`kizlo dev` creates a separate application password for REST access and writes it to the local `.env`
+connection. That credential is not the `wp-admin` password.
 
 Its MySQL is published on `127.0.0.1:3307` (override with [`dev.dbPort`](#configuration)) so you can
 inspect or edit tables directly, beyond what `wp-admin` exposes. Kizlo doesn't bundle a database UI. Point

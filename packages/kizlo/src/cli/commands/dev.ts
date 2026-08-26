@@ -41,7 +41,7 @@ function note(text: string): void {
  * Print the connection summary as an aligned, Next.js-style block. Shows the wp-admin URL on
  * the loopback ("Local") and — when local WordPress is installed on a LAN address rather than
  * localhost — on the network, so it can be opened from other devices. On a fresh install, also
- * show the one-time wp-admin password (it's never stored, so this is the only chance to see it).
+ * show the default wp-admin login.
  */
 function printSummary(info: DevStackInfo): void {
 	const { cyan, dim, reset } = palette()
@@ -54,13 +54,7 @@ function printSummary(info: DevStackInfo): void {
 	const width = Math.max(...rows.map(([label]) => label.length)) + 1
 	const lines = ["", ...rows.map(([label, value]) => `   ${dim}- ${`${label}:`.padEnd(width)}${reset} ${cyan}${value}${reset}`)]
 
-	if (info.secrets) {
-		lines.push(
-			"",
-			`   ${dim}admin login:${reset} ${info.username} / ${info.secrets.password}`,
-			`   ${dim}save the password now — it's shown only once${reset}`,
-		)
-	}
+	if (info.adminPassword) lines.push("", `   ${dim}admin login:${reset} ${info.username} / ${info.adminPassword}`)
 	if (info.seeded > 0) lines.push(`   ${dim}seeded ${info.seeded} fixture${info.seeded === 1 ? "" : "s"}${reset}`)
 
 	process.stdout.write(`${lines.join("\n")}\n`)
