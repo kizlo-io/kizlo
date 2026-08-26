@@ -1,5 +1,11 @@
 # @kizlo/shared
 
+## 0.8.0
+
+### Minor Changes
+
+- [#171](https://github.com/kizlo-io/kizlo/pull/171) [`2e71e5d`](https://github.com/kizlo-io/kizlo/commit/2e71e5dc9231423ba05a7a555fc5b3ca4b9fd68a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Replace extensions with declarative integrations and rename runtime variables to `KIZLO_BASE_URL` and `KIZLO_MODE`.
+
 ## 0.7.0
 
 ### Minor Changes

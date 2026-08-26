@@ -1,6 +1,6 @@
 {
 	"name": "kizlo",
-	"version": "0.15.2",
+	"version": "0.16.0",
 	"type": "module",
 	"description": "A headless WordPress framework for TypeScript.",
 	"keywords": [
