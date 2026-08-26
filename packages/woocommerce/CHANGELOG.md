@@ -1,5 +1,14 @@
 # @kizlo/woocommerce
 
+## 0.2.2
+
+### Patch Changes
+
+- [#171](https://github.com/kizlo-io/kizlo/pull/171) [`2e71e5d`](https://github.com/kizlo-io/kizlo/commit/2e71e5dc9231423ba05a7a555fc5b3ca4b9fd68a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Build the WooCommerce integration from declarative procedures and WordPress requirements.
+
+- Updated dependencies [[`2e71e5d`](https://github.com/kizlo-io/kizlo/commit/2e71e5dc9231423ba05a7a555fc5b3ca4b9fd68a)]:
+  - @kizlo/shared@0.8.0
+
 ## 0.2.1
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @kizlo/cf7
 
+## 0.1.11
+
+### Patch Changes
+
+- [#171](https://github.com/kizlo-io/kizlo/pull/171) [`2e71e5d`](https://github.com/kizlo-io/kizlo/commit/2e71e5dc9231423ba05a7a555fc5b3ca4b9fd68a) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Build Contact Form 7 integrations from declarative procedures.
+
+- Updated dependencies [[`2e71e5d`](https://github.com/kizlo-io/kizlo/commit/2e71e5dc9231423ba05a7a555fc5b3ca4b9fd68a)]:
+  - @kizlo/shared@0.8.0
+
 ## 0.1.10
 
 ### Patch Changes
