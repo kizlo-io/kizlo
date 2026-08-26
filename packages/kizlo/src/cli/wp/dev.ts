@@ -1,11 +1,10 @@
-import { randomBytes } from "node:crypto"
 import { existsSync } from "node:fs"
 import { type NetworkInterfaceInfo, networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { WordPressTransport } from "../../wordpress"
 import type { ResolvedDevConfig } from "../daemon/config"
 import { log } from "../daemon/logger"
-import { createAdminAppPassword, seedUsers } from "./bootstrap"
+import { createAdminAppPassword, installWordPress, seedUsers } from "./bootstrap"
 import { DEFAULT_PLUGINS, TEST_ADMIN } from "./constants"
 import { compose, composePull, composeUp, wpCli, wpEval } from "./docker"
 import type { SeedContext } from "./types"
@@ -21,11 +20,10 @@ export interface DevStackInfo {
 	/** Number of `dev.fixtures` seeded this run (0 unless a fresh stack was just seeded). */
 	seeded: number
 	/**
-	 * The generated admin password for the wp-admin login. Present only on a fresh
-	 * install — the one moment we can show it, since WordPress stores it hashed and we
-	 * keep no artifact to read it back from.
+	 * The default wp-admin login password. Present only on a fresh install, since an
+	 * existing local database may still use an older credential.
 	 */
-	secrets?: { password: string }
+	adminPassword?: string
 	/**
 	 * A freshly minted REST application password, present only on a fresh install. The prior
 	 * one (if any) died with the wiped database, so callers write this into `.env` to keep REST
@@ -33,11 +31,6 @@ export interface DevStackInfo {
 	 * changed to invalidate them).
 	 */
 	appPassword?: string
-}
-
-/** A strong random admin password (144 bits, URL/JSON/CLI-safe characters). */
-function generatePassword(): string {
-	return randomBytes(18).toString("base64url")
 }
 
 const VIRTUAL_INTERFACE = /^(?:docker|br-|veth|utun|tun|tap)/i
@@ -96,9 +89,8 @@ async function seedDevFixtures(cfg: ResolvedDevConfig, url: string): Promise<num
  * sources + bind-mounted locals). An already-provisioned install is left untouched
  * (idempotent reruns).
  *
- * Credentials are an output, not a stored file: a fresh install mints a random admin
- * password and returns it once (to log into wp-admin). No application password is minted —
- * that's a test concern.
+ * A fresh install uses the shared local admin credentials and returns the password so
+ * the command can show the login. Existing installs are left untouched.
  */
 export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo> {
 	const url = devUrl(cfg.port)
@@ -117,20 +109,9 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 	await composeUp()
 
 	const installed = (await compose(["exec", "-T", "wp-cli", "wp", "core", "is-installed"])).code === 0
-	let password: string | undefined
 
 	if (!installed) {
-		password = generatePassword()
-		await wpCli([
-			"core",
-			"install",
-			`--url=${url}`,
-			"--title=Kizlo Dev",
-			`--admin_user=${TEST_ADMIN.username}`,
-			`--admin_password=${password}`,
-			`--admin_email=${TEST_ADMIN.email}`,
-			"--skip-email",
-		])
+		await installWordPress(url, "Kizlo Dev")
 		await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
 	}
 
@@ -149,7 +130,7 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 
 	const seeded = !installed && cfg.fixtures.length ? await seedDevFixtures(cfg, url) : 0
 
-	const appPassword = password ? await createAdminAppPassword("kizlo-dev") : undefined
+	const appPassword = !installed ? await createAdminAppPassword("kizlo-dev") : undefined
 
 	return {
 		url,
@@ -157,6 +138,6 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 		dbPort: cfg.dbPort,
 		seeded,
 		appPassword,
-		secrets: password ? { password } : undefined,
+		adminPassword: !installed ? TEST_ADMIN.password : undefined,
 	}
 }

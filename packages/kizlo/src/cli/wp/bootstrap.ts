@@ -12,6 +12,20 @@ export interface BootstrapConfig {
 	fixtures?: Fixture[]
 }
 
+/** Install a local WordPress site with the shared admin credentials. */
+export async function installWordPress(url: string, title: string): Promise<void> {
+	await wpCli([
+		"core",
+		"install",
+		`--url=${url}`,
+		`--title=${title}`,
+		`--admin_user=${TEST_ADMIN.username}`,
+		`--admin_password=${TEST_ADMIN.password}`,
+		`--admin_email=${TEST_ADMIN.email}`,
+		"--skip-email",
+	])
+}
+
 export async function seedUsers(): Promise<number> {
 	const existing = await wpCli(["user", "get", TEST_USER.username, "--field=ID"]).catch(() => "")
 	const id = existing
@@ -47,18 +61,7 @@ export async function bootstrapWp(config: BootstrapConfig): Promise<TestCredenti
 	await composeUp()
 
 	const installed = await compose(["exec", "-T", "wp-cli", "wp", "core", "is-installed"])
-	if (installed.code !== 0) {
-		await wpCli([
-			"core",
-			"install",
-			`--url=${url}`,
-			"--title=Kizlo Test",
-			`--admin_user=${TEST_ADMIN.username}`,
-			`--admin_password=${TEST_ADMIN.password}`,
-			`--admin_email=${TEST_ADMIN.email}`,
-			"--skip-email",
-		])
-	}
+	if (installed.code !== 0) await installWordPress(url, "Kizlo Test")
 
 	await wpCli(["rewrite", "structure", "/%postname%/", "--hard"])
 

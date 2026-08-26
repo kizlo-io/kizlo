@@ -67,8 +67,8 @@ export interface Connection {
 	wpUsername: string
 	wpPassword: string
 	/**
-	 * One-time wp-admin login password from a fresh local install, surfaced in the "Next steps" box.
-	 * Set by {@link setupLocalWordPress}; absent when resuming an existing stack (nothing to show).
+	 * Default wp-admin login password from a fresh local install, surfaced in the "Next steps" box.
+	 * Absent when resuming an existing stack, which may use an older credential.
 	 */
 	adminPassword?: string
 }
@@ -358,7 +358,7 @@ interface LocalStack {
 	username: string
 	/** REST application password minted for `.env` (local WordPress doesn't make one itself). */
 	appPassword: string
-	/** One-time wp-admin login password, shown only on a fresh install. */
+	/** Default wp-admin login password, shown on a fresh install. */
 	adminPassword?: string
 	/** Set when pushing `KIZLO_LOCAL_WP_SECRET` into the local plugin failed (warn-and-continue). */
 	secretSyncError?: string
@@ -390,7 +390,7 @@ async function provisionLocalStack(cfg: ResolvedDevConfig, siteSecret: string, b
 		url: info.url,
 		username: info.username,
 		appPassword,
-		adminPassword: info.secrets?.password,
+		adminPassword: info.adminPassword,
 		secretSyncError: sync.ok ? undefined : sync.error,
 	}
 }
@@ -498,7 +498,7 @@ export async function syncRemote(conn: Connection): Promise<string[]> {
 export function nextStepsLines(conn: Connection, prefix = ""): string[] {
 	const login =
 		conn.mode === "local" && conn.adminPassword
-			? [``, `Log in to wp-admin (${conn.wpUrl}/wp-admin):`, `  ${conn.wpUsername} / ${conn.adminPassword} — save it, it's shown only once`]
+			? [``, `Log in to wp-admin (${conn.wpUrl}/wp-admin):`, `  ${conn.wpUsername} / ${conn.adminPassword}`]
 			: []
 	return [`Start developing:`, `  ${prefix}npx kizlo dev`, ...login]
 }

@@ -80,7 +80,7 @@ export const TEST_ADMIN: Omit<TestAdminUser, "id" | "applicationPassword"> = {
 	firstName: "Admin",
 	lastName: "",
 	username: "admin",
-	password: "admin_pass",
+	password: "admin",
 	email: "admin@example.com",
 }
 
