@@ -19,7 +19,7 @@ function deserializeSitemapUrls(urls: WPK_SitemapUrl[]): SitemapUrl[] {
 	}))
 }
 
-export const SEO_ROUTER_MAP = {
+export const SEO_PROCEDURES = {
 	homepage: createProcedure(
 		{
 			scope: "internal",

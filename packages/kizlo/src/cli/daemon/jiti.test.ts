@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { CONTRACT_GENERATION_ENV } from "../../shared/constants"
+import { isContractGeneration, setContractGeneration } from "../../shared/contract-generation"
 import { importIgnoringVirtualModules } from "./jiti"
 
 /**
@@ -41,11 +41,11 @@ function load<T = Record<string, unknown>>(entry: string): Promise<T> {
 	return importIgnoringVirtualModules<T>(dir, entry)
 }
 
-describe("importIgnoringVirtualModules — real modules", () => {
+describe("importIgnoringVirtualModules: real modules", () => {
 	test("returns the exported shape of a plain module with no virtual deps", async () => {
-		const entry = write("src/index.ts", `export const router = { name: "posts" }\nexport const answer = 42\n`)
-		const mod = await load<{ router: { name: string }; answer: number }>(entry)
-		expect(mod.router).toEqual({ name: "posts" })
+		const entry = write("src/index.ts", `export const procedures = { name: "posts" }\nexport const answer = 42\n`)
+		const mod = await load<{ procedures: { name: string }; answer: number }>(entry)
+		expect(mod.procedures).toEqual({ name: "posts" })
 		expect(mod.answer).toBe(42)
 	})
 
@@ -53,30 +53,30 @@ describe("importIgnoringVirtualModules — real modules", () => {
 		pkg({ name: "app" })
 		write("tsconfig.json", JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@/*": ["./src/*"] } } }))
 		write("src/lib/secret.ts", `export const marker = "real-aliased-module"\n`)
-		const entry = write("src/index.ts", `import { marker } from "@/lib/secret"\nexport const router = { marker }\n`)
-		const mod = await load<{ router: { marker: string } }>(entry)
+		const entry = write("src/index.ts", `import { marker } from "@/lib/secret"\nexport const procedures = { marker }\n`)
+		const mod = await load<{ procedures: { marker: string } }>(entry)
 		// A stubbed alias would surface as a no-op proxy, never the real string.
-		expect(mod.router.marker).toBe("real-aliased-module")
+		expect(mod.procedures.marker).toBe("real-aliased-module")
 	})
 })
 
-describe("importIgnoringVirtualModules — virtual module stubbing", () => {
+describe("importIgnoringVirtualModules: virtual module stubbing", () => {
 	test("stubs an undeclared bare specifier and completes the import", async () => {
 		const entry = write(
 			"src/index.ts",
-			`import { getSecret } from "some-framework-virtual"\nexport const router = { ok: true }\nexport const kind = typeof getSecret\n`,
+			`import { getSecret } from "some-framework-virtual"\nexport const procedures = { ok: true }\nexport const kind = typeof getSecret\n`,
 		)
-		const mod = await load<{ router: { ok: boolean }; kind: string }>(entry)
-		expect(mod.router).toEqual({ ok: true })
+		const mod = await load<{ procedures: { ok: boolean }; kind: string }>(entry)
+		expect(mod.procedures).toEqual({ ok: true })
 	})
 
 	test("stubs a scheme-style virtual specifier (the real `astro:env/server` case)", async () => {
 		const entry = write(
 			"src/index.ts",
-			`import { getSecret } from "astro:env/server"\nvoid getSecret\nexport const router = { ok: true }\n`,
+			`import { getSecret } from "astro:env/server"\nvoid getSecret\nexport const procedures = { ok: true }\n`,
 		)
-		const mod = await load<{ router: { ok: boolean } }>(entry)
-		expect(mod.router).toEqual({ ok: true })
+		const mod = await load<{ procedures: { ok: boolean } }>(entry)
+		expect(mod.procedures).toEqual({ ok: true })
 	})
 
 	test("the stub satisfies default, named, nested, and callable usage at import time", async () => {
@@ -91,11 +91,11 @@ describe("importIgnoringVirtualModules — virtual module stubbing", () => {
 				`const b = named.deeply.nested.value`,
 				`const c = named.callable()`,
 				`const d = ns.anything.at.all()`,
-				`export const router = { a, b: typeof b, c, d }`,
+				`export const procedures = { a, b: typeof b, c, d }`,
 			].join("\n"),
 		)
-		const mod = await load<{ router: Record<string, unknown> }>(entry)
-		expect(mod.router).toBeDefined()
+		const mod = await load<{ procedures: Record<string, unknown> }>(entry)
+		expect(mod.procedures).toBeDefined()
 	})
 
 	test("stubs several distinct virtual specifiers in one import (loop iterates per miss)", async () => {
@@ -106,37 +106,37 @@ describe("importIgnoringVirtualModules — virtual module stubbing", () => {
 				`import { b } from "virtual:two"`,
 				`import { c } from "#imports"`,
 				`void a; void b; void c`,
-				`export const router = { ok: true }`,
+				`export const procedures = { ok: true }`,
 			].join("\n"),
 		)
-		const mod = await load<{ router: { ok: boolean } }>(entry)
-		expect(mod.router).toEqual({ ok: true })
+		const mod = await load<{ procedures: { ok: boolean } }>(entry)
+		expect(mod.procedures).toEqual({ ok: true })
 	})
 
 	test("stubs an undeclared scoped bare specifier", async () => {
-		const entry = write("src/index.ts", `import x from "@vendor/not-installed/sub"\nvoid x\nexport const router = { ok: true }\n`)
-		const mod = await load<{ router: { ok: boolean } }>(entry)
-		expect(mod.router).toEqual({ ok: true })
+		const entry = write("src/index.ts", `import x from "@vendor/not-installed/sub"\nvoid x\nexport const procedures = { ok: true }\n`)
+		const mod = await load<{ procedures: { ok: boolean } }>(entry)
+		expect(mod.procedures).toEqual({ ok: true })
 	})
 })
 
-describe("importIgnoringVirtualModules — errors that must surface", () => {
+describe("importIgnoringVirtualModules: errors that must surface", () => {
 	test("surfaces a missing relative import (a real bug, never a virtual module)", async () => {
-		const entry = write("src/index.ts", `import { x } from "./does-not-exist"\nexport const router = { x }\n`)
+		const entry = write("src/index.ts", `import { x } from "./does-not-exist"\nexport const procedures = { x }\n`)
 		// Stubbing this would hide a genuine broken import; it must reject instead.
 		await expect(load(entry)).rejects.toThrow()
 	})
 
 	test("surfaces a declared dependency that fails to resolve, rather than stubbing it", async () => {
 		pkg({ name: "app", dependencies: { "totally-missing-pkg": "1.0.0" } })
-		const entry = write("src/index.ts", `import x from "totally-missing-pkg"\nvoid x\nexport const router = { ok: true }\n`)
+		const entry = write("src/index.ts", `import x from "totally-missing-pkg"\nvoid x\nexport const procedures = { ok: true }\n`)
 		// It is declared, so an unresolvable import is a real install problem, not a virtual module.
 		await expect(load(entry)).rejects.toThrow()
 	})
 
 	test("surfaces a declared scoped dependency by its package name, not its subpath", async () => {
 		pkg({ name: "app", dependencies: { "@scope/pkg": "1.0.0" } })
-		const entry = write("src/index.ts", `import x from "@scope/pkg/sub"\nvoid x\nexport const router = { ok: true }\n`)
+		const entry = write("src/index.ts", `import x from "@scope/pkg/sub"\nvoid x\nexport const procedures = { ok: true }\n`)
 		await expect(load(entry)).rejects.toThrow()
 	})
 
@@ -146,51 +146,51 @@ describe("importIgnoringVirtualModules — errors that must surface", () => {
 	})
 })
 
-describe("importIgnoringVirtualModules — contract-generation flag", () => {
+describe("importIgnoringVirtualModules: contract-generation flag", () => {
 	test("the shape-only flag is set while the module body evaluates", async () => {
-		const entry = write("src/index.ts", `export const flagWhileImporting = process.env["${CONTRACT_GENERATION_ENV}"] ?? null\n`)
-		const mod = await load<{ flagWhileImporting: string | null }>(entry)
-		expect(mod.flagWhileImporting).toBe("1")
+		const entry = write("src/index.ts", `export const flagWhileImporting = globalThis[Symbol.for("kizlo.contract-generation")] ?? false\n`)
+		const mod = await load<{ flagWhileImporting: boolean }>(entry)
+		expect(mod.flagWhileImporting).toBe(true)
 	})
 
-	test("lets a module that would otherwise throw on missing env complete (the createKizlo case)", async () => {
-		// Mirrors `requireEnv`: the server factory throws when a connection env var is absent, unless the
-		// shape-only flag is set. Contract generation must get past that to read the router's shape.
+	test("lets a module that would otherwise throw on missing values complete (the createKizlo case)", async () => {
+		// Mirrors `requireEnvValue`: the server factory throws when a connection value is absent, unless the
+		// shape-only flag is set. Contract generation must get past that to read the procedure tree's shape.
 		const entry = write(
 			"src/index.ts",
 			[
-				`if (!process.env["${CONTRACT_GENERATION_ENV}"]) {`,
-				`  throw new Error("Please define PUBLIC_KIZLO_API_URL in your .env file.")`,
+				`if (!globalThis[Symbol.for("kizlo.contract-generation")]) {`,
+				`  throw new Error("Missing apiUrl")`,
 				`}`,
-				`export const router = { ok: true }`,
+				`export const procedures = { ok: true }`,
 			].join("\n"),
 		)
-		const mod = await load<{ router: { ok: boolean } }>(entry)
-		expect(mod.router).toEqual({ ok: true })
+		const mod = await load<{ procedures: { ok: boolean } }>(entry)
+		expect(mod.procedures).toEqual({ ok: true })
 	})
 
-	test("restores a previously-unset flag after a successful import", async () => {
-		delete process.env[CONTRACT_GENERATION_ENV]
-		const entry = write("src/index.ts", `export const router = { ok: true }\n`)
+	test("restores an inactive flag after a successful import", async () => {
+		setContractGeneration(false)
+		const entry = write("src/index.ts", `export const procedures = { ok: true }\n`)
 		await load(entry)
-		expect(CONTRACT_GENERATION_ENV in process.env).toBe(false)
+		expect(isContractGeneration()).toBe(false)
 	})
 
-	test("restores a previously-unset flag even when the import throws", async () => {
-		delete process.env[CONTRACT_GENERATION_ENV]
+	test("restores an inactive flag even when the import throws", async () => {
+		setContractGeneration(false)
 		const entry = write("src/index.ts", `throw new Error("boom")\n`)
 		await expect(load(entry)).rejects.toThrow()
-		expect(CONTRACT_GENERATION_ENV in process.env).toBe(false)
+		expect(isContractGeneration()).toBe(false)
 	})
 
-	test("restores a pre-existing flag value instead of clobbering it", async () => {
-		process.env[CONTRACT_GENERATION_ENV] = "outer"
+	test("restores a pre-existing active flag instead of clobbering it", async () => {
+		setContractGeneration(true)
 		try {
-			const entry = write("src/index.ts", `export const router = { ok: true }\n`)
+			const entry = write("src/index.ts", `export const procedures = { ok: true }\n`)
 			await load(entry)
-			expect(process.env[CONTRACT_GENERATION_ENV]).toBe("outer")
+			expect(isContractGeneration()).toBe(true)
 		} finally {
-			delete process.env[CONTRACT_GENERATION_ENV]
+			setContractGeneration(false)
 		}
 	})
 })

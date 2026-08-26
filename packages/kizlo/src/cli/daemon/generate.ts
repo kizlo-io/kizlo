@@ -1,9 +1,10 @@
 import fs from "node:fs"
 import path from "node:path"
 import { isPluginVersionSupported, pluginUpdateMessage } from "@kizlo/shared"
-import { resolveWordPressConnection } from "../../kizlo"
+import { node } from "../../integrations/node/integration"
+import { integrationEnv, resolveWordPressConnection } from "../../kizlo"
 import { generateContract } from "../../shared/contract"
-import type { AnyProcedureRouter } from "../../shared/procedure"
+import type { AnyProcedureTree } from "../../shared/procedure"
 import { fetchIntrospection } from "../../wordpress/fetch-introspection"
 import { generateWordPressModule } from "../../wordpress/generate"
 import { type IntrospectionDiagnostic, type IntrospectionDocument, IntrospectionVersionError } from "../../wordpress/introspection"
@@ -16,22 +17,32 @@ import { importIgnoringVirtualModules } from "./jiti"
 import { log } from "./logger"
 
 /**
- * The generated barrel — also written as a stub by `kizlo init`. It re-exports `endpoints` rather
+ * The generated barrel is also written as a stub by `kizlo init`. It re-exports `endpoints` rather
  * than pre-wrapping it: a server entry passes `wordpress: { endpoints }` itself, so the rest of the
  * WordPress options stay visible at the call site instead of hiding inside a generated object.
  */
 export const CONTRACT_BARREL = [
-	`import type { router } from ".."`,
+	`import type { procedures } from ".."`,
 	`import contractJson from "./contract.json"`,
 	``,
-	`export const contract = contractJson as unknown as typeof router`,
+	`export const contract = contractJson as unknown as typeof procedures`,
 	`export { endpoints, type WordPressClient } from "./wordpress"`,
 	``,
 ].join("\n")
 
+export class LegacyRouterExportError extends Error {
+	readonly name = "LegacyRouterExportError"
+
+	constructor(entry: string) {
+		super(
+			`The Kizlo server at ${entry} exports \`router\`, which is no longer supported. Rename that export to \`procedures\` and run \`kizlo generate\` again.`,
+		)
+	}
+}
+
 /**
  * `wordpress.ts` before the first generation. WordPress is reachable but untyped until then, so a
- * freshly scaffolded project compiles — including kizlo's own procedures — before it has ever
+ * freshly scaffolded project compiles, including Kizlo's own procedures, before it has ever
  * connected. `kizlo dev` / `kizlo generate` replaces this with the real client. `any` rather than an
  * empty tree on purpose: every endpoint a procedure names has to resolve to something until the
  * real shapes arrive, which `WP_Client` preserves by passing `any` through.
@@ -203,7 +214,7 @@ async function fetchDocument(
 	etag?: string,
 ): Promise<Awaited<ReturnType<typeof fetchIntrospection>> | undefined> {
 	loadEnvFiles(cwd)
-	const credentials = options.credentials ?? resolveWordPressConnection(undefined).credentials
+	const credentials = options.credentials ?? resolveWordPressConnection(undefined, integrationEnv([node()])).credentials
 	// Strict generation never revalidates: a 304 carries no diagnostics, so a warm meta file left over
 	// from a partial generation would answer "unchanged" and pass a run whose whole job is to fail.
 	const result = await fetchIntrospection(credentials, { etag: options.strict ? undefined : etag, fetch: options.fetch })
@@ -295,11 +306,14 @@ function writeGeneratedWordPress(cfg: ResolvedConfig, client: string, meta: stri
 export async function generateOnce(cfg: ResolvedConfig, options: GenerateWordPressOptions = {}): Promise<boolean> {
 	loadEnvFiles(cfg.cwd)
 	const entry = path.resolve(cfg.cwd, cfg.serverEntry)
-	const { router } = await importIgnoringVirtualModules<{ router?: AnyProcedureRouter }>(cfg.cwd, entry)
+	const server = await importIgnoringVirtualModules<{ procedures?: AnyProcedureTree; router?: unknown }>(cfg.cwd, entry)
 
-	if (!router) return false
+	if (!server.procedures) {
+		if (server.router) throw new LegacyRouterExportError(cfg.serverEntry)
+		return false
+	}
 
-	const contract = JSON.stringify(await generateContract(router))
+	const contract = JSON.stringify(await generateContract(server.procedures))
 	const wordpress = await generateWordPressOnce(cfg, options)
 
 	fs.mkdirSync(path.resolve(cfg.cwd, cfg.generatedDir), { recursive: true })

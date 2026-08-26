@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Register through Kizlo's version gate and report the active companion to integrations

@@ -173,7 +173,7 @@
 		]
 	},
 	"env": {
-		"baseUrl": "NEXT_PUBLIC_KIZLO_API_URL",
+		"baseUrl": "NEXT_PUBLIC_KIZLO_BASE_URL",
 		"remote": {
 			"siteSecret": "KIZLO_WP_SECRET",
 			"wpUrl": "KIZLO_WP_URL",
@@ -181,7 +181,7 @@
 			"wpPassword": "KIZLO_WP_APP_PASSWORD"
 		},
 		"local": {
-			"connect": "KIZLO_CONNECT",
+			"mode": "KIZLO_MODE",
 			"siteSecret": "KIZLO_LOCAL_WP_SECRET",
 			"wpUrl": "KIZLO_LOCAL_WP_URL",
 			"wpUsername": "KIZLO_LOCAL_WP_USERNAME",

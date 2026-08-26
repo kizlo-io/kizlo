@@ -56,28 +56,27 @@ export function pluginUpdateMessage(installed?: string | null): string {
 }
 
 // ====================================================
-// EXTENSION PLUGIN COMPATIBILITY
+// INTEGRATION PLUGIN COMPATIBILITY
 // ====================================================
 
 /**
- * Response header the plugin stamps the extension plugins that started on, as `slug=version` pairs:
- * `kizlo-woocommerce=0.2.0,kizlo-cf7=0.1.0`. An extension whose own requirements failed did not start
+ * Response header the plugin stamps the integration plugins that started on, as `name=version` pairs:
+ * `kizlo-woocommerce=0.2.0,kizlo-cf7=0.1.0`. An integration whose own requirements failed did not start
  * and is absent, so presence here means the contract behind it is registered, not merely installed.
+ * The wire name stays unchanged so released WordPress plugins remain compatible.
  */
-export const EXTENSION_VERSIONS_HEADER = "x-kizlo-extensions"
+export const INTEGRATION_VERSIONS_HEADER = "x-kizlo-extensions"
 
-/** The WordPress plugin a client-side extension needs, and the oldest version of it that carries its contract. */
-export interface ExtensionPluginRequirement {
-	/** Plugin slug, as the plugin's own directory names it. */
-	slug: string
-	/** Display name, for the warning text. */
+/** A WordPress plugin an integration needs, and the oldest version that carries its contract. */
+export interface IntegrationPluginRequirement {
+	/** Plugin name, as the plugin reports it in the integration versions header. */
 	name: string
-	/** Oldest version that registers the endpoints this extension calls. */
+	/** Oldest version that registers the endpoints this integration calls. */
 	version: string
 }
 
-/** Parse {@link EXTENSION_VERSIONS_HEADER} into slug/version pairs. Malformed pairs are dropped. */
-export function parseExtensionVersions(header: string | null | undefined): Record<string, string> {
+/** Parse {@link INTEGRATION_VERSIONS_HEADER} into name/version pairs. Malformed pairs are dropped. */
+export function parseIntegrationVersions(header: string | null | undefined): Record<string, string> {
 	if (!header) return {}
 	const versions: Record<string, string> = {}
 	for (const pair of header.split(",")) {
@@ -87,8 +86,8 @@ export function parseExtensionVersions(header: string | null | undefined): Recor
 	return versions
 }
 
-/** The user-facing "update the extension plugin" guidance, mirroring {@link pluginUpdateMessage}. */
-export function extensionUpdateMessage(requirement: ExtensionPluginRequirement, installed?: string | null): string {
+/** The user-facing "update the integration plugin" guidance, mirroring {@link pluginUpdateMessage}. */
+export function integrationUpdateMessage(requirement: IntegrationPluginRequirement, installed?: string | null): string {
 	const found = installed ?? "not active"
 	return `${requirement.name} plugin outdated (${found}). Update to ${requirement.version}+.`
 }

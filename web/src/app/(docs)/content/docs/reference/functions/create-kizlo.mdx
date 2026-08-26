@@ -1,10 +1,10 @@
 ---
 title: createKizlo
-description: Create a Kizlo server, the client, request handler, and router for your app.
+description: Create a Kizlo server, procedure tree, client, request handler, and context for your app.
 ---
 
-`createKizlo` builds your Kizlo server from credentials and registered [extensions](/docs/reference/functions/create-extension).
-It returns the `handler` you mount on a route, a server-to-server `client`, the resolved `router`, and the `context`.
+`createKizlo` builds your Kizlo server from credentials and registered [integrations](/docs/reference/functions/create-integration).
+It returns the `handler` you mount on a route, a server-to-server `client`, the resolved `procedures`, and the `context`.
 Call it once and export the pieces you need.
 
 ## Parameters
@@ -13,8 +13,9 @@ Call it once and export the pieces you need.
 createKizlo(options?)
 ```
 
-Every field is optional. Anything you omit falls back to an environment variable, so a credentials-only setup can be
-driven entirely from `.env` with no arguments.
+Every field is optional. Runtime integrations contribute the connection values their environment provides.
+Kizlo does not read environment variables itself. It resolves the active local or remote WordPress values
+from the canonical `mode`, `remote`, and `local` values after integrations map and compose them.
 
 <AutoTypeTable
   path="../packages/kizlo/src/kizlo.ts"
@@ -22,12 +23,12 @@ driven entirely from `.env` with no arguments.
   type={`CreateKizloOptions`}
 />
 
-Each field lists its environment fallback above. When a field is omitted and its env var is also missing, Kizlo throws
-`MISSING_ENV_VARIABLE`.
+When neither an explicit option nor an integration supplies a required value, Kizlo throws
+`MISSING_ENV_VALUE` with the missing camel-case key.
 
-`extensions` takes the [extensions](/docs/reference/functions/create-extension) whose namespaces are mounted on the
-client and whose routes and event handlers are mounted on the handler. `adapters` supplies the auth, captcha, geo,
-logger, and cookies services.
+`integrations` takes the [integrations](/docs/reference/functions/create-integration) whose procedures, events,
+adapters, environment values, and requirements Kizlo composes. `logging` enables the built-in console logger at
+`error`, `warn`, `info`, or `debug`; see [Adapter precedence](/docs/concepts/adapter#which-adapter-wins).
 
 ## Returns
 
@@ -37,38 +38,49 @@ A `Kizlo` instance with four members:
 | --- | --- |
 | `handler` | `(request: Request) => Promise<Response>`, the fetch handler to mount on your server route. It is pre-bound, so destructuring keeps it working. |
 | `client` | A server-to-server client for calling your own procedures from server code. |
-| `router` | The resolved router (core routes plus every registered extension and the webhook route). |
+| `procedures` | The resolved procedure tree: core procedures, namespaced integration procedures, and webhooks. |
 | `context` | The shared server context passed to procedures and middleware. |
 
 ## Examples
 
-Zero-config, everything from `.env`:
+On a Node server, map `process.env` through the Node integration:
 
 ```ts title="src/lib/kizlo/server/index.ts"
 import { createKizlo } from "kizlo"
+import { node } from "kizlo/node"
 
-export const { client, handler } = createKizlo()
-```
-
-With extensions registered:
-
-```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo } from "kizlo"
-import { reviews } from "./reviews"
-
-export const { client, handler } = createKizlo({
-  extensions: [reviews()],
+export const { procedures, client, handler } = createKizlo({
+  integrations: [node()],
 })
 ```
 
-With adapters supplied:
+With a framework and provider integration registered:
 
 ```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo, consoleLog } from "kizlo"
+import { createKizlo } from "kizlo"
+import { nextjs } from "kizlo/nextjs/server"
+import { reviews } from "./reviews"
 
-export const { client, handler } = createKizlo({
-  adapters: {
-    logger: consoleLog(),
+export const { procedures, client, handler } = createKizlo({
+  integrations: [nextjs(), reviews()],
+})
+```
+
+With explicit values and console logging:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+
+export const { procedures, client, handler } = createKizlo({
+  baseUrl: "https://example.com/api/kizlo",
+  siteSecret: "shared-secret",
+  wordpress: {
+    credentials: {
+      url: "https://wordpress.example.com",
+      username: "kizlo",
+      password: "application-password",
+    },
   },
+  logging: "debug",
 })
 ```

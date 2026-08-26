@@ -59,7 +59,7 @@ export async function activateLocalPlugin(pluginPath: string): Promise<void> {
 
 /**
  * Ensure every plugin is active. Installable sources go first so a bind-mounted
- * local plugin that depends on one (e.g. a WooCommerce extension) finds it already
+ * local plugin that depends on one (e.g. a WooCommerce integration) finds it already
  * present; then each {@link LocalPlugin} is activated by basename. A local plugin
  * whose slug matches an installable (e.g. mounting `kizlo` over the released
  * `kizlo`) is seen as already installed, so `ensurePlugin` activates the live

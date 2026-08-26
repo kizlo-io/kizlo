@@ -11,7 +11,7 @@
   </a>
 </p>
 
-<h3 align="center">WooCommerce Extension</h3>
+<h3 align="center">WooCommerce Integration</h3>
 
 <p align="center">
   Type-safe storefront using the WooCommerce WordPress plugin

@@ -12,7 +12,7 @@ Bring your Contact Form 7 forms into any JavaScript runtime.
 
 == Description ==
 
-Connects contact form 7 plugin with @kizlo/cf7 extension.
+Connects Contact Form 7 with the @kizlo/cf7 integration.
 
 Requires the Kizlo core plugin and Contact Form 7 to be active.
 

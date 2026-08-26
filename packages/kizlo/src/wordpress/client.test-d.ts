@@ -210,7 +210,7 @@ describe("described WordPress core routes", () => {
 /**
  * The WooCommerce routes the plugin describes and WooCommerce serves. Asserted against this repo's
  * generated `wordpress.ts` the same way the core block above is, so a WooCommerce release that moves
- * one of these shapes fails here rather than inside the extension that calls it.
+ * one of these shapes fails here rather than inside the integration that calls it.
  */
 describe("described WooCommerce routes", () => {
 	const wordpress = null as unknown as ActiveWordPressClient

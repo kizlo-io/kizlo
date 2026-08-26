@@ -63,7 +63,7 @@ describe("generated endpoints", () => {
 		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/wc/store/v1/cart")
 	})
 
-	/** The escape hatch an extension reaches for, so a context it asks for by hand still arrives. */
+	/** The escape hatch an integration reaches for, so a context it asks for by hand still arrives. */
 	test("carries a context the caller asked for", async () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
 		vi.stubGlobal("fetch", fetch)

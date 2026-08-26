@@ -52,6 +52,12 @@
 				"default": "./dist/test.js"
 			}
 		},
+		"./node": {
+			"import": {
+				"types": "./dist/node.d.ts",
+				"default": "./dist/node.js"
+			}
+		},
 		"./nextjs": {
 			"import": {
 				"types": "./dist/nextjs.d.ts",

@@ -1,104 +1,290 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+import { afterEach, describe, expect, test, vi } from "vitest"
+import { authMock } from "./adapters/auth"
 import type { ProcedureContext } from "./context"
 import { Kizlo, resolveKizloConfig } from "./kizlo"
+import { CORE_PROCEDURES } from "./procedures"
+import { createIntegration } from "./shared/integration"
 
-const KEYS = [
-	"KIZLO_CONNECT",
-	"KIZLO_WP_SECRET",
-	"KIZLO_LOCAL_WP_SECRET",
-	"KIZLO_WP_URL",
-	"KIZLO_WP_USERNAME",
-	"KIZLO_WP_APP_PASSWORD",
-	"KIZLO_LOCAL_WP_URL",
-	"KIZLO_LOCAL_WP_USERNAME",
-	"KIZLO_LOCAL_WP_APP_PASSWORD",
-] as const
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
-const REMOTE = {
-	KIZLO_WP_SECRET: "remote-secret",
-	KIZLO_WP_URL: "https://remote.example.com",
-	KIZLO_WP_USERNAME: "remote-user",
-	KIZLO_WP_APP_PASSWORD: "remote-pass",
+const credentials = { url: "https://wp.example", username: "admin", password: "secret" }
+
+const runtimeValues = {
+	baseUrl: "https://app.example.com/api/kizlo",
+	remote: {
+		siteSecret: "site-secret",
+		wordpressUrl: credentials.url,
+		wordpressUsername: credentials.username,
+		wordpressPassword: credentials.password,
+	},
 }
 
-const LOCAL = {
-	KIZLO_LOCAL_WP_SECRET: "local-secret",
-	KIZLO_LOCAL_WP_URL: "http://localhost:8080",
-	KIZLO_LOCAL_WP_USERNAME: "local-user",
-	KIZLO_LOCAL_WP_APP_PASSWORD: "local-pass",
+const localRuntimeValues = {
+	...runtimeValues,
+	mode: "local",
+	local: {
+		siteSecret: "local-site-secret",
+		wordpressUrl: "http://localhost:8080",
+		wordpressUsername: "local-admin",
+		wordpressPassword: "local-secret",
+	},
 }
 
-const saved: Record<string, string | undefined> = {}
+describe("resolveKizloConfig environment boundary", () => {
+	test("resolves camel-case values contributed by an integration", () => {
+		const config = resolveKizloConfig({ integrations: [createIntegration({ id: "runtime", env: runtimeValues })] })
 
-const resolve = (options?: Parameters<typeof resolveKizloConfig>[0]) =>
-	resolveKizloConfig({ baseUrl: "https://app.example.com", ...options }, { baseUrlEnvKey: "KIZLO_API_URL" })
+		expect(config).toMatchObject({
+			baseUrl: runtimeValues.baseUrl,
+			siteSecret: runtimeValues.remote.siteSecret,
+			credentials,
+		})
+	})
 
-describe("resolveKizloConfig connect selection", () => {
-	beforeEach(() => {
-		for (const key of KEYS) {
-			saved[key] = process.env[key]
-			delete process.env[key]
+	test("selects the local WordPress values after integrations map them", () => {
+		const config = resolveKizloConfig({ integrations: [createIntegration({ id: "runtime", env: localRuntimeValues })] })
+
+		expect(config).toMatchObject({
+			baseUrl: runtimeValues.baseUrl,
+			siteSecret: localRuntimeValues.local.siteSecret,
+			credentials: {
+				url: localRuntimeValues.local.wordpressUrl,
+				username: localRuntimeValues.local.wordpressUsername,
+				password: localRuntimeValues.local.wordpressPassword,
+			},
+		})
+	})
+
+	test("checks requirements against the selected local values", () => {
+		const env = {
+			...localRuntimeValues,
+			remote: undefined,
 		}
-		Object.assign(process.env, REMOTE, LOCAL)
+		const runtime = createIntegration({
+			id: "runtime",
+			env,
+			requires: { env: ["siteSecret", "local.wordpressUrl", "local.wordpressUsername", "local.wordpressPassword"] },
+		})
+
+		expect(() => resolveKizloConfig({ integrations: [runtime] })).not.toThrow()
 	})
 
-	afterEach(() => {
-		for (const key of KEYS) {
-			if (saved[key] === undefined) delete process.env[key]
-			else process.env[key] = saved[key]
+	test("validates the canonical WordPress mode after mapping", () => {
+		expect(() =>
+			resolveKizloConfig({
+				integrations: [createIntegration({ id: "runtime", env: { ...runtimeValues, mode: "preview" } })],
+			}),
+		).toThrow('The "mode" environment value must be "local" or "remote", got "preview".')
+	})
+
+	test("does not read runtime environment variables itself", () => {
+		const previous = process.env.KIZLO_BASE_URL
+		process.env.KIZLO_BASE_URL = "https://ignored.example/api/kizlo"
+		try {
+			expect(() =>
+				resolveKizloConfig({
+					siteSecret: "explicit-secret",
+					wordpress: { credentials },
+				}),
+			).toThrow(/"baseUrl" environment value/)
+		} finally {
+			if (previous === undefined) delete process.env.KIZLO_BASE_URL
+			else process.env.KIZLO_BASE_URL = previous
 		}
 	})
 
-	test("defaults to remote keys", () => {
-		const config = resolve()
-		expect(config.connect).toBe("remote")
-		expect(config.siteSecret).toBe("remote-secret")
-		expect(config.credentials).toEqual({ url: REMOTE.KIZLO_WP_URL, username: "remote-user", password: "remote-pass" })
+	test("lets explicit options configure Kizlo without an integration", () => {
+		const config = resolveKizloConfig({
+			baseUrl: "https://explicit.example/api/kizlo",
+			siteSecret: "explicit-secret",
+			wordpress: { credentials },
+		})
+
+		expect(config).toMatchObject({
+			baseUrl: "https://explicit.example/api/kizlo",
+			siteSecret: "explicit-secret",
+			credentials,
+		})
 	})
 
-	test('connect: "local" reads the KIZLO_LOCAL_WP_* / KIZLO_LOCAL_WP_SECRET keys', () => {
-		const config = resolve({ connect: "local" })
-		expect(config.connect).toBe("local")
-		expect(config.siteSecret).toBe("local-secret")
-		expect(config.credentials).toEqual({ url: LOCAL.KIZLO_LOCAL_WP_URL, username: "local-user", password: "local-pass" })
+	test("lets explicit options override integration values", () => {
+		const config = resolveKizloConfig({
+			baseUrl: "https://explicit.example/api/kizlo",
+			siteSecret: "explicit-secret",
+			wordpress: { credentials: { username: "explicit-user" } },
+			integrations: [createIntegration({ id: "runtime", env: runtimeValues })],
+		})
+
+		expect(config).toMatchObject({
+			baseUrl: "https://explicit.example/api/kizlo",
+			siteSecret: "explicit-secret",
+			credentials: { ...credentials, username: "explicit-user" },
+		})
+	})
+})
+
+function config(integrations?: readonly ReturnType<typeof createIntegration>[]) {
+	return {
+		baseUrl: "https://app.example",
+		siteSecret: "site-secret",
+		credentials,
+		integrations,
+	}
+}
+
+describe("integration composition", () => {
+	test("uses an adapter bundled by a provider integration without app wiring", async () => {
+		const kizlo = new Kizlo(config([createIntegration({ id: "provider", adapters: { auth: authMock({ mockUserId: 42 }) } })]))
+
+		await expect(kizlo.context.createServerContext().getAuthUser()).resolves.toMatchObject({ id: 42 })
 	})
 
-	test("KIZLO_CONNECT=local selects the local set with no explicit option", () => {
-		process.env.KIZLO_CONNECT = "local"
-		const config = resolve()
-		expect(config.connect).toBe("local")
-		expect(config.siteSecret).toBe("local-secret")
+	test("resolves integration adapters from left to right without erasing concrete values", () => {
+		const firstAuth = authMock({ mockUserId: 1 })
+		const secondAuth = authMock({ mockUserId: 2 })
+		const logger = vi.fn()
+		const captcha = vi.fn(async () => true)
+		const integrations = [
+			createIntegration({ id: "first", adapters: { auth: firstAuth, captcha, logger } }),
+			createIntegration({ id: "second", adapters: { auth: secondAuth, captcha: undefined, logger: undefined } }),
+		] as const
+
+		const resolved = resolveKizloConfig({
+			baseUrl: "https://app.example",
+			siteSecret: "site-secret",
+			logging: "debug",
+			wordpress: { credentials },
+			integrations,
+		})
+		const adapters = new Kizlo(resolved).context.createServerContext().config.adapters
+
+		expect(adapters).toMatchObject({
+			auth: secondAuth,
+			captcha,
+			logger,
+		})
 	})
 
-	test("the explicit option overrides KIZLO_CONNECT", () => {
-		process.env.KIZLO_CONNECT = "local"
-		const config = resolve({ connect: "remote" })
-		expect(config.connect).toBe("remote")
-		expect(config.credentials.url).toBe(REMOTE.KIZLO_WP_URL)
+	test("resolves integration env from left to right without erasing concrete values", () => {
+		const resolved = resolveKizloConfig({
+			integrations: [
+				createIntegration({ id: "runtime", env: { ...runtimeValues, baseUrl: "https://base.example" } }),
+				createIntegration({ id: "framework", env: { baseUrl: "https://first.example" } }),
+				createIntegration({
+					id: "provider",
+					env: { baseUrl: undefined, remote: { wordpressUsername: "second-user", wordpressPassword: undefined } },
+				}),
+			],
+		})
+
+		expect(resolved.baseUrl).toBe("https://first.example")
+		expect(resolved.credentials.username).toBe("second-user")
+		expect(resolved.credentials.password).toBe(credentials.password)
 	})
 
-	test("an unrecognized KIZLO_CONNECT throws naming the bad value", () => {
-		process.env.KIZLO_CONNECT = "dev"
-		expect(() => resolve()).toThrow(/KIZLO_CONNECT must be "local" or "remote", got "dev"/)
+	test("checks integration env requirements against the fully composed environment", () => {
+		const integrations = [
+			createIntegration({ id: "consumer", requires: { env: ["providerSecret"] } }),
+			createIntegration({ id: "runtime", env: runtimeValues }),
+			createIntegration({ id: "provider", env: { providerSecret: "secret" } }),
+		] as const
+
+		expect(() => resolveKizloConfig({ integrations })).not.toThrow()
 	})
 
-	test("a missing local key throws an error naming the resolved key", () => {
-		delete process.env.KIZLO_LOCAL_WP_URL
-		expect(() => resolve({ connect: "local" })).toThrow(/KIZLO_LOCAL_WP_URL/)
+	test("rejects a missing integration env requirement before server creation", () => {
+		expect(() =>
+			resolveKizloConfig({
+				integrations: [
+					createIntegration({ id: "provider", requires: { env: ["providerSecret"] } }),
+					createIntegration({ id: "runtime", env: runtimeValues }),
+				],
+			}),
+		).toThrow(/"provider" integration.*providerSecret/)
+	})
+
+	test("keeps adapter-only and empty-procedure integrations out of the procedure tree", () => {
+		const kizlo = new Kizlo(
+			config([
+				createIntegration({ id: "adapter-only", adapters: { auth: authMock() } }),
+				createIntegration({ id: "empty", procedures: {} }),
+			]),
+		)
+
+		expect(kizlo.procedures).not.toHaveProperty("adapter-only")
+		expect(kizlo.procedures).not.toHaveProperty("empty")
+	})
+
+	test("preserves declared event order across integrations", () => {
+		const first = { handler: vi.fn() }
+		const second = { handler: vi.fn() }
+		const third = { handler: vi.fn() }
+		const kizlo = new Kizlo(
+			config([createIntegration({ id: "first", events: [first, second] }), createIntegration({ id: "second", events: [third] })]),
+		)
+		const registered = (kizlo as unknown as { registerIntegrations(): { events: unknown[] } }).registerIntegrations()
+
+		expect(registered.events).toEqual([first, second, third])
+	})
+
+	test("rejects duplicate integration ids with the startup error code", () => {
+		let thrown: unknown
+		try {
+			new Kizlo(config([createIntegration({ id: "provider" }), createIntegration({ id: "provider" })]))
+		} catch (error) {
+			thrown = error
+		}
+
+		expect(thrown).toMatchObject({ code: "INTEGRATION_ID_CONFLICT" })
+		expect(thrown).toHaveProperty(
+			"message",
+			'The integration id "provider" is registered more than once. Give every integration a unique id.',
+		)
+	})
+
+	test.each([...Object.keys(CORE_PROCEDURES), "webhooks"])("rejects the reserved integration id %s", (id) => {
+		let thrown: unknown
+		try {
+			new Kizlo(config([createIntegration({ id })]))
+		} catch (error) {
+			thrown = error
+		}
+
+		expect(thrown).toMatchObject({ code: "INTEGRATION_ID_CONFLICT" })
+		expect(thrown).toHaveProperty("message", `The integration id "${id}" is reserved by Kizlo. Choose a different integration id.`)
 	})
 })
 
 describe("request error interceptor", () => {
+	test("logging enables the built-in console adapter at the selected level", () => {
+		const debug = vi.spyOn(console, "debug").mockImplementation(() => {})
+		const info = vi.spyOn(console, "info").mockImplementation(() => {})
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+		const error = vi.spyOn(console, "error").mockImplementation(() => {})
+		const kizlo = new Kizlo({ ...config(), logging: "warn" })
+		const logger = kizlo.context.createServerContext().logger
+
+		logger.debug("debug")
+		logger.info("info")
+		logger.warn("warn")
+		logger.error("error")
+
+		expect(debug).not.toHaveBeenCalled()
+		expect(info).not.toHaveBeenCalled()
+		expect(warn).toHaveBeenCalledOnce()
+		expect(error).toHaveBeenCalledOnce()
+	})
+
 	test("reports unexpected errors through the logger and preserves the thrown error", async () => {
 		const failure = new Error("unexpected failure")
 		const logger = vi.fn()
 		const kizlo = new Kizlo({
 			baseUrl: "https://app.example",
 			siteSecret: "site-secret",
-			environment: "test",
-			connect: "remote",
-			adapters: { logger },
-			credentials: { url: "https://wp.example", username: "admin", password: "secret" },
+			integrations: [createIntegration({ id: "logger", adapters: { logger } })],
+			credentials,
 		})
 		const interceptor = (
 			kizlo as unknown as {
@@ -126,8 +312,6 @@ describe("response headers", () => {
 		const kizlo = new Kizlo({
 			baseUrl: "https://app.example",
 			siteSecret: "site-secret",
-			environment: "test",
-			connect: "remote",
 			credentials: { url: "https://wp.example", username: "admin", password: "secret" },
 		})
 		const openapiHandler = (

@@ -5,14 +5,14 @@ description: Learn how the Kizlo plugin connects your framework to WordPress, an
 ---
 
 Kizlo has two halves: the **framework** in your app (TypeScript) and **WordPress** itself. For them to work as
-one system, WordPress needs a piece that speaks the framework's language — a **plugin**.
+one system, WordPress needs a piece that speaks the framework's language: a **plugin**.
 
 WordPress already exposes an API, and so do plugins like WooCommerce. So why install anything on the WordPress
 side at all? There are two kinds of plugin:
 
-- **The Kizlo plugin** — required, installed once. Makes WordPress itself a partner to the framework.
-- **Companion plugins** — optional. Bring a third-party plugin into that same system, and exist only when an
-  [extension](/docs/concepts/extension) needs one.
+- **The Kizlo plugin**: required, installed once. Makes WordPress itself a partner to the framework.
+- **Companion plugins**: optional. Bring a third-party plugin into that same system, and exist only when an
+  [integration](/docs/concepts/integration) needs one.
 
 ## The Kizlo plugin
 
@@ -26,38 +26,38 @@ complete or safe backend for a frontend:
 - It's **too open.** Left as-is, it exposes more of itself than a headless frontend needs or should reach.
 
 The **Kizlo plugin** turns WordPress into a backend built for a frontend. It fills those gaps, sets the
-guardrails, and makes the relationship two-way — so WordPress can send [events](/docs/concepts/extension#events)
+guardrails, and makes the relationship two-way, so WordPress can send [events](/docs/concepts/integration#events)
 the framework reacts to, not just answer calls.
 
 That's why it's required: it's what makes a WordPress install a Kizlo backend at all. Install it once (see
 [Installation](/docs/installation)) and leave it; everything else builds on top.
 
 <Callout>
-  The Kizlo plugin is the **foundation**, and deliberately generic — it knows nothing about WooCommerce,
+  The Kizlo plugin is the **foundation**, and deliberately generic. It knows nothing about WooCommerce,
   Contact Form 7, or any other specific plugin. Bridging those is what companion plugins are for.
 </Callout>
 
 ## Companion plugins
 
-**Most extensions don't need one.** An extension that builds only on what the Kizlo plugin already reaches —
-WordPress itself — is self-contained: add the package to your app and it works.
+**Most integrations don't need one.** An integration that builds only on what the Kizlo plugin already reaches,
+WordPress itself, is self-contained: add the package to your app and it works.
 
-A companion plugin comes in only when an extension **bridges a third-party plugin** like WooCommerce or
+A companion plugin comes in only when an integration **bridges a third-party plugin** like WooCommerce or
 Contact Form 7. That plugin sits outside the relationship the Kizlo plugin set up, so the framework can only
 reach what it chose to expose. A companion plugin brings it inside that relationship instead, doing one or
 both of:
 
-- **Glue** — connect the plugin into Kizlo so it shows up through the framework like everything else.
-- **Extra features** — add what the third-party plugin doesn't offer, so the extension can expose it too.
+- **Glue**: connect the plugin into Kizlo so it shows up through the framework like everything else.
+- **Extra features**: add what the third-party plugin doesn't offer, so the integration can expose it too.
 
-A bridging extension therefore ships as **two halves**: the extension for your app, and the companion plugin
-for WordPress. Install the companion alongside the third-party plugin, and the extension in your app.
+A bridging integration therefore ships as **two halves**: the integration for your app, and the companion plugin
+for WordPress. Install the companion alongside the third-party plugin, and the integration in your app.
 
 <Callout>
-  *Kizlo for WooCommerce* does both: it brings WooCommerce into Kizlo for the `@kizlo/woocommerce` extension,
-  and adds features WooCommerce doesn't ship — like product swatches. *Kizlo for Contact Form 7* just brings
-  CF7 in so the extension can reach it.
+  *Kizlo for WooCommerce* does both: it brings WooCommerce into Kizlo for the `@kizlo/woocommerce` integration,
+  and adds features WooCommerce doesn't ship, like product swatches. *Kizlo for Contact Form 7* just brings
+  CF7 in so the integration can reach it.
 </Callout>
 
 This works the same on fresh WordPress or an existing install: add the Kizlo plugin, add a companion only when
-an extension calls for one, and nothing about your existing content has to change.
+an integration calls for one, and nothing about your existing content has to change.

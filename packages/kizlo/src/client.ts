@@ -4,21 +4,21 @@ import { inferRPCMethodFromContractRouter } from "@orpc/contract"
 import { OpenAPILink } from "@orpc/openapi-client/fetch"
 import { RPC_PROTOCOL_HEADER } from "./shared/constants"
 import { type Contract, isContractProcedure, restoreContract } from "./shared/contract"
-import type { AnyProcedureRouter, ExtractProcedureByScope } from "./shared/procedure"
+import type { AnyProcedureTree, ExtractProcedureByScope } from "./shared/procedure"
 import { createResultClient, type ResultClient } from "./shared/result"
 import { getObjectProperty } from "./shared/utils"
 
-export interface KizloClientConfig<T extends AnyProcedureRouter> {
+export interface KizloClientConfig<T extends AnyProcedureTree> {
 	url?: string
 	contract: T
 	fetch?: (request: Request) => Promise<Response>
 }
 
-export class KizloClient<TRouter extends AnyProcedureRouter> {
-	public readonly client: ResultClient<ExtractProcedureByScope<TRouter, "remote" | "api">>
-	protected readonly config: KizloClientConfig<TRouter>
+export class KizloClient<TProcedures extends AnyProcedureTree> {
+	public readonly client: ResultClient<ExtractProcedureByScope<TProcedures, "remote" | "api">>
+	protected readonly config: KizloClientConfig<TProcedures>
 
-	constructor(config: KizloClientConfig<TRouter>) {
+	constructor(config: KizloClientConfig<TProcedures>) {
 		this.config = config
 		const url = this.getUrl()
 		const orpcContract = restoreContract(config.contract as Contract)
@@ -37,7 +37,7 @@ export class KizloClient<TRouter extends AnyProcedureRouter> {
 
 			if (!isContractProcedure(procedure)) {
 				throw new Error(
-					`No valid procedure found at path "${path.join(".")}". This may happen when the contract router is not properly configured.`,
+					`No valid procedure found at path "${path.join(".")}". The generated contract may not match the exported procedures.`,
 				)
 			}
 
@@ -69,6 +69,6 @@ export class KizloClient<TRouter extends AnyProcedureRouter> {
  * Creates a browser client for a generated contract. Defaults the URL to the
  * current origin (`window.location.origin`); framework packages wrap this to resolve it from their env.
  */
-export function createKizloClient<T extends AnyProcedureRouter>(contract: T, options?: { url?: string }): KizloClient<T> {
+export function createKizloClient<T extends AnyProcedureTree>(contract: T, options?: { url?: string }): KizloClient<T> {
 	return new KizloClient({ contract, url: options?.url })
 }

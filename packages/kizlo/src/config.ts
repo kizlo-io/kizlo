@@ -29,17 +29,17 @@ export interface KizloDevConfig {
 	 * Host port the local WordPress MySQL is published on (default 3307), bound to `127.0.0.1` so
 	 * you can point a SQL client (TablePlus, DBeaver, `mysql`) at the database to
 	 * inspect or edit tables directly. Connect with db `wordpress`, user `wordpress`,
-	 * password `wppass`. Pick a port that's free — change it if you run multiple projects
+	 * password `wppass`. Pick a port that's free; change it if you run multiple projects
 	 * or already have MySQL on the default.
 	 */
 	dbPort?: number
 
 	/**
-	 * Code-defined seed data for a **fresh** local WordPress — the same {@link Fixture}s the
+	 * Code-defined seed data for a **fresh** local WordPress. These are the same {@link Fixture}s the
 	 * test environment uses, so you can populate your local site from versioned code instead of a
-	 * blank install. Each fixture also declares the plugins it needs — wp.org slugs / zip
+	 * blank install. Each fixture also declares the plugins it needs as wp.org slugs or zip
 	 * sources to install, or `{ path }` local directories bind-mounted live so your edits
-	 * show up without a reinstall — which `kizlo dev` ensures every run. Each fixture's
+	 * show up without a reinstall, which `kizlo dev` ensures every run. Each fixture's
 	 * `seed` runs once over REST (and may drop to wp-cli) on the first `kizlo dev` and
 	 * after `kizlo dev reset`; an existing install is left alone.
 	 */
@@ -68,7 +68,7 @@ export interface KizloTestConfig {
 	 * takes effect on the next `kizlo test reset` and Kizlo says so when the two disagree.
 	 */
 	version?: string
-	/** Extension fixtures to install + seed. */
+	/** Integration fixtures to install + seed. */
 	fixtures?: Fixture[]
 	/**
 	 * Package manager used to launch the test script (default: auto-detected from
@@ -77,7 +77,7 @@ export interface KizloTestConfig {
 	packageManager?: "npm" | "pnpm" | "yarn" | "bun"
 	/**
 	 * Override the test command entirely. Default: `<packageManager> test` (the
-	 * project's own `test` script — never hardcoded to vitest).
+	 * project's own `test` script, never hardcoded to Vitest).
 	 */
 	command?: string
 }
@@ -85,7 +85,7 @@ export interface KizloTestConfig {
 export interface KizloGlobalConfig {
 	/**
 	 * Kizlo's home directory. Kizlo owns the layout inside it: your server
-	 * (`server/`, whose `index.ts` exports `router` plus your extensions), the
+	 * (`server/`, whose `index.ts` exports `procedures` plus your integrations), the
 	 * browser `client.ts`, and the generated contract.
 	 * @default 'src/lib/kizlo' (or 'lib/kizlo' without a src dir)
 	 */
@@ -119,7 +119,7 @@ export interface KizloGlobalConfig {
 
 	/**
 	 * Directory to write the WordPress client into, as `<wordpressClientDir>/wordpress.ts`. For a package or
-	 * workspace that ships procedures but no Kizlo server: there is no router to build a contract from,
+	 * workspace that ships procedures but no Kizlo server: there is no procedure tree to build a contract from,
 	 * yet those procedures still call the generated tree, so they need the client on its own.
 	 *
 	 * Independent of `dir`. An app leaves this unset and gets its client inside `dir` alongside the

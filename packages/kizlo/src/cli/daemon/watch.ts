@@ -1,6 +1,7 @@
 import path from "node:path"
 import { FSWatcher } from "chokidar"
-import { resolveWordPressConnection } from "../../kizlo"
+import { node } from "../../integrations/node/integration"
+import { integrationEnv, resolveWordPressConnection } from "../../kizlo"
 import { IntrospectionFetchError } from "../../wordpress/fetch-introspection"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
@@ -226,7 +227,7 @@ export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: S
 		// Credentials come from the environment and cannot change while the dev server runs, so they are
 		// resolved once here rather than on every regeneration.
 		loadEnvFiles(cwd)
-		const { credentials } = resolveWordPressConnection(undefined)
+		const { credentials } = resolveWordPressConnection(undefined, integrationEnv([node()]))
 
 		if (wordpressClientDir) {
 			try {

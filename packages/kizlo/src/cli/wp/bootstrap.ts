@@ -8,7 +8,7 @@ export interface BootstrapConfig {
 	port?: number
 	/** Compose project owning the stack, recorded so a later run can tell whose credentials these are. */
 	project?: string
-	/** Extension fixtures to install + seed. */
+	/** Integration fixtures to install + seed. */
 	fixtures?: Fixture[]
 }
 

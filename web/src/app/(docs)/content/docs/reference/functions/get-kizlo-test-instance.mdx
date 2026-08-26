@@ -14,9 +14,9 @@ against real WordPress responses.
 getKizloTestInstance(options?)
 ```
 
-### `options.extensions`
+### `options.integrations`
 
-The [extensions](/docs/reference/functions/create-extension) to register on the test instance, the same array you
+The [integrations](/docs/reference/functions/create-integration) to register on the test instance, the same array you
 pass to [`createKizlo`](/docs/reference/functions/create-kizlo). Their namespaces appear on the returned `client`.
 Omit it to test only the core routes.
 
@@ -51,13 +51,13 @@ test("reads a seeded post by slug", async () => {
 })
 ```
 
-With an extension registered so its namespace is testable:
+With an integration registered so its namespace is testable:
 
 ```ts title="reviews.test.ts"
 import { getKizloTestInstance } from "kizlo/test"
 import { reviews } from "../src/lib/kizlo/server/reviews"
 
-const kizlo = getKizloTestInstance({ extensions: [reviews()] })
+const kizlo = getKizloTestInstance({ integrations: [reviews()] })
 
 const list = await kizlo.client.reviews.list.call()
 ```

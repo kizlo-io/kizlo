@@ -17,29 +17,29 @@ import type { AnyMiddleware, InferMiddlewares, Middleware } from "./middleware"
 // SHARED
 // ====================================================
 
-export type AnyProcedureRouter = { [K: string]: AnyProcedure | AnyProcedureRouter }
+export type AnyProcedureTree = { [K: string]: AnyProcedure | AnyProcedureTree }
 
-export type RouterDepthTuple = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+export type ProcedureTreeDepthTuple = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 export type ExtractProcedureByScope<
-	TRouter extends AnyProcedureRouter,
+	TProcedures extends AnyProcedureTree,
 	TScope extends InvocationScope,
 	TDepth extends number = 10,
 > = TDepth extends 0
-	? TRouter
+	? TProcedures
 	: {
-			[K in keyof TRouter as TRouter[K] extends Procedure<infer Scope, infer _Input, infer _Output, infer _Errors>
+			[K in keyof TProcedures as TProcedures[K] extends Procedure<infer Scope, infer _Input, infer _Output, infer _Errors>
 				? Scope extends TScope
 					? K
 					: never
-				: TRouter[K] extends AnyProcedureRouter
-					? keyof ExtractProcedureByScope<TRouter[K], TScope, RouterDepthTuple[TDepth]> extends never
+				: TProcedures[K] extends AnyProcedureTree
+					? keyof ExtractProcedureByScope<TProcedures[K], TScope, ProcedureTreeDepthTuple[TDepth]> extends never
 						? never
 						: K
-					: never]: TRouter[K] extends AnyProcedure
-				? TRouter[K]
-				: TRouter[K] extends AnyProcedureRouter
-					? ExtractProcedureByScope<TRouter[K], TScope, RouterDepthTuple[TDepth]>
+					: never]: TProcedures[K] extends AnyProcedure
+				? TProcedures[K]
+				: TProcedures[K] extends AnyProcedureTree
+					? ExtractProcedureByScope<TProcedures[K], TScope, ProcedureTreeDepthTuple[TDepth]>
 					: never
 		}
 
@@ -47,9 +47,9 @@ export type ExtractProcedureByScope<
 export interface BaseHandlerOptions<TInput, TContext, TError extends DefinedErrorMapLike> {
 	/** The validated, typed request. For `api`, the merged `{ params, query, body, headers }`; for `remote`/`internal`, the `input` schema's type. */
 	input: TInput
-	/** Server-side services and adapters — the WordPress client, logger, cookies, auth, and more — plus anything middleware adds. */
+	/** Server-side services and adapters, including the WordPress client, logger, cookies, and auth, plus anything middleware adds. */
 	context: TContext
-	/** Typed error map — throw `errors.SOME_CODE()` for a known failure. */
+	/** Typed error map. Throw `errors.SOME_CODE()` for a known failure. */
 	errors: ProcedureErrors<TError>
 }
 
@@ -158,7 +158,7 @@ export type ProcedureOptions<
 	scope: TScope
 	/** Error codes this procedure can throw, on top of the built-in common HTTP errors. An inline object or a `defineErrorMap`. */
 	errors?: TError
-	/** Schema that types — and, when `outputValidation` is on, validates — the handler's return value. */
+	/** Schema that types the handler's return value and validates it when `outputValidation` is on. */
 	output: TOutput
 	/** Middleware to run before the handler, in declaration order. */
 	middlewares?: TMiddlewares

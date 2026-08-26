@@ -7,7 +7,7 @@ import { GET_PAGE_ERROR_MAP, LIST_PAGE_ERROR_MAP } from "./error"
 import { ListPageInput, Page, PageList, RetrievePageInput } from "./schema"
 import { deserializePage } from "./utils"
 
-export const PAGE_ROUTER_MAP = {
+export const PAGE_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

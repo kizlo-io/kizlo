@@ -80,13 +80,13 @@ function readEnvValue(content: string, key: string): string | undefined {
 }
 
 /**
- * The Kizlo backend URL from `.env` — the one key ending in `KIZLO_API_URL` (`KIZLO_API_URL`,
- * or a framework-prefixed `NEXT_PUBLIC_KIZLO_API_URL`). It's the handler mount the plugin delivers
+ * The Kizlo backend URL from `.env` — the one key ending in `KIZLO_BASE_URL` (`KIZLO_BASE_URL`,
+ * or a framework-prefixed `NEXT_PUBLIC_KIZLO_BASE_URL`). It's the handler mount the plugin delivers
  * webhook events to; its origin is the site's canonical URL. User-managed (init writes it), so dev
  * only reads it. Undefined before `kizlo init` has populated `.env`.
  */
 function readBaseUrl(content: string): string | undefined {
-	const value = content.match(/^\s*[A-Z_]*KIZLO_API_URL\s*=\s*(.*)$/m)?.[1]?.trim()
+	const value = content.match(/^\s*[A-Z_]*KIZLO_BASE_URL\s*=\s*(.*)$/m)?.[1]?.trim()
 	return value || undefined
 }
 
@@ -97,7 +97,7 @@ function readBaseUrl(content: string): string | undefined {
  * connection keys are overwritten; everything else in `.env` is preserved, and the file is created
  * if absent. Gated by the caller on a minted `appPassword`, so a warm resume never churns it.
  *
- * `KIZLO_CONNECT=local` and `KIZLO_LOCAL_WP_SECRET` are written too but kept out of the overwrite set,
+ * `KIZLO_MODE=local` and `KIZLO_LOCAL_WP_SECRET` are written too but kept out of the overwrite set,
  * so a value the user already set is preserved — booting local WordPress only fills them when absent.
  * The resolved local secret (the existing one, or a freshly minted one) and the Kizlo server base URL
  * are returned so the caller can sync them into the plugin.
@@ -114,7 +114,7 @@ function updateWpEnv(cfg: ResolvedDevConfig, info: DevStackInfo): { siteSecret: 
 			KIZLO_LOCAL_WP_USERNAME: info.username,
 			KIZLO_LOCAL_WP_APP_PASSWORD: info.appPassword,
 			KIZLO_LOCAL_WP_SECRET: siteSecret,
-			KIZLO_CONNECT: "local",
+			KIZLO_MODE: "local",
 		},
 		new Set(WP_ENV_KEYS),
 		envGroups(DEFAULT_ENV_KEYS),

@@ -1,4 +1,4 @@
-export * from "./kizlo.server"
+export * from "./integration"
 export * from "./manifest"
 export * from "./metadata"
 export * from "./robots"

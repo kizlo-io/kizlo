@@ -6,7 +6,7 @@ import { GET_CATEGORY_ERROR_MAP, LIST_CATEGORY_ERROR_MAP } from "./error"
 import { Category, CategoryList, ListCategoryInput, RetrieveCategoryInput } from "./schema"
 import { deserializeCategory } from "./utils"
 
-export const CATEGORY_ROUTER_MAP = {
+export const CATEGORY_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

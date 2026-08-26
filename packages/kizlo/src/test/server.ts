@@ -1,9 +1,10 @@
 import { endpoints } from "../../../../wordpress"
 import { geoMock } from "../adapters/geo"
 import { consoleLog } from "../adapters/logger"
+import type { ServiceAdapters } from "../adapters/types"
 import { getTestCredentials } from "../cli/wp/utils"
-import { Kizlo, type ServiceAdapters } from "../kizlo"
-import type { AnyExtension } from "../shared/extension"
+import { Kizlo } from "../kizlo"
+import { type AnyIntegration, createIntegration } from "../shared/integration"
 import { testAuthAdapter } from "./auth"
 import { captchaMock } from "./captcha"
 import { toTestUser } from "./users"
@@ -13,24 +14,14 @@ import { toTestUser } from "./users"
  * the test-credentials artifact, with mock geo, auth, and captcha adapters and a
  * warn/error logger. Call procedures directly through its `client` in integration tests.
  */
-export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>(options?: {
+export function getKizloTestInstance<TIntegrations extends readonly AnyIntegration[] = []>(options?: {
 	adapters?: Partial<ServiceAdapters>
 	baseUrl?: string
-	extensions?: TExts
+	integrations?: TIntegrations
 }) {
 	const creds = getTestCredentials()
-
-	return new Kizlo({
-		baseUrl: options?.baseUrl ?? "http://test.local",
-		siteSecret: "test-secret",
-		environment: "test",
-		connect: "remote",
-		credentials: {
-			url: creds.url,
-			username: creds.users.admin.username,
-			password: creds.users.admin.applicationPassword,
-		},
-		wordpressEndpoints: endpoints,
+	const testRuntime = createIntegration({
+		id: "kizlo-test",
 		adapters: {
 			geo: geoMock(),
 			auth: testAuthAdapter(toTestUser(creds.users.user)),
@@ -38,7 +29,18 @@ export function getKizloTestInstance<TExts extends readonly AnyExtension[] = []>
 			logger: consoleLog({ levels: ["warn", "error"] }),
 			...options?.adapters,
 		},
-		extensions: options?.extensions,
+	})
+
+	return new Kizlo<TIntegrations>({
+		baseUrl: options?.baseUrl ?? "http://test.local",
+		siteSecret: "test-secret",
+		credentials: {
+			url: creds.url,
+			username: creds.users.admin.username,
+			password: creds.users.admin.applicationPassword,
+		},
+		wordpressEndpoints: endpoints,
+		integrations: [testRuntime, ...(options?.integrations ?? [])] as unknown as TIntegrations,
 	})
 }
 

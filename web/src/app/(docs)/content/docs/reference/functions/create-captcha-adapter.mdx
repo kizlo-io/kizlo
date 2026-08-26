@@ -4,8 +4,8 @@ description: Build a custom captcha adapter that verifies a challenge token.
 ---
 
 `createCaptchaAdapter` declares a custom captcha adapter, typed against the `CaptchaAdapter` contract. Kizlo calls it
-to verify a challenge token submitted with a request. Register the result on
-[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.captcha`.
+to verify a challenge token submitted with a request. Provide the result through an
+[integration](/docs/reference/functions/create-integration)'s `adapters.captcha`.
 
 Reach for this to support a provider Kizlo doesn't ship. For Turnstile, reCAPTCHA, hCaptcha, and friends, use a
 prebuilt adapter instead. Those live in the adapter guides, not here.
@@ -45,10 +45,12 @@ export const captcha = createCaptchaAdapter(async ({ token, ip }) => {
 Register it:
 
 ```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo } from "kizlo"
+import { createIntegration, createKizlo } from "kizlo"
 import { captcha } from "../adapters/captcha"
 
+const verification = createIntegration({ id: "verification", adapters: { captcha } })
+
 export const { client, handler } = createKizlo({
-  adapters: { captcha },
+  integrations: [verification],
 })
 ```

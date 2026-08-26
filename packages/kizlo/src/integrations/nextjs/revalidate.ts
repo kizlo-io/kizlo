@@ -1,5 +1,5 @@
 import type { Pathname } from "@kizlo/shared"
-import { createExtension } from "../../shared/extension"
+import { createIntegration } from "../../shared/integration"
 import { createEventHandler } from "../../webhook"
 import type { KizloEvent } from "../../webhook/schema"
 import { POST_EVENT_TYPES, SETTINGS_EVENT_TYPES, TERM_EVENT_TYPES } from "../../webhook/schema"
@@ -36,34 +36,32 @@ export interface NextRevalidateOptions {
 }
 
 export function nextRevalidation(options?: NextRevalidateOptions) {
-	return createExtension({
+	return createIntegration({
 		id: "nextjs-revalidation",
-		init: () => ({
-			events: [
-				createEventHandler(async (event) => {
-					if (!event) return
+		events: [
+			createEventHandler(async (event) => {
+				if (!event) return
 
-					const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
-					const revalidateTag = options?.revalidateTag ?? (await import("next/cache")).revalidateTag
+				const revalidatePath = options?.revalidatePath ?? (await import("next/cache")).revalidatePath
+				const revalidateTag = options?.revalidateTag ?? (await import("next/cache")).revalidateTag
 
-					const eventUrl = event.data && "url" in event.data ? event.data.url : undefined
-					const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(eventUrl ? [eventUrl] : []), "/post"]
-					for (const path of normalizePaths(paths)) revalidatePath(path)
+				const eventUrl = event.data && "url" in event.data ? event.data.url : undefined
+				const paths = [...(await Promise.resolve(options?.paths?.(event) ?? [])), ...(eventUrl ? [eventUrl] : []), "/post"]
+				for (const path of normalizePaths(paths)) revalidatePath(path)
 
-					if (event.type === "settings.crawling.updated" || event.type === "settings.site.updated") {
-						revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
-					}
+				if (event.type === "settings.crawling.updated" || event.type === "settings.site.updated") {
+					revalidateTag(ROBOTS_CACHE_TAG, { expire: 0 })
+				}
 
-					if (FRONTEND_SETTINGS_EVENT_TYPES.has(event.type)) revalidatePath("/", "layout")
+				if (FRONTEND_SETTINGS_EVENT_TYPES.has(event.type)) revalidatePath("/", "layout")
 
-					if (CONTENT_EVENT_TYPES.has(event.type)) {
-						revalidateTag(SITEMAP_CACHE_TAG, { expire: 0 })
+				if (CONTENT_EVENT_TYPES.has(event.type)) {
+					revalidateTag(SITEMAP_CACHE_TAG, { expire: 0 })
 
-						for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
-					}
-				}),
-			],
-		}),
+					for (const target of resolveSitemapTargets(options?.sitemap)) revalidatePath(normalizePath(target.path), target.type)
+				}
+			}),
+		],
 	})
 }
 

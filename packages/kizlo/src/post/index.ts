@@ -7,7 +7,7 @@ import { GET_POST_ERROR_MAP, LIST_POST_ERROR_MAP } from "./error"
 import { ListPostInput, Post, PostList, RetrievePostInput } from "./schema"
 import { deserializePost } from "./utils"
 
-export const POST_ROUTER_MAP = {
+export const POST_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

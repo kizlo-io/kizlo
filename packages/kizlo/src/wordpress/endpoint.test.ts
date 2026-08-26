@@ -153,7 +153,7 @@ describe("createWordPressClient", () => {
 })
 
 /**
- * The tree describes whatever the connected installation serves, and Kizlo's own routers call fixed
+ * The tree describes whatever the connected installation serves, and Kizlo's own procedures call fixed
  * paths into it, so a post type with API access switched off takes `postTypes.post` out from under
  * `post.list`. These resolve to a failure rather than throwing, which is how a request that never
  * left already reports itself.

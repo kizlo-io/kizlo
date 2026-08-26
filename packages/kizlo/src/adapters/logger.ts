@@ -1,8 +1,4 @@
-import type { LiteralUnion } from "@kizlo/shared"
-
 export type LogLevel = "debug" | "info" | "warn" | "error"
-
-export type Environment = LiteralUnion<"development" | "production" | "test", string>
 
 export interface LogPayload {
 	/** Severity of the record: `debug`, `info`, `warn`, or `error`. */
@@ -19,7 +15,7 @@ export interface LogPayload {
 
 export type LoggerAdapter = (payload: LogPayload) => void | Promise<void>
 
-/** Author a custom logger adapter — types your handler against the {@link LoggerAdapter} contract. */
+/** Author a custom logger adapter. Types your handler against the {@link LoggerAdapter} contract. */
 export function createLoggerAdapter(adapter: LoggerAdapter): LoggerAdapter {
 	return adapter
 }

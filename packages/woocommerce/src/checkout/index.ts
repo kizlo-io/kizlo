@@ -4,7 +4,7 @@ import { CONFIRM_CHECKOUT_ERROR_MAP, GET_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERRO
 import { Checkout, ConfirmCheckoutInput, RetryCheckoutInput, UpdateCheckoutInput } from "./schema"
 import { deserializeCheckout, gateway, serializeAddress, serializeBillingAddress } from "./utils"
 
-export const CHECKOUT_ROUTER = {
+export const CHECKOUT_PROCEDURES = {
 	get: createProcedure(
 		{
 			scope: "api",

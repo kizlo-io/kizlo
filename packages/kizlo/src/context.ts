@@ -2,12 +2,12 @@ import {
 	base64Decode,
 	type Cookie,
 	type CookieOptions,
-	EXTENSION_VERSIONS_HEADER,
-	type ExtensionPluginRequirement,
-	extensionUpdateMessage,
+	INTEGRATION_VERSIONS_HEADER,
+	type IntegrationPluginRequirement,
+	integrationUpdateMessage,
 	isPluginVersionSupported,
 	PLUGIN_VERSION_HEADER,
-	parseExtensionVersions,
+	parseIntegrationVersions,
 	pluginUpdateMessage,
 	satisfiesVersion,
 	tryCatchSync,
@@ -16,9 +16,9 @@ import { parseCookie, stringifySetCookie } from "cookie"
 import type { AuthUser } from "./adapters/auth"
 import type { ConnInfo } from "./adapters/geo"
 import { type Logger, type LogLevel, noopAdapter } from "./adapters/logger"
+import type { ServiceAdapters } from "./adapters/types"
 import { CookiesStorage } from "./cookie"
 import { EmailService } from "./email/service"
-import type { ServiceAdapters } from "./kizlo"
 import { SettingsService } from "./settings/service"
 import { compare, hmac } from "./shared/crypto"
 import { PreviewTokenData, type PreviewTokenPayload } from "./shared/schema"
@@ -68,8 +68,8 @@ export interface ContextConfig {
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
 	wordpressEndpoints?: object
-	/** WordPress plugins the registered extensions need, checked against what each response reports. */
-	extensionPlugins?: ExtensionPluginRequirement[]
+	/** WordPress plugins the registered integrations need, checked against what each response reports. */
+	integrationPlugins?: IntegrationPluginRequirement[]
 }
 
 export type AuthUserFn = () => Promise<AuthUser | null>
@@ -78,7 +78,7 @@ export type VerifyCaptchaFn = (token: string) => Promise<boolean>
 export type VerifyPreviewTokenFn = (token: string) => Promise<PreviewTokenPayload | null>
 
 /**
- * The context every procedure, middleware, event, and webhook handler receives — the fixed base
+ * The context every procedure, middleware, event, and webhook handler receives. The fixed base
  * the server builds. A procedure's handler receives this base plus whatever its middleware injected
  * via `next({ context })`.
  */
@@ -149,15 +149,15 @@ export class Context {
 		}
 		if (!isPluginVersionSupported(installed)) this.warn(pluginUpdateMessage(installed))
 
-		const plugins = this.config.extensionPlugins
+		const plugins = this.config.integrationPlugins
 		if (!plugins?.length) return
 
 		// A plugin whose own requirements failed did not start and is absent from the header, so the
 		// same check covers both "too old" and "installed but not running".
-		const active = parseExtensionVersions(result.headers.get(EXTENSION_VERSIONS_HEADER))
+		const active = parseIntegrationVersions(result.headers.get(INTEGRATION_VERSIONS_HEADER))
 		for (const plugin of plugins) {
-			if (satisfiesVersion(active[plugin.slug], plugin.version)) continue
-			this.warn(extensionUpdateMessage(plugin, active[plugin.slug]))
+			if (satisfiesVersion(active[plugin.name], plugin.version)) continue
+			this.warn(integrationUpdateMessage(plugin, active[plugin.name]))
 		}
 	}
 

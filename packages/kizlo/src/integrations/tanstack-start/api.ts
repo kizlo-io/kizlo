@@ -1,6 +1,6 @@
 import type { ServerRoute, ServerRouteContext } from "./utils"
 
-/** The Kizlo request handler a server entry exports (`createKizlo().handler`): a web `Request` in, `Response` out. */
+/** The Kizlo request handler a server entry exports (`createKizlo(...).handler`): a web `Request` in, `Response` out. */
 export type KizloHandler = (request: Request) => Promise<Response> | Response
 
 /** Every HTTP method TanStack Start registers per server route, each mapped to the same handler. */

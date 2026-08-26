@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { MIN_PLUGIN_VERSION, pluginUpdateMessage } from "@kizlo/shared"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import type { IntrospectionDocument } from "../../wordpress/introspection"
@@ -9,13 +10,18 @@ import { assertGeneratedClientCompiles, GeneratedClientTypeError } from "../../w
 import { WORDPRESS_CLIENT_META_REL } from "../wp/constants"
 import type { ResolvedConfig } from "./config"
 import {
+	CONTRACT_BARREL,
+	generateOnce,
 	generateWordPressOnce,
 	generateWordPressSource,
 	generateWorkspaceClientOnce,
+	LegacyRouterExportError,
 	PartialContractError,
 	reportGenerationError,
 } from "./generate"
 import { log } from "./logger"
+
+const here = path.dirname(fileURLToPath(import.meta.url))
 
 /**
  * Compiling the fixture is {@link assertGeneratedClientCompiles}'s own suite's job, and doing it
@@ -69,6 +75,12 @@ function project(): ResolvedConfig {
 	return config(cwd)
 }
 
+function writeServer(cfg: ResolvedConfig, source: string): void {
+	const entry = path.join(cfg.cwd, cfg.serverEntry)
+	fs.mkdirSync(path.dirname(entry), { recursive: true })
+	fs.writeFileSync(entry, source)
+}
+
 function responder(...responses: Response[]): typeof globalThis.fetch {
 	const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
 	for (const response of responses) fetch.mockResolvedValueOnce(response)
@@ -102,6 +114,28 @@ function watchLog(): void {
 	vi.spyOn(log, "warn").mockImplementation(() => {})
 	vi.spyOn(log, "error").mockImplementation(() => {})
 }
+
+describe("generateOnce", () => {
+	test("reads procedures and writes a barrel typed from that export", async () => {
+		const cfg = project()
+		const kizloModule = path.resolve(here, "../../kizlo.ts")
+		writeServer(cfg, `import { createKizlo } from ${JSON.stringify(kizloModule)}\nexport const { procedures } = createKizlo()\n`)
+
+		await expect(generateOnce(cfg, { fetch: responder(modified()) })).resolves.toBe(true)
+		expect(JSON.parse(fs.readFileSync(path.join(cfg.cwd, cfg.contractPath), "utf8"))).toHaveProperty("posts")
+		expect(fs.readFileSync(path.join(cfg.cwd, cfg.barrelPath), "utf8")).toBe(CONTRACT_BARREL)
+		expect(CONTRACT_BARREL).toContain('import type { procedures } from ".."')
+		expect(CONTRACT_BARREL).toContain("typeof procedures")
+	})
+
+	test("gives a targeted migration error for a legacy router export", async () => {
+		const cfg = project()
+		writeServer(cfg, "export const router = {}\n")
+
+		await expect(generateOnce(cfg)).rejects.toThrow(LegacyRouterExportError)
+		await expect(generateOnce(cfg)).rejects.toThrow(/exports `router`.*Rename that export to `procedures`/)
+	})
+})
 
 describe("generateWordPressOnce", () => {
 	test("fetches once, writes current output, and reuses the ETag without rewriting", async () => {

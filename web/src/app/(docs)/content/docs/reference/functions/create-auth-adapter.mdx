@@ -4,8 +4,8 @@ description: Build a custom auth adapter that resolves the caller's identity.
 ---
 
 `createAuthAdapter` declares a custom auth adapter, typed against the `AuthAdapter` contract. Kizlo calls it to
-resolve who is making a request, mapping your session to a WordPress user. Register the result on
-[`createKizlo`](/docs/reference/functions/create-kizlo)'s `adapters.auth`.
+resolve who is making a request, mapping your session to a WordPress user. Provide the result through an
+[integration](/docs/reference/functions/create-integration)'s `adapters.auth`.
 
 Reach for this when you bring your own session layer. For common providers, use a prebuilt adapter instead. Those
 live in the adapter guides, not here.
@@ -59,10 +59,12 @@ export const auth = createAuthAdapter({
 Register it:
 
 ```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo } from "kizlo"
+import { createIntegration, createKizlo } from "kizlo"
 import { auth } from "../adapters/auth"
 
+const authentication = createIntegration({ id: "authentication", adapters: { auth } })
+
 export const { client, handler } = createKizlo({
-  adapters: { auth },
+  integrations: [authentication],
 })
 ```

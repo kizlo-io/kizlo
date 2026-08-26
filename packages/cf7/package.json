@@ -2,7 +2,7 @@
 	"name": "@kizlo/cf7",
 	"version": "0.1.10",
 	"type": "module",
-	"description": "Contact Form 7 extension for Kizlo.",
+	"description": "Contact Form 7 integration for Kizlo.",
 	"keywords": [
 		"wordpress",
 		"headless",
@@ -69,6 +69,6 @@
 		"vitest": "catalog:"
 	},
 	"peerDependencies": {
-		"kizlo": ">=0.1.0"
+		"kizlo": ">=0.16.0"
 	}
 }

@@ -1,6 +1,6 @@
 import type { Pathname, TODO } from "@kizlo/shared"
 import { type AnyContractRouter, isContractProcedure as isOrpcContractProcedure, minifyContractRouter } from "@orpc/contract"
-import type { AnyProcedureRouter, InvocationScope } from "./procedure"
+import type { AnyProcedureTree, InvocationScope } from "./procedure"
 import { createOrpcRouter } from "./router"
 import type { HTTPMethod } from "./types"
 
@@ -12,8 +12,8 @@ export function isContractProcedure(node: unknown): node is ContractProcedure {
 	return "route" in (node as object) || "meta" in (node as object)
 }
 
-export async function generateContract<TRouter extends AnyProcedureRouter>(router: TRouter): Promise<Contract> {
-	const contract = minifyContractRouter(createOrpcRouter(router) as TODO)
+export async function generateContract<TProcedures extends AnyProcedureTree>(procedures: TProcedures): Promise<Contract> {
+	const contract = minifyContractRouter(createOrpcRouter(procedures) as TODO)
 
 	const walk = (node: AnyContractRouter): Contract => {
 		const out: Contract = {}

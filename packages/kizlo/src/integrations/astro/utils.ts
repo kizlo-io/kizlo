@@ -1,7 +1,7 @@
 import { KizloError } from "../../shared/error"
 
 /**
- * Minimal shape of Astro's `APIContext` this integration needs — just the standard web `Request`.
+ * Minimal shape of Astro's `APIContext` this integration needs: just the standard web `Request`.
  * Typed structurally so the package never has to depend on `astro` (which stays an optional peer).
  */
 export interface AstroRouteContext {
@@ -12,16 +12,15 @@ export interface AstroRouteContext {
 export type AstroRoute = (context: AstroRouteContext) => Promise<Response> | Response
 
 /**
- * The public Kizlo API base URL, read from `process.env` as a last-resort fallback for a client built
- * without an explicit `url`. The server factory (`createKizlo`) reads env the Astro-native way through
- * `astro:env/server`, and client-side code passes `import.meta.env.PUBLIC_KIZLO_API_URL` at the call
- * site (see the template's `client.ts`); this fallback only matters if neither is supplied.
+ * The public Kizlo API base URL, read from `process.env` as a last-resort fallback when this client
+ * factory runs on the server without an explicit `url`. Browser code passes
+ * `import.meta.env.PUBLIC_KIZLO_BASE_URL` at the call site so Vite can inline it.
  */
 export function getServerBaseUrl(): string {
-	const baseUrl = process.env.PUBLIC_KIZLO_API_URL?.trim()
+	const baseUrl = process.env.PUBLIC_KIZLO_BASE_URL?.trim()
 	if (!baseUrl) {
 		throw new KizloError("MISSING_ENV_VARIABLE", {
-			message: "Please define PUBLIC_KIZLO_API_URL in your .env file.",
+			message: "Please define PUBLIC_KIZLO_BASE_URL in your .env file.",
 		})
 	}
 	return baseUrl
