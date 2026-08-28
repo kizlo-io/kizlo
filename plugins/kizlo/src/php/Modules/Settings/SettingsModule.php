@@ -17,7 +17,6 @@ use Kizlo\Modules\Settings\Webhook\WebhookSettingsService;
 use Kizlo\Modules\Settings\Uploads\UploadsSettingsService;
 use Kizlo\Modules\Settings\Headless\HeadlessSettingsService;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
-use Kizlo\Modules\CustomFields\CustomFieldsValidator;
 use Kizlo\Support\Utils;
 
 class SettingsModule
@@ -149,14 +148,12 @@ class SettingsModule
                     'content_variables' => Variables::toJSON('post_type_content'),
                     'default_title_format'  => Variables::DEFAULT_POST_TITLE_TEMPLATE,
                     'default_desc_format'  => Variables::DEFAULT_POST_DESC_TEMPLATE,
-                    'reserved_field_names'  => CustomFieldsValidator::RESERVED_POST_FIELD_NAMES,
                 ],
                 'taxonomy' => [
                     'path_variables'    => Variables::toJSON('taxonomy_path'),
                     'content_variables' => Variables::toJSON('taxonomy_content'),
                     'default_title_format'  => Variables::DEFAULT_TAX_TITLE_TEMPLATE,
                     'default_desc_format'  => Variables::DEFAULT_TAX_DESC_TEMPLATE,
-                    'reserved_field_names'  => CustomFieldsValidator::RESERVED_TERM_FIELD_NAMES,
                 ],
                 'author' => [
                     'path_variables'    => Variables::toJSON('author_path'),

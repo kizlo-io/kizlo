@@ -1,6 +1,7 @@
 import { arrayable, BooleanLike, MediaImage, Metadata, NumberLike } from "@kizlo/shared"
-import { CurrencyFormat, IdentifierInput, ListMetadata, Seo } from "kizlo"
+import { CurrencyFormat, customFieldsSchema, IdentifierInput, ListMetadata, Seo } from "kizlo"
 import { z } from "zod/v4"
+import type { ProductCustomFields } from "./types"
 
 export const SWATCH_TYPES = ["text", "color", "image"] as const
 export const SwatchType = z.enum(SWATCH_TYPES)
@@ -97,6 +98,7 @@ export const Product = z.object({
 	stock: z.number().nullable(),
 	lowStockRemaining: z.number().nullable(),
 	seo: Seo.nullable(),
+	custom: customFieldsSchema<ProductCustomFields>(),
 	currencyFormat: CurrencyFormat,
 	meta: Metadata,
 })

@@ -30,6 +30,13 @@ export type CurrencyFormat = z.infer<typeof CurrencyFormat>
 export const IdentifierInput = z.union([NumberLike, z.string()])
 export type IdentifierInput = z.output<typeof IdentifierInput>
 
+/** Preserve a project's generated custom-field shape while checking the runtime value is an object. */
+export const customFieldsSchema = <TCustom extends object>() =>
+	z.custom<TCustom>(
+		(value) => typeof value === "object" && value !== null && !Array.isArray(value),
+		"Expected custom fields to be an object",
+	)
+
 export const PreviewTokenPayload = z.object({
 	id: z.number(),
 	parent: z.number(),

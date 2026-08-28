@@ -22,10 +22,9 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettings;
  * decided here: {@see CoreItemSchema} derives the response and the write surface
  * the same way {@see CoreCollectionParams} derives the list, and {@see CoreControllers}
  * decides which controller that is. Kizlo adds three things on top, and only
- * three. The `kizlo` envelope, which is its own. The configured custom fields,
- * which merge in at the response root exactly where the API puts them. And a name
- * for the `status` vocabulary, so a client gets one type rather than an anonymous
- * enum at every site.
+ * three. The `kizlo` envelope, including its configured `custom` field group. A
+ * name for the `status` vocabulary, so a client gets one type rather than an
+ * anonymous enum at every site. The derived WordPress fields remain unchanged.
  *
  * The five operations are described for every managed type. `attachment` used to
  * be listed as read-only here, which was true of the route rather than of the
@@ -358,7 +357,7 @@ class ManagedPostTypes
             $properties['status'] = ['$ref' => CoreSchemas::POST_STATUS, 'required' => true];
         }
 
-        $properties['kizlo'] = self::envelope($slug, $properties, $single);
+        $properties['kizlo'] = self::envelope($slug, $properties, $fields, $single);
 
         return [
             'type'        => 'object',
@@ -366,10 +365,7 @@ class ManagedPostTypes
                 ? sprintf('A single "%s" entry.', $slug)
                 : sprintf('A "%s" entry as it appears in a list response, without the resolved SEO block.', $slug),
 
-            // Custom fields land at the response root, and a name already taken by
-            // a WordPress field is skipped rather than overwritten — which is what
-            // CustomFieldsStore::inject() does, so union order matters here.
-            'properties'  => $properties + CustomFieldSchema::responseProperties($fields),
+            'properties'  => $properties,
         ];
     }
 
@@ -384,9 +380,10 @@ class ManagedPostTypes
      * read.
      *
      * @param array<string, array<string, mixed>> $properties The derived response fields.
+     * @param array<int, array<string, mixed>>    $fields     Configured custom fields.
      * @return array<string, mixed>
      */
-    private static function envelope(string $slug, array $properties, bool $single): array
+    private static function envelope(string $slug, array $properties, array $fields, bool $single): array
     {
         $block = [
             'url' => ['type' => 'string', 'required' => true, 'format' => 'uri', 'description' => 'The resolved frontend URL.'],
@@ -426,6 +423,8 @@ class ManagedPostTypes
             $block['seo'] = ['$ref' => CoreSchemas::SEO, 'required' => true];
         }
 
+        $block['custom'] = CustomFieldSchema::responseGroup($fields);
+
         $block['extend'] = [
             'type'                 => 'object',
             'required'             => true,
@@ -461,7 +460,9 @@ class ManagedPostTypes
             'description' => $partial
                 ? sprintf('A partial update to a "%s" entry. Custom fields are only re-validated when submitted.', $slug)
                 : sprintf('A new "%s" entry. Required custom fields must be present.', $slug),
-            'properties'  => $properties + CustomFieldSchema::inputProperties($fields, $partial),
+            'properties'  => $properties + [
+                'custom' => CustomFieldSchema::inputGroup($fields, $partial),
+            ],
         ];
     }
 

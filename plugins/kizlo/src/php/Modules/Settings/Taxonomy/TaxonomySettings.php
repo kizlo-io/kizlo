@@ -46,8 +46,7 @@ class TaxonomySettings extends SettingsIndexedAbstract
             $previous = is_array($this->get('custom_fields')) ? $this->get('custom_fields') : [];
             CustomFieldsValidator::assert(
                 FieldDefinitions::normalize($value, $previous),
-                $previous,
-                CustomFieldsValidator::RESERVED_TERM_FIELD_NAMES
+                $previous
             );
         }
     }

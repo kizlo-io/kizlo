@@ -78,43 +78,16 @@ class CustomFieldsValidatorTest extends TestCase
         $this->assertTrue(true);
     }
 
-    public function test_rejects_a_reserved_top_level_post_name(): void
+    public function test_allows_names_used_by_core_response_properties(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        CustomFieldsValidator::assert(
-            FieldDefinitions::normalize([['type' => 'text', 'name' => 'content']]),
-            [],
-            CustomFieldsValidator::RESERVED_POST_FIELD_NAMES
-        );
-    }
-
-    public function test_rejects_a_reserved_top_level_term_name(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        CustomFieldsValidator::assert(
-            FieldDefinitions::normalize([['type' => 'text', 'name' => 'taxonomy']]),
-            [],
-            CustomFieldsValidator::RESERVED_TERM_FIELD_NAMES
-        );
-    }
-
-    public function test_allows_a_reserved_name_on_a_nested_child(): void
-    {
-        // Nested names live inside their parent's value object, never at the root.
         $defs = FieldDefinitions::normalize([
-            ['type' => 'group', 'name' => 'details', 'fields' => [['type' => 'text', 'name' => 'content']]],
+            ['type' => 'text', 'name' => 'content'],
+            ['type' => 'text', 'name' => 'taxonomy'],
+            ['type' => 'text', 'name' => 'kizlo'],
         ]);
 
-        CustomFieldsValidator::assert($defs, [], CustomFieldsValidator::RESERVED_POST_FIELD_NAMES);
-        $this->assertTrue(true);
-    }
-
-    public function test_reserved_names_are_ignored_when_no_list_is_given(): void
-    {
-        $defs = FieldDefinitions::normalize([['type' => 'text', 'name' => 'content']]);
-
         CustomFieldsValidator::assert($defs);
-        $this->assertTrue(true);
+        $this->assertSame(['content', 'taxonomy', 'kizlo'], array_column($defs, 'name'));
     }
 
     public function test_rejects_a_digit_leading_name(): void

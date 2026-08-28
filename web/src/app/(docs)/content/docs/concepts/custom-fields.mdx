@@ -1,0 +1,86 @@
+---
+title: Custom fields
+icon: BracketsCurly
+description: Use configured custom fields with exact generated types across Kizlo content APIs.
+---
+
+Configure custom fields for a post type or taxonomy in the Kizlo WordPress settings, then run
+`kizlo generate`. The generated WordPress contract uses the configured field names and value types instead
+of a generic record.
+
+## Read fields from public models
+
+Posts, pages, categories, tags, and WooCommerce products expose configured values under `custom`:
+
+```ts
+const post = await client.posts.get.call({
+  params: { identifier: "hello-world" },
+})
+
+post.custom.company_name // string
+```
+
+The property is always an object. Content with no configured custom fields returns `custom: {}`.
+
+## Read and write through WordPress
+
+Managed post-type and taxonomy write endpoints accept a grouped `custom` object. Fields that are required in
+WordPress are required when creating content. Update requests may include only the fields that changed.
+
+```ts
+const response = await context.wordpress.postTypes.post.create({
+  title: "Hello world",
+  custom: {
+    company_name: "Acme Ltd",
+  },
+})
+
+if (response.error) throw response.error
+
+response.data.kizlo.custom.company_name // string
+```
+
+Raw response paths differ by API surface:
+
+| Content | Raw response | Public Kizlo model |
+| --- | --- | --- |
+| Post types and taxonomies | `kizlo.custom` | `custom` |
+| WooCommerce REST products | `kizlo.custom` | `custom` |
+| WooCommerce Store API products | `extensions.kizlo.custom` | `custom` |
+
+Custom field names may match standard fields such as `content`, `taxonomy`, or `kizlo` because the group keeps
+them separate from the API's own properties.
+
+## Migrate root-level fields
+
+Custom fields previously appeared beside standard properties in requests and responses.
+
+```ts title="Before"
+await context.wordpress.postTypes.post.create({
+  title: "Hello world",
+  company_name: "Acme Ltd",
+})
+
+response.data.company_name
+post.company_name
+```
+
+Move every custom field into `custom`. Raw managed WordPress responses place the group inside `kizlo`, while
+public Kizlo models expose it directly.
+
+```ts title="After"
+await context.wordpress.postTypes.post.create({
+  title: "Hello world",
+  custom: {
+    company_name: "Acme Ltd",
+  },
+})
+
+response.data.kizlo.custom.company_name
+post.custom.company_name
+```
+
+Regenerate `wordpress.ts` after updating the Kizlo plugins or changing custom-field settings. See the
+[WordPress client](/docs/concepts/wordpress-client#generate-the-client) for generation and commit guidance.
+
+File custom fields return the shared [`Media`](/docs/reference/types/media) union.

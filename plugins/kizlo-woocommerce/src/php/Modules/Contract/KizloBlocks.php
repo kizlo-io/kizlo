@@ -2,6 +2,8 @@
 
 namespace Kizlo\WooCommerce\Modules\Contract;
 
+use Kizlo\Modules\Introspection\CustomFieldSchema;
+use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 
 /**
@@ -68,6 +70,10 @@ final class KizloBlocks
                 'context'     => ['view', 'edit'],
                 'readonly'    => true,
             ],
+            'custom' => array_merge(self::customFields(), [
+                'context'  => ['view', 'edit'],
+                'readonly' => true,
+            ]),
         ];
     }
 
@@ -148,6 +154,7 @@ final class KizloBlocks
                     ],
                 ],
                 'currency_format' => ['$ref' => WooCommerceSchemas::CURRENCY_FORMAT, 'required' => true],
+                'custom'          => self::customFields(),
             ],
         ];
     }
@@ -194,6 +201,18 @@ final class KizloBlocks
                 ],
             ],
         ];
+    }
+
+    /**
+     * The exact resolved custom-field schema configured for products.
+     *
+     * @return array<string, mixed>
+     */
+    private static function customFields(): array
+    {
+        $definitions = PostTypeSettings::load('product')->getCustomFields();
+
+        return CustomFieldSchema::responseGroup($definitions);
     }
 
     /**

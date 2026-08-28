@@ -10,8 +10,8 @@ use WP_REST_Request;
 use Kizlo\Support\Utils;
 
 /**
- * Accepts custom-field writes on the Kizlo create/update endpoints, keyed by field
- * name at the request root (the same shape reads come back as).
+ * Accepts custom-field writes under the Kizlo create/update endpoints' `custom`
+ * object, matching the public response shape.
  *
  * The `/post-types/*` and `/taxonomies/*` routes delegate to the core WordPress
  * REST controllers, so the submitted values are:
@@ -22,8 +22,8 @@ use Kizlo\Support\Utils;
  *     exists.
  *
  * The keys are never registered with `show_in_rest`, so the native `meta` object
- * stays untouched; reads come back out at the response root through the post/term
- * extension instead.
+ * stays untouched; reads come back through the post/term extension's grouped
+ * Kizlo response envelope instead.
  */
 class CustomFieldsModule
 {
@@ -70,12 +70,12 @@ class CustomFieldsModule
             return $response;
         }
 
-        $values = self::collectValues($definitions, $request);
-        if ($values === null) {
-            return $response;
-        }
-
         try {
+            $values = self::collectValues($request);
+            if ($values === null) {
+                return $response;
+            }
+
             CustomFieldsStore::assertWritable(self::writeTargets($definitions, $values, $request), $values);
         } catch (Throwable $e) {
             return new WP_Error('kizlo_custom_fields_invalid', $e->getMessage(), ['status' => 400]);
@@ -106,24 +106,25 @@ class CustomFieldsModule
     }
 
     /**
-     * Collect submitted custom-field values from the request root, keyed by
-     * top-level definition name. Returns null when the request carries none, so a
-     * write that never touches custom fields leaves the stored values untouched.
+     * Collect submitted custom-field values from the grouped `custom` parameter.
+     * Returns null when the request carries no group, so a write that never
+     * touches custom fields leaves the stored values untouched.
      *
-     * @param array<int, array<string, mixed>> $definitions
      * @return array<string, mixed>|null
+     * @throws \InvalidArgumentException
      */
-    private static function collectValues(array $definitions, WP_REST_Request $request): ?array
+    private static function collectValues(WP_REST_Request $request): ?array
     {
-        $values = [];
-        foreach ($definitions as $definition) {
-            $name = (string) $definition['name'];
-            if (isset($request[$name])) {
-                $values[$name] = $request[$name];
-            }
+        if (!isset($request['custom'])) {
+            return null;
         }
 
-        return $values === [] ? null : $values;
+        $values = $request['custom'];
+        if (!is_array($values)) {
+            throw new \InvalidArgumentException('The custom field group must be an object.');
+        }
+
+        return $values;
     }
 
     /**
@@ -154,15 +155,15 @@ class CustomFieldsModule
      */
     private function save(string $meta_type, int $object_id, array $definitions, WP_REST_Request $request): void
     {
-        $values = self::collectValues($definitions, $request);
-        if ($values === null) {
-            return;
-        }
-
         // Content was already validated in rest_request_before_callbacks; a throw
         // here would only mean the two passes disagree, so log rather than 500
         // after the row has been created.
         try {
+            $values = self::collectValues($request);
+            if ($values === null) {
+                return;
+            }
+
             CustomFieldsStore::write($meta_type, $object_id, self::writeTargets($definitions, $values, $request), $values);
         } catch (Throwable $e) {
             kizlo_log('Custom fields write failed: ' . $e->getMessage());

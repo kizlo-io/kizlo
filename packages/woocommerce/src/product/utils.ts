@@ -10,7 +10,7 @@ import {
 	type ProductStockStatus,
 	type ProductType,
 } from "./schema"
-import type { WCK_Product, WCSK_Product, WCSK_ProductCollectionData } from "./types"
+import type { ProductCustomFields, WCK_Product, WCSK_Product, WCSK_ProductCollectionData } from "./types"
 
 /** Kizlo takes the rating filter as strings and the Store API takes it as the numbers it enumerates. */
 type ProductRatingFilter = NonNullable<WP_EndpointInput<"woocommerce.store.products.list">["rating"]>[number]
@@ -59,6 +59,7 @@ export function deserializeProduct(data: WCK_Product): Product {
 		currencyFormat: deserializeCurrencyFormat(data.kizlo.currency_format),
 		meta: toPublicMetadata(data.meta_data),
 		seo: null,
+		custom: data.kizlo.custom,
 	}
 }
 
@@ -66,7 +67,7 @@ export function deserializeStoreProduct(data: WCSK_Product): Product {
 	// WooCommerce registers the Store API extension without declaring it required, so the contract
 	// admits a product carrying no `kizlo` block. Nothing produces one while this plugin is active,
 	// and reading through an empty block beats making every field below optional.
-	const kizlo = data.extensions.kizlo ?? { stock: null, on_sale_from: null, on_sale_to: null, hs_code: null }
+	const kizlo = data.extensions.kizlo ?? { stock: null, on_sale_from: null, on_sale_to: null, hs_code: null, custom: {} }
 
 	return {
 		id: data.id,
@@ -109,8 +110,13 @@ export function deserializeStoreProduct(data: WCSK_Product): Product {
 		onSaleFrom: timestampFromIso(kizlo.on_sale_from),
 		onSaleTo: timestampFromIso(kizlo.on_sale_to),
 		seo: null,
+		custom: productCustomFields(kizlo.custom),
 		meta: {},
 	}
+}
+
+function productCustomFields(value: unknown): ProductCustomFields {
+	return (typeof value === "object" && value !== null && !Array.isArray(value) ? value : {}) as ProductCustomFields
 }
 
 export function deserializeProductFilters(data: WCSK_ProductCollectionData): ProductFilters | null {

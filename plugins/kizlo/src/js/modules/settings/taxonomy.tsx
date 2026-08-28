@@ -50,8 +50,7 @@ export function TaxonomySettingsPage() {
 	const navPage = useNavPage(pathname)
 	const postTypeOptions = useMemo(() => (settings?.post_types ?? []).map((t) => ({ value: t.slug, label: t.name })), [settings])
 
-	const reservedFieldNames = settings?.constants.taxonomy.reserved_field_names
-	const schema = useMemo(() => createTaxonomyUnifiedSchema(reservedFieldNames ?? []), [reservedFieldNames])
+	const schema = useMemo(() => createTaxonomyUnifiedSchema(), [])
 
 	const values = useMemo<TaxonomyUnifiedInput>(() => {
 		const settingsValues = {

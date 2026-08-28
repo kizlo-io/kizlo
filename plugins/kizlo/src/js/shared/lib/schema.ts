@@ -257,25 +257,6 @@ function refineFieldNames(fields: CustomFieldDefinition[], ctx: z.RefinementCtx,
 	})
 }
 
-/**
- * Flag any top-level custom-field name that collides with a reserved response key.
- * The reserved list is delivered per object type via the settings bootstrap
- * (`constants.post_type` / `constants.taxonomy`); PHP remains the authoritative gate.
- * Nested (group/repeater) children are namespaced under their parent, so only the
- * top level is checked. The issue path targets the offending field's Name input.
- */
-function refineReservedNames(fields: CustomFieldDefinition[], reserved: Set<string>, ctx: z.RefinementCtx): void {
-	fields.forEach((field, index) => {
-		if (reserved.has(field.name)) {
-			ctx.addIssue({
-				code: "custom",
-				path: ["custom_fields", index, "name"],
-				message: `"${field.name}" is a reserved field name and would collide with an existing response field.`,
-			})
-		}
-	})
-}
-
 // ====================================================
 // POST TYPE SCHEMA
 // ====================================================
@@ -296,12 +277,10 @@ export const PostTypeSettingsSchema = z.object({
 export type PostTypeSettingsInput = z.input<typeof PostTypeSettingsSchema>
 export type PostTypeSettingsOutput = z.output<typeof PostTypeSettingsSchema>
 
-/** Post-type settings schema that requires field names and rejects reserved top-level ones. */
-export function createPostTypeSettingsSchema(reservedFieldNames: Iterable<string>) {
-	const reserved = new Set(reservedFieldNames)
+/** Post-type settings schema that requires every configured field to have a name. */
+export function createPostTypeSettingsSchema() {
 	return PostTypeSettingsSchema.superRefine((val, ctx) => {
 		refineFieldNames(val.custom_fields, ctx)
-		refineReservedNames(val.custom_fields, reserved, ctx)
 	})
 }
 
@@ -318,12 +297,10 @@ export const TaxonomySettingsSchema = z.object({
 export type TaxonomySettingsInput = z.input<typeof TaxonomySettingsSchema>
 export type TaxonomySettingsOutput = z.output<typeof TaxonomySettingsSchema>
 
-/** Taxonomy settings schema that requires field names and rejects reserved top-level ones. */
-export function createTaxonomySettingsSchema(reservedFieldNames: Iterable<string>) {
-	const reserved = new Set(reservedFieldNames)
+/** Taxonomy settings schema that requires every configured field to have a name. */
+export function createTaxonomySettingsSchema() {
 	return TaxonomySettingsSchema.superRefine((val, ctx) => {
 		refineFieldNames(val.custom_fields, ctx)
-		refineReservedNames(val.custom_fields, reserved, ctx)
 	})
 }
 
@@ -429,11 +406,9 @@ export type PostTypeUnifiedInput = z.input<typeof PostTypeUnifiedSchema>
 export type PostTypeUnifiedOutput = z.output<typeof PostTypeUnifiedSchema>
 
 /** Unified post-type schema carrying the same custom-field refinements as the settings-only one. */
-export function createPostTypeUnifiedSchema(reservedFieldNames: Iterable<string>) {
-	const reserved = new Set(reservedFieldNames)
+export function createPostTypeUnifiedSchema() {
 	return PostTypeUnifiedSchema.superRefine((val, ctx) => {
 		refineFieldNames(val.custom_fields, ctx)
-		refineReservedNames(val.custom_fields, reserved, ctx)
 	})
 }
 
@@ -442,11 +417,9 @@ export type TaxonomyUnifiedInput = z.input<typeof TaxonomyUnifiedSchema>
 export type TaxonomyUnifiedOutput = z.output<typeof TaxonomyUnifiedSchema>
 
 /** Unified taxonomy schema carrying the same custom-field refinements as the settings-only one. */
-export function createTaxonomyUnifiedSchema(reservedFieldNames: Iterable<string>) {
-	const reserved = new Set(reservedFieldNames)
+export function createTaxonomyUnifiedSchema() {
 	return TaxonomyUnifiedSchema.superRefine((val, ctx) => {
 		refineFieldNames(val.custom_fields, ctx)
-		refineReservedNames(val.custom_fields, reserved, ctx)
 	})
 }
 

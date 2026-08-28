@@ -65,6 +65,7 @@ test("posts.get by slug returns the matching post", async () => {
 	const parsed = Post.safeParse(result)
 	expect(parsed.success).toBe(true)
 	expect(result.slug).toBe("hello-world-test")
+	expect(result.custom).toEqual({ company_name: "Kizlo" })
 })
 
 test("posts.get by id returns the post with matching id", async () => {

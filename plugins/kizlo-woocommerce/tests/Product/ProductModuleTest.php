@@ -2,6 +2,10 @@
 
 namespace Kizlo\WooCommerce\Tests\Product;
 
+use Kizlo\Modules\CustomFields\CustomFieldsStore;
+use Kizlo\Modules\CustomFields\FieldDefinitions;
+use Kizlo\Modules\Settings\PostType\PostTypeSettings;
+use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
 use Kizlo\WooCommerce\Modules\Product\ProductModule;
 use Kizlo\WooCommerce\Tests\TestCase;
 use WC_DateTime;
@@ -27,5 +31,34 @@ class ProductModuleTest extends TestCase
 
         $this->assertNull($result['on_sale_from']);
         $this->assertNull($result['on_sale_to']);
+    }
+
+    public function test_store_products_expose_grouped_custom_values_and_their_exact_schema(): void
+    {
+        $definitions = FieldDefinitions::normalize([[
+            'type'    => 'text',
+            'name'    => 'product_note',
+            'default' => 'Default note',
+        ]]);
+        $settings = PostTypeSettings::load('product');
+        $settings->setData(['custom_fields' => $definitions]);
+        $settings->save('product');
+
+        $product = new WC_Product_Simple();
+        $product->set_name('Custom product');
+        $product->set_regular_price('10');
+        $product->save();
+
+        CustomFieldsStore::write(CustomFieldsStore::META_POST, $product->get_id(), $definitions, [
+            'product_note' => 'Stored note',
+        ]);
+
+        $result = (new ProductModule())->storeProductExtensionData($product);
+        $schema = KizloBlocks::storeProduct()['custom'];
+
+        $this->assertSame(['product_note' => 'Stored note'], (array) $result['custom']);
+        $this->assertSame('string', $schema['properties']['product_note']['type']);
+        $this->assertTrue($schema['properties']['product_note']['required']);
+        $this->assertArrayNotHasKey('additionalProperties', $schema);
     }
 }

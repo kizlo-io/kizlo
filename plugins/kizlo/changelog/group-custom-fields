@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Group managed custom-field inputs and outputs under `custom`

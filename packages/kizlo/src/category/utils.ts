@@ -14,6 +14,7 @@ export function deserializeCategory(data: WPK_Category | WPK_CategoryListItem): 
 		postCount: data.count,
 		// List responses carry no resolved SEO block; only a single fetch does.
 		seo: "seo" in data.kizlo ? deserializeSeo(data.kizlo.seo) : null,
+		custom: data.kizlo.custom,
 		meta: stringifiedMetaRecord(data.meta),
 	}
 }

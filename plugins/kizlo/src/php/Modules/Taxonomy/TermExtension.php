@@ -37,7 +37,9 @@ class TermExtension
             : $this->extendListItem($response->get_data(), $term);
 
         $definitions = Utils::getSettings()->taxonomies->get($term->taxonomy)->getCustomFields();
-        $data        = CustomFieldsStore::inject($data, CustomFieldsStore::META_TERM, $term->term_id, $definitions);
+        $custom      = CustomFieldsStore::read(CustomFieldsStore::META_TERM, $term->term_id, $definitions);
+
+        $data['kizlo']['custom'] = (object) $custom;
 
         $response->set_data($data);
 

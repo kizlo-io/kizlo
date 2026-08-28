@@ -68,6 +68,7 @@ test("products.list reads the Store API through the generated endpoint", async (
 
 	expect(ProductList.safeParse(result).success).toBe(true)
 	expect(result.items.length).toBeGreaterThan(0)
+	expect(result.items[0]?.custom).toEqual({ product_note: "Fixture product" })
 })
 
 test("products.list resolves pagination from the headers the contract declares", async () => {
@@ -91,6 +92,7 @@ test("products.get resolves a product by slug through the REST v3 list", async (
 
 	expect(Product.safeParse(result).success).toBe(true)
 	expect(result.id).toBe(productId)
+	expect(result.custom).toEqual({ product_note: "Fixture product" })
 	// Every field here comes from the `kizlo` block the plugin's response filter adds, which no
 	// WooCommerce schema mentions and the spec therefore declares by hand.
 	expect(result.currencyFormat.currencyCode).toBeTruthy()

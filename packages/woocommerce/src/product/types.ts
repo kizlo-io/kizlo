@@ -16,6 +16,9 @@ export type WCK_Product = WP_EndpointData<"woocommerce.products.retrieve">
  */
 export type WCSK_Product = WP_EndpointData<"woocommerce.store.products.list">[number]
 
+/** The exact resolved custom-field shape configured for products on this WordPress site. */
+export type ProductCustomFields = WCK_Product["kizlo"]["custom"]
+
 /** Collection counts, with the `kizlo` block the route interceptor adds. */
 export type WCSK_ProductCollectionData = WP_EndpointData<"woocommerce.store.products.collectionData">
 

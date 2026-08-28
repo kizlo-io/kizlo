@@ -281,14 +281,14 @@ class ManagedTaxonomies
     {
         $properties = CoreItemSchema::responseForTaxonomy($slug);
 
-        $properties['kizlo'] = self::envelope($single);
+        $properties['kizlo'] = self::envelope($fields, $single);
 
         return [
             'type'        => 'object',
             'description' => $single
                 ? sprintf('A single "%s" term.', $slug)
                 : sprintf('A "%s" term as it appears in a list response, without the resolved SEO block.', $slug),
-            'properties'  => $properties + CustomFieldSchema::responseProperties($fields),
+            'properties'  => $properties,
         ];
     }
 
@@ -297,15 +297,18 @@ class ManagedTaxonomies
      * taxonomy, hierarchical or not, because it mirrors `WP_Term::$parent`, which
      * is always set.
      *
+     * @param array<int, array<string, mixed>> $fields Configured custom fields.
      * @return array<string, mixed>
      */
-    private static function envelope(bool $single): array
+    private static function envelope(array $fields, bool $single): array
     {
         $properties = [];
 
         if ($single) {
             $properties['seo'] = ['$ref' => CoreSchemas::SEO, 'required' => true];
         }
+
+        $properties['custom'] = CustomFieldSchema::responseGroup($fields);
 
         return [
             'type'       => 'object',
@@ -348,7 +351,9 @@ class ManagedTaxonomies
             'description' => $partial
                 ? sprintf('A partial update to a "%s" term. Custom fields are only re-validated when submitted.', $slug)
                 : sprintf('A new "%s" term. Required custom fields must be present.', $slug),
-            'properties'  => $properties + CustomFieldSchema::inputProperties($fields, $partial),
+            'properties'  => $properties + [
+                'custom' => CustomFieldSchema::inputGroup($fields, $partial),
+            ],
         ];
     }
 

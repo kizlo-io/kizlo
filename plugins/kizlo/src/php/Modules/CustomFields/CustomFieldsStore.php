@@ -23,7 +23,7 @@ class CustomFieldsStore
     private const REF_PREFIX   = '_kcf_';
 
     /**
-     * Resolve stored values into the nested `custom_fields` output shape.
+     * Resolve stored values into the nested `custom` output shape.
      *
      * @param array<int, array<string, mixed>> $definitions Normalized definitions.
      * @return array<string, mixed>
@@ -37,26 +37,6 @@ class CustomFieldsStore
             $out[$definition['name']] = self::readField($definition, '', $existing);
         }
         return $out;
-    }
-
-    /**
-     * Merge a post/term's resolved custom fields onto the REST response root,
-     * skipping any name already present. Reserved names are rejected at save time,
-     * so this skip only guards the dynamic keys the static reserved list cannot
-     * know (e.g. a CPT-specific taxonomy's rest_base) from clobbering core data.
-     *
-     * @param array<string, mixed>             $data        Existing response data.
-     * @param array<int, array<string, mixed>> $definitions Normalized definitions.
-     * @return array<string, mixed>
-     */
-    public static function inject(array $data, string $meta_type, int $object_id, array $definitions): array
-    {
-        foreach (self::read($meta_type, $object_id, $definitions) as $name => $value) {
-            if (!array_key_exists($name, $data)) {
-                $data[$name] = $value;
-            }
-        }
-        return $data;
     }
 
     /**

@@ -1,7 +1,8 @@
 import { arrayable, lenient, MediaImage, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
-import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
+import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
+import type { WPK_Page } from "./types"
 
 const WP_PAGE_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
 const WP_PAGE_ORDER_BYES = [
@@ -50,6 +51,7 @@ export const Page = z.object({
 	author: PageAuthorRef.nullable(),
 	featuredMedia: MediaImage.nullable(),
 	seo: Seo.nullable(),
+	custom: customFieldsSchema<WPK_Page["kizlo"]["custom"]>(),
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	meta: Metadata,

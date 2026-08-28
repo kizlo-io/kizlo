@@ -74,13 +74,14 @@ test("tags.get by slug returns the matching tag with seo", async () => {
 	const parsed = Tag.safeParse(result)
 	expect(parsed.success).toBe(true)
 	expect(result.slug).toBe(TAG_SLUG)
+	expect(result.custom).toEqual({ rank: 1 })
 	expect(result.seo).not.toBeNull()
 })
 
 test("tags.get returns exactly the kizlo shape with no leaked WordPress or parent fields", async () => {
 	const result = await kizlo.client.tags.get.call({ params: { identifier: TAG_SLUG } })
 	// deserializeTag builds the object explicitly; assert the surface is exactly these keys.
-	expect(Object.keys(result).sort()).toEqual(["description", "id", "meta", "name", "postCount", "seo", "slug", "url"])
+	expect(Object.keys(result).sort()).toEqual(["custom", "description", "id", "meta", "name", "postCount", "seo", "slug", "url"])
 	// post_tag is non-hierarchical: parent must never appear.
 	expect("parent" in result).toBe(false)
 })

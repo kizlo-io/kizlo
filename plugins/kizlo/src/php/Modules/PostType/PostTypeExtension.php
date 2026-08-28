@@ -27,7 +27,7 @@ class PostTypeExtension
             ]
         );
 
-        return $this->injectCustomFields($data);
+        return $this->groupCustomFields($data);
     }
 
     public function extendListItem(array $data): array
@@ -38,27 +38,31 @@ class PostTypeExtension
             ['extend' => $extend]
         );
 
-        return $this->injectCustomFields($data);
+        return $this->groupCustomFields($data);
     }
 
     /**
-     * Merge the post's resolved custom fields onto the response root, keyed by
-     * field name. Reserved names are rejected at save time, so nothing here can
-     * clobber an existing key (see {@see CustomFieldsStore::inject}).
+     * Group the post's resolved custom fields inside Kizlo's response envelope.
+     * Casting to an object keeps the no-definition JSON shape as `{}` rather than
+     * `[]`, matching the declared contract.
      *
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function injectCustomFields(array $data): array
+    private function groupCustomFields(array $data): array
     {
         $post = get_post($data['id']);
         if (!$post) {
+            $data['kizlo']['custom'] = (object) [];
             return $data;
         }
 
         $definitions = Utils::getSettings()->postTypes->get($post->post_type)->getCustomFields();
+        $custom      = CustomFieldsStore::read(CustomFieldsStore::META_POST, $post->ID, $definitions);
 
-        return CustomFieldsStore::inject($data, CustomFieldsStore::META_POST, $post->ID, $definitions);
+        $data['kizlo']['custom'] = (object) $custom;
+
+        return $data;
     }
 
     private function extendBase(array $data, Settings $settings): array
