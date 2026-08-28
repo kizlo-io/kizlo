@@ -6,6 +6,8 @@ use WP_Term;
 use WP_Comment;
 use WC_Product;
 use WC_Product_Attribute;
+use Kizlo\Modules\CustomFields\CustomFieldsStore;
+use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
 use Automattic\WooCommerce\StoreApi\Schemas\V1\ProductSchema;
 use Automattic\WooCommerce\StoreApi\Formatters\CurrencyFormatter;
@@ -88,7 +90,9 @@ class ProductModule
                 'regular_price' => $to_minor_unit($product->get_regular_price()),
                 'sale_price'    => $product->is_on_sale() ? $to_minor_unit($product->get_sale_price()) : null,
             ],
-        ], kizlo_apply_extend_filter('product', $product));
+        ], kizlo_apply_extend_filter('product', $product), [
+            'custom' => (object) $this->customFields($product),
+        ]);
 
         return $data;
     }
@@ -233,7 +237,17 @@ class ProductModule
             'on_sale_from' => $this->qualifiedDate($product->get_date_on_sale_from()),
             'on_sale_to'   => $this->qualifiedDate($product->get_date_on_sale_to()),
             'hs_code'      => $product->get_meta('kizlo_hs_code'),
-        ], kizlo_apply_extend_filter('product_list_item', $product));
+        ], kizlo_apply_extend_filter('product_list_item', $product), [
+            'custom' => (object) $this->customFields($product),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function customFields(WC_Product $product): array
+    {
+        $definitions = PostTypeSettings::load('product')->getCustomFields();
+
+        return CustomFieldsStore::read(CustomFieldsStore::META_POST, $product->get_id(), $definitions);
     }
 
     private function qualifiedDate(?\WC_DateTime $date): ?string

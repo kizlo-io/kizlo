@@ -10,11 +10,11 @@ use Kizlo\Modules\CustomFields\CustomFieldsModule;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
 
 /**
- * The Kizlo REST write contract: custom-field values are read from the request
- * root (keyed by field name, the same shape reads come back as) and validated
- * before the row is created. A create (POST) validates every definition, while an
- * update (PUT/PATCH) validates only the fields actually submitted so a partial
- * edit leaves untouched fields — including required ones — as they were.
+ * The Kizlo REST write contract: custom-field values are read from the grouped
+ * `custom` request property and validated before the row is created. A create
+ * (POST) validates every definition, while an update (PUT/PATCH) validates only
+ * the fields actually submitted so a partial edit leaves untouched fields,
+ * including required ones, as they were.
  */
 class CustomFieldsWriteTest extends SeoTestCase
 {
@@ -38,18 +38,18 @@ class CustomFieldsWriteTest extends SeoTestCase
         $this->seedSettings(['post_types' => ['post' => ['custom_fields' => FieldDefinitions::normalize($raw)]]]);
     }
 
-    public function test_create_accepts_valid_root_custom_field_values(): void
+    public function test_create_accepts_valid_grouped_custom_field_values(): void
     {
         $this->seed([['type' => 'text', 'name' => 'company_name']]);
 
-        $this->assertNull($this->validate($this->request('POST', ['company_name' => 'Acme Ltd'])));
+        $this->assertNull($this->validate($this->request('POST', ['custom' => ['company_name' => 'Acme Ltd']])));
     }
 
-    public function test_create_rejects_invalid_root_custom_field_values(): void
+    public function test_create_rejects_invalid_grouped_custom_field_values(): void
     {
         $this->seed([['type' => 'number', 'name' => 'rank']]);
 
-        $result = $this->validate($this->request('POST', ['rank' => 'not-a-number']));
+        $result = $this->validate($this->request('POST', ['custom' => ['rank' => 'not-a-number']]));
 
         $this->assertInstanceOf(WP_Error::class, $result);
         $this->assertSame(400, $result->get_error_data()['status']);
@@ -62,7 +62,7 @@ class CustomFieldsWriteTest extends SeoTestCase
             ['type' => 'number', 'name' => 'rank', 'required' => true],
         ]);
 
-        $result = $this->validate($this->request('POST', ['subtitle' => 'Hello']));
+        $result = $this->validate($this->request('POST', ['custom' => ['subtitle' => 'Hello']]));
 
         $this->assertInstanceOf(WP_Error::class, $result);
     }
@@ -76,7 +76,7 @@ class CustomFieldsWriteTest extends SeoTestCase
 
         // Only `subtitle` is submitted, so the untouched required `rank` is left
         // alone rather than being reported as missing.
-        $this->assertNull($this->validate($this->request('PUT', ['subtitle' => 'Hello'])));
+        $this->assertNull($this->validate($this->request('PUT', ['custom' => ['subtitle' => 'Hello']])));
     }
 
     public function test_update_still_rejects_an_emptied_required_field(): void
@@ -84,7 +84,7 @@ class CustomFieldsWriteTest extends SeoTestCase
         $this->seed([['type' => 'number', 'name' => 'rank', 'required' => true]]);
 
         // Present in the payload but blank: a required field cannot be cleared.
-        $result = $this->validate($this->request('PATCH', ['rank' => '']));
+        $result = $this->validate($this->request('PATCH', ['custom' => ['rank' => '']]));
 
         $this->assertInstanceOf(WP_Error::class, $result);
     }
@@ -94,6 +94,16 @@ class CustomFieldsWriteTest extends SeoTestCase
         $this->seed([['type' => 'number', 'name' => 'rank', 'required' => true]]);
 
         $this->assertNull($this->validate($this->request('POST', ['title' => 'Hello'])));
+    }
+
+    public function test_a_non_object_custom_group_is_rejected(): void
+    {
+        $this->seed([['type' => 'text', 'name' => 'subtitle']]);
+
+        $result = $this->validate($this->request('PATCH', ['custom' => 'not-an-object']));
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame(400, $result->get_error_data()['status']);
     }
 
     public function test_update_persists_the_submitted_field_and_leaves_the_rest_untouched(): void
@@ -109,7 +119,7 @@ class CustomFieldsWriteTest extends SeoTestCase
 
         // Drive the real insert hook with an update that touches only `subtitle`.
         (new CustomFieldsModule())->register();
-        do_action('rest_after_insert_post', $post, $this->request('PUT', ['subtitle' => 'New']));
+        do_action('rest_after_insert_post', $post, $this->request('PUT', ['custom' => ['subtitle' => 'New']]));
 
         $this->assertSame('New', get_post_meta($post->ID, 'kcf_subtitle', true), 'The submitted field is updated.');
         $this->assertSame('5', get_post_meta($post->ID, 'kcf_rank', true), 'The omitted field keeps its stored value.');
@@ -124,7 +134,7 @@ class CustomFieldsWriteTest extends SeoTestCase
             'post_status'    => 'inherit',
         ]);
 
-        $result = $this->validate($this->request('POST', ['cover' => $attachment]));
+        $result = $this->validate($this->request('POST', ['custom' => ['cover' => $attachment]]));
 
         $this->assertInstanceOf(WP_Error::class, $result);
     }
@@ -138,6 +148,6 @@ class CustomFieldsWriteTest extends SeoTestCase
             'post_status'    => 'inherit',
         ]);
 
-        $this->assertNull($this->validate($this->request('POST', ['download' => $attachment])));
+        $this->assertNull($this->validate($this->request('POST', ['custom' => ['download' => $attachment]])));
     }
 }

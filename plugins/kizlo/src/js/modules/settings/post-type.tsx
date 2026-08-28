@@ -52,8 +52,7 @@ export function PostTypeSettingsPage() {
 	const navPage = useNavPage(pathname)
 	const taxonomyOptions = useMemo(() => (settings?.taxonomies ?? []).map((t) => ({ value: t.slug, label: t.name })), [settings])
 
-	const reservedFieldNames = settings?.constants.post_type.reserved_field_names
-	const schema = useMemo(() => createPostTypeUnifiedSchema(reservedFieldNames ?? []), [reservedFieldNames])
+	const schema = useMemo(() => createPostTypeUnifiedSchema(), [])
 
 	const values = useMemo<PostTypeUnifiedInput>(() => {
 		const settingsValues = {

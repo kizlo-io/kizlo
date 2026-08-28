@@ -1,7 +1,8 @@
 import { arrayable, BooleanLike, lenient, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
-import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
+import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
+import type { WPK_Tag } from "./types"
 
 const WP_TAG_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs", "term_group", "description", "count"] as const
 
@@ -17,6 +18,7 @@ export const Tag = z.object({
 	description: z.string().nullable(),
 	postCount: z.number(),
 	seo: Seo.nullable(),
+	custom: customFieldsSchema<WPK_Tag["kizlo"]["custom"]>(),
 	meta: Metadata,
 })
 export type Tag = z.output<typeof Tag>

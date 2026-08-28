@@ -3,10 +3,49 @@ import { woocommerce } from "@kizlo/woocommerce/test"
 import { defineConfig } from "kizlo/config"
 import { coreFixtures, defineFixture } from "kizlo/test"
 
+const customField = (definition: Record<string, unknown>) => ({
+	key: `field_fixture_${String(definition.name)}`,
+	label: String(definition.name),
+	instructions: "",
+	required: false,
+	...definition,
+})
+
+const textField = (name: string, defaultValue: string) => customField({ type: "text", name, default: defaultValue })
+
+const numberField = (name: string, defaultValue: number) =>
+	customField({ type: "number", name, default: defaultValue, min: null, max: null, step: null })
+
+const toggleField = (name: string, defaultValue: boolean) => customField({ type: "toggle", name, default: defaultValue })
+
+const kizloCore = defineFixture({
+	name: "kizlo-core",
+	plugins: [{ path: "plugins/kizlo" }],
+	async seed({ service }) {
+		const definitions = [
+			["post_types/post", [textField("company_name", "Kizlo")]],
+			["post_types/page", [toggleField("featured", true)]],
+			["post_types/product", [textField("product_note", "Fixture product")]],
+			["taxonomies/category", [textField("blurb", "Fixture category")]],
+			["taxonomies/post_tag", [numberField("rank", 1)]],
+		] as const
+
+		for (const [path, custom_fields] of definitions) {
+			const response = await service.put(`settings/${path}`, {
+				base: "/wp-json/kizlo/v1",
+				body: { custom_fields },
+			})
+			if (response.error) throw response.error
+		}
+
+		return {}
+	},
+})
+
 /** The active plugins whose freshly seeded test contract is committed in both generated WordPress clients. */
 const wordpressClientFixtures = [
 	...coreFixtures,
-	defineFixture({ name: "kizlo-core", plugins: [{ path: "plugins/kizlo" }] }),
+	kizloCore,
 	woocommerce({ plugins: ["woocommerce", { path: "plugins/kizlo-woocommerce" }] }),
 	cf7({ plugins: ["contact-form-7", { path: "plugins/kizlo-cf7" }] }),
 ]

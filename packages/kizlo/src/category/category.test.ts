@@ -64,6 +64,7 @@ test("categories.get by slug returns the matching category with seo", async () =
 	const parsed = Category.safeParse(result)
 	expect(parsed.success).toBe(true)
 	expect(result.slug).toBe(CATEGORY_SLUG)
+	expect(result.custom).toEqual({ blurb: "Fixture category" })
 	expect(result.seo).not.toBeNull()
 })
 

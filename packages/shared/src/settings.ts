@@ -443,9 +443,7 @@ export interface SettingsConstants {
 		title_separators: string[]
 		default_title_separator: string
 	}
-	/** Reserved field names collide with the term REST response keys (+ `kizlo`). */
-	taxonomy: SettingsVariableGroup & { reserved_field_names: string[] }
-	/** Reserved field names collide with the post REST response keys (+ `kizlo`). */
-	post_type: SettingsVariableGroup & { reserved_field_names: string[] }
+	taxonomy: SettingsVariableGroup
+	post_type: SettingsVariableGroup
 	author: SettingsVariableGroup
 }

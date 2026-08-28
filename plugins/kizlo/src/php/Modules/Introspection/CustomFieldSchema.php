@@ -24,6 +24,48 @@ namespace Kizlo\Modules\Introspection;
 class CustomFieldSchema
 {
     /**
+     * The grouped request property for configured values.
+     *
+     * On create, the group itself is required exactly when at least one top-level
+     * field is required. On update it stays optional, and its submitted fields
+     * carry the existing partial-update behavior.
+     *
+     * @param array<int, array<string, mixed>> $definitions
+     * @return array<string, mixed>
+     */
+    public static function inputGroup(array $definitions, bool $partial): array
+    {
+        $schema = [
+            'type'        => 'object',
+            'description' => 'Configured Kizlo custom-field values.',
+            'properties'  => self::inputProperties($definitions, $partial),
+        ];
+
+        if (!$partial && self::hasRequiredField($definitions)) {
+            $schema = self::required($schema);
+        }
+
+        return $schema;
+    }
+
+    /**
+     * The grouped response property for resolved configured values. Reads always
+     * emit the group, including an empty object when no definitions exist.
+     *
+     * @param array<int, array<string, mixed>> $definitions
+     * @return array<string, mixed>
+     */
+    public static function responseGroup(array $definitions): array
+    {
+        return [
+            'type'        => 'object',
+            'required'    => true,
+            'description' => 'Resolved Kizlo custom-field values.',
+            'properties'  => self::responseProperties($definitions),
+        ];
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $definitions
      * @return array<string, array<string, mixed>>
      */
@@ -160,6 +202,20 @@ class CustomFieldSchema
         }
 
         return $ordered;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $definitions
+     */
+    private static function hasRequiredField(array $definitions): bool
+    {
+        foreach ($definitions as $definition) {
+            if (!empty($definition['required'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -37,6 +37,7 @@ export function deserializePost(data: WPK_Post | WPK_PostListItem, options?: { p
 		format: data.format,
 		// List responses carry no resolved SEO block; only a single fetch does.
 		seo: "seo" in kizlo ? deserializeSeo(kizlo.seo) : null,
+		custom: kizlo.custom,
 		createdAt: timestampFromWpGmt(data.date_gmt) ?? timestampFromWpGmt(data.modified_gmt) ?? 0,
 		updatedAt: timestampFromWpGmt(data.modified_gmt) ?? 0,
 		meta: stringifiedMetaRecord(data.meta),

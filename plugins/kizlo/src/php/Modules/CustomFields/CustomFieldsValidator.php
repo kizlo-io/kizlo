@@ -18,69 +18,11 @@ class CustomFieldsValidator
 
     /**
      * A field name must be a valid identifier: a leading lowercase letter followed by
-     * lowercase letters, digits, or underscores. Top-level names surface as REST
-     * response keys and nested names as object properties, so an all-digit or
-     * digit-leading name (e.g. `123123`) would only be reachable via bracket access
-     * and is invalid as a GraphQL field name.
+     * lowercase letters, digits, or underscores. An all-digit or digit-leading
+     * name (e.g. `123123`) would only be reachable via bracket access and is
+     * invalid as a GraphQL field name.
      */
     private const NAME_PATTERN = '/^[a-z][a-z0-9_]*$/';
-
-    /**
-     * Top-level custom-field names surface as root keys on the post REST response,
-     * so they must not collide with WordPress's own post keys (edit context) or
-     * Kizlo's `kizlo` enrichment block. Nested (group/repeater) children are
-     * namespaced inside their parent's value object and never reach the root.
-     *
-     * @var array<int, string>
-     */
-    public const RESERVED_POST_FIELD_NAMES = [
-        'id',
-        'date',
-        'date_gmt',
-        'guid',
-        'modified',
-        'modified_gmt',
-        'password',
-        'slug',
-        'status',
-        'type',
-        'link',
-        'title',
-        'content',
-        'excerpt',
-        'author',
-        'featured_media',
-        'comment_status',
-        'ping_status',
-        'sticky',
-        'template',
-        'format',
-        'meta',
-        'categories',
-        'tags',
-        'permalink_template',
-        'generated_slug',
-        'class_list',
-        'kizlo',
-    ];
-
-    /**
-     * Term REST response keys (plus `kizlo`) reserved from top-level custom-field names.
-     *
-     * @var array<int, string>
-     */
-    public const RESERVED_TERM_FIELD_NAMES = [
-        'id',
-        'count',
-        'description',
-        'link',
-        'name',
-        'slug',
-        'taxonomy',
-        'parent',
-        'meta',
-        'kizlo',
-    ];
 
     /** Digits reserved for an unbounded repeater index (9999999999). */
     private const UNBOUNDED_INDEX_DIGITS = 10;
@@ -100,14 +42,12 @@ class CustomFieldsValidator
     /**
      * @param array<int, array<string, mixed>> $definitions Normalized definitions.
      * @param array<int, array<string, mixed>> $previous    Previously stored definitions.
-     * @param array<int, string>               $reserved    Names disallowed at the top level.
      * @throws InvalidArgumentException
      */
-    public static function assert(array $definitions, array $previous = [], array $reserved = []): void
+    public static function assert(array $definitions, array $previous = []): void
     {
         self::assertValidNames($definitions);
         self::assertUniqueNames($definitions);
-        self::assertNoReservedNames($definitions, $reserved);
         self::assertSafeTypeChanges($definitions, self::flattenTypes($previous));
         self::assertKeyLengths($definitions, '', []);
     }
@@ -134,34 +74,6 @@ class CustomFieldsValidator
 
             if (in_array($definition['type'], FieldDefinitions::CONTAINER_TYPES, true)) {
                 self::assertValidNames($definition['fields'] ?? []);
-            }
-        }
-    }
-
-    /**
-     * Reject top-level field names that collide with a reserved response key.
-     * Only the top level is checked: nested children live inside their parent's
-     * value object, so they never become a root key.
-     *
-     * @param array<int, array<string, mixed>> $definitions
-     * @param array<int, string>               $reserved
-     * @throws InvalidArgumentException
-     */
-    private static function assertNoReservedNames(array $definitions, array $reserved): void
-    {
-        if ($reserved === []) {
-            return;
-        }
-
-        $reserved_set = array_flip($reserved);
-        foreach ($definitions as $definition) {
-            $name = (string) $definition['name'];
-            if (isset($reserved_set[$name])) {
-                $label = $definition['label'] !== '' ? $definition['label'] : $name;
-                throw new InvalidArgumentException(
-                    "Custom field \"{$label}\" uses the reserved name \"{$name}\". It would collide with an existing "
-                    . "response field. Choose a different name."
-                );
             }
         }
     }

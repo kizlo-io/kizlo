@@ -63,8 +63,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
     {
         $described = $this->itemProperties(sprintf('post-types.%s.item', $slug));
 
-        // The envelope and the configured custom fields are Kizlo's own, and are
-        // the only things in the response that core has no opinion about.
+        // The Kizlo envelope is the only response field core has no opinion about.
         unset($described['kizlo']);
 
         $this->assertSame(
@@ -81,9 +80,14 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         $controller = CoreControllers::forPostType($slug);
 
         foreach ([WP_REST_Server::CREATABLE => 'create', WP_REST_Server::EDITABLE => 'update'] as $method => $operation) {
+            $described = $this->itemProperties(sprintf('post-types.%s.%s-input', $slug, $operation));
+
+            $this->assertArrayHasKey('custom', $described, $operation);
+            unset($described['custom']);
+
             $this->assertSame(
                 $this->sorted(array_keys($controller->get_endpoint_args_for_item_schema($method))),
-                $this->sorted(array_keys($this->itemProperties(sprintf('post-types.%s.%s-input', $slug, $operation)))),
+                $this->sorted(array_keys($described)),
                 $operation,
             );
         }
@@ -136,9 +140,14 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         $controller = new WP_REST_Terms_Controller('category');
 
         foreach ([WP_REST_Server::CREATABLE => 'create', WP_REST_Server::EDITABLE => 'update'] as $method => $operation) {
+            $described = $this->itemProperties(sprintf('taxonomies.category.%s-input', $operation));
+
+            $this->assertArrayHasKey('custom', $described, $operation);
+            unset($described['custom']);
+
             $this->assertSame(
                 $this->sorted(array_keys($controller->get_endpoint_args_for_item_schema($method))),
-                $this->sorted(array_keys($this->itemProperties(sprintf('taxonomies.category.%s-input', $operation)))),
+                $this->sorted(array_keys($described)),
                 $operation,
             );
         }
@@ -328,7 +337,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
     {
         $envelope = $this->itemProperties('post-types.post.item')['kizlo']['properties'];
 
-        foreach (['url', 'categories', 'tags', 'author', 'featured_media', 'seo', 'extend'] as $key) {
+        foreach (['url', 'categories', 'tags', 'author', 'featured_media', 'seo', 'custom', 'extend'] as $key) {
             $this->assertArrayHasKey($key, $envelope, $key);
         }
     }
@@ -356,13 +365,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         $this->assertArrayHasKey('url', $envelope);
     }
 
-    /**
-     * Custom fields land at the response root, and a name a WordPress field
-     * already holds is skipped rather than overwritten, which is what
-     * `CustomFieldsStore::inject()` does. Deriving the WordPress half did not
-     * change which side wins.
-     */
-    public function test_a_custom_field_cannot_displace_a_derived_field(): void
+    public function test_a_custom_field_may_share_a_name_with_a_derived_field(): void
     {
         $this->seedSettings([
             'post_types' => [
@@ -378,9 +381,13 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
 
         $properties = $this->itemProperties('post-types.post.item');
 
-        $this->assertArrayHasKey('acme_note', $properties);
         $this->assertSame('string', $properties['slug']['type']);
-        $this->assertTrue($properties['slug']['required'], 'The WordPress field held its name.');
+        $this->assertTrue($properties['slug']['required']);
+
+        $custom = $properties['kizlo']['properties']['custom']['properties'];
+        $this->assertSame('string', $custom['acme_note']['type']);
+        $this->assertSame('string', $custom['slug']['type']);
+        $this->assertArrayNotHasKey('acme_note', $properties);
     }
 
     public function test_the_status_vocabularies_are_still_named_rather_than_inlined(): void

@@ -43,18 +43,13 @@ class PostTypeSettingsCustomFieldsTest extends TestCase
         $this->assertSame('ok', $settings->getCustomFields()[0]['name']);
     }
 
-    public function test_a_reserved_field_name_rejects_the_update(): void
+    public function test_a_field_may_share_a_name_with_a_core_response_property(): void
     {
         $settings = new PostTypeSettings();
 
-        try {
-            $settings->setData(['custom_fields' => [['type' => 'text', 'name' => 'content']]]);
-            $this->fail('Expected the reserved name to be rejected.');
-        } catch (InvalidArgumentException $e) {
-            $this->assertStringContainsString('reserved', $e->getMessage());
-        }
+        $settings->setData(['custom_fields' => [['type' => 'text', 'name' => 'content']]]);
 
-        $this->assertSame([], $settings->getCustomFields());
+        $this->assertSame('content', $settings->getCustomFields()[0]['name']);
     }
 
     public function test_getData_exposes_custom_fields_for_the_settings_response(): void

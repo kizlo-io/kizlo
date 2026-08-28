@@ -1,3 +1,3 @@
 {
-	"pages": ["cli", "plugin", "integration", "wordpress-client", "client", "adapter", "development-and-testing"]
+	"pages": ["cli", "plugin", "integration", "wordpress-client", "custom-fields", "client", "adapter", "development-and-testing"]
 }

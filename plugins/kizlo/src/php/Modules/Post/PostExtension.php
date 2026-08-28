@@ -22,7 +22,9 @@ class PostExtension
             : $this->extendListItem($response->get_data(), $post);
 
         $definitions = Utils::getSettings()->postTypes->get($post->post_type)->getCustomFields();
-        $data        = CustomFieldsStore::inject($data, CustomFieldsStore::META_POST, $post->ID, $definitions);
+        $custom      = CustomFieldsStore::read(CustomFieldsStore::META_POST, $post->ID, $definitions);
+
+        $data['kizlo']['custom'] = (object) $custom;
 
         $response->set_data($data);
 

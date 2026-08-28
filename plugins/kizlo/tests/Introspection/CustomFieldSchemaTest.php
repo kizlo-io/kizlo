@@ -17,7 +17,7 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
      * Configure `post` with these definitions and return the generated schemas.
      *
      * @param array<int, array<string, mixed>> $raw
-     * @return array{item: array<string, mixed>, create: array<string, mixed>, update: array<string, mixed>}
+     * @return array{item: array<string, mixed>, create: array<string, mixed>, update: array<string, mixed>, itemRoot: array<string, mixed>, createGroup: array<string, mixed>, updateGroup: array<string, mixed>}
      */
     private function generate(array $raw): array
     {
@@ -25,14 +25,25 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         $schemas = $this->document()['schemas'];
 
+        $item_root   = $schemas['post-types.post.item']['properties'];
+        $create_root = $schemas['post-types.post.create-input']['properties'];
+        $update_root = $schemas['post-types.post.update-input']['properties'];
+
+        $item_group   = $item_root['kizlo']['properties']['custom'];
+        $create_group = $create_root['custom'];
+        $update_group = $update_root['custom'];
+
         return [
-            'item'   => $schemas['post-types.post.item']['properties'],
-            'create' => $schemas['post-types.post.create-input']['properties'],
-            'update' => $schemas['post-types.post.update-input']['properties'],
+            'item'        => $item_group['properties'],
+            'create'      => $create_group['properties'],
+            'update'      => $update_group['properties'],
+            'itemRoot'    => $item_root,
+            'createGroup' => $create_group,
+            'updateGroup' => $update_group,
         ];
     }
 
-    public function test_custom_fields_are_merged_into_the_response_root(): void
+    public function test_custom_fields_are_grouped_inside_the_kizlo_response_envelope(): void
     {
         $schemas = $this->generate([['type' => 'text', 'name' => 'company_name', 'label' => 'Company']]);
 
@@ -40,13 +51,16 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
         $this->assertSame('string', $schemas['item']['company_name']['type']);
         $this->assertTrue($schemas['item']['company_name']['required'], 'Every definition is read back, so every one is present.');
         $this->assertSame('Company', $schemas['item']['company_name']['title']);
+        $this->assertTrue($schemas['itemRoot']['kizlo']['properties']['custom']['required']);
+        $this->assertArrayNotHasKey('company_name', $schemas['itemRoot']);
     }
 
-    public function test_a_custom_field_never_overwrites_a_wordpress_field(): void
+    public function test_a_custom_field_may_share_a_name_with_a_wordpress_field(): void
     {
         $schemas = $this->generate([['type' => 'text', 'name' => 'slug']]);
 
-        $this->assertArrayNotHasKey('title', $schemas['item']['slug'], 'The WordPress "slug" field wins, matching CustomFieldsStore::inject().');
+        $this->assertArrayHasKey('description', $schemas['itemRoot']['slug']);
+        $this->assertSame('string', $schemas['item']['slug']['type']);
     }
 
     public function test_text_types_map_to_strings(): void
@@ -248,6 +262,8 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         $this->assertTrue($schemas['create']['company_name']['required']);
         $this->assertArrayNotHasKey('required', $schemas['update']['company_name']);
+        $this->assertTrue($schemas['createGroup']['required'], 'The create group must be present when it contains a required field.');
+        $this->assertArrayNotHasKey('required', $schemas['updateGroup']);
     }
 
     public function test_a_nested_required_field_stays_required_on_a_partial_update(): void
@@ -286,7 +302,19 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         $schemas = $this->document()['schemas'];
 
-        $this->assertSame('integer', $schemas['taxonomies.category.create-input']['properties']['banner']['type']);
-        $this->assertSame('kizlo.media-image', $schemas['taxonomies.category.item']['properties']['banner']['$ref']);
+        $this->assertSame('integer', $schemas['taxonomies.category.create-input']['properties']['custom']['properties']['banner']['type']);
+        $this->assertSame(
+            'kizlo.media-image',
+            $schemas['taxonomies.category.item']['properties']['kizlo']['properties']['custom']['properties']['banner']['$ref'],
+        );
+    }
+
+    public function test_no_definitions_still_publish_a_required_empty_response_group(): void
+    {
+        $schemas = $this->generate([]);
+
+        $this->assertEquals((object) [], $schemas['item']);
+        $this->assertTrue($schemas['itemRoot']['kizlo']['properties']['custom']['required']);
+        $this->assertArrayNotHasKey('required', $schemas['createGroup']);
     }
 }

@@ -1,7 +1,8 @@
 import { arrayable, BooleanLike, lenient, MediaImage, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
-import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
+import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
+import type { WPK_Post } from "./types"
 
 const WP_POST_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
 const WP_POST_FORMATS = ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"] as const
@@ -59,6 +60,7 @@ export const Post = z.object({
 	categories: z.array(PostCategoryRef),
 	tags: z.array(PostTagRef),
 	seo: Seo.nullable(),
+	custom: customFieldsSchema<WPK_Post["kizlo"]["custom"]>(),
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	meta: Metadata,

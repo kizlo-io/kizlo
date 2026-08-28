@@ -81,6 +81,7 @@ test("pages.get by slug returns the matching page", async () => {
 	const parsed = Page.safeParse(result)
 	expect(parsed.success).toBe(true)
 	expect(result.slug).toBe(PUBLISHED_SLUG)
+	expect(result.custom).toEqual({ featured: true })
 })
 
 test("pages.get by id returns the page with matching id", async () => {

@@ -11,8 +11,9 @@
  * `function.notFound` / `class.notFound` / `constant.notFound`.
  *
  * Signatures must mirror the kizlo core plugin (src/php/Support/functions.php,
- * Modules/Admin/Components.php, Modules/Webhook/Webhook.php). Stub only — never
- * loaded at runtime, never shipped (phpstan config is .distignore'd).
+ * Modules/Admin/Components.php, Modules/Webhook/Webhook.php, and the settings,
+ * introspection, and custom-field classes used by integrations). Stub only,
+ * never loaded at runtime or shipped (phpstan config is .distignore'd).
  */
 
 namespace {
@@ -87,6 +88,40 @@ namespace {
     function kizlo_include_post_type(string $post_type): void {}
 
     function kizlo_include_taxonomy(string $taxonomy): void {}
+}
+
+namespace Kizlo\Modules\Settings\PostType {
+    class PostTypeSettings
+    {
+        public static function load(string $post_type): PostTypeSettings {}
+
+        /** @return array<int, array<string, mixed>> */
+        public function getCustomFields(): array {}
+    }
+}
+
+namespace Kizlo\Modules\CustomFields {
+    class CustomFieldsStore
+    {
+        public const META_POST = 'post';
+
+        /**
+         * @param array<int, array<string, mixed>> $definitions
+         * @return array<string, mixed>
+         */
+        public static function read(string $meta_type, int $object_id, array $definitions): array {}
+    }
+}
+
+namespace Kizlo\Modules\Introspection {
+    class CustomFieldSchema
+    {
+        /**
+         * @param array<int, array<string, mixed>> $definitions
+         * @return array<string, mixed>
+         */
+        public static function responseGroup(array $definitions): array {}
+    }
 }
 
 namespace Kizlo\Modules\Admin {
