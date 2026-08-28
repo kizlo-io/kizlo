@@ -1,5 +1,18 @@
 # kizlo
 
+## 0.17.0
+
+### Minor Changes
+
+- [#178](https://github.com/kizlo-io/kizlo/pull/178) [`8c11454`](https://github.com/kizlo-io/kizlo/commit/8c1145414a4f67cd8112273c4cffdf6e95e2ea45) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Group custom-field reads and writes under `custom`, and derive exact public model types from the generated WordPress contract.
+
+- [#177](https://github.com/kizlo-io/kizlo/pull/177) [`823bbf1`](https://github.com/kizlo-io/kizlo/commit/823bbf1cc972c071dac82dbe2f3a7f9cea50bca6) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Adopt discriminated media members across WordPress and WooCommerce responses
+
+### Patch Changes
+
+- Updated dependencies [[`42f7fe3`](https://github.com/kizlo-io/kizlo/commit/42f7fe34ff2225942b5291c11c8c2732afeca0dc), [`8c11454`](https://github.com/kizlo-io/kizlo/commit/8c1145414a4f67cd8112273c4cffdf6e95e2ea45), [`823bbf1`](https://github.com/kizlo-io/kizlo/commit/823bbf1cc972c071dac82dbe2f3a7f9cea50bca6)]:
+  - @kizlo/shared@0.9.0
+
 ## 0.16.0
 
 ### Minor Changes
