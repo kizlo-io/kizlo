@@ -406,29 +406,42 @@ function kizlo_apply_extend_filter(string $name, $arg = []): array
 }
 
 /**
- * Resolve a WordPress media attachment ID to the shared Media shape.
+ * Resolve a WordPress media attachment ID to the shared discriminated Media shape.
  * Used when returning media data in API responses.
  *
  * @param  int $id Attachment ID.
- * @return array{id: int, name: string, alt: string, src: string, mime: string, width?: int, height?: int, variants?: array<int, array{src: string, width: int, height: int}>, srcset?: string}
+ * @return array<string, mixed>
  */
 function kizlo_ensure_media_data(int $id): array
 {
+    $mime       = get_post_mime_type($id) ?: '';
+    $media_type = str_starts_with($mime, 'image/')
+        ? 'image'
+        : (str_starts_with($mime, 'video/')
+            ? 'video'
+            : (str_starts_with($mime, 'audio/') ? 'audio' : 'file'));
+
     $data = [
+        'type' => $media_type,
         'id'   => $id,
         'name' => get_the_title($id),
-        'alt'  => get_post_meta($id, '_wp_attachment_image_alt', true) ?: '',
-        'src'  => wp_get_attachment_url($id),
-        'mime' => get_post_mime_type($id) ?: '',
+        'src'  => (string) wp_get_attachment_url($id),
     ];
 
+    if ($mime !== '') $data['mime'] = $mime;
+
     $metadata = wp_get_attachment_metadata($id);
-    if (!empty($metadata['width']) && !empty($metadata['height'])) {
+
+    if ($media_type === 'image') {
+        $data['alt'] = get_post_meta($id, '_wp_attachment_image_alt', true) ?: '';
+    }
+
+    if (($media_type === 'image' || $media_type === 'video') && !empty($metadata['width']) && !empty($metadata['height'])) {
         $data['width']  = (int) $metadata['width'];
         $data['height'] = (int) $metadata['height'];
     }
 
-    if (!empty($metadata['sizes'])) {
+    if ($media_type === 'image' && !empty($metadata['sizes'])) {
         $variants = [];
         foreach (array_keys($metadata['sizes']) as $size) {
             $rendition = wp_get_attachment_image_src($id, $size);
@@ -443,10 +456,32 @@ function kizlo_ensure_media_data(int $id): array
         if ($variants) $data['variants'] = $variants;
     }
 
-    $srcset = wp_get_attachment_image_srcset($id, 'full', $metadata ?: null);
-    if ($srcset) $data['srcset'] = $srcset;
+    if ($media_type === 'image') {
+        $srcset = wp_get_attachment_image_srcset($id, 'full', $metadata ?: null);
+        if ($srcset) $data['srcset'] = $srcset;
+    }
+
+    if (($media_type === 'video' || $media_type === 'audio') && isset($metadata['length'])) {
+        $data['duration'] = (int) $metadata['length'];
+    }
 
     return $data;
+}
+
+/**
+ * Resolve an attachment only when it is an image union member.
+ *
+ * Image-specific response fields use this boundary so a stale or directly
+ * edited option cannot make their published contract invalid.
+ *
+ * @param int $id Attachment ID.
+ * @return array<string, mixed>|null
+ */
+function kizlo_ensure_media_image_data(int $id): ?array
+{
+    $media = kizlo_ensure_media_data($id);
+
+    return $media['type'] === 'image' ? $media : null;
 }
 
 /**

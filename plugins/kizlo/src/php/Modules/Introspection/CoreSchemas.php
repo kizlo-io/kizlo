@@ -34,9 +34,14 @@ use WP_REST_Posts_Controller;
  */
 class CoreSchemas
 {
-    public const ERROR  = 'kizlo.error';
-    public const MEDIA  = 'kizlo.media';
-    public const SEO    = 'kizlo.seo';
+    public const ERROR               = 'kizlo.error';
+    public const MEDIA               = 'kizlo.media';
+    public const MEDIA_IMAGE         = 'kizlo.media-image';
+    public const MEDIA_IMAGE_VARIANT = 'kizlo.media-image-variant';
+    public const MEDIA_VIDEO         = 'kizlo.media-video';
+    public const MEDIA_AUDIO         = 'kizlo.media-audio';
+    public const MEDIA_FILE          = 'kizlo.media-file';
+    public const SEO                 = 'kizlo.seo';
 
     /** A status a post can be read back as. */
     public const POST_STATUS = 'kizlo.post-status';
@@ -72,6 +77,11 @@ class CoreSchemas
         return self::$all = [
             self::ERROR                => self::error(),
             self::MEDIA                => self::media(),
+            self::MEDIA_IMAGE          => self::mediaImage(),
+            self::MEDIA_IMAGE_VARIANT  => self::mediaImageVariant(),
+            self::MEDIA_VIDEO          => self::mediaVideo(),
+            self::MEDIA_AUDIO          => self::mediaAudio(),
+            self::MEDIA_FILE           => self::mediaFile(),
             self::SEO                  => self::seo(),
             self::POST_STATUS          => self::postStatus($status['filter']),
             self::POST_STATUS_WRITABLE => self::postStatusWritable($status['writable']),
@@ -210,30 +220,106 @@ class CoreSchemas
     private static function media(): array
     {
         return [
+            'description' => 'A resolved image, video, audio, or generic file attachment.',
+            'oneOf'       => [
+                ['$ref' => self::MEDIA_IMAGE],
+                ['$ref' => self::MEDIA_VIDEO],
+                ['$ref' => self::MEDIA_AUDIO],
+                ['$ref' => self::MEDIA_FILE],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function mediaImage(): array
+    {
+        return [
             'type'        => 'object',
-            'description' => 'A resolved attachment, as returned wherever Kizlo expands a media reference.',
-            'properties'  => [
-                'id'       => ['type' => 'integer', 'required' => true],
-                'name'     => ['type' => 'string', 'required' => true],
+            'description' => 'An image attachment with image-specific presentation metadata.',
+            'properties'  => self::mediaProperties('image') + [
                 'alt'      => ['type' => 'string', 'required' => true],
-                'src'      => ['type' => 'string', 'required' => true, 'format' => 'uri'],
-                'mime'     => ['type' => 'string', 'required' => true],
-                'width'    => ['type' => 'integer', 'description' => 'Absent for attachments without image metadata.'],
-                'height'   => ['type' => 'integer', 'description' => 'Absent for attachments without image metadata.'],
+                'width'    => ['type' => 'integer'],
+                'height'   => ['type' => 'integer'],
                 'variants' => [
                     'type'        => 'array',
-                    'description' => 'One entry per registered image size.',
-                    'items'       => [
-                        'type'       => 'object',
-                        'properties' => [
-                            'src'    => ['type' => 'string', 'required' => true, 'format' => 'uri'],
-                            'width'  => ['type' => 'integer', 'required' => true],
-                            'height' => ['type' => 'integer', 'required' => true],
-                        ],
-                    ],
+                    'description' => 'One entry per registered WordPress image size.',
+                    'items'       => ['$ref' => self::MEDIA_IMAGE_VARIANT],
                 ],
                 'srcset'   => ['type' => 'string'],
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function mediaImageVariant(): array
+    {
+        return [
+            'type'       => 'object',
+            'properties' => [
+                'src'    => ['type' => 'string', 'required' => true, 'format' => 'uri'],
+                'width'  => ['type' => 'integer', 'required' => true],
+                'height' => ['type' => 'integer', 'required' => true],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function mediaVideo(): array
+    {
+        return [
+            'type'        => 'object',
+            'description' => 'A video attachment with metadata WordPress extracted from the file.',
+            'properties'  => self::mediaProperties('video') + [
+                'width'    => ['type' => 'integer'],
+                'height'   => ['type' => 'integer'],
+                'duration' => ['type' => 'integer', 'description' => 'Playback duration in seconds.'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function mediaAudio(): array
+    {
+        return [
+            'type'        => 'object',
+            'description' => 'An audio attachment with metadata WordPress extracted from the file.',
+            'properties'  => self::mediaProperties('audio') + [
+                'duration' => ['type' => 'integer', 'description' => 'Playback duration in seconds.'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function mediaFile(): array
+    {
+        return [
+            'type'        => 'object',
+            'description' => 'An attachment that is not an image, video, or audio resource.',
+            'properties'  => self::mediaProperties('file'),
+        ];
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private static function mediaProperties(string $type): array
+    {
+        return [
+            'type' => ['type' => 'string', 'required' => true, 'enum' => [$type]],
+            'id'   => ['type' => 'integer', 'required' => true],
+            'name' => ['type' => 'string', 'required' => true],
+            'src'  => ['type' => 'string', 'required' => true, 'format' => 'uri'],
+            'mime' => ['type' => 'string'],
         ];
     }
 

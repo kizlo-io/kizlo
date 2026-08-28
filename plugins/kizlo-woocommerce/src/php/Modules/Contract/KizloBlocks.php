@@ -176,7 +176,7 @@ final class KizloBlocks
                     'items'       => [
                         'type'       => 'object',
                         'properties' => self::term() + [
-                            'thumbnail' => ['type' => 'string', 'required' => true, 'nullable' => true, 'description' => 'Full-size URL of the term\'s `thumbnail_id` image, which only `product_cat` sets.'],
+                            'image' => ['$ref' => 'kizlo.media-image', 'required' => true, 'nullable' => true, 'description' => 'The term\'s resolved `thumbnail_id` image, which only `product_cat` sets.'],
                         ],
                     ],
                 ],

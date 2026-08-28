@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Return discriminated image, video, audio, and file media shapes from public APIs

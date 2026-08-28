@@ -29,14 +29,7 @@ export function deserializePage(data: WPK_Page | WPK_PageListItem, options?: { p
 					id: kizlo.author.id,
 					name: kizlo.author.name,
 					slug: kizlo.author.slug,
-					avatar: kizlo.author.avatar_url
-						? {
-								id: 0,
-								alt: kizlo.author.name,
-								name: kizlo.author.name,
-								src: kizlo.author.avatar_url,
-							}
-						: null,
+					avatarUrl: kizlo.author.avatar_url || null,
 				}
 			: null,
 		// List responses carry no resolved SEO block; only a single fetch does.

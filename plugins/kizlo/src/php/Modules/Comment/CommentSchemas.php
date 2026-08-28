@@ -105,15 +105,10 @@ final class CommentSchemas
                         'slug'           => ['type' => 'string', 'required' => true],
                         'title'          => ['type' => 'string', 'required' => true],
                         'featured_image' => [
-                            'type'        => 'object',
+                            '$ref'        => CoreSchemas::MEDIA_IMAGE,
                             'required'    => true,
                             'nullable'    => true,
                             'description' => 'Null when the post has no featured image.',
-                            'properties'  => [
-                                'id'  => ['type' => 'integer', 'required' => true],
-                                'url' => ['type' => 'string', 'required' => true, 'nullable' => true, 'format' => 'uri'],
-                                'alt' => ['type' => 'string', 'required' => true],
-                            ],
                         ],
                     ],
                 ],

@@ -1,4 +1,4 @@
-import { arrayable, lenient, Media, Metadata, NumberLike } from "@kizlo/shared"
+import { arrayable, lenient, MediaImage, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
@@ -29,7 +29,7 @@ export const PageAuthorRef = z.object({
 	id: z.number(),
 	name: z.string(),
 	slug: z.string(),
-	avatar: Media.nullable(),
+	avatarUrl: z.string().nullable(),
 })
 export type PageAuthorRef = z.infer<typeof PageAuthorRef>
 
@@ -48,7 +48,7 @@ export const Page = z.object({
 	preview: z.boolean(),
 	status: PageStatus,
 	author: PageAuthorRef.nullable(),
-	featuredMedia: Media.nullable(),
+	featuredMedia: MediaImage.nullable(),
 	seo: Seo.nullable(),
 	createdAt: z.number(),
 	updatedAt: z.number(),

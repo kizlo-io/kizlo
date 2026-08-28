@@ -3,6 +3,7 @@
 	"icon": "Cube",
 	"pages": [
 		"procedure-context",
+		"media",
 		"wp-endpoint-data",
 		"wp-endpoint-input",
 		"wp-endpoint-result",

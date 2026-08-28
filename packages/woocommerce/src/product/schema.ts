@@ -1,4 +1,4 @@
-import { arrayable, BooleanLike, Media, Metadata, NumberLike } from "@kizlo/shared"
+import { arrayable, BooleanLike, MediaImage, Metadata, NumberLike } from "@kizlo/shared"
 import { CurrencyFormat, IdentifierInput, ListMetadata, Seo } from "kizlo"
 import { z } from "zod/v4"
 
@@ -82,7 +82,7 @@ export const Product = z.object({
 	prices: ProductPrices,
 	averageRating: z.string(),
 	reviewCount: z.number(),
-	images: z.array(Media),
+	images: z.array(MediaImage),
 	categories: z.array(ProductCategoryRef),
 	tags: z.array(ProductTagRef),
 	brands: z.array(ProductBrandRef),
@@ -219,7 +219,7 @@ export const ProductFiltersTerm = z.object({
 export type ProductFiltersTerm = z.infer<typeof ProductFiltersTerm>
 
 export const ProductFiltersTaxonomyTerm = ProductFiltersTerm.extend({
-	image: Media.nullable(),
+	image: MediaImage.nullable(),
 })
 export type ProductFiltersTaxonomyTerm = z.infer<typeof ProductFiltersTaxonomyTerm>
 

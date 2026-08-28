@@ -1,4 +1,4 @@
-import { type Media, normalizeArrayableValue, timestampFromIso, timestampFromWpGmt, toPublicMetadata } from "@kizlo/shared"
+import { type MediaImage, normalizeArrayableValue, timestampFromIso, timestampFromWpGmt, toPublicMetadata } from "@kizlo/shared"
 import { deserializeCurrencyFormat, type WP_EndpointInput } from "kizlo"
 import {
 	type ListProductInputOut,
@@ -132,14 +132,7 @@ export function deserializeProductFilters(data: WCSK_ProductCollectionData): Pro
 			parentId: item.parent,
 			slug: item.slug,
 			taxonomy: item.taxonomy,
-			image: item.thumbnail
-				? {
-						id: 0,
-						alt: item.name,
-						name: item.name,
-						src: item.thumbnail,
-					}
-				: null,
+			image: item.image,
 		})),
 		attributeTerms: data.kizlo.attribute_counts.map((item) => ({
 			id: item.id,
@@ -214,8 +207,8 @@ function stockStatus(status: string): ProductStockStatus | null {
 	return (PRODUCT_STOCK_STATUSES as readonly string[]).includes(status) ? (status as ProductStockStatus) : null
 }
 
-function deserializeImages(images: { id: number; src: string; name: string; alt: string }[]): Media[] {
-	return images.map((item) => ({ id: item.id, src: item.src, name: item.name, alt: item.alt }))
+function deserializeImages(images: { id: number; src: string; name: string; alt: string }[]): MediaImage[] {
+	return images.map((item) => ({ type: "image", id: item.id, src: item.src, name: item.name, alt: item.alt }))
 }
 
 function deserializeTermRefs(terms: { id: number; name: string; slug: string }[]): ProductCategoryRef[] {

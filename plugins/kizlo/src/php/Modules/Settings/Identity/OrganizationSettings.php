@@ -268,6 +268,7 @@ class OrganizationSettings extends SettingsAbstract
             'founding_date'   => $this->assertValidDate($value),
             'employees_min',
             'employees_max'   => $this->assertPositiveInt($value),
+            'logo'            => $this->assertValidImageId($key, $value),
             'social_profiles' => $this->assertValidSocialProfiles($value),
             'founder'         => $this->assertValidFounder($value),
             'publishing_principles',

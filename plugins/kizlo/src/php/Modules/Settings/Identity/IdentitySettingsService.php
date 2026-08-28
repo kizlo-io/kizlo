@@ -163,11 +163,11 @@ class IdentitySettingsService
         $organization = $settings->organization->getData();
 
         if (!empty($person['image'])) {
-            $person['image'] = kizlo_ensure_media_data($person['image']);
+            $person['image'] = kizlo_ensure_media_image_data($person['image']);
         }
 
         if (!empty($organization['logo'])) {
-            $organization['logo'] = kizlo_ensure_media_data($organization['logo']);
+            $organization['logo'] = kizlo_ensure_media_image_data($organization['logo']);
         }
 
         return [

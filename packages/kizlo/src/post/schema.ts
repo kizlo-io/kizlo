@@ -1,4 +1,4 @@
-import { arrayable, BooleanLike, lenient, Media, Metadata, NumberLike } from "@kizlo/shared"
+import { arrayable, BooleanLike, lenient, MediaImage, Metadata, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
@@ -22,7 +22,7 @@ export const PostAuthorRef = z.object({
 	id: z.number(),
 	name: z.string(),
 	slug: z.string(),
-	avatar: Media.nullable(),
+	avatarUrl: z.string().nullable(),
 })
 export type PostAuthorRef = z.infer<typeof PostAuthorRef>
 
@@ -55,7 +55,7 @@ export const Post = z.object({
 	format: PostTypeFormat,
 	sticky: z.boolean(),
 	author: PostAuthorRef.nullable(),
-	featuredMedia: Media.nullable(),
+	featuredMedia: MediaImage.nullable(),
 	categories: z.array(PostCategoryRef),
 	tags: z.array(PostTagRef),
 	seo: Seo.nullable(),

@@ -114,4 +114,30 @@ class CustomFieldsWriteTest extends SeoTestCase
         $this->assertSame('New', get_post_meta($post->ID, 'kcf_subtitle', true), 'The submitted field is updated.');
         $this->assertSame('5', get_post_meta($post->ID, 'kcf_rank', true), 'The omitted field keeps its stored value.');
     }
+
+    public function test_image_fields_reject_non_image_attachments(): void
+    {
+        $this->seed([['type' => 'image', 'name' => 'cover']]);
+        $attachment = self::factory()->post->create([
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'video/mp4',
+            'post_status'    => 'inherit',
+        ]);
+
+        $result = $this->validate($this->request('POST', ['cover' => $attachment]));
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+    }
+
+    public function test_file_fields_accept_any_attachment_media_type(): void
+    {
+        $this->seed([['type' => 'file', 'name' => 'download']]);
+        $attachment = self::factory()->post->create([
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'application/pdf',
+            'post_status'    => 'inherit',
+        ]);
+
+        $this->assertNull($this->validate($this->request('POST', ['download' => $attachment])));
+    }
 }

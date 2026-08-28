@@ -78,6 +78,7 @@ class PersonSettings extends SettingsAbstract
     protected function validate(string $key, mixed $value): void
     {
         match ($key) {
+            'image'           => $this->assertValidImageId($key, $value),
             'social_profiles' => $this->assertValidSocialProfiles($value),
             default           => null,
         };

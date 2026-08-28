@@ -71,7 +71,18 @@ describe("buildWebManifest", () => {
 	test("resolves manifest icons from the brand", () => {
 		const manifest = buildWebManifest(
 			settings({
-				brand: { logo_icon: { id: 1, name: "", alt: "", src: "https://cdn.test/icon.png", mime: "image/png", width: 512, height: 512 } },
+				brand: {
+					logo_icon: {
+						type: "image",
+						id: 1,
+						name: "",
+						alt: "",
+						src: "https://cdn.test/icon.png",
+						mime: "image/png",
+						width: 512,
+						height: 512,
+					},
+				},
 			}),
 		)
 		expect(manifest.icons).toEqual([{ src: "https://cdn.test/icon.png", type: "image/png", sizes: "512x512" }])

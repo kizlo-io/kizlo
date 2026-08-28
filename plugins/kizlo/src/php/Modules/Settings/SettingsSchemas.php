@@ -20,7 +20,7 @@ use Kizlo\Modules\Settings\Site\SiteSettings;
  * `SettingsAbstract` subclass's `$data` and the `toResponse()` on its service,
  * not from the WordPress option or the admin form. Where a service expands a
  * stored attachment ID through `kizlo_ensure_media_data()`, the response
- * property is `kizlo.media` and the matching input property is the integer ID
+ * property is `kizlo.media-image` and the matching input property is the integer ID
  * that was stored.
  *
  * The `nav` key {@see SettingsModule} attaches for the plugin admin is
@@ -177,7 +177,7 @@ final class SettingsSchemas
                 'alternate_name'            => ['type' => 'string', 'required' => true, 'nullable' => true],
                 'tagline'                   => ['type' => 'string', 'required' => true, 'nullable' => true],
                 'title_separator'           => ['type' => 'string', 'required' => true, 'enum' => SiteSettings::TITLE_SEPARATORS],
-                'fallback_image'            => ['$ref' => CoreSchemas::MEDIA, 'required' => true, 'nullable' => true],
+                'fallback_image'            => ['$ref' => CoreSchemas::MEDIA_IMAGE, 'required' => true, 'nullable' => true],
                 'search_action_structure'   => ['type' => 'string', 'required' => true, 'nullable' => true, 'description' => 'Search URL template published in the site JSON-LD.'],
                 'discourage_search_engines' => ['type' => 'boolean', 'required' => true],
             ],
@@ -192,7 +192,7 @@ final class SettingsSchemas
         $properties = [];
 
         foreach (['logo', 'logo_dark', 'logo_icon', 'logo_icon_dark', 'logo_wordmark', 'logo_wordmark_dark', 'favicon', 'app_icon'] as $key) {
-            $properties[$key] = ['$ref' => CoreSchemas::MEDIA, 'required' => true, 'nullable' => true];
+            $properties[$key] = ['$ref' => CoreSchemas::MEDIA_IMAGE, 'required' => true, 'nullable' => true];
         }
 
         foreach (['theme_color', 'theme_color_dark', 'background_color'] as $key) {
@@ -231,7 +231,7 @@ final class SettingsSchemas
             'type'       => 'object',
             'properties' => [
                 'user_id'         => ['type' => 'integer', 'required' => true, 'nullable' => true, 'description' => 'WordPress user the person node derives its name and description from.'],
-                'image'           => ['$ref' => CoreSchemas::MEDIA, 'required' => true, 'nullable' => true],
+                'image'           => ['$ref' => CoreSchemas::MEDIA_IMAGE, 'required' => true, 'nullable' => true],
                 'social_profiles' => ['type' => 'array', 'required' => true, 'items' => ['$ref' => self::SOCIAL_PROFILE]],
             ],
         ];
@@ -275,7 +275,7 @@ final class SettingsSchemas
         $properties['founder']         = ['$ref' => self::FOUNDER, 'required' => true, 'nullable' => true];
         $properties['employees_min']   = ['type' => 'integer', 'required' => true, 'nullable' => true];
         $properties['employees_max']   = ['type' => 'integer', 'required' => true, 'nullable' => true];
-        $properties['logo']            = ['$ref' => CoreSchemas::MEDIA, 'required' => true, 'nullable' => true];
+        $properties['logo']            = ['$ref' => CoreSchemas::MEDIA_IMAGE, 'required' => true, 'nullable' => true];
         $properties['social_profiles'] = ['type' => 'array', 'required' => true, 'items' => ['$ref' => self::SOCIAL_PROFILE]];
 
         return [

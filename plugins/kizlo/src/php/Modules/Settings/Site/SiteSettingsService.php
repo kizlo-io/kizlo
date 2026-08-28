@@ -65,7 +65,7 @@ class SiteSettingsService
         $data = $settings->getData();
 
         if (!empty($data['fallback_image'])) {
-            $data['fallback_image'] = kizlo_ensure_media_data($data['fallback_image']);
+            $data['fallback_image'] = kizlo_ensure_media_image_data($data['fallback_image']);
         }
 
         return $data;

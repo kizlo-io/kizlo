@@ -6,6 +6,7 @@ use Automattic\WooCommerce\StoreApi\Routes\V1\AbstractRoute;
 use Automattic\WooCommerce\StoreApi\RoutesController;
 use Automattic\WooCommerce\StoreApi\StoreApi;
 use Kizlo\WooCommerce\Modules\Contract\StoreApiRoutes;
+use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
 use Kizlo\WooCommerce\Tests\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
@@ -61,6 +62,15 @@ class StoreApiRoutesTest extends TestCase
                 );
             }
         }
+    }
+
+    public function test_collection_taxonomy_images_use_the_shared_image_schema(): void
+    {
+        $image = KizloBlocks::collectionData()['properties']['taxonomy_counts']['items']['properties']['image'];
+
+        $this->assertSame('kizlo.media-image', $image['$ref']);
+        $this->assertTrue($image['nullable']);
+        $this->assertArrayNotHasKey('thumbnail', KizloBlocks::collectionData()['properties']['taxonomy_counts']['items']['properties']);
     }
 
     private function routes(): RoutesController

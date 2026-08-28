@@ -15,14 +15,7 @@ export function deserializeComment(data: WPK_Comment): Comment | null {
 		author: data.kizlo.author
 			? {
 					id: data.kizlo.author.id,
-					avatar: data.kizlo.author.avatar_url
-						? {
-								id: 0,
-								alt: "",
-								name: "",
-								src: data.kizlo.author.avatar_url,
-							}
-						: null,
+					avatarUrl: data.kizlo.author.avatar_url || null,
 					name: data.kizlo.author.name,
 				}
 			: null,
@@ -31,14 +24,7 @@ export function deserializeComment(data: WPK_Comment): Comment | null {
 		parentId: data.parent,
 		post: {
 			id: post.id,
-			image: post.featured_image?.url
-				? {
-						id: post.featured_image.id,
-						alt: post.featured_image.alt,
-						src: post.featured_image.url,
-						name: "",
-					}
-				: null,
+			image: post.featured_image ?? null,
 			title: post.title,
 			slug: post.slug,
 		},

@@ -1,4 +1,4 @@
-import { arrayable, Media, NumberLike } from "@kizlo/shared"
+import { arrayable, MediaImage, NumberLike } from "@kizlo/shared"
 import z from "zod/v4"
 import { ListMetadata, ListOrder } from "../shared/schema"
 
@@ -9,7 +9,7 @@ import { ListMetadata, ListOrder } from "../shared/schema"
 export const CommentAuthorRef = z.object({
 	id: z.number(),
 	name: z.string(),
-	avatar: Media.nullable(),
+	avatarUrl: z.string().nullable(),
 })
 export type CommentAuthorRef = z.infer<typeof CommentAuthorRef>
 
@@ -17,7 +17,7 @@ export const CommentPostRef = z.object({
 	id: z.number(),
 	slug: z.string(),
 	title: z.string(),
-	image: Media.nullable(),
+	image: MediaImage.nullable(),
 })
 export type CommentPostRef = z.infer<typeof CommentPostRef>
 

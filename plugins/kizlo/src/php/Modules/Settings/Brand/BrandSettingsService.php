@@ -89,7 +89,7 @@ class BrandSettingsService
 
         foreach (self::MEDIA_KEYS as $key) {
             if (!empty($data[$key])) {
-                $data[$key] = kizlo_ensure_media_data($data[$key]);
+                $data[$key] = kizlo_ensure_media_image_data($data[$key]);
             }
         }
 

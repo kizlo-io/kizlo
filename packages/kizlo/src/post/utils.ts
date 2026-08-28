@@ -31,14 +31,7 @@ export function deserializePost(data: WPK_Post | WPK_PostListItem, options?: { p
 					id: kizlo.author.id,
 					name: kizlo.author.name,
 					slug: kizlo.author.slug,
-					avatar: kizlo.author.avatar_url
-						? {
-								id: 0,
-								alt: kizlo.author.name,
-								name: kizlo.author.name,
-								src: kizlo.author.avatar_url,
-							}
-						: null,
+					avatarUrl: kizlo.author.avatar_url || null,
 				}
 			: null,
 		format: data.format,
