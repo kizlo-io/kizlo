@@ -49,14 +49,16 @@ final class KizloBlocks
                 'readonly'    => true,
             ],
             'on_sale_from' => [
-                'description' => 'When the sale price starts applying, in the site timezone.',
+                'description' => 'When the sale price starts applying, as RFC 3339 UTC.',
                 'type'        => ['string', 'null'],
+                'format'      => 'date-time',
                 'context'     => ['view', 'edit'],
                 'readonly'    => true,
             ],
             'on_sale_to' => [
-                'description' => 'When the sale price stops applying, in the site timezone.',
+                'description' => 'When the sale price stops applying, as RFC 3339 UTC.',
                 'type'        => ['string', 'null'],
+                'format'      => 'date-time',
                 'context'     => ['view', 'edit'],
                 'readonly'    => true,
             ],

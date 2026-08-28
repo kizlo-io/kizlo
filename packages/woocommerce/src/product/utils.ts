@@ -1,4 +1,4 @@
-import { type Media, normalizeArrayableValue, toPublicMetadata } from "@kizlo/shared"
+import { type Media, normalizeArrayableValue, timestampFromIso, timestampFromWpGmt, toPublicMetadata } from "@kizlo/shared"
 import { deserializeCurrencyFormat, type WP_EndpointInput } from "kizlo"
 import {
 	type ListProductInputOut,
@@ -31,9 +31,9 @@ export function deserializeProduct(data: WCK_Product): Product {
 			regularPrice: data.kizlo.prices.regular_price,
 		},
 		isSoldIndividually: data.sold_individually,
-		onSaleFrom: data.date_on_sale_from ? toTimestamp(data.date_on_sale_from) : null,
+		onSaleFrom: timestampFromWpGmt(data.date_on_sale_from_gmt),
 		lowStockRemaining: data.low_stock_amount,
-		onSaleTo: data.date_on_sale_to ? toTimestamp(data.date_on_sale_to) : null,
+		onSaleTo: timestampFromWpGmt(data.date_on_sale_to_gmt),
 		isInStock: data.stock_status === "instock",
 		stock: data.stock_quantity,
 		images: deserializeImages(data.images),
@@ -106,8 +106,8 @@ export function deserializeStoreProduct(data: WCSK_Product): Product {
 		parentId: data.parent,
 		variations: data.variations,
 		stock: kizlo.stock,
-		onSaleFrom: kizlo.on_sale_from ? toTimestamp(kizlo.on_sale_from) : null,
-		onSaleTo: kizlo.on_sale_to ? toTimestamp(kizlo.on_sale_to) : null,
+		onSaleFrom: timestampFromIso(kizlo.on_sale_from),
+		onSaleTo: timestampFromIso(kizlo.on_sale_to),
 		seo: null,
 		meta: {},
 	}
@@ -220,8 +220,4 @@ function deserializeImages(images: { id: number; src: string; name: string; alt:
 
 function deserializeTermRefs(terms: { id: number; name: string; slug: string }[]): ProductCategoryRef[] {
 	return terms.map((term) => ({ id: term.id, name: term.name, slug: term.slug }))
-}
-
-function toTimestamp(date: string) {
-	return new Date(date).getTime()
 }

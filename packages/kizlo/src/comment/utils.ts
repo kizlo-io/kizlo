@@ -1,4 +1,4 @@
-import { resolveWpTimestamp } from "@kizlo/shared"
+import { timestampFromWpGmt } from "@kizlo/shared"
 import type { Comment } from "./schema"
 import type { WPK_Comment } from "./types"
 
@@ -42,7 +42,7 @@ export function deserializeComment(data: WPK_Comment): Comment | null {
 			title: post.title,
 			slug: post.slug,
 		},
-		postedAt: resolveWpTimestamp(data.date_gmt) ?? 0,
+		postedAt: timestampFromWpGmt(data.date_gmt) ?? 0,
 		replyCount: data.kizlo.reply_count,
 	}
 }

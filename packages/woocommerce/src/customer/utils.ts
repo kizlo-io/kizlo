@@ -1,4 +1,4 @@
-import { toPublicMetadata } from "@kizlo/shared"
+import { timestampFromWpGmt, toPublicMetadata } from "@kizlo/shared"
 import type { Customer } from "./schema"
 import type { WCK_Customer } from "./types"
 
@@ -36,7 +36,7 @@ export function deserializeCustomer(data: WCK_Customer): Customer {
 		lastName: data.last_name,
 		isPayingCustomer: data.is_paying_customer,
 		meta: toPublicMetadata(data.meta_data),
-		registeredAt: new Date(data.date_created).getTime(),
+		registeredAt: timestampFromWpGmt(data.date_created_gmt) ?? 0,
 		role: data.role,
 		username: data.username,
 	}
