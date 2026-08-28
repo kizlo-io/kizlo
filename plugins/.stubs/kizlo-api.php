@@ -12,8 +12,8 @@
  *
  * Signatures must mirror the kizlo core plugin (src/php/Support/functions.php,
  * Modules/Admin/Components.php, Modules/Webhook/Webhook.php, and the settings,
- * introspection, and custom-field classes used by integrations). Stub only,
- * never loaded at runtime or shipped (phpstan config is .distignore'd).
+ * introspection, post SEO, and custom-field classes used by integrations). Stub
+ * only, never loaded at runtime or shipped (phpstan config is .distignore'd).
  */
 
 namespace {
@@ -90,16 +90,56 @@ namespace {
     function kizlo_include_taxonomy(string $taxonomy): void {}
 }
 
+namespace Kizlo\Support {
+    class Utils
+    {
+        public static function getSettings(): \Kizlo\Modules\Settings\Settings {}
+    }
+}
+
+namespace Kizlo\Modules\Settings {
+    class Settings
+    {
+        public \Kizlo\Modules\Settings\PostType\PostTypeSettingsCollection $postTypes;
+        public \Kizlo\Modules\Settings\Taxonomy\TaxonomySettingsCollection $taxonomies;
+
+        public function resolvePostUrl(
+            \WP_Post $post,
+            \Kizlo\Modules\Settings\PostType\PostTypeSettings $post_type_settings
+        ): string {}
+
+        public function resolveTermUrl(
+            \WP_Term $term,
+            \Kizlo\Modules\Settings\Taxonomy\TaxonomySettings $taxonomy_settings
+        ): string {}
+    }
+}
+
 namespace Kizlo\Modules\Settings\PostType {
+    class PostTypeSettingsCollection
+    {
+        public function get(string $post_type): PostTypeSettings {}
+    }
+
     class PostTypeSettings
     {
         public static function load(string $post_type): PostTypeSettings {}
 
         /** @return array<int, array<string, mixed>> */
         public function getCustomFields(): array {}
+
+        public function getSeoEnabled(): bool {}
     }
 }
 
+namespace Kizlo\Modules\Settings\Taxonomy {
+    class TaxonomySettingsCollection
+    {
+        public function get(string $taxonomy): TaxonomySettings {}
+    }
+
+    class TaxonomySettings {}
+}
 namespace Kizlo\Modules\CustomFields {
     class CustomFieldsStore
     {
@@ -121,6 +161,19 @@ namespace Kizlo\Modules\Introspection {
          * @return array<string, mixed>
          */
         public static function responseGroup(array $definitions): array {}
+    }
+}
+
+namespace Kizlo\Modules\Post {
+    class PostSchema
+    {
+        public function __construct(\Kizlo\Modules\Settings\Settings $settings) {}
+
+        /** @return array<string, mixed> */
+        public function buildMeta(\WP_Post $post): array {}
+
+        /** @return array<string, mixed> */
+        public function jsonLd(\WP_Post $post): array {}
     }
 }
 

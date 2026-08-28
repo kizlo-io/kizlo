@@ -7,6 +7,7 @@ import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
 import { woocommerce } from "./index"
 import { Product, ProductFilters, ProductList } from "./product/schema"
+import { deserializeProduct } from "./product/utils"
 import type { BillingAddress } from "./schema"
 
 /**
@@ -34,7 +35,7 @@ beforeAll(async () => {
 	kizlo = instance()
 
 	const products = await client().products.list.call({ query: { perPage: 100 } })
-	const seeded = products.items.find((item) => item.slug.startsWith("test-product-"))
+	const seeded = products.items.find((item) => item.slug === "test-product-1")
 	if (!seeded) throw new Error("The woocommerce fixture seeded no products.")
 
 	productId = seeded.id
@@ -87,17 +88,84 @@ test("products.list honours a filter the derived contract carries", async () => 
 	expect(result.items[0]?.id).toBe(productId)
 })
 
-test("products.get resolves a product by slug through the REST v3 list", async () => {
-	const result = await client().products.get.call({ params: { identifier: productSlug } })
+test("products.get optionally resolves recommendations by slug through the Store API", async () => {
+	const result = await client().products.get.call({
+		params: { identifier: productSlug },
+		query: { recommendations: true },
+	})
 
 	expect(Product.safeParse(result).success).toBe(true)
 	expect(result.id).toBe(productId)
 	expect(result.custom).toEqual({ product_note: "Fixture product" })
-	// Every field here comes from the `kizlo` block the plugin's response filter adds, which no
-	// WooCommerce schema mentions and the spec therefore declares by hand.
+	expect(result.url).not.toBeNull()
 	expect(result.currencyFormat.currencyCode).toBeTruthy()
 	expect(Array.isArray(result.attributes)).toBe(true)
 	expect(typeof result.prices.regularPrice).toBe("number")
+	expect(result.categories).toEqual(
+		expect.arrayContaining([expect.objectContaining({ slug: "test-product-category", url: expect.any(String) })]),
+	)
+	expect(result.images.every((image) => !("thumbnail" in image))).toBe(true)
+	expect(result.addToCart).not.toHaveProperty("url")
+	expect(result).not.toHaveProperty("hsCode")
+	expect(result).not.toHaveProperty("extend")
+	expect(result).not.toHaveProperty("customFields")
+	expect(result.custom).toEqual(expect.any(Object))
+	expect(result.recommendations).toEqual({
+		upsells: expect.any(Array),
+		crossSells: expect.any(Array),
+		related: expect.any(Array),
+	})
+	expect(result.recommendations?.upsells.map((product) => product.slug)).toContain("test-product-2")
+	expect(result.recommendations?.crossSells.map((product) => product.slug)).toContain("test-product-3")
+	expect(result.recommendations?.related).toEqual(expect.any(Array))
+})
+
+test("products.get leaves recommendations out by default", async () => {
+	const result = await client().products.get.call({ params: { identifier: productId } })
+
+	expect(Product.safeParse(result).success).toBe(true)
+	expect(result.id).toBe(productId)
+	expect(result.recommendations).toBeNull()
+})
+
+test("products.list leaves recommendations and SEO out of every collection item", async () => {
+	const result = await client().products.list.call({ query: { perPage: 100 } })
+
+	expect(result.items.every((product) => product.recommendations === null)).toBe(true)
+	expect(result.items.every((product) => product.seo === null)).toBe(true)
+})
+
+test("products.list optionally resolves recommendations for every collection item", async () => {
+	const result = await client().products.list.call({ query: { slug: productSlug, recommendations: true } })
+	const product = result.items[0]
+
+	expect(product?.recommendations).toEqual({
+		upsells: expect.any(Array),
+		crossSells: expect.any(Array),
+		related: expect.any(Array),
+	})
+	expect(product?.recommendations?.upsells.map((item) => item.slug)).toContain("test-product-2")
+	expect(product?.recommendations?.crossSells.map((item) => item.slug)).toContain("test-product-3")
+})
+
+test("the REST v3 preview payload deserializes to the same complete Product", async () => {
+	const response = await admin().woocommerce.products.retrieve({ id: productId })
+	if (response.error) throw response.error
+
+	const result = deserializeProduct(response.data)
+
+	expect(Product.safeParse(result).success).toBe(true)
+	expect(result.id).toBe(productId)
+	expect(result.recommendations).toBeNull()
+})
+
+test("password-protected products redact descriptions and SEO", async () => {
+	const result = await client().products.get.call({ params: { identifier: "test-product-locked" } })
+
+	expect(result.isPasswordProtected).toBe(true)
+	expect(result.description).toBe("")
+	expect(result.shortDescription).toBe("")
+	expect(result.seo).toBeNull()
 })
 
 test("products.get reports an unknown slug as a mapped error rather than resolving", async () => {
@@ -105,11 +173,12 @@ test("products.get reports an unknown slug as a mapped error rather than resolvi
 })
 
 test("products.filters aggregates the collection through the generated endpoint", async () => {
-	const result = await client().products.filters.call({ query: { perPage: 100 } })
+	const result = await client().products.filters.call({ query: { perPage: 100, ratingCounts: true } })
 
 	expect(result).not.toBeNull()
 	expect(ProductFilters.safeParse(result).success).toBe(true)
 	expect(result?.priceRange.maxPrice).toBeGreaterThanOrEqual(result?.priceRange.minPrice ?? 0)
+	expect(Array.isArray(result?.ratingCounts)).toBe(true)
 })
 
 // ==================================================

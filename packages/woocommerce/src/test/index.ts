@@ -2,17 +2,28 @@ import { type DevPluginSource, defineFixture, kizloRelease, type SeedContext, ty
 import { WC_CORE_BASE, WC_STORE_BASE } from "../constants"
 import type { WC_Product, WC_ProductCreateInput } from "../product/types.wc"
 
-const PRODUCTS: Array<Pick<WC_ProductCreateInput, "slug" | "name" | "regular_price">> = [
+type SeedProduct = Pick<WC_ProductCreateInput, "slug" | "name" | "regular_price"> &
+	Partial<Pick<WC_ProductCreateInput, "description" | "post_password" | "short_description">>
+
+const PRODUCTS: SeedProduct[] = [
 	{ slug: "test-product-1", name: "Test Product 1", regular_price: "10" },
 	{ slug: "test-product-2", name: "Test Product 2", regular_price: "20" },
 	{ slug: "test-product-3", name: "Test Product 3", regular_price: "30" },
 	{ slug: "test-product-4", name: "Test Product 4", regular_price: "40" },
 	{ slug: "test-product-5", name: "Test Product 5", regular_price: "50" },
+	{
+		slug: "test-product-locked",
+		name: "Test Product Locked",
+		regular_price: "60",
+		description: "Private product description",
+		short_description: "Private product summary",
+		post_password: "secret",
+	},
 ]
 
 const COUPONS = [{ code: "TEST10", discount_type: "percent", amount: "10" }]
 
-async function upsertProduct(service: SeedContext["service"], product: (typeof PRODUCTS)[number]): Promise<number> {
+async function upsertProduct(service: SeedContext["service"], product: SeedProduct): Promise<number> {
 	const existing = await service.get<WC_Product[]>(`${WC_CORE_BASE}/products`, { searchParams: { slug: product.slug } })
 	if (existing.data?.[0]) return existing.data[0].id
 
@@ -29,6 +40,37 @@ async function upsertCoupon(service: SeedContext["service"], coupon: (typeof COU
 
 	const created = await service.post(`${WC_CORE_BASE}/coupons`, { body: coupon })
 	if (created.error) throw created.error
+}
+
+async function upsertProductCategory(service: SeedContext["service"]): Promise<number> {
+	const existing = await service.get<Array<{ id: number }>>(`${WC_CORE_BASE}/products/categories`, {
+		searchParams: { slug: "test-product-category" },
+	})
+	if (existing.data?.[0]) return existing.data[0].id
+
+	const created = await service.post<{ id: number }>(`${WC_CORE_BASE}/products/categories`, {
+		body: { name: "Test Product Category", slug: "test-product-category" },
+	})
+	if (created.error) throw created.error
+	return created.data.id
+}
+
+async function linkProductCategory(service: SeedContext["service"], productId: number): Promise<void> {
+	const categoryId = await upsertProductCategory(service)
+	const updated = await service.put(`${WC_CORE_BASE}/products/${productId}`, {
+		body: { categories: [{ id: categoryId }] },
+	})
+	if (updated.error) throw updated.error
+}
+
+async function linkRecommendations(service: SeedContext["service"], productIds: number[]): Promise<void> {
+	const [productId, upsellId, crossSellId] = productIds
+	if (!productId || !upsellId || !crossSellId) return
+
+	const updated = await service.put(`${WC_CORE_BASE}/products/${productId}`, {
+		body: { upsell_ids: [upsellId], cross_sell_ids: [crossSellId] },
+	})
+	if (updated.error) throw updated.error
 }
 
 /**
@@ -79,10 +121,14 @@ export function woocommerce(opts: { plugins?: DevPluginSource[] } = {}) {
 		},
 		async seed({ service }) {
 			let productId = 0
+			const productIds: number[] = []
 			for (const product of PRODUCTS) {
 				const id = await upsertProduct(service, product)
+				productIds.push(id)
 				if (!productId) productId = id
 			}
+			if (productIds[0]) await linkProductCategory(service, productIds[0])
+			await linkRecommendations(service, productIds)
 			for (const coupon of COUPONS) await upsertCoupon(service, coupon)
 			await enableBankTransfer(service)
 			return { productId }

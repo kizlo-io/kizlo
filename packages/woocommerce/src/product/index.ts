@@ -1,7 +1,15 @@
 import { createProcedure, deserializeListMetadata } from "kizlo"
 import { GET_PRODUCT_ERROR_MAP, LIST_PRODUCT_ERROR_MAP } from "./error"
 import { ListProductInput, Product, ProductFilters, ProductList, RetrieveProductFiltersInput, RetrieveProductInput } from "./schema"
-import { deserializeProduct, deserializeProductFilters, deserializeStoreProduct, serializeProductListInput } from "./utils"
+import {
+	deserializeProduct,
+	deserializeProductFilters,
+	deserializeProductRecommendations,
+	deserializeStoreProduct,
+	serializeProductListInput,
+} from "./utils"
+
+const PRODUCT_EMBEDS = "upsells,cross_sells,related"
 
 export const PRODUCT_PROCEDURES = {
 	get: createProcedure(
@@ -10,7 +18,7 @@ export const PRODUCT_PROCEDURES = {
 			method: "GET",
 			path: "/products/{identifier}",
 			params: RetrieveProductInput.pick({ identifier: true }),
-			query: RetrieveProductInput.pick({ previewToken: true }).optional(),
+			query: RetrieveProductInput.pick({ previewToken: true, recommendations: true }).optional(),
 			output: Product,
 			errors: GET_PRODUCT_ERROR_MAP,
 		},
@@ -30,20 +38,28 @@ export const PRODUCT_PROCEDURES = {
 				}
 				return deserializeProduct(response.data)
 			}
-			const response = await context.wordpress.woocommerce.products.list({ slug: String(input.params.identifier) })
+			const identifier = input.params.identifier
+			const includeRecommendations = input.query?.recommendations ?? false
+			const embeds = includeRecommendations ? { _embed: PRODUCT_EMBEDS } : {}
+			const response =
+				typeof identifier === "number"
+					? await context.wordpress.woocommerce.store.products.getById({ id: identifier, ...embeds })
+					: await context.wordpress.woocommerce.store.products.getBySlug({ slug: identifier, ...embeds })
 			if (response.error) {
 				switch (response.error.code) {
+					case "woocommerce_rest_product_invalid_id":
+					case "woocommerce_rest_product_invalid_slug":
+						throw errors.PRODUCT_NOT_FOUND({ message: response.error.message })
 					default:
 						context.logger.error("Get product unhandled error", response.error, {
-							identifier: input.params.identifier,
+							identifier,
 							code: response.error.code,
 						})
 						throw errors.INTERNAL_SERVER_ERROR()
 				}
 			}
-			const data = response.data[0]
-			if (!data) throw errors.PRODUCT_NOT_FOUND()
-			return deserializeProduct(data)
+
+			return deserializeStoreProduct(response.data, includeRecommendations ? deserializeProductRecommendations(response.data) : null)
 		},
 	),
 	list: createProcedure(
@@ -57,7 +73,9 @@ export const PRODUCT_PROCEDURES = {
 		},
 		async ({ context, input, errors }) => {
 			const searchParams = serializeProductListInput(input.query)
-			const response = await context.wordpress.woocommerce.store.products.list(searchParams)
+			const includeRecommendations = input.query?.recommendations ?? false
+			const embeds = includeRecommendations ? { _embed: PRODUCT_EMBEDS } : {}
+			const response = await context.wordpress.woocommerce.store.products.list({ ...searchParams, ...embeds })
 			if (response.error) {
 				switch (response.error.code) {
 					default:
@@ -71,7 +89,9 @@ export const PRODUCT_PROCEDURES = {
 				searchParams: { ...searchParams },
 			})
 			return {
-				items: list.items.map(deserializeStoreProduct),
+				items: list.items.map((item) =>
+					deserializeStoreProduct(item, includeRecommendations ? deserializeProductRecommendations(item) : null),
+				),
 				meta: deserializeListMetadata(list.meta),
 			}
 		},
@@ -89,12 +109,12 @@ export const PRODUCT_PROCEDURES = {
 			const response = await context.wordpress.woocommerce.store.products.collectionData({
 				...searchParams,
 				calculate_price_range: true,
-				calculate_rating_counts: input.query?.ratingFilters,
-				calculate_taxonomy_counts: input.query?.taxonomyFilters,
-				calculate_stock_status_counts: input.query?.stockStatusFilters,
-				calculate_attribute_counts: input.query?.attributeFilters?.map((item) => ({
+				calculate_rating_counts: input.query?.ratingCounts,
+				calculate_taxonomy_counts: input.query?.taxonomyCounts,
+				calculate_stock_status_counts: input.query?.stockStatusCounts,
+				calculate_attribute_counts: input.query?.attributeCounts?.map((item) => ({
 					taxonomy: item.taxonomy,
-					query_type: item.queryType,
+					query_type: item.operator,
 				})),
 			})
 			if (response.error) {

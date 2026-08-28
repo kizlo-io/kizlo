@@ -12,7 +12,7 @@ use Throwable;
 /**
  * The `wc/store/v1` operations this plugin's clients consume.
  *
- * Fourteen of them, and not one shape is written out here. WooCommerce registers
+ * Sixteen of them, and not one upstream shape is written out here. WooCommerce registers
  * these routes from `AbstractRoute::get_args()` and builds their responses from
  * the schema classes behind `SchemaController`, so both halves are already
  * described in PHP by the plugin that serves them. This class asks those objects
@@ -101,7 +101,7 @@ final class StoreApiRoutes
 
     public static function register(): void
     {
-        for ($index = 0; $index < 14; $index++) {
+        for ($index = 0; $index < 16; $index++) {
             kizlo_register_route_spec(
                 static fn(): array => self::routeSpec($index),
             );
@@ -119,6 +119,8 @@ final class StoreApiRoutes
                 WooCommerceSchemas::STORE_CHECKOUT,
                 WooCommerceSchemas::STORE_CHECKOUT_ORDER,
                 WooCommerceSchemas::STORE_PRODUCT,
+                WooCommerceSchemas::STORE_PRODUCT_SUMMARY,
+                WooCommerceSchemas::STORE_PRODUCT_DETAIL,
                 WooCommerceSchemas::STORE_PRODUCT_COLLECTION_DATA,
             ] as $id
         ) {
@@ -177,6 +179,10 @@ final class StoreApiRoutes
                     continue;
                 }
 
+                if ($identifier === 'product') {
+                    $properties = self::normalizeProductProperties($properties);
+                }
+
                 // Collection data carries a `kizlo` block added by a route
                 // interceptor, which is a response filter and has no schema half for
                 // the derivation to find.
@@ -203,6 +209,42 @@ final class StoreApiRoutes
                     'properties'  => $properties,
                 ];
             }
+
+            $summary = self::properties($schemas, 'product', WooCommerceSchemas::STORE_PRODUCT_SUMMARY, 'embed');
+
+            if ($summary !== null) {
+                $summary = self::normalizeProductProperties($summary);
+                $derived[WooCommerceSchemas::STORE_PRODUCT_SUMMARY] = [
+                    'type'        => 'object',
+                    'description' => 'A Store API product filtered to the fields WooCommerce exposes in embed context.',
+                    'properties'  => $summary,
+                ];
+            }
+
+            $relations = [];
+            foreach (['upsells', 'cross_sells', 'related'] as $relation) {
+                $relations[$relation] = [
+                    'type'        => 'array',
+                    'description' => sprintf('Embedded %s product collections. WordPress wraps each collection once.', str_replace('_', ' ', $relation)),
+                    'items'       => [
+                        'type'  => 'array',
+                        'items' => ['$ref' => WooCommerceSchemas::STORE_PRODUCT_SUMMARY],
+                    ],
+                ];
+            }
+
+            $derived[WooCommerceSchemas::STORE_PRODUCT_DETAIL] = [
+                'type'        => 'object',
+                '$extends'    => WooCommerceSchemas::STORE_PRODUCT,
+                'description' => 'A Store API product that may carry the integration\'s fixed recommendation collections.',
+                'properties'  => [
+                    '_embedded' => [
+                        'type'        => 'object',
+                        'description' => 'Recommendation collections included by the WordPress embed transport.',
+                        'properties'  => $relations,
+                    ],
+                ],
+            ];
         }
 
         return $derived[$id]
@@ -226,11 +268,75 @@ final class StoreApiRoutes
     }
 
     /**
+     * Correct Store API response shapes WooCommerce's schema describes too narrowly.
+     *
+     * Custom attributes and unselected variation attributes return null, while
+     * third-party Store extensions may add namespaces beside Kizlo's.
+     *
+     * @param array<string, array<string, mixed>> $properties
+     * @return array<string, array<string, mixed>>
+     */
+    private static function normalizeProductProperties(array $properties): array
+    {
+        $properties['attributes']['items']['properties']['taxonomy']['nullable'] = true;
+        $properties['variations']['items']['properties']['attributes']['items']['properties']['value']['nullable'] = true;
+        $properties['extensions']['additionalProperties'] = true;
+
+        return $properties;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private static function products(RoutesController $routes): array
     {
         return [
+            self::declaration(
+                routes: $routes,
+                identifier: 'products-by-id',
+                api: self::PRODUCTS_API_ID,
+                operation: 'get_by_id',
+                method: 'GET',
+                summary: 'Retrieve a published product by ID',
+                errors: ['woocommerce_rest_product_invalid_id', 'woocommerce_rest_unknown_server_error'],
+                responses: [
+                    '200' => [
+                        'description' => 'The product, optionally carrying the fixed recommendation collections.',
+                        'body'        => ['$ref' => WooCommerceSchemas::STORE_PRODUCT_DETAIL],
+                    ],
+                    '404' => ['description' => 'No published product has this ID.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                ],
+                extra: [
+                    'id' => [
+                        'type'        => 'integer',
+                        'required'    => true,
+                        'description' => 'The published product ID.',
+                    ],
+                ],
+            ),
+            self::declaration(
+                routes: $routes,
+                identifier: 'products-by-slug',
+                api: self::PRODUCTS_API_ID,
+                operation: 'get_by_slug',
+                method: 'GET',
+                summary: 'Retrieve a published product by slug',
+                errors: ['woocommerce_rest_product_invalid_slug', 'woocommerce_rest_unknown_server_error'],
+                responses: [
+                    '200' => [
+                        'description' => 'The product, optionally carrying the fixed recommendation collections.',
+                        'body'        => ['$ref' => WooCommerceSchemas::STORE_PRODUCT_DETAIL],
+                    ],
+                    '404' => ['description' => 'No published product has this slug.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                ],
+                extra: [
+                    'slug' => [
+                        'type'        => 'string',
+                        'required'    => true,
+                        'description' => 'The published product slug.',
+                    ],
+                ],
+            ),
             self::declaration(
                 routes: $routes,
                 identifier: 'products',
@@ -241,9 +347,9 @@ final class StoreApiRoutes
                 errors: ['woocommerce_rest_unknown_server_error'],
                 responses: [
                     '200' => [
-                        'description' => 'A page of products.',
+                        'description' => 'A page of products, optionally carrying fixed recommendation collections.',
                         'headers'     => self::paginationHeaders(),
-                        'body'        => ['type' => 'array', 'items' => ['$ref' => WooCommerceSchemas::STORE_PRODUCT]],
+                        'body'        => ['type' => 'array', 'items' => ['$ref' => WooCommerceSchemas::STORE_PRODUCT_DETAIL]],
                     ],
                 ],
             ),
@@ -627,7 +733,7 @@ final class StoreApiRoutes
     /**
      * @return array<string, array<string, mixed>>|null
      */
-    private static function properties(SchemaController $schemas, string $identifier, string $id): ?array
+    private static function properties(SchemaController $schemas, string $identifier, string $id, string $context = 'view'): ?array
     {
         try {
             $schema = $schemas->get($identifier);
@@ -641,7 +747,7 @@ final class StoreApiRoutes
         return kizlo_translate_spec_properties(
             $schema->get_properties(),
             $id,
-            context: 'view',
+            context: $context,
             required: true,
         );
     }

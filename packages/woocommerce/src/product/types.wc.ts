@@ -289,6 +289,7 @@ export interface WC_ProductCreateInput {
 	catalog_visibility?: WC_CatalogVisibility
 	description?: string
 	short_description?: string
+	post_password?: string
 	sku?: string
 	global_unique_id?: string
 	regular_price?: string
@@ -349,6 +350,7 @@ export interface WC_ProductUpdateInput {
 	catalog_visibility?: WC_CatalogVisibility
 	description?: string
 	short_description?: string
+	post_password?: string
 	sku?: string
 	global_unique_id?: string
 	regular_price?: string

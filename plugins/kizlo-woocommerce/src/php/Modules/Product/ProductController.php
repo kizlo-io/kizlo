@@ -24,6 +24,12 @@ class ProductController
             }
         ]);
 
+        kizlo_register_route_interceptor([
+            'route'  => '/wc/store/v1/products/:identifier',
+            'method' => 'GET',
+            'callback' => [$this, 'prepareStoreProductCallback'],
+        ]);
+
         add_filter('woocommerce_rest_prepare_product_cat', [$this, 'prepareCategoryCallback'], PHP_INT_MAX, 2);
         add_filter('woocommerce_rest_prepare_product_review', [$this, 'prepareReviewCallback'], PHP_INT_MAX, 2);
         add_filter('woocommerce_rest_prepare_product_object', [$this, 'prepareProductCallback'], PHP_INT_MAX, 3);
@@ -34,6 +40,21 @@ class ProductController
         if (is_wp_error($response)) return $response;
 
         $response->set_data($this->product->extendProduct($response->get_data(), $product));
+
+        return $response;
+    }
+
+    public function prepareStoreProductCallback(WP_REST_Request $request, WP_REST_Response $response): WP_REST_Response
+    {
+        if ($request->get_param('context') === 'embed') return $response;
+
+        $data = $response->get_data();
+        if (! is_array($data) || ! isset($data['id'])) return $response;
+
+        $product = wc_get_product((int) $data['id']);
+        if (! $product instanceof WC_Product) return $response;
+
+        $response->set_data($this->product->extendStoreProductDetail($data, $product));
 
         return $response;
     }

@@ -5,8 +5,8 @@ namespace Kizlo\WooCommerce\Tests\Contract;
 use Automattic\WooCommerce\StoreApi\Routes\V1\AbstractRoute;
 use Automattic\WooCommerce\StoreApi\RoutesController;
 use Automattic\WooCommerce\StoreApi\StoreApi;
-use Kizlo\WooCommerce\Modules\Contract\StoreApiRoutes;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
+use Kizlo\WooCommerce\Modules\Contract\StoreApiRoutes;
 use Kizlo\WooCommerce\Tests\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
@@ -29,7 +29,7 @@ class StoreApiRoutesTest extends TestCase
         $registered = rest_get_server()->get_routes();
         $derived    = $this->declarations();
 
-        $this->assertCount(14, $derived);
+        $this->assertCount(16, $derived);
 
         foreach ($derived as $operation) {
             $path = sprintf('/%s%s', $operation['namespace'], $operation['route']);
@@ -40,6 +40,87 @@ class StoreApiRoutesTest extends TestCase
                 sprintf('%s does not accept %s.', $path, $operation['method']),
             );
         }
+    }
+
+    public function test_product_detail_operations_are_fixed_routes_without_a_public_embed_input(): void
+    {
+        $operations = array_slice($this->declarations(), 0, 2);
+
+        $this->assertSame(['get_by_id', 'get_by_slug'], array_column($operations, 'operation'));
+
+        foreach ($operations as $operation) {
+            $this->assertArrayNotHasKey('_embed', $operation['input']['properties']);
+            $this->assertSame(
+                'woocommerce.store.product-detail',
+                $operation['responses']['200']['body']['$ref'],
+            );
+        }
+    }
+
+    public function test_product_collection_operations_publish_every_fixed_woocommerce_argument(): void
+    {
+        $operations = array_slice($this->declarations(), 2, 2);
+        $identifiers = ['products', 'product-collection-data'];
+
+        foreach ($operations as $index => $operation) {
+            $route = $this->routes()->get($identifiers[$index]);
+
+            $this->assertInstanceOf(AbstractRoute::class, $route);
+
+            $expected = $this->handlerArguments($route, 'GET');
+            unset($expected['context']);
+
+            $this->assertSame(
+                array_keys($expected),
+                array_keys($operation['input']['properties']),
+                sprintf('%s dropped a fixed WooCommerce argument.', $operation['operation']),
+            );
+            $this->assertArrayHasKey('date_column', $operation['input']['properties']);
+        }
+
+        $this->assertArrayNotHasKey('_embed', $operations[0]['input']['properties']);
+        $this->assertSame(
+            'woocommerce.store.product-detail',
+            $operations[0]['responses']['200']['body']['items']['$ref'],
+        );
+    }
+
+    public function test_product_summary_is_embed_context_and_detail_adds_recommendations(): void
+    {
+        $summary = $this->routeSchema('woocommerce.store.product-summary');
+        $detail  = $this->routeSchema('woocommerce.store.product-detail');
+
+        $this->assertArrayHasKey('id', $summary['properties']);
+        $this->assertArrayHasKey('extensions', $summary['properties']);
+        $this->assertArrayNotHasKey('weight', $summary['properties']);
+        $this->assertTrue($summary['properties']['extensions']['additionalProperties']);
+        $this->assertTrue($summary['properties']['attributes']['items']['properties']['taxonomy']['nullable']);
+        $this->assertTrue(
+            $summary['properties']['variations']['items']['properties']['attributes']['items']['properties']['value']['nullable'],
+        );
+
+        $this->assertSame('woocommerce.store.product', $detail['$extends']);
+        $relations = $detail['properties']['_embedded']['properties'];
+        $this->assertSame(['upsells', 'cross_sells', 'related'], array_keys($relations));
+
+        foreach ($relations as $relation) {
+            $this->assertSame(
+                'woocommerce.store.product-summary',
+                $relation['items']['items']['$ref'],
+            );
+        }
+    }
+
+    public function test_store_product_extension_contains_only_kizlo_owned_product_data(): void
+    {
+        $properties = KizloBlocks::storeProduct();
+
+        $this->assertSame(['string', 'null'], $properties['url']['type']);
+        $this->assertArrayHasKey('term_urls', $properties);
+        $this->assertArrayHasKey('custom', $properties);
+        $this->assertArrayNotHasKey('custom_fields', $properties);
+        $this->assertArrayNotHasKey('hs_code', $properties);
+        $this->assertArrayNotHasKey('extend', $properties);
     }
 
     public function test_every_required_overlay_argument_still_exists_upstream(): void
@@ -88,6 +169,14 @@ class StoreApiRoutesTest extends TestCase
         $method = new ReflectionMethod(StoreApiRoutes::class, 'declarations');
 
         return $method->invoke(null, $this->routes());
+    }
+
+    /** @return array<string, mixed> */
+    private function routeSchema(string $id): array
+    {
+        $method = new ReflectionMethod(StoreApiRoutes::class, 'routeSchema');
+
+        return $method->invoke(null, $id);
     }
 
     /**

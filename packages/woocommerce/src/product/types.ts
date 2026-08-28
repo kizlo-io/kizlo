@@ -19,6 +19,12 @@ export type WCSK_Product = WP_EndpointData<"woocommerce.store.products.list">[nu
 /** The exact resolved custom-field shape configured for products on this WordPress site. */
 export type ProductCustomFields = WCK_Product["kizlo"]["custom"]
 
+/** A published Store API product that may carry Kizlo's fixed recommendation embeddings. */
+export type WCSK_ProductDetail = WP_EndpointData<"woocommerce.store.products.getById">
+
+/** A Store API product filtered to fields WooCommerce permits in embed context. */
+export type WCSK_ProductSummary = NonNullable<NonNullable<WCSK_ProductDetail["_embedded"]>["upsells"]>[number][number]
+
 /** Collection counts, with the `kizlo` block the route interceptor adds. */
 export type WCSK_ProductCollectionData = WP_EndpointData<"woocommerce.store.products.collectionData">
 

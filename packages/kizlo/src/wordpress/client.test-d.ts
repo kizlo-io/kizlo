@@ -279,6 +279,12 @@ describe("described WooCommerce routes", () => {
 		// @ts-expect-error `context` is undeclared, so no caller can reshape the response
 		await wordpress.woocommerce.store.products.list({ context: "edit" })
 		expectTypeOf<WP_EndpointInput<"woocommerce.store.products.collectionData">>().toHaveProperty("calculate_price_range")
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.products.list">["date_column"]>().toEqualTypeOf<
+			"date" | "date_gmt" | "modified" | "modified_gmt" | undefined
+		>()
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.products.collectionData">["date_column"]>().toEqualTypeOf<
+			"date" | "date_gmt" | "modified" | "modified_gmt" | undefined
+		>()
 	})
 
 	it("types the pagination headers resolveList reads off a product page", () => {
