@@ -57,7 +57,7 @@ class SiteSettings extends SettingsAbstract
         match ($key) {
             'url'             => $this->assertValidUrl($key, $value),
             'backend_url'     => $this->assertValidUrl($key, $value),
-            'fallback_image'  => $this->assertValidMediaId($key, $value),
+            'fallback_image'  => $this->assertValidImageId($key, $value),
             'title_separator' => ! in_array($value, static::TITLE_SEPARATORS, true) ? throw new InvalidArgumentException('Invalid title separator.') : null,
             default           => null,
         };

@@ -5,7 +5,7 @@ import { resolveIcons } from "./icons"
 type Media = NonNullable<BrandSettings["favicon"]>
 
 function media(mime: string, src = `https://cdn.test/${mime.replace("/", "-")}`, size?: { width: number; height: number }): Media {
-	return { id: 1, name: "", alt: "", src, mime, ...size }
+	return { type: "image", id: 1, name: "", alt: "", src, mime, ...size }
 }
 
 const EMPTY: BrandSettings = {
@@ -103,6 +103,7 @@ describe("resolveIcons", () => {
 
 		test("expands a source's generated variants into one entry per real size", () => {
 			const source: Media = {
+				type: "image",
 				id: 1,
 				name: "",
 				alt: "",
@@ -125,6 +126,7 @@ describe("resolveIcons", () => {
 
 		test("dedupes renditions that resolve to the same size", () => {
 			const source: Media = {
+				type: "image",
 				id: 1,
 				name: "",
 				alt: "",
@@ -160,6 +162,7 @@ describe("resolveIcons", () => {
 
 		test("drops non-square variants, keeping only square renditions", () => {
 			const source: Media = {
+				type: "image",
 				id: 1,
 				name: "",
 				alt: "",
@@ -181,6 +184,7 @@ describe("resolveIcons", () => {
 
 		test("drops renditions below the 192px icon floor (e.g. the 150 thumbnail)", () => {
 			const source: Media = {
+				type: "image",
 				id: 1,
 				name: "",
 				alt: "",

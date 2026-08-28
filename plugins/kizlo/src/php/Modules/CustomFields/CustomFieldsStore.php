@@ -129,7 +129,8 @@ class CustomFieldsStore
     private static function resolveValue(array $definition, mixed $raw): mixed
     {
         return match ($definition['type']) {
-            'image', 'file' => ((int) $raw) > 0 ? kizlo_ensure_media_data((int) $raw) : null,
+            'image'         => ((int) $raw) > 0 ? kizlo_ensure_media_image_data((int) $raw) : null,
+            'file'          => ((int) $raw) > 0 ? kizlo_ensure_media_data((int) $raw) : null,
             'number'        => is_numeric($raw) ? $raw + 0 : self::defaultValue($definition),
             'toggle'        => (string) $raw === '1',
             'multiselect'   => is_array($raw) ? array_values($raw) : ($raw === '' ? [] : [(string) $raw]),
@@ -349,8 +350,12 @@ class CustomFieldsStore
                 }
                 break;
             case 'image':
+                if (get_post_type((int) $value) !== 'attachment' || !str_starts_with((string) get_post_mime_type((int) $value), 'image/')) {
+                    throw new InvalidArgumentException("Custom field \"{$label}\" must reference an uploaded image.");
+                }
+                break;
             case 'file':
-                if (!wp_attachment_is_image((int) $value) && get_post_type((int) $value) !== 'attachment') {
+                if (get_post_type((int) $value) !== 'attachment') {
                     throw new InvalidArgumentException("Custom field \"{$label}\" must reference an uploaded file.");
                 }
                 break;

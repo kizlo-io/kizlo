@@ -63,7 +63,7 @@ class BrandSettings extends SettingsAbstract
             'logo_wordmark',
             'logo_wordmark_dark',
             'favicon',
-            'app_icon'           => $this->assertValidMediaId($key, $value),
+            'app_icon'           => $this->assertValidImageId($key, $value),
 
             'theme_color',
             'theme_color_dark',

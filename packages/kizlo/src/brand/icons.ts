@@ -1,4 +1,4 @@
-import type { Media } from "@kizlo/shared"
+import type { MediaImage } from "@kizlo/shared"
 import type { BrandSettings } from "../settings/service.interface"
 
 /** Raster mimes: the only sources iOS home-screen icons can render. */
@@ -53,17 +53,17 @@ export interface ResolvedIcons {
 	manifestIcons: ManifestIcon[]
 }
 
-function isRaster(media: Media | null | undefined): media is Media {
+function isRaster(media: MediaImage | null | undefined): media is MediaImage {
 	return media != null && media.mime !== undefined && RASTER_MIMES.has(media.mime)
 }
 
 /** Return the media only when it is a raster the target can render; otherwise null. */
-function raster(media: Media | null | undefined): Media | null {
+function raster(media: MediaImage | null | undefined): MediaImage | null {
 	return isRaster(media) ? media : null
 }
 
 /** Return the media only when a web manifest can render it (raster or SVG). */
-function manifestSource(media: Media | null | undefined): Media | null {
+function manifestSource(media: MediaImage | null | undefined): MediaImage | null {
 	return media?.mime && MANIFEST_MIMES.has(media.mime) ? media : null
 }
 
@@ -72,7 +72,7 @@ function manifestSource(media: Media | null | undefined): Media | null {
  * descriptor never claims a size the image cannot satisfy. Falls back to `"any"`
  * on scalable sources (e.g. SVG) that have no fixed size.
  */
-function pixelSize(media: Media): string {
+function pixelSize(media: MediaImage): string {
 	return media.width && media.height ? `${media.width}x${media.height}` : "any"
 }
 
@@ -86,7 +86,7 @@ function versioned(src: string, id: number): string {
 	return `${src}${src.includes("?") ? "&" : "?"}v=${id}`
 }
 
-function toDescriptor(media: Media): IconDescriptor {
+function toDescriptor(media: MediaImage): IconDescriptor {
 	return {
 		url: versioned(media.src, media.id),
 		type: media.mime ?? "",
@@ -101,7 +101,7 @@ function toDescriptor(media: Media): IconDescriptor {
  * or above the floor so browsers get genuine 192/512-ish icons; if none qualify
  * (e.g. a non-square upload) the original is used as-is.
  */
-function toManifestIcons(media: Media): ManifestIcon[] {
+function toManifestIcons(media: MediaImage): ManifestIcon[] {
 	const type = media.mime ?? ""
 
 	if (media.mime === SVG_MIME) {

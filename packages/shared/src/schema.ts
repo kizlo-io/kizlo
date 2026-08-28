@@ -87,17 +87,52 @@ export const BooleanLike = z.union([z.boolean(), z.stringbool()])
 // MEDIA
 // ====================================================
 
-export const Media = z.object({
-	id: z.number(),
+export const MediaImageVariant = z
+	.object({
+		src: z.string(),
+		width: z.number().int().positive(),
+		height: z.number().int().positive(),
+	})
+	.strict()
+export type MediaImageVariant = z.infer<typeof MediaImageVariant>
+
+const MediaBase = z.object({
+	id: z.number().int().nonnegative(),
 	name: z.string(),
-	alt: z.string(),
 	src: z.string(),
 	mime: z.string().optional(),
-	width: z.number().optional(),
-	height: z.number().optional(),
-	variants: z.array(z.object({ src: z.string(), width: z.number(), height: z.number() })).optional(),
-	srcset: z.string().optional(),
 })
+
+export const MediaImage = MediaBase.extend({
+	type: z.literal("image"),
+	alt: z.string(),
+	width: z.number().int().positive().optional(),
+	height: z.number().int().positive().optional(),
+	variants: z.array(MediaImageVariant).optional(),
+	srcset: z.string().optional(),
+}).strict()
+export type MediaImage = z.infer<typeof MediaImage>
+
+export const MediaVideo = MediaBase.extend({
+	type: z.literal("video"),
+	width: z.number().int().positive().optional(),
+	height: z.number().int().positive().optional(),
+	duration: z.number().int().nonnegative().optional(),
+}).strict()
+export type MediaVideo = z.infer<typeof MediaVideo>
+
+export const MediaAudio = MediaBase.extend({
+	type: z.literal("audio"),
+	duration: z.number().int().nonnegative().optional(),
+}).strict()
+export type MediaAudio = z.infer<typeof MediaAudio>
+
+export const MediaFile = MediaBase.extend({
+	type: z.literal("file"),
+}).strict()
+export type MediaFile = z.infer<typeof MediaFile>
+
+export const Media = z.discriminatedUnion("type", [MediaImage, MediaVideo, MediaAudio, MediaFile])
 export type Media = z.infer<typeof Media>
 
 // ====================================================

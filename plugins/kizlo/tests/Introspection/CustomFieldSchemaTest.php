@@ -156,11 +156,16 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         foreach (['cover', 'manual'] as $name) {
             $this->assertSame('integer', $schemas['create'][$name]['type']);
-            $this->assertSame(
-                ['$ref' => 'kizlo.media', 'required' => true, 'nullable' => true],
-                $schemas['item'][$name],
-            );
         }
+
+        $this->assertSame(
+            ['$ref' => 'kizlo.media-image', 'required' => true, 'nullable' => true],
+            $schemas['item']['cover'],
+        );
+        $this->assertSame(
+            ['$ref' => 'kizlo.media', 'required' => true, 'nullable' => true],
+            $schemas['item']['manual'],
+        );
     }
 
     public function test_a_group_nests_its_children_on_both_sides(): void
@@ -282,6 +287,6 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
         $schemas = $this->document()['schemas'];
 
         $this->assertSame('integer', $schemas['taxonomies.category.create-input']['properties']['banner']['type']);
-        $this->assertSame('kizlo.media', $schemas['taxonomies.category.item']['properties']['banner']['$ref']);
+        $this->assertSame('kizlo.media-image', $schemas['taxonomies.category.item']['properties']['banner']['$ref']);
     }
 }

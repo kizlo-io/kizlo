@@ -9,7 +9,8 @@ namespace Kizlo\Modules\Introspection;
  * than convention:
  *
  * - Media fields are written as an attachment ID and read back as a resolved
- *   {@see CoreSchemas::MEDIA} object, or null.
+ *   media object, or null. Image fields use {@see CoreSchemas::MEDIA_IMAGE};
+ *   file fields use the full {@see CoreSchemas::MEDIA} union.
  * - A required field is required on create, but optional on a partial update:
  *   an update only validates the fields it actually carries, so an untouched
  *   required field stays as it was.
@@ -114,7 +115,7 @@ class CustomFieldSchema
 
         if ($type === 'image' || $type === 'file') {
             return self::documented([
-                '$ref'     => CoreSchemas::MEDIA,
+                '$ref'     => $type === 'image' ? CoreSchemas::MEDIA_IMAGE : CoreSchemas::MEDIA,
                 'required' => true,
                 'nullable' => true,
             ], $definition, true);

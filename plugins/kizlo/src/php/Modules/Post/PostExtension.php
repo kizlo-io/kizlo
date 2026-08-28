@@ -86,13 +86,7 @@ class PostExtension
         $featured_image = null;
         $thumbnail_id   = get_post_thumbnail_id($post->ID);
         if ($thumbnail_id) {
-            $full  = wp_get_attachment_image_src($thumbnail_id, 'full');
-
-            $featured_image = [
-                'id'     => $thumbnail_id,
-                'url'    => $full[0] ?? null,
-                'alt'    => get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true),
-            ];
+            $featured_image = kizlo_ensure_media_image_data($thumbnail_id);
         }
 
         return [

@@ -74,8 +74,11 @@ namespace {
      */
     function kizlo_apply_extend_filter(string $name, $arg = []): array {}
 
-    /** @return array{id: int, url: string} */
+    /** @return array<string, mixed> */
     function kizlo_ensure_media_data(int $id): array {}
+
+    /** @return array<string, mixed>|null */
+    function kizlo_ensure_media_image_data(int $id): ?array {}
 
     function kizlo_extend_post_type(string $post_type, callable $callback): void {}
 

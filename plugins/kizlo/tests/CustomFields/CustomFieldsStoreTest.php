@@ -153,8 +153,41 @@ class CustomFieldsStoreTest extends TestCase
 
         $value = $this->read($defs)['hero_image'];
         $this->assertIsArray($value);
+        $this->assertSame('image', $value['type']);
         $this->assertSame($attachment, $value['id']);
         $this->assertArrayHasKey('src', $value);
+    }
+
+    public function test_file_fields_resolve_non_image_attachments_as_union_members(): void
+    {
+        $attachment = self::factory()->post->create([
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'application/pdf',
+            'post_status'    => 'inherit',
+        ]);
+        update_post_meta($attachment, '_wp_attached_file', '2026/08/manual.pdf');
+
+        $defs = $this->defs([['type' => 'file', 'name' => 'manual']]);
+        $this->write($defs, ['manual' => $attachment]);
+
+        $value = $this->read($defs)['manual'];
+        $this->assertSame('file', $value['type']);
+        $this->assertSame($attachment, $value['id']);
+        $this->assertArrayNotHasKey('alt', $value);
+    }
+
+    public function test_image_fields_never_read_back_non_image_members(): void
+    {
+        $attachment = self::factory()->post->create([
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'video/mp4',
+            'post_status'    => 'inherit',
+        ]);
+        $defs = $this->defs([['type' => 'image', 'name' => 'hero_image']]);
+
+        update_post_meta($this->post, 'kcf_hero_image', $attachment);
+
+        $this->assertNull($this->read($defs)['hero_image']);
     }
 
     public function test_unset_fields_fall_back_to_configured_defaults(): void

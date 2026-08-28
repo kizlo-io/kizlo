@@ -157,6 +157,14 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         }
     }
 
+    public function test_featured_media_is_described_as_image_media(): void
+    {
+        $featured = $this->itemProperties('post-types.post.item')['kizlo']['properties']['featured_media'];
+
+        $this->assertSame('kizlo.media-image', $featured['$ref']);
+        $this->assertArrayNotHasKey('required', $featured);
+    }
+
     // ============================================================
     // THE FIELDS THAT WERE WRONG
     // ============================================================

@@ -2,7 +2,7 @@
 // KIZLO SETTINGS — CANONICAL RESPONSE CONTRACT
 // ====================================================
 
-import type { Media } from "./schema"
+import type { Media, MediaImage } from "./schema"
 
 export interface Variable {
 	value: string
@@ -27,20 +27,20 @@ export interface SiteSettings {
 	alternate_name: string | null
 	tagline: string | null
 	title_separator: TitleSeparator
-	fallback_image: Media | null
+	fallback_image: MediaImage | null
 	search_action_structure: string | null
 	discourage_search_engines: boolean
 }
 
 export interface BrandSettings {
-	logo: Media | null
-	logo_dark: Media | null
-	logo_icon: Media | null
-	logo_icon_dark: Media | null
-	logo_wordmark: Media | null
-	logo_wordmark_dark: Media | null
-	favicon: Media | null
-	app_icon: Media | null
+	logo: MediaImage | null
+	logo_dark: MediaImage | null
+	logo_icon: MediaImage | null
+	logo_icon_dark: MediaImage | null
+	logo_wordmark: MediaImage | null
+	logo_wordmark_dark: MediaImage | null
+	favicon: MediaImage | null
+	app_icon: MediaImage | null
 	theme_color: string | null
 	theme_color_dark: string | null
 	background_color: string | null
@@ -48,7 +48,7 @@ export interface BrandSettings {
 
 export interface PersonSettings {
 	user_id: number | null
-	image: Media | null
+	image: MediaImage | null
 	social_profiles: SocialProfile[]
 }
 
@@ -69,7 +69,7 @@ export interface OrganizationSettings {
 	founder: OrganizationFounder | null
 	employees_min: number | null
 	employees_max: number | null
-	logo: Media | null
+	logo: MediaImage | null
 	social_profiles: SocialProfile[]
 	vat_id: string | null
 	tax_id: string | null
@@ -350,7 +350,8 @@ export type CustomFieldDefinition =
 /**
  * Resolved custom-field value. Top-level fields are injected onto the REST response
  * root (keyed by field name) and accepted on Kizlo writes. Media fields resolve to
- * {@link Media}; groups nest an object and repeaters an array of row objects.
+ * {@link MediaImage} for image fields and {@link Media} for file fields; groups
+ * nest an object and repeaters an array of row objects.
  */
 export type CustomFieldValue = string | number | boolean | null | string[] | Media | CustomFieldValues | CustomFieldValues[]
 

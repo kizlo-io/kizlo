@@ -65,6 +65,25 @@ abstract class SettingsAbstract extends DataAbstract
     }
 
     /**
+     * Assert value references an uploaded image, including formats such as SVG
+     * that WordPress cannot render through its raster image functions.
+     *
+     * @param mixed $value
+     * @throws InvalidArgumentException
+     */
+    protected function assertValidImageId(string $key, mixed $value): void
+    {
+        if (empty($value)) return;
+
+        $this->assertValidMediaId($key, $value);
+
+        $id = (int) $value;
+        if (get_post_type($id) !== 'attachment' || !str_starts_with((string) get_post_mime_type($id), 'image/')) {
+            throw new InvalidArgumentException("{$key} must reference an uploaded image.");
+        }
+    }
+
+    /**
      * Assert that a value is either a valid URL or empty.
      *
      * @param  string $key   Field name used in the exception message.

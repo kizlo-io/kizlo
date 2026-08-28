@@ -1,0 +1,71 @@
+---
+title: Media
+icon: Images
+description: Work with discriminated image, video, audio, and file attachments.
+types: [Media, MediaImage, MediaVideo, MediaAudio, MediaFile, MediaImageVariant]
+---
+
+`Media` is the attachment union returned by Kizlo APIs. Check `type` before reading properties that only
+belong to one member.
+
+```ts
+import type { Media } from "@kizlo/shared"
+
+function label(media: Media) {
+  if (media.type === "image") return media.alt || media.name
+  if (media.type === "audio" || media.type === "video") {
+    return `${media.name} (${media.duration ?? "unknown"} seconds)`
+  }
+  return media.name
+}
+```
+
+## Properties
+
+| Property | Image | Video | Audio | File |
+| --- | --- | --- | --- | --- |
+| `type` | `"image"` | `"video"` | `"audio"` | `"file"` |
+| `id`, `name`, `src` | Required | Required | Required | Required |
+| `mime` | Optional | Optional | Optional | Optional |
+| `alt` | Required | No | No | No |
+| `width`, `height` | Optional | Optional | No | No |
+| `variants`, `srcset` | Optional | No | No | No |
+| `duration` | No | Optional | Optional | No |
+
+`MediaImageVariant` contains `src`, `width`, and `height` for one registered WordPress image size.
+
+WordPress supplies optional image dimensions and renditions from attachment metadata. For video and audio,
+Kizlo maps WordPress attachment metadata `length` to `duration` as whole seconds. The property is absent when
+WordPress could not extract that metadata.
+
+## Named members
+
+Import a member when an API accepts or returns one media kind:
+
+```ts
+import type {
+  Media,
+  MediaAudio,
+  MediaFile,
+  MediaImage,
+  MediaImageVariant,
+  MediaVideo,
+} from "@kizlo/shared"
+```
+
+Image settings, featured media, comment post images, and WooCommerce product and cart images use
+`MediaImage`. File custom fields use `Media` because WordPress can attach an image, video, audio file, or
+another file type to them.
+
+## Migrate from the previous shape
+
+This is a breaking change while Kizlo is pre-1.0.
+
+- Add the `type` discriminator to authored or test media values.
+- Narrow `Media` by `type` before reading `alt`, dimensions, renditions, or `duration`.
+- Use `MediaImage` for image-only properties and `Media` for file custom fields.
+- Replace post, page, and comment author `avatar` media access with `avatarUrl`, which is `string | null`.
+- Read WooCommerce product and cart image URLs from the shared `src` property.
+
+Regenerate `wordpress.ts` after updating the WordPress plugins so generated contracts include the named media
+members and their discriminators.

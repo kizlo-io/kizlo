@@ -55,6 +55,7 @@ export function deserializeCart(data: WCK_Cart): Cart {
 			quantity: item.quantity,
 			isSoldIndividually: item.sold_individually,
 			images: item.images.map((item) => ({
+				type: "image",
 				id: item.id,
 				name: item.name,
 				alt: item.alt,

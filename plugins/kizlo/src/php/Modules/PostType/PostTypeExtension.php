@@ -101,7 +101,7 @@ class PostTypeExtension
 
         $thumbnail_id = get_post_thumbnail_id($id);
         if ($thumbnail_id) {
-            $base['featured_media'] = kizlo_ensure_media_data($thumbnail_id);
+            $base['featured_media'] = kizlo_ensure_media_image_data($thumbnail_id);
         }
 
         return $base;

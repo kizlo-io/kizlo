@@ -24,8 +24,65 @@ class DocumentTest extends IntrospectionTestCase
     {
         $schemas = $this->document()['schemas'];
 
-        foreach (['kizlo.error', 'kizlo.media', 'kizlo.seo'] as $id) {
+        foreach ([
+            'kizlo.error',
+            'kizlo.media',
+            'kizlo.media-image',
+            'kizlo.media-image-variant',
+            'kizlo.media-video',
+            'kizlo.media-audio',
+            'kizlo.media-file',
+            'kizlo.seo',
+        ] as $id) {
             $this->assertArrayHasKey($id, $schemas);
+        }
+    }
+
+    public function test_media_is_a_union_of_named_discriminated_members(): void
+    {
+        $schemas = $this->document()['schemas'];
+
+        $this->assertSame([
+            ['$ref' => 'kizlo.media-image'],
+            ['$ref' => 'kizlo.media-video'],
+            ['$ref' => 'kizlo.media-audio'],
+            ['$ref' => 'kizlo.media-file'],
+        ], $schemas['kizlo.media']['oneOf']);
+
+        foreach (['image', 'video', 'audio', 'file'] as $type) {
+            $this->assertSame(
+                [$type],
+                $schemas["kizlo.media-{$type}"]['properties']['type']['enum'],
+            );
+        }
+    }
+
+    public function test_only_image_media_publishes_image_properties(): void
+    {
+        $schemas = $this->document()['schemas'];
+
+        foreach (['kizlo.media-video', 'kizlo.media-audio', 'kizlo.media-file'] as $id) {
+            foreach (['alt', 'variants', 'srcset'] as $property) {
+                $this->assertArrayNotHasKey($property, $schemas[$id]['properties'], "{$id}.{$property}");
+            }
+        }
+
+        $this->assertArrayHasKey('duration', $schemas['kizlo.media-video']['properties']);
+        $this->assertArrayHasKey('duration', $schemas['kizlo.media-audio']['properties']);
+        $this->assertArrayNotHasKey('duration', $schemas['kizlo.media-image']['properties']);
+        $this->assertArrayNotHasKey('duration', $schemas['kizlo.media-file']['properties']);
+    }
+
+    public function test_settings_image_properties_reference_the_image_member(): void
+    {
+        $schemas = $this->document()['schemas'];
+
+        $this->assertSame('kizlo.media-image', $schemas['kizlo.settings-site']['properties']['fallback_image']['$ref']);
+        $this->assertSame('kizlo.media-image', $schemas['kizlo.settings-person']['properties']['image']['$ref']);
+        $this->assertSame('kizlo.media-image', $schemas['kizlo.settings-organization']['properties']['logo']['$ref']);
+
+        foreach (['logo', 'logo_dark', 'logo_icon', 'logo_icon_dark', 'logo_wordmark', 'logo_wordmark_dark', 'favicon', 'app_icon'] as $key) {
+            $this->assertSame('kizlo.media-image', $schemas['kizlo.settings-brand']['properties'][$key]['$ref'], $key);
         }
     }
 

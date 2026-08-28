@@ -1,4 +1,4 @@
-import { Media } from "@kizlo/shared"
+import { MediaImage } from "@kizlo/shared"
 import { CurrencyFormat } from "kizlo"
 import z from "zod/v4"
 import { ProductPrices } from "../product/schema"
@@ -67,7 +67,7 @@ export const CartItem = z.object({
 	slug: z.string(),
 	lowStockCount: z.number().nullable(),
 	isSoldIndividually: z.boolean(),
-	images: z.array(Media),
+	images: z.array(MediaImage),
 	variations: z.array(CartItemVariation),
 	prices: ProductPrices,
 	quantity: z.number(),

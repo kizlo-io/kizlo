@@ -111,7 +111,6 @@ class ProductModule
         $customer = get_userdata($customer_id);
 
         $featured_image_id = $product ? (int) get_post_thumbnail_id($product->get_id()) : 0;
-        $featured_image = wp_get_attachment_image_src($featured_image_id, 'full');
 
         $data['kizlo'] = array_merge([
             'customer' => [
@@ -123,11 +122,7 @@ class ProductModule
                 'id'            => $product ? $product->get_id() : 0,
                 'name'          => $product ? $product->get_name() : '',
                 'slug'          => $product ? $product->get_slug() : '',
-                'featured_image' => $featured_image[0] ? [
-                    'id'  => $featured_image_id,
-                    'src' => $featured_image[0],
-                    'alt' => get_post_meta($featured_image_id, '_wp_attachment_image_alt', true) ?: '',
-                ] : null,
+                'featured_image' => $featured_image_id ? kizlo_ensure_media_image_data($featured_image_id) : null,
             ],
         ], kizlo_apply_extend_filter('product_review', $comment));
 
@@ -176,9 +171,9 @@ class ProductModule
 
         /**
          * Enrich a single taxonomy_counts item (e.g. product_cat, product_tag)
-         * with term data and thumbnail. Thumbnail is stored as term meta under
-         * 'thumbnail_id' — a WooCommerce convention for product_cat.
-         * Other taxonomies will naturally return null for thumbnail.
+         * with term data and its image. The attachment is stored as term meta
+         * under `thumbnail_id`, a WooCommerce convention for product_cat.
+         * Other taxonomies naturally return null.
          */
         $enrich_taxonomy = function ($item) {
             $item = (array) $item;
@@ -188,8 +183,7 @@ class ProductModule
                 return null;
             }
 
-            $thumbnail_id  = get_term_meta($term->term_id, 'thumbnail_id', true);
-            $thumbnail_url = $thumbnail_id ? wp_get_attachment_image_url($thumbnail_id, 'full') : null;
+            $thumbnail_id = (int) get_term_meta($term->term_id, 'thumbnail_id', true);
 
             return [
                 'id'          => $term->term_id,
@@ -199,7 +193,7 @@ class ProductModule
                 'description' => $term->description,
                 'parent'      => $term->parent,
                 'count'       => $item['count'],
-                'thumbnail'   => $thumbnail_url,
+                'image'       => $thumbnail_id ? kizlo_ensure_media_image_data($thumbnail_id) : null,
             ];
         };
 

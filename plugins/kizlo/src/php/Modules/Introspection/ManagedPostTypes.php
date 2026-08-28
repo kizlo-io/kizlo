@@ -417,7 +417,7 @@ class ManagedPostTypes
 
         if (isset($properties['featured_media'])) {
             $block['featured_media'] = [
-                '$ref'        => CoreSchemas::MEDIA,
+                '$ref'        => CoreSchemas::MEDIA_IMAGE,
                 'description' => 'Absent when the entry has no featured image.',
             ];
         }
