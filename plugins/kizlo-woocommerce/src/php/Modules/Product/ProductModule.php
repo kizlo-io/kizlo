@@ -216,14 +216,7 @@ class ProductModule
         woocommerce_store_api_register_endpoint_data([
             'namespace'       => 'kizlo',
             'endpoint'        => ProductSchema::IDENTIFIER,
-            'data_callback'   => function (WC_Product $product) {
-                return array_merge([
-                    'stock' => $product->get_stock_quantity(),
-                    'on_sale_from' => wc_rest_prepare_date_response($product->get_date_on_sale_from(), false),
-                    'on_sale_to' => wc_rest_prepare_date_response($product->get_date_on_sale_to(), false),
-                    'hs_code'   => $product->get_meta('kizlo_hs_code')
-                ], kizlo_apply_extend_filter('product_list_item', $product));
-            },
+            'data_callback'   => [$this, 'storeProductExtensionData'],
             // Without this, WooCommerce publishes the data and describes none of
             // it: get_endpoint_schema() skips an extension registered with no
             // schema callback. The Store API product spec derives its response
@@ -232,6 +225,28 @@ class ProductModule
             'schema_callback' => [KizloBlocks::class, 'storeProduct'],
             'schema_type'     => ARRAY_A,
         ]);
+    }
+
+    /**
+     * Kizlo-owned data attached to every Store API product context.
+     *
+     * @return array<string, mixed>
+     */
+    public function storeProductExtensionData(WC_Product $product): array
+    {
+        return array_merge([
+            'stock'        => $product->get_stock_quantity(),
+            'on_sale_from' => $this->qualifiedDate($product->get_date_on_sale_from()),
+            'on_sale_to'   => $this->qualifiedDate($product->get_date_on_sale_to()),
+            'hs_code'      => $product->get_meta('kizlo_hs_code'),
+        ], kizlo_apply_extend_filter('product_list_item', $product));
+    }
+
+    private function qualifiedDate(?\WC_DateTime $date): ?string
+    {
+        $value = wc_rest_prepare_date_response($date);
+
+        return $value === null ? null : $value . 'Z';
     }
 
     public function injectReviewUserIdBeforeInsert(int $comment_id, WP_Comment $comment): int

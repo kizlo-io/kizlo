@@ -1,4 +1,4 @@
-import { resolveWpTimestamp, stringifiedMetaRecord } from "@kizlo/shared"
+import { stringifiedMetaRecord, timestampFromWpGmt } from "@kizlo/shared"
 import { publicPostStatus } from "../post-type/status"
 import { deserializeSeo } from "../seo/utils"
 import type { Post } from "./schema"
@@ -44,8 +44,8 @@ export function deserializePost(data: WPK_Post | WPK_PostListItem, options?: { p
 		format: data.format,
 		// List responses carry no resolved SEO block; only a single fetch does.
 		seo: "seo" in kizlo ? deserializeSeo(kizlo.seo) : null,
-		createdAt: resolveWpTimestamp(data.date_gmt) ?? resolveWpTimestamp(data.modified_gmt) ?? 0,
-		updatedAt: resolveWpTimestamp(data.modified_gmt) ?? 0,
+		createdAt: timestampFromWpGmt(data.date_gmt) ?? timestampFromWpGmt(data.modified_gmt) ?? 0,
+		updatedAt: timestampFromWpGmt(data.modified_gmt) ?? 0,
 		meta: stringifiedMetaRecord(data.meta),
 	}
 }

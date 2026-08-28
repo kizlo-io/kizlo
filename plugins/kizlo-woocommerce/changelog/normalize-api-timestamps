@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Emit Store API product sale dates as RFC 3339 UTC values
