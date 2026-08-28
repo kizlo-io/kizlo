@@ -1,117 +1,171 @@
-import { type MediaImage, normalizeArrayableValue, timestampFromIso, timestampFromWpGmt, toPublicMetadata } from "@kizlo/shared"
-import { deserializeCurrencyFormat, type WP_EndpointInput } from "kizlo"
+import { normalizeArrayableValue, timestampFromIso } from "@kizlo/shared"
+import { deserializeCurrencyFormat, deserializeSeo, type WP_EndpointInput, type WPK_Seo } from "kizlo"
 import {
 	type ListProductInputOut,
+	PRODUCT_RATINGS,
 	PRODUCT_STOCK_STATUSES,
-	PRODUCT_TYPES,
 	type Product,
-	type ProductCategoryRef,
 	type ProductFilters,
+	type ProductRating,
+	type ProductRecommendations,
 	type ProductStockStatus,
-	type ProductType,
+	type ProductSummary,
 } from "./schema"
-import type { ProductCustomFields, WCK_Product, WCSK_Product, WCSK_ProductCollectionData } from "./types"
+import type {
+	ProductCustomFields,
+	WCK_Product,
+	WCSK_Product,
+	WCSK_ProductCollectionData,
+	WCSK_ProductDetail,
+	WCSK_ProductSummary,
+} from "./types"
 
-/** Kizlo takes the rating filter as strings and the Store API takes it as the numbers it enumerates. */
-type ProductRatingFilter = NonNullable<WP_EndpointInput<"woocommerce.store.products.list">["rating"]>[number]
+type StoreProductListInput = WP_EndpointInput<"woocommerce.store.products.list">
+type DynamicTaxonomyInput = Partial<Record<`_unstable_tax_${string}`, string>>
+export type SerializedProductListInput = StoreProductListInput & DynamicTaxonomyInput
+
+const STORE_PRODUCT_LIST_INPUT_KEYS = [
+	"after",
+	"attribute_relation",
+	"attributes",
+	"before",
+	"brand",
+	"brand_operator",
+	"catalog_visibility",
+	"category",
+	"category_operator",
+	"date_column",
+	"exclude",
+	"featured",
+	"include",
+	"max_price",
+	"min_price",
+	"offset",
+	"on_sale",
+	"order",
+	"orderby",
+	"page",
+	"parent",
+	"parent_exclude",
+	"per_page",
+	"rating",
+	"related",
+	"search",
+	"sku",
+	"slug",
+	"stock_status",
+	"tag",
+	"tag_operator",
+	"type",
+] as const satisfies readonly (keyof StoreProductListInput)[]
+
+function assertNoMissingStoreProductInputs<_T extends never>(): void {}
+assertNoMissingStoreProductInputs<Exclude<keyof StoreProductListInput, (typeof STORE_PRODUCT_LIST_INPUT_KEYS)[number]>>()
 
 export function deserializeProduct(data: WCK_Product): Product {
+	return deserializeStoreProduct(data.kizlo.store_product, null)
+}
+
+export function deserializeStoreProduct(data: WCSK_Product | WCSK_ProductDetail, recommendations: ProductRecommendations | null): Product {
+	const summary = deserializeProductSummary(data)
+	const { kizlo } = deserializeExtensions(data.extensions)
+
 	return {
-		id: data.id,
-		type: data.type,
-		slug: data.slug,
-		name: data.name,
-		sku: data.sku,
-		description: data.description,
-		shortDescription: data.short_description,
-		prices: {
-			price: data.kizlo.prices.price,
-			// Null when the product is not on sale, which `+null` had been turning into a sale at zero.
-			salePrice: data.kizlo.prices.sale_price,
-			regularPrice: data.kizlo.prices.regular_price,
-		},
-		isSoldIndividually: data.sold_individually,
-		onSaleFrom: timestampFromWpGmt(data.date_on_sale_from_gmt),
-		lowStockRemaining: data.low_stock_amount,
-		onSaleTo: timestampFromWpGmt(data.date_on_sale_to_gmt),
-		isInStock: data.stock_status === "instock",
-		stock: data.stock_quantity,
-		images: deserializeImages(data.images),
-		categories: deserializeTermRefs(data.categories),
-		tags: deserializeTermRefs(data.tags),
-		averageRating: data.average_rating,
-		reviewCount: data.rating_count,
-		attributes: data.kizlo.attributes.map((item) => ({
-			id: item.id,
-			hasVariations: item.has_variations,
-			name: item.name,
-			taxonomy: item.taxonomy,
-			terms: item.terms,
-		})),
-		groupedProducts: data.grouped_products,
-		isOnBackorder: data.backordered,
-		isPurchasable: data.purchasable,
-		isOnSale: data.on_sale,
-		parentId: data.parent_id,
-		brands: data.brands,
-		variations: data.kizlo.variations,
-		hasOptions: !!data.kizlo.variations.length,
-		currencyFormat: deserializeCurrencyFormat(data.kizlo.currency_format),
-		meta: toPublicMetadata(data.meta_data),
-		seo: null,
-		custom: data.kizlo.custom,
+		...summary,
+		weight: data.weight,
+		dimensions: data.dimensions,
+		formattedWeight: data.formatted_weight,
+		formattedDimensions: data.formatted_dimensions,
+		stockQuantity: nullableNumber(kizlo.stock),
+		saleStartsAt: timestampFromIso(typeof kizlo.on_sale_from === "string" ? kizlo.on_sale_from : null),
+		saleEndsAt: timestampFromIso(typeof kizlo.on_sale_to === "string" ? kizlo.on_sale_to : null),
+		seo: isRecord(kizlo.seo) ? deserializeSeo(kizlo.seo as unknown as WPK_Seo) : null,
+		custom: productCustomFields(kizlo.custom),
+		recommendations,
 	}
 }
 
-export function deserializeStoreProduct(data: WCSK_Product): Product {
-	// WooCommerce registers the Store API extension without declaring it required, so the contract
-	// admits a product carrying no `kizlo` block. Nothing produces one while this plugin is active,
-	// and reading through an empty block beats making every field below optional.
-	const kizlo = data.extensions.kizlo ?? { stock: null, on_sale_from: null, on_sale_to: null, hs_code: null, custom: {} }
+export function deserializeProductSummary(data: WCSK_Product | WCSK_ProductSummary): ProductSummary {
+	const { extensions, kizlo } = deserializeExtensions(data.extensions)
+	const termUrls = deserializeTermUrls(kizlo.term_urls)
 
 	return {
 		id: data.id,
-		type: productType(data.type),
 		name: data.name,
 		slug: data.slug,
-		sku: data.sku,
-		description: data.description,
+		parentId: data.parent === 0 ? null : data.parent,
+		type: data.type,
+		variationDescription: data.variation,
+		url: typeof kizlo.url === "string" ? kizlo.url : null,
+		sku: data.sku === "" ? null : data.sku,
 		shortDescription: data.short_description,
-		isInStock: data.is_in_stock,
+		description: data.description,
+		isPasswordProtected: data.is_password_protected,
+		isOnSale: data.on_sale,
+		prices: {
+			price: Number(data.prices.price),
+			regularPrice: Number(data.prices.regular_price),
+			salePrice: data.on_sale ? Number(data.prices.sale_price) : null,
+			priceRange: data.prices.price_range
+				? { minAmount: Number(data.prices.price_range.min_amount), maxAmount: Number(data.prices.price_range.max_amount) }
+				: null,
+		},
+		currencyFormat: deserializeCurrencyFormat(data.prices),
+		priceHtml: data.price_html,
+		averageRating: Number(data.average_rating),
 		reviewCount: data.review_count,
-		averageRating: data.average_rating,
+		images: data.images.map((image) => ({
+			type: "image",
+			id: image.id,
+			src: image.src,
+			srcset: image.srcset,
+			name: image.name,
+			alt: image.alt,
+		})),
+		categories: data.categories.map((term) => deserializeTermRef(term, "product_cat", termUrls)),
+		tags: data.tags.map((term) => deserializeTermRef(term, "product_tag", termUrls)),
+		brands: data.brands.map((term) => deserializeTermRef(term, "product_brand", termUrls)),
+		attributes: data.attributes.map((attribute) => ({
+			id: attribute.id,
+			name: attribute.name,
+			taxonomy: attribute.taxonomy ?? null,
+			hasVariations: attribute.has_variations,
+			terms: attribute.terms.map((term) => ({
+				id: term.id,
+				name: term.name,
+				slug: term.slug,
+				isDefault: term.default,
+			})),
+		})),
+		variations: data.variations.map((variation) => ({
+			id: variation.id,
+			attributes: variation.attributes.map((attribute) => ({ name: attribute.name, value: attribute.value ?? null })),
+		})),
+		groupedProductIds: data.grouped_products,
+		hasOptions: data.has_options,
+		isPurchasable: data.is_purchasable,
+		isInStock: data.is_in_stock,
+		isOnBackorder: data.is_on_backorder,
+		stockAvailability: data.stock_availability,
 		lowStockRemaining: data.low_stock_remaining,
 		isSoldIndividually: data.sold_individually,
-		prices: {
-			price: +data.prices.price,
-			salePrice: +data.prices.sale_price,
-			regularPrice: +data.prices.regular_price,
+		addToCart: {
+			text: data.add_to_cart.text,
+			description: data.add_to_cart.description,
+			singleText: data.add_to_cart.single_text,
+			minimum: data.add_to_cart.minimum,
+			maximum: data.add_to_cart.maximum,
+			multipleOf: data.add_to_cart.multiple_of,
 		},
-		images: deserializeImages(data.images),
-		categories: deserializeTermRefs(data.categories),
-		tags: deserializeTermRefs(data.tags),
-		attributes: data.attributes.map((item) => ({
-			id: item.id,
-			name: item.name,
-			terms: item.terms,
-			taxonomy: item.taxonomy,
-			hasVariations: item.has_variations,
-		})),
-		currencyFormat: deserializeCurrencyFormat(data.prices),
-		brands: data.brands,
-		groupedProducts: data.grouped_products,
-		hasOptions: data.has_options,
-		isOnBackorder: data.is_on_backorder,
-		isPurchasable: data.is_purchasable,
-		isOnSale: data.on_sale,
-		parentId: data.parent,
-		variations: data.variations,
-		stock: kizlo.stock,
-		onSaleFrom: timestampFromIso(kizlo.on_sale_from),
-		onSaleTo: timestampFromIso(kizlo.on_sale_to),
-		seo: null,
-		custom: productCustomFields(kizlo.custom),
-		meta: {},
+		extensions,
+	}
+}
+
+export function deserializeProductRecommendations(data: WCSK_ProductDetail): ProductRecommendations {
+	return {
+		upsells: deserializeEmbeddedProducts(data._embedded?.upsells),
+		crossSells: deserializeEmbeddedProducts(data._embedded?.cross_sells),
+		related: deserializeEmbeddedProducts(data._embedded?.related),
 	}
 }
 
@@ -126,6 +180,9 @@ export function deserializeProductFilters(data: WCSK_ProductCollectionData): Pro
 	const minPrice = +data.price_range.min_price
 
 	return {
+		ratingCounts: (data.rating_counts ?? []).flatMap((entry) =>
+			(PRODUCT_RATINGS as readonly number[]).includes(entry.rating) ? [{ count: entry.count, rating: entry.rating as ProductRating }] : [],
+		),
 		stockStatuses: (data.stock_status_counts ?? []).flatMap((entry) => {
 			const status = stockStatus(entry.status)
 			return status ? [{ count: entry.count, status }] : []
@@ -156,33 +213,34 @@ export function deserializeProductFilters(data: WCSK_ProductCollectionData): Pro
 	}
 }
 
-export function serializeProductListInput(data?: ListProductInputOut): WP_EndpointInput<"woocommerce.store.products.list"> {
-	return {
+export function serializeProductListInput(data?: ListProductInputOut): SerializedProductListInput {
+	const searchParams: SerializedProductListInput = {
 		after: data?.after,
 		attribute_relation: data?.attributeRelation,
 		before: data?.before,
-		brand: data?.brand,
+		brand: commaSeparated(data?.brand),
 		brand_operator: data?.brandOperator,
 		catalog_visibility: data?.catalogVisibility,
-		category: data?.category,
+		category: commaSeparated(data?.category),
 		category_operator: data?.categoryOperator,
+		date_column: data?.dateColumn,
 		featured: data?.featured,
-		max_price: data?.maxPrice ? String(data?.maxPrice) : undefined,
-		min_price: data?.minPrice ? String(data?.minPrice) : undefined,
+		max_price: data?.maxPrice === undefined ? undefined : String(data.maxPrice),
+		min_price: data?.minPrice === undefined ? undefined : String(data.minPrice),
 		on_sale: data?.onSale,
-		orderby: data?.orderby,
+		orderby: data?.orderBy,
 		parent: normalizeArrayableValue(data?.parent),
 		parent_exclude: normalizeArrayableValue(data?.parentExclude),
-		rating: normalizeArrayableValue(data?.rating)?.map((value) => Number(value) as ProductRatingFilter),
-		sku: data?.sku,
-		slug: data?.slug,
+		rating: normalizeArrayableValue(data?.rating),
+		sku: commaSeparated(data?.sku),
+		slug: commaSeparated(data?.slug),
 		stock_status: normalizeArrayableValue(data?.stockStatus),
-		tag: data?.tag,
+		tag: commaSeparated(data?.tag),
 		tag_operator: data?.tagOperator,
-		type: data?.type,
+		type: data?.type as StoreProductListInput["type"],
 		attributes: data?.attributes?.map((item) => ({
 			operator: item.operator,
-			attribute: item.attribute,
+			attribute: item.taxonomy,
 			slug: normalizeArrayableValue(item.slug),
 			term_id: normalizeArrayableValue(item.termId),
 		})),
@@ -195,28 +253,58 @@ export function serializeProductListInput(data?: ListProductInputOut): WP_Endpoi
 		related: data?.related,
 		search: data?.search,
 	}
+
+	for (const filter of data?.taxonomies ?? []) {
+		const key: `_unstable_tax_${string}` = `_unstable_tax_${filter.taxonomy}`
+		searchParams[key] = commaSeparated(filter.termIds ?? filter.slugs)
+		if (filter.operator !== undefined) searchParams[`${key}_operator`] = filter.operator
+	}
+
+	return searchParams
 }
 
-/**
- * WooCommerce declares both of these fields as plain strings, so the contract cannot narrow them and
- * neither can this without saying what it does with a value it does not recognize.
- *
- * A product type Kizlo has no name for reads as `simple`, which is what every gateway to a product
- * page needs it to behave like. An unrecognized stock status is dropped from the filter list
- * instead: a count nobody can label is not a filter anyone can offer.
- */
-function productType(type: string): ProductType {
-	return (PRODUCT_TYPES as readonly string[]).includes(type) ? (type as ProductType) : "simple"
+function commaSeparated(value: string | number | Array<string | number> | undefined): string | undefined {
+	if (value === undefined) return undefined
+	return (Array.isArray(value) ? value : [value]).join(",")
 }
 
 function stockStatus(status: string): ProductStockStatus | null {
 	return (PRODUCT_STOCK_STATUSES as readonly string[]).includes(status) ? (status as ProductStockStatus) : null
 }
 
-function deserializeImages(images: { id: number; src: string; name: string; alt: string }[]): MediaImage[] {
-	return images.map((item) => ({ type: "image", id: item.id, src: item.src, name: item.name, alt: item.alt }))
+function deserializeTermRef(term: { id: number; name: string; slug: string }, taxonomy: string, urls: Record<string, string>) {
+	return { id: term.id, name: term.name, slug: term.slug, url: urls[`${taxonomy}:${term.id}`] ?? null }
 }
 
-function deserializeTermRefs(terms: { id: number; name: string; slug: string }[]): ProductCategoryRef[] {
-	return terms.map((term) => ({ id: term.id, name: term.name, slug: term.slug }))
+function deserializeTermUrls(value: unknown): Record<string, string> {
+	if (!Array.isArray(value)) return {}
+
+	return Object.fromEntries(
+		value.flatMap((item) => {
+			if (!isRecord(item) || typeof item.id !== "number" || typeof item.taxonomy !== "string" || typeof item.url !== "string") return []
+			return [[`${item.taxonomy}:${item.id}`, item.url]]
+		}),
+	)
+}
+function deserializeEmbeddedProducts(collections: WCSK_ProductSummary[][] | undefined): ProductSummary[] {
+	return (collections ?? []).flat().map(deserializeProductSummary)
+}
+
+function deserializeExtensions(value: unknown): { extensions: Record<string, unknown>; kizlo: Record<string, unknown> } {
+	const all = asRecord(value)
+	const { kizlo: rawKizlo, ...extensions } = all
+
+	return { extensions, kizlo: asRecord(rawKizlo) }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+	return isRecord(value) ? value : {}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function nullableNumber(value: unknown): number | null {
+	return typeof value === "number" ? value : null
 }

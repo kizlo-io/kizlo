@@ -86,6 +86,12 @@ namespace Automattic\WooCommerce\StoreApi\Schemas\V1 {
     class ProductSchema extends AbstractSchema
     {
         const IDENTIFIER = 'product';
+
+        /**
+         * @param mixed $product
+         * @return array<string, mixed>
+         */
+        public function get_item_response($product): array {}
     }
 }
 

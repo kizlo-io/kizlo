@@ -4,11 +4,16 @@ namespace Kizlo\WooCommerce\Modules\Product;
 
 use WP_Term;
 use WP_Comment;
+use WP_Post;
 use WC_Product;
 use WC_Product_Attribute;
+use Kizlo\Support\Utils;
+use Kizlo\Modules\Post\PostSchema;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
+use Automattic\WooCommerce\StoreApi\SchemaController;
+use Automattic\WooCommerce\StoreApi\StoreApi;
 use Automattic\WooCommerce\StoreApi\Schemas\V1\ProductSchema;
 use Automattic\WooCommerce\StoreApi\Formatters\CurrencyFormatter;
 
@@ -81,6 +86,10 @@ class ProductModule
             ];
         }, $product->get_children());
 
+        $schema        = $this->productSchema();
+        $store_product = $schema->get_item_response($product);
+        $store_product = $this->extendStoreProductDetail($store_product, $product);
+
         $data['kizlo'] = array_merge([
             'attributes' => $attributes,
             'variations' => $variations,
@@ -90,9 +99,40 @@ class ProductModule
                 'regular_price' => $to_minor_unit($product->get_regular_price()),
                 'sale_price'    => $product->is_on_sale() ? $to_minor_unit($product->get_sale_price()) : null,
             ],
+            'store_product' => $store_product,
         ], kizlo_apply_extend_filter('product', $product), [
             'custom' => (object) $this->customFields($product),
         ]);
+
+        return $data;
+    }
+
+    /**
+     * Add fields that only a product detail response owns.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public function extendStoreProductDetail(array $data, WC_Product $product): array
+    {
+        $post       = get_post($product->get_id());
+        $post_data = $post instanceof WP_Post
+            ? $this->postExtensionData($post, true)
+            : ['url' => null, 'custom' => [], 'seo' => null];
+
+        $extensions = is_array($data['extensions'] ?? null) || is_object($data['extensions'] ?? null)
+            ? (array) $data['extensions']
+            : [];
+        $kizlo = is_array($extensions['kizlo'] ?? null) || is_object($extensions['kizlo'] ?? null)
+            ? (array) $extensions['kizlo']
+            : [];
+
+        $extensions['kizlo'] = array_merge($kizlo, [
+            'url'    => $post_data['url'],
+            'seo'    => $post_data['seo'],
+            'custom' => (object) $post_data['custom'],
+        ]);
+        $data['extensions'] = $extensions;
 
         return $data;
     }
@@ -218,8 +258,8 @@ class ProductModule
             // Without this, WooCommerce publishes the data and describes none of
             // it: get_endpoint_schema() skips an extension registered with no
             // schema callback. The Store API product spec derives its response
-            // from that schema, so the four fields above would be returned and
-            // described nowhere.
+            // from that schema, so these fields would be returned and described
+            // nowhere.
             'schema_callback' => [KizloBlocks::class, 'storeProduct'],
             'schema_type'     => ARRAY_A,
         ]);
@@ -232,14 +272,20 @@ class ProductModule
      */
     public function storeProductExtensionData(WC_Product $product): array
     {
-        return array_merge([
+        $post      = get_post($product->get_id());
+        $post_data = $post instanceof WP_Post
+            ? $this->postExtensionData($post)
+            : ['url' => null, 'custom' => [], 'seo' => null];
+
+        return [
+            'url'          => $post_data['url'],
+            'term_urls'    => $this->productTermUrls($product),
             'stock'        => $product->get_stock_quantity(),
             'on_sale_from' => $this->qualifiedDate($product->get_date_on_sale_from()),
             'on_sale_to'   => $this->qualifiedDate($product->get_date_on_sale_to()),
-            'hs_code'      => $product->get_meta('kizlo_hs_code'),
-        ], kizlo_apply_extend_filter('product_list_item', $product), [
-            'custom' => (object) $this->customFields($product),
-        ]);
+            'seo'          => $post_data['seo'],
+            'custom'       => (object) $post_data['custom'],
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -276,6 +322,66 @@ class ProductModule
         return $comment_id;
     }
 
+    /**
+     * Resolve Kizlo-owned fields for a product's backing post.
+     *
+     * SEO is opt-in because collection responses must not expose it. Password-
+     * protected products never expose SEO, even when a caller requests it.
+     *
+     * @return array{url: string, custom: array<string, mixed>, seo: array{head: mixed, schema: mixed}|null}
+     */
+    private function postExtensionData(WP_Post $post, bool $include_seo = false): array
+    {
+        $settings           = Utils::getSettings();
+        $post_type_settings = PostTypeSettings::load($post->post_type);
+        $custom             = CustomFieldsStore::read(
+            CustomFieldsStore::META_POST,
+            $post->ID,
+            $post_type_settings->getCustomFields(),
+        );
+
+        $seo = null;
+        if ($include_seo && $post_type_settings->getSeoEnabled() && ! post_password_required($post)) {
+            $post_seo = new PostSchema($settings);
+            $seo      = [
+                'head'   => $post_seo->buildMeta($post),
+                'schema' => $post_seo->jsonLd($post),
+            ];
+        }
+
+        return [
+            'url'    => $settings->resolvePostUrl($post, $post_type_settings),
+            'custom' => $custom,
+            'seo'    => $seo,
+        ];
+    }
+
+    /**
+     * @return array<int, array{id: int, taxonomy: string, url: string}>
+     */
+    private function productTermUrls(WC_Product $product): array
+    {
+        $taxonomies = [];
+        foreach (['product_cat', 'product_tag', 'product_brand'] as $taxonomy) {
+            if (taxonomy_exists($taxonomy)) {
+                $taxonomies[] = $taxonomy;
+            }
+        }
+
+        if (!$product->get_id() || !$taxonomies) return [];
+
+        $terms = wp_get_object_terms($product->get_id(), $taxonomies);
+        if (is_wp_error($terms)) return [];
+
+        $settings = Utils::getSettings();
+
+        return array_map(static fn(WP_Term $term): array => [
+            'id'       => $term->term_id,
+            'taxonomy' => $term->taxonomy,
+            'url'      => $settings->resolveTermUrl($term, $settings->taxonomies->get($term->taxonomy)),
+        ], $terms);
+    }
+
     private function _getAttributeByTaxonomy(string $taxonomy): ?object
     {
         /** @var array<string, object|null> $cache */
@@ -294,5 +400,16 @@ class ProductModule
         }
 
         return $cache[$taxonomy] = null;
+    }
+
+    private function productSchema(): ProductSchema
+    {
+        $schema = StoreApi::container()->get(SchemaController::class)->get(ProductSchema::IDENTIFIER);
+
+        if (! $schema instanceof ProductSchema) {
+            throw new \RuntimeException('The WooCommerce Store API product schema is unavailable.');
+        }
+
+        return $schema;
     }
 }

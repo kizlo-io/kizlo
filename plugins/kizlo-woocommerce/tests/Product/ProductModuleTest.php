@@ -6,6 +6,7 @@ use Kizlo\Modules\CustomFields\CustomFieldsStore;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
+use Kizlo\Support\Utils;
 use Kizlo\WooCommerce\Modules\Product\ProductModule;
 use Kizlo\WooCommerce\Tests\TestCase;
 use WC_DateTime;
@@ -60,5 +61,54 @@ class ProductModuleTest extends TestCase
         $this->assertSame('string', $schema['properties']['product_note']['type']);
         $this->assertTrue($schema['properties']['product_note']['required']);
         $this->assertArrayNotHasKey('additionalProperties', $schema);
+    }
+
+    public function test_detail_enrichment_preserves_third_party_extensions_without_store_url_fallbacks(): void
+    {
+        $module = new ProductModule();
+        $result = $module->extendStoreProductDetail(
+            [
+                'extensions' => (object) [
+                    'acme' => (object) ['retained' => true],
+                ],
+            ],
+            new WC_Product_Simple(),
+        );
+
+        $this->assertTrue($result['extensions']['acme']->retained);
+        $this->assertNull($result['extensions']['kizlo']['url']);
+        $this->assertSame([], (array) $result['extensions']['kizlo']['custom']);
+        $this->assertArrayNotHasKey('hs_code', $result['extensions']['kizlo']);
+        $this->assertArrayNotHasKey('extend', $result['extensions']['kizlo']);
+    }
+
+    public function test_store_extension_resolves_headless_relationship_urls(): void
+    {
+        $term_id = self::factory()->term->create([
+            'taxonomy' => 'product_cat',
+            'name'     => 'Plans',
+            'slug'     => 'plans',
+        ]);
+
+        $product = new WC_Product_Simple();
+        $product->set_name('Subscription');
+        $product->set_regular_price('10');
+        $product->save();
+        wp_set_object_terms($product->get_id(), [$term_id], 'product_cat');
+
+        $module = new ProductModule();
+        $result = $module->storeProductExtensionData($product);
+        $term   = get_term($term_id, 'product_cat');
+
+        $this->assertInstanceOf(\WP_Term::class, $term);
+
+        $settings = Utils::getSettings();
+        $expected = $settings->resolveTermUrl($term, $settings->taxonomies->get('product_cat'));
+        $urls     = array_column($result['term_urls'], null, 'taxonomy');
+
+        $this->assertSame($expected, $urls['product_cat']['url']);
+        $this->assertSame($term_id, $urls['product_cat']['id']);
+        $this->assertArrayNotHasKey('hs_code', $result);
+        $this->assertArrayNotHasKey('extend', $result);
     }
 }

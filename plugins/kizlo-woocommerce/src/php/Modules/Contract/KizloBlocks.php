@@ -30,9 +30,8 @@ use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
  *
  * The last two have nowhere to be declared, so the route specs merge them in.
  *
- * Each block is open. `kizlo_apply_extend_filter()` lets a site add fields to any
- * of them, so naming the four this plugin writes and closing the object would
- * describe a shape the response does not have.
+ * The REST v3 and collection blocks remain open because their extension hooks
+ * can add fields that this plugin cannot describe ahead of time.
  */
 final class KizloBlocks
 {
@@ -44,6 +43,26 @@ final class KizloBlocks
     public static function storeProduct(): array
     {
         return [
+            'url' => [
+                'description' => 'The headless product URL resolved from Kizlo post type settings, or null when unavailable.',
+                'type'        => ['string', 'null'],
+                'context'     => ['view', 'edit', 'embed'],
+                'readonly'    => true,
+            ],
+            'term_urls' => [
+                'description' => 'Headless URLs for the product category, tag, and brand relationships.',
+                'type'        => 'array',
+                'context'     => ['view', 'edit', 'embed'],
+                'readonly'    => true,
+                'items'       => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'id'       => ['type' => 'integer', 'required' => true],
+                        'taxonomy' => ['type' => 'string', 'required' => true],
+                        'url'      => ['type' => 'string', 'required' => true],
+                    ],
+                ],
+            ],
             'stock' => [
                 'description' => 'Stock quantity, or null when the product does not manage stock.',
                 'type'        => ['integer', 'null'],
@@ -64,9 +83,9 @@ final class KizloBlocks
                 'context'     => ['view', 'edit'],
                 'readonly'    => true,
             ],
-            'hs_code' => [
-                'description' => 'Harmonized System code from the `kizlo_hs_code` meta field.',
-                'type'        => ['string', 'null'],
+            'seo' => [
+                'description' => 'Kizlo SEO for a single unlocked product, or null when SEO is disabled or the product is locked.',
+                'type'        => ['object', 'null'],
                 'context'     => ['view', 'edit'],
                 'readonly'    => true,
             ],
@@ -155,6 +174,11 @@ final class KizloBlocks
                 ],
                 'currency_format' => ['$ref' => WooCommerceSchemas::CURRENCY_FORMAT, 'required' => true],
                 'custom'          => self::customFields(),
+                'store_product' => [
+                    '$ref'        => WooCommerceSchemas::STORE_PRODUCT,
+                    'required'    => true,
+                    'description' => 'The same Store API product shape published reads use, added so a draft preview can share their deserializer.',
+                ],
             ],
         ];
     }

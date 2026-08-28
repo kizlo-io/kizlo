@@ -1,7 +1,6 @@
 import { MediaImage } from "@kizlo/shared"
 import { CurrencyFormat } from "kizlo"
 import z from "zod/v4"
-import { ProductPrices } from "../product/schema"
 import { BillingAddress, ItemTotals, ShippingAddress, Totals } from "../schema"
 
 export const CART_ITEM_STATUSES = ["insufficient_stock", "low_stock", "out_of_stock", "unavailable", "available"] as const
@@ -54,6 +53,13 @@ export const CartItemVariation = z.object({
 })
 export type CartItemVariation = z.infer<typeof CartItemVariation>
 
+export const CartItemPrices = z.object({
+	price: z.number(),
+	salePrice: z.number().nullable(),
+	regularPrice: z.number(),
+})
+export type CartItemPrices = z.infer<typeof CartItemPrices>
+
 export const CartItem = z.object({
 	key: z.string(),
 	type: z.string(),
@@ -69,7 +75,7 @@ export const CartItem = z.object({
 	isSoldIndividually: z.boolean(),
 	images: z.array(MediaImage),
 	variations: z.array(CartItemVariation),
-	prices: ProductPrices,
+	prices: CartItemPrices,
 	quantity: z.number(),
 	totals: ItemTotals,
 })
