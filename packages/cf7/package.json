@@ -1,6 +1,6 @@
 {
 	"name": "@kizlo/cf7",
-	"version": "0.1.11",
+	"version": "0.1.12",
 	"type": "module",
 	"description": "Contact Form 7 integration for Kizlo.",
 	"keywords": [
