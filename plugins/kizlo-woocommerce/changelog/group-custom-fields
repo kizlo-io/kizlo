@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Group product custom fields under `extensions.kizlo.custom` with exact generated types
