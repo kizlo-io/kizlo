@@ -4,7 +4,7 @@
  * Plugin Name: Kizlo Contact Form 7
  * Plugin URI: https://kizlo.io/plugins/kizlo-cf7
  * Description: Connects Contact Form 7 with the @kizlo/cf7 integration.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: Kizlo Developers
  * Author URI: https://kizlo.io
  * License: GPL v2 or later
@@ -19,7 +19,7 @@
 
 defined('ABSPATH') || exit;
 
-define('KIZLO_CF7_VERSION', '0.2.0');
+define('KIZLO_CF7_VERSION', '0.2.1');
 define('KIZLO_CF7_FILE', __FILE__);
 define('KIZLO_CF7_PATH', plugin_dir_path(__FILE__));
 define('KIZLO_CF7_URL', plugin_dir_url(__FILE__));
