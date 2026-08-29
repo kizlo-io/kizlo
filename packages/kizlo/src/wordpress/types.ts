@@ -49,6 +49,12 @@ type IsAny<T> = 0 extends 1 & T ? true : false
 /** Generated WordPress endpoint trees augment this registry in the project that owns them. */
 export interface WordPressClientRegistry {}
 
+/** Generated WordPress modules augment this flat registry with every raw operation they expose. */
+export interface WordPressEndpointRegistry {}
+
+/** Generated WordPress modules augment this registry from managed-content item schemas. */
+export interface WordPressCustomFieldsRegistry {}
+
 /**
  * The WordPress client this project compiles against: its generated endpoints bound to the
  * transport, or the bare transport. The stub written before the first generation registers `any`,
@@ -58,17 +64,22 @@ export type ActiveWordPressClient = WordPressClientRegistry extends { endpoints:
 	? WP_Client<TEndpoints> & WordPressTransport
 	: WordPressTransport
 
-/** Walk a dotted endpoint path (`postTypes.post.retrieve`) into the active client. */
-type WP_EndpointAtPath<TClient, TPath extends string> = TPath extends `${infer TKey}.${infer TRest}`
-	? TKey extends keyof TClient
-		? WP_EndpointAtPath<TClient[TKey], TRest>
-		: never
-	: TPath extends keyof TClient
-		? TClient[TPath]
+/** Every raw WordPress operation path generated for the active project. */
+export type WP_EndpointPath = keyof WordPressEndpointRegistry extends never ? string : Extract<keyof WordPressEndpointRegistry, string>
+
+/**
+ * Resolve a generated registry entry. The empty-registry branch keeps the package declarations
+ * usable before a project writes its first generated module; the generated stub adds the same
+ * permissive fallback explicitly.
+ */
+type WP_EndpointAtPath<TPath extends WP_EndpointPath> = keyof WordPressEndpointRegistry extends never
+	? any
+	: TPath extends keyof WordPressEndpointRegistry
+		? WordPressEndpointRegistry[TPath]
 		: never
 
 type WP_EndpointCallResult<TEndpoint> =
-	IsAny<TEndpoint> extends true ? any : TEndpoint extends (input: never) => Promise<infer TResult> ? TResult : never
+	IsAny<TEndpoint> extends true ? any : TEndpoint extends WP_Endpoint<any, infer TResult> ? TResult : never
 
 /**
  * `never` is short-circuited rather than let through: every type is assignable to it, so an
@@ -90,7 +101,7 @@ type WP_EndpointSuccessData<TEndpoint> =
  * resolves against whichever client is compiling, so it stays well-formed in a project that has
  * not generated one yet (`any`) or whose WordPress does not serve the endpoint (`never`).
  */
-export type WP_EndpointData<TPath extends string> = WP_EndpointSuccessData<WP_EndpointAtPath<ActiveWordPressClient, TPath>>
+export type WP_EndpointData<TPath extends WP_EndpointPath> = WP_EndpointSuccessData<WP_EndpointAtPath<TPath>>
 
 /**
  * Everything a generated endpoint resolves to, success and failure alike, addressed the same way.
@@ -98,17 +109,42 @@ export type WP_EndpointData<TPath extends string> = WP_EndpointSuccessData<WP_En
  * name the whole result uses, so a service can publish its return type without the project's
  * generated module leaking into the package's own declarations.
  */
-export type WP_EndpointResult<TPath extends string> = WP_EndpointCallResult<WP_EndpointAtPath<ActiveWordPressClient, TPath>>
+export type WP_EndpointResult<TPath extends WP_EndpointPath> = WP_EndpointCallResult<WP_EndpointAtPath<TPath>>
 
 type WP_EndpointCallInput<TEndpoint> =
-	IsAny<TEndpoint> extends true ? any : TEndpoint extends (...args: infer TArguments) => unknown ? Exclude<TArguments[0], undefined> : never
+	IsAny<TEndpoint> extends true ? any : TEndpoint extends WP_Endpoint<infer TInput, any> ? TInput : never
 
 /**
  * What a generated endpoint accepts, addressed the same way as {@link WP_EndpointData}. Kizlo's own
  * modules name their WordPress payloads with this rather than restating them, so an input can only
  * drift from the route it is sent to by the route itself changing.
  */
-export type WP_EndpointInput<TPath extends string> = WP_EndpointCallInput<WP_EndpointAtPath<ActiveWordPressClient, TPath>>
+export type WP_EndpointInput<TPath extends WP_EndpointPath> = WP_EndpointCallInput<WP_EndpointAtPath<TPath>>
+
+type WP_EndpointCallError<TEndpoint> =
+	IsAny<TEndpoint> extends true
+		? any
+		: TEndpoint extends WP_Endpoint<any, infer TResult>
+			? Exclude<TResult extends { error: infer TError } ? TError : never, null>
+			: never
+
+/** The non-null WordPress error returned by a generated raw endpoint. */
+export type WP_EndpointError<TPath extends WP_EndpointPath> = WP_EndpointCallError<WP_EndpointAtPath<TPath>>
+
+/** Every canonical managed-content custom-field mapping generated for the active project. */
+export type WP_CustomFieldsPath = keyof WordPressCustomFieldsRegistry extends never
+	? string
+	: Extract<keyof WordPressCustomFieldsRegistry, string>
+
+/**
+ * Exact custom fields from a managed post type or taxonomy's canonical item schema. The fallback
+ * remains permissive until a generated module augments the registry with the project's mappings.
+ */
+export type WP_CustomFields<TPath extends WP_CustomFieldsPath> = keyof WordPressCustomFieldsRegistry extends never
+	? Record<string, unknown>
+	: TPath extends keyof WordPressCustomFieldsRegistry
+		? WordPressCustomFieldsRegistry[TPath]
+		: never
 
 /**
  * The codes that widen every endpoint's own union, because no introspection document can declare

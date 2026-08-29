@@ -13,6 +13,18 @@ import {
 } from "./error"
 import type { AnyMiddleware, InferMiddlewares, Middleware } from "./middleware"
 
+declare const schemaTypeOutput: unique symbol
+
+type TypedSchema<TInput, TOutput = TInput> = Schema<TInput, TOutput> & {
+	readonly [schemaTypeOutput]: TOutput
+}
+
+type ProcedureOutput<TScope, TOutput extends Schema> = TScope extends "api"
+	? TOutput extends TypedSchema<any, infer TPreservedOutput>
+		? TPreservedOutput
+		: JsonifiedValue<SchemaOutput<TOutput>>
+	: SchemaOutput<TOutput>
+
 // ====================================================
 // SHARED
 // ====================================================
@@ -226,7 +238,7 @@ export function createProcedure<
 ): Procedure<
 	TScope,
 	ResolvedSchemaInput<TScope, TPathname, TInput, TBody, TParams, TQuery, THeaders>,
-	TScope extends "api" ? JsonifiedValue<SchemaOutput<TOutput>> : SchemaOutput<TOutput>,
+	ProcedureOutput<TScope, TOutput>,
 	TError
 > {
 	return {
@@ -238,7 +250,11 @@ export function createProcedure<
 	}
 }
 
-export function schemaType<TInput, TOutput = TInput>(schema?: Schema): Schema<TInput, TOutput> {
+/**
+ * Give a schema an explicit input and output type. For API procedure outputs, the declared output
+ * is already the client-visible wire type and is preserved without structural JSON remapping.
+ */
+export function schemaType<TInput, TOutput = TInput>(schema?: Schema): TypedSchema<TInput, TOutput> {
 	return (schema ?? {
 		"~standard": {
 			vendor: "custom",
@@ -247,7 +263,7 @@ export function schemaType<TInput, TOutput = TInput>(schema?: Schema): Schema<TI
 				return { value: value as TOutput }
 			},
 		},
-	}) as Schema<TInput, TOutput>
+	}) as TypedSchema<TInput, TOutput>
 }
 
 export function buildProcedure(procedure: AnyProcedure) {

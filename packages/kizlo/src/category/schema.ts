@@ -2,13 +2,17 @@ import { arrayable, BooleanLike, lenient, Metadata, NumberLike } from "@kizlo/sh
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import type { WPK_Category } from "./types"
+import type { WP_CustomFields } from "../wordpress"
 
 const WP_CATEGORY_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs", "term_group", "description", "count"] as const
 
 // ====================================================
 // CATEGORY
 // ====================================================
+
+export type CategoryCustomFields = WP_CustomFields<"taxonomies.category">
+
+export const CategoryCustomFieldsSchema: z.ZodType<CategoryCustomFields, CategoryCustomFields> = customFieldsSchema<CategoryCustomFields>()
 
 export const Category = z.object({
 	id: z.number(),
@@ -19,10 +23,10 @@ export const Category = z.object({
 	parent: z.number().nullable(),
 	postCount: z.number(),
 	seo: Seo.nullable(),
-	custom: customFieldsSchema<WPK_Category["kizlo"]["custom"]>(),
+	custom: CategoryCustomFieldsSchema,
 	meta: Metadata,
 })
-export type Category = z.output<typeof Category>
+export type Category = Omit<z.output<typeof Category>, "custom"> & { custom: CategoryCustomFields }
 
 // ====================================================
 // RETRIEVE
@@ -38,7 +42,7 @@ export type RetrieveCategoryInput = z.input<typeof RetrieveCategoryInput>
 // ====================================================
 
 export const CategoryList = z.object({ items: z.array(Category), meta: ListMetadata })
-export type CategoryList = z.output<typeof CategoryList>
+export type CategoryList = Omit<z.output<typeof CategoryList>, "items"> & { items: Category[] }
 
 export const CategoryOrderBy = z.enum(WP_CATEGORY_ORDER_BYS)
 export type CategoryOrderBy = z.infer<typeof CategoryOrderBy>

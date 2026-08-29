@@ -1,4 +1,4 @@
-import type { WP_EndpointData } from "kizlo"
+import type { WP_CustomFields, WP_EndpointData } from "kizlo"
 
 /**
  * A product from the REST v3 API, with the `kizlo` block this plugin's response filter adds.
@@ -17,7 +17,7 @@ export type WCK_Product = WP_EndpointData<"woocommerce.products.retrieve">
 export type WCSK_Product = WP_EndpointData<"woocommerce.store.products.list">[number]
 
 /** The exact resolved custom-field shape configured for products on this WordPress site. */
-export type ProductCustomFields = WCK_Product["kizlo"]["custom"]
+export type ProductCustomFields = WP_CustomFields<"postTypes.product">
 
 /** A published Store API product that may carry Kizlo's fixed recommendation embeddings. */
 export type WCSK_ProductDetail = WP_EndpointData<"woocommerce.store.products.getById">

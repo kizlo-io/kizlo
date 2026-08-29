@@ -1,7 +1,7 @@
 import type { SchemaOutput } from "@kizlo/shared"
 import type { NestedClient } from "@orpc/client"
 import { type DefinedErrorMapLike, type KizloError, toKizloError, type WithCommonErrorMap } from "./error"
-import type { AnyProcedureTree, Procedure } from "./procedure"
+import type { AnyProcedure, AnyProcedureTree, Procedure } from "./procedure"
 
 export type MaybeCallerOptions<UInput> = unknown extends UInput
 	? []
@@ -27,6 +27,22 @@ export type KizloResult<TOutput, TErrors extends DefinedErrorMapLike = DefinedEr
 			error: KizloErrorUnion<WithCommonErrorMap<TErrors>>
 			success: false
 	  }
+
+/** The input accepted by one public Kizlo procedure object. */
+export type InferProcedureInput<TProcedure extends AnyProcedure> =
+	TProcedure extends Procedure<any, infer TInput, any, any> ? TInput : never
+
+/** The successful data returned by one public Kizlo procedure object. */
+export type InferProcedureData<TProcedure extends AnyProcedure> =
+	TProcedure extends Procedure<any, any, infer TOutput, any> ? TOutput : never
+
+/** The declared and common client-visible errors returned by one public Kizlo procedure object. */
+export type InferProcedureError<TProcedure extends AnyProcedure> =
+	TProcedure extends Procedure<any, any, any, infer TErrors> ? KizloErrorUnion<WithCommonErrorMap<TErrors>> : never
+
+/** The complete wrapped result returned by a normal call to one public Kizlo procedure object. */
+export type InferProcedureResult<TProcedure extends AnyProcedure> =
+	TProcedure extends Procedure<any, any, infer TOutput, infer TErrors> ? KizloResult<TOutput, TErrors> : never
 
 export type ResultClient<T extends AnyProcedureTree> = {
 	[K in keyof T]: T[K] extends Procedure<infer _Scope, infer Input, infer Output, infer Errors>

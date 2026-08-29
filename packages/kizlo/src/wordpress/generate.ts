@@ -401,6 +401,32 @@ function renderEndpointNode(node: WordPressEndpointNode, indent: string): string
 	return `{\n${entries.join("\n")}\n${indent.slice(0, -1)}}`
 }
 
+function renderEndpointRegistry(node: WordPressEndpointNode, path: string[] = []): string[] {
+	const entries: string[] = []
+	for (const [key, child] of sortedChildren(node)) {
+		entries.push(...renderEndpointRegistry(child, [...path, key]))
+	}
+	for (const entry of sortedEndpoints(node)) {
+		const input = endpointName(entry.apiId, entry.operationId, "EndpointInput")
+		const result = endpointName(entry.apiId, entry.operationId, "EndpointResult")
+		entries.push(`\t\t${JSON.stringify([...path, entry.member].join("."))}: WP_Endpoint<${input}, ${result}>`)
+	}
+	return entries
+}
+
+function renderCustomFieldsRegistry(document: IntrospectionDocument): string[] {
+	const entries: string[] = []
+	for (const id of Object.keys(document.schemas).sort((left, right) => left.localeCompare(right))) {
+		const match = /^(post-types|taxonomies)\.([^.]+)\.item$/.exec(id)
+		if (!match) continue
+		const namespace = match[1] === "post-types" ? "postTypes" : "taxonomies"
+		const slug = match[2]
+		if (!slug) continue
+		entries.push(`\t\t${JSON.stringify(`${namespace}.${camel(slug)}`)}: ${schemaName(id)}["kizlo"]["custom"]`)
+	}
+	return entries
+}
+
 function operationEntries(apiId: string, api: IntrospectionApi): Array<[string, IntrospectionOperation]> {
 	const entries: Array<[string, IntrospectionOperation]> = []
 	for (const [, operations] of sortedEntries(api.paths)) {
@@ -464,14 +490,30 @@ function assertUniqueClientMembers(node: WordPressEndpointNode, path: string[] =
 
 const RUNTIME_TYPES = ["WP_Failure", "WP_Success", "WP_TransportFailure"]
 
-const REGISTRY = `declare module "kizlo" {\n\tinterface WordPressClientRegistry {\n\t\tendpoints: typeof endpoints\n\t}\n}`
+function renderRegistries(tree: WordPressEndpointNode, document: IntrospectionDocument): string {
+	const endpoints = renderEndpointRegistry(tree)
+	const customFields = renderCustomFieldsRegistry(document)
+	return [
+		`declare module "kizlo" {`,
+		`\tinterface WordPressClientRegistry {`,
+		`\t\tendpoints: typeof endpoints`,
+		`\t}`,
+		`\tinterface WordPressEndpointRegistry {`,
+		...endpoints,
+		`\t}`,
+		`\tinterface WordPressCustomFieldsRegistry {`,
+		...customFields,
+		`\t}`,
+		`}`,
+	].join("\n")
+}
 
 /**
  * The `kizlo` names a generated module uses. `wpEndpoint` is the only value among them, so the rest
  * erase at build.
  */
 function kizloImports(body: string, hasEndpoints: boolean): string {
-	const types = new Set(["WP_Client", ...RUNTIME_TYPES.filter((name) => new RegExp(`\\b${name}\\b`).test(body))])
+	const types = new Set(["WP_Client", ...["WP_Endpoint", ...RUNTIME_TYPES].filter((name) => new RegExp(`\\b${name}\\b`).test(body))])
 	const values = hasEndpoints ? ["wpEndpoint"] : []
 	return [...types, ...values]
 		.sort()
@@ -524,7 +566,7 @@ export function generateWordPressModule(document: IntrospectionDocument): Genera
 		body,
 		`export const endpoints = ${endpointBody}`,
 		`export type WordPressClient = WP_Client<typeof endpoints>`,
-		REGISTRY,
+		renderRegistries(tree, document),
 	].join(DECLARATION_SEPARATOR)
 
 	const imports = `import { ${kizloImports(moduleBody, endpointBody !== "{}")} } from "kizlo"`

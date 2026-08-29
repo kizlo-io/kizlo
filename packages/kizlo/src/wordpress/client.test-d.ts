@@ -9,7 +9,9 @@ import type {
 	WP_Client,
 	WP_Endpoint,
 	WP_EndpointData,
+	WP_EndpointError,
 	WP_EndpointInput,
+	WP_EndpointPath,
 	WP_EndpointResult,
 	WP_Failure,
 	WP_Result,
@@ -132,6 +134,17 @@ describe("createWordPressClient", () => {
  * own, so these assert against whatever this repo's `wordpress.ts` currently declares.
  */
 describe("addressing an endpoint by path", () => {
+	it("exposes only generated raw operation paths", () => {
+		const path: WP_EndpointPath = "postTypes.post.retrieve"
+		expectTypeOf(path).toEqualTypeOf<"postTypes.post.retrieve">()
+		// @ts-expect-error public procedure names do not become fake raw endpoints
+		const publicProcedure: WP_EndpointPath = "woocommerce.products.get"
+		// @ts-expect-error unknown raw endpoint path
+		const missing: WP_EndpointPath = "seo.nowhere.retrieve"
+		void publicProcedure
+		void missing
+	})
+
 	it("resolves the email endpoint's real payload", () => {
 		expectTypeOf<WP_EndpointData<"email.send">>().toEqualTypeOf<{ subject: string; to: string[] }>()
 		expectTypeOf<WP_EndpointData<"email.send">>().not.toHaveProperty("success")
@@ -146,10 +159,9 @@ describe("addressing an endpoint by path", () => {
 		}>()
 	})
 
-	it("answers `never` for a route this WordPress does not serve", () => {
-		expectTypeOf<WP_EndpointData<"seo.nowhere.retrieve">>().toBeNever()
-		expectTypeOf<WP_EndpointResult<"seo.nowhere.retrieve">>().toBeNever()
-		expectTypeOf<WP_EndpointInput<"seo.nowhere.retrieve">>().toBeNever()
+	it("resolves the complete result and its non-null error", () => {
+		expectTypeOf<WP_EndpointError<"email.send">>().toEqualTypeOf<Exclude<WP_EndpointResult<"email.send">["error"], null>>()
+		expectTypeOf<WP_EndpointResult<"email.send">>().not.toBeNever()
 	})
 })
 
@@ -382,7 +394,7 @@ describe("described WooCommerce routes", () => {
  * division from both ends, so moving a code between them cannot pass unnoticed.
  */
 describe("error codes on a generated call", () => {
-	type CodeOn<TPath extends string> = Extract<WP_EndpointResult<TPath>, { data: null }>["error"]["code"]
+	type CodeOn<TPath extends WP_EndpointPath> = Extract<WP_EndpointResult<TPath>, { data: null }>["error"]["code"]
 	/** An endpoint declaring nothing of its own, so its codes are the common bucket exactly. */
 	type CommonCode = Extract<WP_Result<{ id: number }, never>, { data: null }>["error"]["code"]
 

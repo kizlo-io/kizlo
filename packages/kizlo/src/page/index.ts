@@ -1,7 +1,7 @@
 import { normalizeArrayableValue } from "@kizlo/shared"
 import { compare } from "../shared/crypto"
 import { parseIdentifier } from "../shared/identifier"
-import { createProcedure } from "../shared/procedure"
+import { createProcedure, schemaType } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
 import { GET_PAGE_ERROR_MAP, LIST_PAGE_ERROR_MAP } from "./error"
 import { ListPageInput, Page, PageList, RetrievePageInput } from "./schema"
@@ -15,7 +15,7 @@ export const PAGE_PROCEDURES = {
 			path: "/pages/{identifier}",
 			params: RetrievePageInput.pick({ identifier: true }),
 			query: RetrievePageInput.pick({ password: true, previewToken: true }).optional(),
-			output: Page,
+			output: schemaType<Page>(Page),
 			errors: GET_PAGE_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
@@ -78,7 +78,7 @@ export const PAGE_PROCEDURES = {
 			method: "GET",
 			path: "/pages",
 			query: ListPageInput.optional(),
-			output: PageList,
+			output: schemaType<PageList>(PageList),
 			errors: LIST_PAGE_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {

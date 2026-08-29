@@ -28,7 +28,17 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export function wpEndpoint<TInput, TResult>(definition: unknown): WP_Endpoint<TInput, TResult>
 	export function createWordPressClient<T extends object>(transport: WordPressTransport, endpoints: T): WP_Client<T> & WordPressTransport
 	export interface WordPressClientRegistry {}
+	export interface WordPressEndpointRegistry {}
+	export interface WordPressCustomFieldsRegistry {}
 	export type ActiveWordPressClient = WordPressClientRegistry extends { endpoints: infer O } ? (O extends object ? WP_Client<O> & WordPressTransport : WordPressTransport) : WordPressTransport
+	export type WP_EndpointPath = Extract<keyof WordPressEndpointRegistry, string>
+	type RegisteredEndpoint<P extends WP_EndpointPath> = WordPressEndpointRegistry[P]
+	export type WP_EndpointInput<P extends WP_EndpointPath> = RegisteredEndpoint<P> extends WP_Endpoint<infer I, any> ? I : never
+	export type WP_EndpointResult<P extends WP_EndpointPath> = RegisteredEndpoint<P> extends WP_Endpoint<any, infer R> ? R : never
+	export type WP_EndpointData<P extends WP_EndpointPath> = Extract<WP_EndpointResult<P>, { error: null }>["data"]
+	export type WP_EndpointError<P extends WP_EndpointPath> = Exclude<WP_EndpointResult<P>["error"], null>
+	export type WP_CustomFieldsPath = Extract<keyof WordPressCustomFieldsRegistry, string>
+	export type WP_CustomFields<P extends WP_CustomFieldsPath> = WordPressCustomFieldsRegistry[P]
 	export function createProcedure(options: unknown, handler: (options: { context: { wordpress: ActiveWordPressClient } }) => unknown): unknown
 }
 `
@@ -94,6 +104,9 @@ describe("generateWordPressClient", () => {
 		expect(first).toContain("export const endpoints = {")
 		expect(first).toContain("\tpostTypes: {")
 		expect(first).toContain("book: {")
+		expect(first).toContain('"postTypes.book.retrieve": WP_Endpoint<WP_PostTypesBookRetrieveEndpointInput,')
+		expect(first).toContain('"postTypes.book": WP_PostTypesBookItem["kizlo"]["custom"]')
+		expect(first).toContain('"taxonomies.genre": WP_TaxonomiesGenreItem["kizlo"]["custom"]')
 	})
 
 	test("emits one shape for every target: the endpoint tree, registered and bindable", () => {
@@ -105,7 +118,39 @@ describe("generateWordPressClient", () => {
 		expect(client).toContain(`declare module "kizlo"`)
 		expect(client).toContain("endpoints: typeof endpoints")
 		expect(client).toContain("export interface WP_AcmeBook extends WP_AcmeEntity")
-		expect(client).toContain(`import { type WP_Client, type WP_Failure, type WP_Success, wpEndpoint } from "kizlo"`)
+		expect(client).toContain(`import { type WP_Client, type WP_Endpoint, type WP_Failure, type WP_Success, wpEndpoint } from "kizlo"`)
+	})
+
+	test("registers exact raw endpoint and canonical custom-field mappings", () => {
+		const client = generateWordPressClient(INTROSPECTION_FIXTURE)
+
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": client,
+				"usage.ts": `import type {
+					WP_CustomFields,
+					WP_EndpointData,
+					WP_EndpointError,
+					WP_EndpointInput,
+					WP_EndpointPath,
+					WP_EndpointResult,
+				} from "kizlo"
+				const path: WP_EndpointPath = "postTypes.book.retrieve"
+				const input: WP_EndpointInput<typeof path> = { identifier: "dune" }
+				const data: WP_EndpointData<typeof path> = { id: 1, status: "publish" }
+				declare const error: WP_EndpointError<typeof path>
+				declare const result: WP_EndpointResult<typeof path>
+				const isbn: string = (null as unknown as WP_CustomFields<"postTypes.book">).isbn
+				const shelf: number = (null as unknown as WP_CustomFields<"taxonomies.genre">).shelf
+				// @ts-expect-error public procedure names are not raw WordPress operations
+				type Fake = WP_EndpointData<"woocommerce.products.get">
+				// @ts-expect-error invalid raw endpoint path
+				type Missing = WP_EndpointInput<"postTypes.book.missing">
+				export { data, error, input, isbn, path, result, shelf }
+				export type { Fake, Missing }`,
+			}),
+		).toEqual([])
 	})
 
 	test("formats empty records without padding", () => {

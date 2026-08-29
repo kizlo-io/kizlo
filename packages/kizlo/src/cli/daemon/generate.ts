@@ -59,6 +59,12 @@ export const WORDPRESS_STUB = [
 	`\tinterface WordPressClientRegistry {`,
 	`\t\tendpoints: typeof endpoints`,
 	`\t}`,
+	`\tinterface WordPressEndpointRegistry {`,
+	`\t\t[path: string]: any`,
+	`\t}`,
+	`\tinterface WordPressCustomFieldsRegistry {`,
+	`\t\t[path: string]: Record<string, unknown>`,
+	`\t}`,
 	`}`,
 	``,
 ].join("\n")
