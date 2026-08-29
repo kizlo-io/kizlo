@@ -4,6 +4,11 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-08-29
+### Changed
+- Group managed custom-field inputs and outputs under `custom`
+- Return discriminated image, video, audio, and file media shapes from public APIs
+
 ## [0.12.0] - 2026-08-21
 ### Added
 - Add a Kizlo API contract system and the GET /kizlo/v1/introspect endpoint that serves it
@@ -142,6 +147,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.13.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.12.0...kizlo-v0.13.0
 [0.12.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.11.0...kizlo-v0.12.0
 [0.11.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.10.0...kizlo-v0.11.0
 [0.10.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.9.0...kizlo-v0.10.0
