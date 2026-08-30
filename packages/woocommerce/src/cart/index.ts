@@ -20,7 +20,7 @@ import {
 	UpdateCartInput,
 	UpdateCartItemInput,
 } from "./schema"
-import { deserializeCart } from "./utils"
+import { deserializeCart, serializeCartUpdateInput } from "./utils"
 
 export const CART_PROCEDURES = {
 	get: createProcedure(
@@ -28,7 +28,7 @@ export const CART_PROCEDURES = {
 			scope: "api",
 			method: "GET",
 			path: "/cart",
-			output: Cart.nullable(),
+			output: Cart,
 			errors: GET_CART_ERROR_MAP,
 			middlewares: [sessionMiddleware()],
 		},
@@ -58,50 +58,18 @@ export const CART_PROCEDURES = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input: { body: input }, errors }) => {
-			const connInfo = await context.getConnInfo()
-			const billing = input.billing ?? { ...input.shipping, email: undefined }
-
-			// Every address field is a required string on the Store API, so a partial address is sent
-			// filled out rather than sparse. The geo fields are the exception worth reading twice: a
-			// missing state or country falls back to the request's own location, which is what makes
-			// shipping quotable before the shopper has typed an address.
-			const address = {
-				first_name: billing.firstName ?? "",
-				last_name: billing.lastName ?? "",
-				address_1: billing.address1 ?? "",
-				address_2: billing.address2 ?? "",
-				company: billing.company ?? "",
-				phone: billing.phone ?? "",
-				city: billing.city ?? "",
-				state: billing.state ?? connInfo?.state ?? "",
-				country: billing.country ?? connInfo?.country ?? "",
-				postcode: billing.postcode ?? connInfo?.postcode ?? "",
-			}
-
-			const response = await context.wordpress.woocommerce.store.cart.updateCustomer(
-				{
-					billing_address: { ...address, email: billing.email ?? "" },
-					...(input.shipping && {
-						shipping_address: {
-							...address,
-							first_name: input.shipping.firstName ?? "",
-							last_name: input.shipping.lastName ?? "",
-							address_1: input.shipping.address1 ?? "",
-							address_2: input.shipping.address2 ?? "",
-							company: input.shipping.company ?? "",
-							phone: input.shipping.phone ?? "",
-							city: input.shipping.city ?? "",
-							state: input.shipping.state ?? connInfo?.state ?? "",
-							country: input.shipping.country ?? connInfo?.country ?? "",
-							postcode: input.shipping.postcode ?? connInfo?.postcode ?? "",
-						},
-					}),
-				},
-				{ headers: context.sessionHeaders },
-			)
+			const response = await context.wordpress.woocommerce.store.cart.updateCustomer(serializeCartUpdateInput(input), {
+				headers: context.sessionHeaders,
+			})
 
 			if (response.error) {
 				switch (response.error.code) {
+					case "rest_invalid_param":
+					case "woocommerce_rest_invalid_address":
+					case "woocommerce_rest_invalid_address_country":
+					case "woocommerce_rest_invalid_email_address":
+					case "woocommerce_rest_missing_email_address":
+						throw errors.CART_ADDRESS_INVALID({ message: response.error.message })
 					default:
 						context.logger.error("Update cart customer unhandled error", response.error, { code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()
@@ -158,9 +126,9 @@ export const CART_PROCEDURES = {
 			async ({ context, input: { body: input }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.addItem(
 					{
-						id: input.productId,
+						id: input.variationId ?? input.productId,
 						quantity: input.quantity,
-						variation: input.variations ?? [],
+						variation: input.selectedAttributes ?? [],
 					},
 					{ headers: context.sessionHeaders },
 				)
@@ -237,7 +205,7 @@ export const CART_PROCEDURES = {
 		remove: createProcedure(
 			{
 				scope: "api",
-				method: "PATCH",
+				method: "DELETE",
 				path: "/cart/items/{key}",
 				params: RemoveCartItemInput.pick({ key: true }),
 				output: Cart,
@@ -298,7 +266,7 @@ export const CART_PROCEDURES = {
 		remove: createProcedure(
 			{
 				scope: "api",
-				method: "POST",
+				method: "DELETE",
 				path: "/cart/coupons/{code}",
 				params: RemoveCouponInput.pick({ code: true }),
 				output: Cart,

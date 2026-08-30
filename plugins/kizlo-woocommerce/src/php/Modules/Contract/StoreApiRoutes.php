@@ -183,6 +183,10 @@ final class StoreApiRoutes
                     $properties = self::normalizeProductProperties($properties);
                 }
 
+                if ($identifier === 'cart') {
+                    $properties = self::normalizeCartProperties($properties);
+                }
+
                 // Collection data carries a `kizlo` block added by a route
                 // interceptor, which is a response filter and has no schema half for
                 // the derivation to find.
@@ -281,6 +285,48 @@ final class StoreApiRoutes
         $properties['attributes']['items']['properties']['taxonomy']['nullable'] = true;
         $properties['variations']['items']['properties']['attributes']['items']['properties']['value']['nullable'] = true;
         $properties['extensions']['additionalProperties'] = true;
+
+        return $properties;
+    }
+
+    /**
+     * Correct Store API cart shapes whose executable response is wider than the
+     * schema WooCommerce publishes.
+     *
+     * @param array<string, array<string, mixed>> $properties
+     * @return array<string, array<string, mixed>>
+     */
+    private static function normalizeCartProperties(array $properties): array
+    {
+        $fee = $properties['fees']['items']['properties'];
+        $fee['key'] = $fee['id'];
+        $fee['key']['description'] = 'Runtime identifier for the fee within the cart.';
+        unset($fee['id']);
+        $properties['fees']['items']['properties'] = $fee;
+
+        $properties['payment_methods']['items'] = ['type' => 'string'];
+        $properties['payment_requirements']['items'] = ['type' => 'string'];
+        $properties['extensions']['additionalProperties'] = true;
+        $properties['items']['items']['properties']['item_data']['items']['properties']['display']['nullable'] = true;
+
+        // WooCommerce's ItemSchema describes extensions with its inherited
+        // ProductSchema identifier, while CartItemSchema serializes them with
+        // its own cart-item identifier. Replace the described Product block
+        // with the Cart Item block the runtime actually returns.
+        $item_extensions = &$properties['items']['items']['properties']['extensions'];
+        $item_extensions['properties'] = kizlo_translate_spec_properties([
+            'kizlo' => [
+                'description' => 'Extension data registered by kizlo',
+                'type'        => ['object', 'null'],
+                'properties'  => KizloBlocks::storeCartItem(),
+            ],
+        ], WooCommerceSchemas::STORE_CART . '.items.extensions', required: true);
+        $item_extensions['additionalProperties'] = true;
+        unset($item_extensions);
+
+        $address_value = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
+        $properties['billing_address']['additionalProperties'] = $address_value;
+        $properties['shipping_address']['additionalProperties'] = $address_value;
 
         return $properties;
     }
@@ -433,13 +479,18 @@ final class StoreApiRoutes
                 'woocommerce_rest_cart_shipping_rate_not_found',
                 'woocommerce_rest_shipping_disabled',
             ]],
-            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', '200', []],
+            ['cart-update-customer', 'update_customer', 'POST', 'Set the billing and shipping addresses on the cart', '200', [
+                'woocommerce_rest_invalid_address',
+                'woocommerce_rest_invalid_address_country',
+                'woocommerce_rest_invalid_email_address',
+                'woocommerce_rest_missing_email_address',
+            ]],
         ];
 
         $declarations = [];
 
         foreach ($operations as [$identifier, $operation, $method, $summary, $status, $errors]) {
-            $declarations[] = self::declaration(
+            $declaration = self::declaration(
                 routes: $routes,
                 identifier: $identifier,
                 api: self::CART_API_ID,
@@ -452,6 +503,23 @@ final class StoreApiRoutes
                 ],
                 required: self::REQUIRED_ARGUMENTS[$identifier] ?? [],
             );
+
+            if ($identifier === 'cart-update-customer') {
+                foreach (['billing_address', 'shipping_address'] as $address) {
+                    $properties = $declaration['input']['properties'][$address]['properties'] ?? [];
+                    foreach ($properties as &$property) {
+                        unset($property['required']);
+                    }
+                    unset($property);
+
+                    $declaration['input']['properties'][$address]['properties'] = $properties;
+                    $declaration['input']['properties'][$address]['additionalProperties'] = [
+                        'anyOf' => [['type' => 'string'], ['type' => 'boolean']],
+                    ];
+                }
+            }
+
+            $declarations[] = $declaration;
         }
 
         return $declarations;

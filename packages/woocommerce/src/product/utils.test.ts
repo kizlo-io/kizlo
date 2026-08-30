@@ -137,6 +137,15 @@ test("Store products normalize the complete public model without losing custom p
 	expect(result.saleStartsAt).toBe(Date.UTC(2026, 0, 2, 3, 4, 5))
 })
 
+test("Store products treat an omitted custom-attribute default flag as false", () => {
+	const product = rawProduct()
+	const term = product.attributes[0]?.terms[0]
+	if (!term) throw new Error("Expected the product fixture to contain an attribute term")
+	delete (term as Partial<typeof term>).default
+
+	expect(deserializeStoreProduct(product, null).attributes[0]?.terms[0]?.isDefault).toBe(false)
+})
+
 test("Store product sale dates require an explicit timezone and do not depend on the host timezone", () => {
 	const product = rawProduct()
 	const kizlo = product.extensions.kizlo

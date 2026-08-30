@@ -26,6 +26,8 @@ import type { BillingAddress } from "./schema"
 let kizlo: ReturnType<typeof instance>
 let productId = 0
 let productSlug = ""
+let variableProductId = 0
+let variationId = 0
 
 function instance() {
 	return getKizloTestInstance({ integrations: [woocommerce()] })
@@ -40,6 +42,11 @@ beforeAll(async () => {
 
 	productId = seeded.id
 	productSlug = seeded.slug
+
+	const variable = products.items.find((item) => item.slug === "test-product-variable")
+	if (!variable?.variations[0]) throw new Error("The woocommerce fixture seeded no variable product.")
+	variableProductId = variable.id
+	variationId = variable.variations[0].id
 })
 
 afterAll(async () => {
@@ -55,7 +62,7 @@ function client() {
 
 async function emptyCart(): Promise<void> {
 	const cart = await client().cart.get.call()
-	for (const item of cart?.lineItems ?? []) {
+	for (const item of cart.items) {
 		await client().cart.items.remove.call({ params: { key: item.key } })
 	}
 }
@@ -189,8 +196,8 @@ test("cart.get returns a cart conforming to Cart", async () => {
 	await emptyCart()
 	const result = await client().cart.get.call()
 
-	expect(Cart.nullable().safeParse(result).success).toBe(true)
-	expect(result?.lineItems).toHaveLength(0)
+	expect(Cart.safeParse(result).success).toBe(true)
+	expect(result.items).toHaveLength(0)
 })
 
 test("cart.items.add puts the product in the cart and answers with the whole cart", async () => {
@@ -198,9 +205,35 @@ test("cart.items.add puts the product in the cart and answers with the whole car
 	const result = await client().cart.items.add.call({ body: { productId, quantity: 2 } })
 
 	expect(Cart.safeParse(result).success).toBe(true)
-	expect(result.lineItems).toHaveLength(1)
-	expect(result.lineItems[0]?.productId).toBe(productId)
-	expect(result.lineItems[0]?.quantity).toBe(2)
+	expect(result.items).toHaveLength(1)
+	expect(result.items[0]?.productId).toBe(productId)
+	expect(result.items[0]?.quantity).toBe(2)
+	expect(result.items[0]?.url).not.toBeNull()
+	expect(result.items[0]?.prices.salePrice).toBeNull()
+	expect(result.items[0]?.custom).toEqual({ product_note: "Fixture product" })
+	expect(result.crossSells.map((product) => product.slug)).toContain("test-product-3")
+})
+
+test("cart.items.add maps variation lines to base and variation IDs", async () => {
+	await emptyCart()
+	const result = await client().cart.items.add.call({
+		body: {
+			productId: variableProductId,
+			variationId,
+		},
+	})
+
+	expect(result.items).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				productId: variableProductId,
+				variationId,
+				quantity: 1,
+				slug: "test-product-variable",
+			}),
+		]),
+	)
+	expect(result.items[0]?.custom).toEqual({ product_note: "Fixture product" })
 })
 
 test("the cart survives between calls, so the session header carries identity", async () => {
@@ -209,8 +242,8 @@ test("the cart survives between calls, so the session header carries identity", 
 
 	const result = await client().cart.get.call()
 
-	expect(result?.lineItems).toHaveLength(1)
-	expect(result?.totalItems).toBe(1)
+	expect(result.items).toHaveLength(1)
+	expect(result.itemCount).toBe(1)
 })
 
 test("an API guest cart is available to a server-rendered storefront request", async () => {
@@ -248,7 +281,7 @@ test("an API guest cart is available to a server-rendered storefront request", a
 	const storefront = getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth: guestAuth, cookies } })
 
 	const serverCart = await storefront.client.woocommerce.cart.get.call()
-	expect(serverCart?.lineItems).toEqual(expect.arrayContaining([expect.objectContaining({ productId, quantity: 1 })]))
+	expect(serverCart.items).toEqual(expect.arrayContaining([expect.objectContaining({ productId, quantity: 1 })]))
 
 	await emptyCart()
 	const signedInApi = getKizloTestInstance({ baseUrl: apiUrl, integrations: [woocommerce()] })
@@ -268,11 +301,57 @@ test("cart.items.add maps an unknown product to its Kizlo error", async () => {
 test("cart.items.remove takes the item key WooCommerce assigned", async () => {
 	await emptyCart()
 	const added = await client().cart.items.add.call({ body: { productId, quantity: 1 } })
-	const key = added.lineItems[0]?.key ?? ""
+	const key = added.items[0]?.key ?? ""
 
 	const result = await client().cart.items.remove.call({ params: { key } })
 
-	expect(result.lineItems).toHaveLength(0)
+	expect(result.items).toHaveLength(0)
+})
+
+test("cart.items.update changes quantity through the shared cart serializer", async () => {
+	await emptyCart()
+	const added = await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+	const key = added.items[0]?.key ?? ""
+
+	const result = await client().cart.items.update.call({ params: { key }, body: { quantity: 2 } })
+
+	expect(result.items[0]).toMatchObject({ key, productId, quantity: 2 })
+})
+
+test("cart.update preserves omitted address fields and clears explicit empty values", async () => {
+	await emptyCart()
+	await client().cart.update.call({
+		body: {
+			shippingAddress: {
+				firstName: "Stored",
+				city: "Los Angeles",
+				state: "CA",
+				postcode: "90210",
+				country: "US",
+			},
+		},
+	})
+
+	const updated = await client().cart.update.call({ body: { shippingAddress: { postcode: "10001", firstName: "" } } })
+
+	expect(updated.shippingAddress).toMatchObject({ firstName: "", city: "Los Angeles", state: "CA", postcode: "10001", country: "US" })
+})
+
+test("cart.selectShippingRate accepts and returns the package identifier", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+	const addressed = await client().cart.update.call({
+		body: { shippingAddress: { city: "Los Angeles", state: "CA", postcode: "90210", country: "US" } },
+	})
+	const shippingPackage = addressed.shippingPackages[0]
+	const rate = shippingPackage?.rates[0]
+	if (!shippingPackage || !rate) throw new Error("The woocommerce fixture exposed no shipping rate.")
+
+	const selected = await client().cart.selectShippingRate.call({ body: { rateId: rate.id, packageId: shippingPackage.id } })
+
+	expect(selected.shippingPackages.flatMap((pkg) => pkg.rates)).toEqual(
+		expect.arrayContaining([expect.objectContaining({ id: rate.id, selected: true })]),
+	)
 })
 
 test("cart.coupons.apply and remove round-trip the seeded coupon", async () => {
@@ -280,10 +359,10 @@ test("cart.coupons.apply and remove round-trip the seeded coupon", async () => {
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
 	const applied = await client().cart.coupons.apply.call({ body: { code: "test10" } })
-	expect(applied.couponLines.map((line) => line.code)).toContain("test10")
+	expect(applied.coupons.map((coupon) => coupon.code)).toContain("test10")
 
 	const removed = await client().cart.coupons.remove.call({ params: { code: "test10" } })
-	expect(removed.couponLines).toHaveLength(0)
+	expect(removed.coupons).toHaveLength(0)
 })
 
 test("cart.coupons.apply maps an unknown coupon to its Kizlo error", async () => {
@@ -407,13 +486,15 @@ test("cart.updateItem changes an item it did not create with 200", async () => {
 test("checkout.get returns a checkout carrying the cart WooCommerce does not declare", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+	const cart = await client().cart.get.call()
 
 	const result = await client().checkout.get.call()
 
 	expect(Checkout.safeParse(result).success).toBe(true)
 	// `__experimentalCart` is returned by both checkout responses and described by neither, so this
 	// resolving at all is the hand-written half of the spec doing its job.
-	expect(result.cart?.lineItems).toHaveLength(1)
+	expect(result.cart && Cart.safeParse(result.cart).success).toBe(true)
+	expect(result.cart?.items).toEqual(cart.items)
 })
 
 /**
