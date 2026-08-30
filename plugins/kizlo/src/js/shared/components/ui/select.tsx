@@ -22,10 +22,11 @@ export interface BaseSelectProps {
 
 export interface SelectProps extends BaseSelectProps {
 	placeholder?: string
+	allowEmpty?: boolean
 	onChange?: (value: string) => void
 }
 
-export function Select({ ...props }: SelectProps) {
+export function Select({ allowEmpty = false, ...props }: SelectProps) {
 	return (
 		<SelectControl
 			id={`${props.name}-select`}
@@ -36,7 +37,7 @@ export function Select({ ...props }: SelectProps) {
 			}
 			value={props.value ?? ""}
 			disabled={props.disabled}
-			options={props.placeholder ? [{ label: props.placeholder, value: "", disabled: true }, ...props.options] : props.options}
+			options={props.placeholder ? [{ label: props.placeholder, value: "", disabled: !allowEmpty }, ...props.options] : props.options}
 			onChange={(value) => {
 				props.onChange?.(value)
 			}}

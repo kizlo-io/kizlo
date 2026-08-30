@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Fix custom-field initialization, validation, error recovery, and nested value storage

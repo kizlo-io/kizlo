@@ -66,7 +66,17 @@ function CustomFieldInput({
 		case "richtext":
 			return <RichTextField control={control} name={name} label={label} description={description} />
 		case "number":
-			return <NumberInputField control={control} name={name} label={label} description={description} />
+			return (
+				<NumberInputField
+					control={control}
+					name={name}
+					label={label}
+					description={description}
+					min={definition.min ?? undefined}
+					max={definition.max ?? undefined}
+					step={definition.step ?? undefined}
+				/>
+			)
 		case "toggle":
 			return <SwitchField control={control} name={name} label={label} description={description} />
 		case "url":

@@ -5,6 +5,7 @@ import type { FieldValues, UseFormReturn } from "react-hook-form"
 import { toast } from "sonner"
 import { refreshSettings } from "@/modules/settings/registration/lib"
 import type { Settings, SettingsMap } from "./schema"
+import { settingsErrorMessage } from "./settings-error"
 import { $settings } from "./store"
 
 export type SettingsKeys = keyof Settings
@@ -46,8 +47,9 @@ export function useSettings() {
 			// Post types / taxonomies feed the served nav (sidebar name, Inactive
 			// badge, which sections show). Re-fetch so the sidebar reflects the save.
 			if (key === "post_types" || key === "taxonomies") await refreshSettings()
-		} catch {
-			toast.error("Something went wrong, please try again.")
+		} catch (error) {
+			toast.error(settingsErrorMessage(error))
+			throw error
 		} finally {
 			setLoading(false)
 		}
@@ -106,8 +108,13 @@ export function useSettingsForm(
 		isLoading,
 		isDirty: form.formState.isDirty,
 		onSubmit: form.handleSubmit(async (data) => {
-			await (slug === null ? save(key, data) : save(key, slug, data))
-			form.reset(form.getValues())
+			form.clearErrors("root.server")
+			try {
+				await (slug === null ? save(key, data) : save(key, slug, data))
+				form.reset(form.getValues())
+			} catch (error) {
+				form.setError("root.server", { type: "server", message: settingsErrorMessage(error) })
+			}
 		}),
 		onCancel: () => form.reset(),
 	}

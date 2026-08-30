@@ -233,6 +233,7 @@ const FIELD_NAME_PATTERN = /^[a-z][a-z0-9_]*$/
  * card and points the error at the offending Name input.
  */
 function refineFieldNames(fields: CustomFieldDefinition[], ctx: z.RefinementCtx, path: (string | number)[] = ["custom_fields"]): void {
+	const seen = new Set<string>()
 	fields.forEach((field, index) => {
 		const fieldPath = [...path, index]
 		const normalized = normalizeFieldName(field.name ?? "")
@@ -250,11 +251,109 @@ function refineFieldNames(fields: CustomFieldDefinition[], ctx: z.RefinementCtx,
 				message: "Name must start with a letter.",
 			})
 		}
+		if (normalized !== "" && seen.has(normalized)) {
+			ctx.addIssue({ code: "custom", path: [...fieldPath, "name"], message: `Name "${normalized}" is already used at this level.` })
+		}
+		seen.add(normalized)
+
+		refineFieldConfiguration(field, ctx, fieldPath)
 
 		if ((field.type === "group" || field.type === "repeater") && Array.isArray(field.fields)) {
 			refineFieldNames(field.fields, ctx, [...fieldPath, "fields"])
 		}
 	})
+}
+
+function refineFieldConfiguration(field: CustomFieldDefinition, ctx: z.RefinementCtx, path: (string | number)[]): void {
+	if (field.type === "number") {
+		if (field.min != null && field.max != null && field.min > field.max) {
+			ctx.addIssue({ code: "custom", path: [...path, "max"], message: "Maximum must be at least the minimum." })
+		}
+		if (field.step != null && field.step <= 0) {
+			ctx.addIssue({ code: "custom", path: [...path, "step"], message: "Step must be greater than zero." })
+		}
+		if (field.default != null) refineNumberValue(field.default, field, ctx, [...path, "default"])
+	}
+
+	if (field.type === "repeater") {
+		for (const bound of ["min", "max"] as const) {
+			const value = field[bound]
+			if (value != null && (!Number.isInteger(value) || value < 0)) {
+				ctx.addIssue({ code: "custom", path: [...path, bound], message: "Row bounds must be nonnegative whole numbers." })
+			}
+		}
+		if (field.min != null && field.max != null && field.min > field.max) {
+			ctx.addIssue({ code: "custom", path: [...path, "max"], message: "Maximum rows must be at least minimum rows." })
+		}
+		if (field.required && field.max === 0) {
+			ctx.addIssue({ code: "custom", path: [...path, "max"], message: "A required repeater must allow at least one row." })
+		}
+	}
+	if (field.type === "group" && field.required && field.fields.length === 0) {
+		ctx.addIssue({ code: "custom", path: [...path, "fields"], message: "A required group needs at least one child field." })
+	}
+
+	if (field.type === "select" || field.type === "multiselect") {
+		const values = new Set<string>()
+		field.choices.forEach((choice, index) => {
+			const value = choice.value.trim()
+			if (value === "") {
+				ctx.addIssue({ code: "custom", path: [...path, "choices", index, "value"], message: "Choice value is required." })
+			} else if (values.has(value)) {
+				ctx.addIssue({ code: "custom", path: [...path, "choices", index, "value"], message: `Choice value "${value}" is duplicated.` })
+			}
+			values.add(value)
+		})
+		if (field.required && !field.choices.some((choice) => choice.value.trim() !== "")) {
+			ctx.addIssue({ code: "custom", path: [...path, "choices"], message: "A required choice field needs at least one choice." })
+		}
+		const defaults = field.type === "select" ? (field.default ? [field.default] : []) : field.default
+		if (field.type === "multiselect" && new Set(field.default).size !== field.default.length) {
+			ctx.addIssue({ code: "custom", path: [...path, "default"], message: "Default choices cannot contain duplicates." })
+		}
+		for (const value of defaults) {
+			if (!values.has(value)) {
+				ctx.addIssue({ code: "custom", path: [...path, "default"], message: `Default value "${value}" is not an available choice.` })
+			}
+		}
+	}
+
+	if (field.type === "email" && field.default && !z.email().safeParse(field.default).success) {
+		ctx.addIssue({ code: "custom", path: [...path, "default"], message: "Enter a valid email default." })
+	}
+	if (field.type === "url" && field.default && !z.url().safeParse(field.default).success) {
+		ctx.addIssue({ code: "custom", path: [...path, "default"], message: "Enter a valid URL default." })
+	}
+	if (field.type === "date" && field.default && !isCalendarDate(field.default)) {
+		ctx.addIssue({ code: "custom", path: [...path, "default"], message: "Enter a real calendar date." })
+	}
+}
+
+function refineNumberValue(
+	value: number,
+	field: Extract<CustomFieldDefinition, { type: "number" }>,
+	ctx: z.RefinementCtx,
+	path: (string | number)[],
+): void {
+	if (field.min != null && value < field.min) ctx.addIssue({ code: "custom", path, message: `Value must be at least ${field.min}.` })
+	if (field.max != null && value > field.max) ctx.addIssue({ code: "custom", path, message: `Value must be at most ${field.max}.` })
+	if (field.step != null && field.step > 0) {
+		const origin = field.min ?? 0
+		const quotient = (value - origin) / field.step
+		if (Math.abs(quotient - Math.round(quotient)) > 1e-9) {
+			ctx.addIssue({ code: "custom", path, message: `Value must follow a step of ${field.step} from ${origin}.` })
+		}
+	}
+}
+
+function isCalendarDate(value: string): boolean {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+	if (!match) return false
+	const year = Number(match[1])
+	const month = Number(match[2])
+	const day = Number(match[3])
+	const date = new Date(Date.UTC(year, month - 1, day))
+	return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
 }
 
 // ====================================================

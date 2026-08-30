@@ -2,6 +2,7 @@
 
 namespace Kizlo\Tests\CustomFields;
 
+use InvalidArgumentException;
 use Kizlo\Tests\TestCase;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
@@ -203,5 +204,22 @@ class CustomFieldsStoreTest extends TestCase
         $this->assertSame('Untitled', $read['subtitle']);
         $this->assertTrue($read['featured']);
         $this->assertNull($read['rank']);
+    }
+
+    public function test_a_legacy_collision_is_rejected_before_any_meta_is_written(): void
+    {
+        $defs = $this->defs([
+            ['type' => 'text', 'name' => 'a_b'],
+            ['type' => 'group', 'name' => 'a', 'fields' => [['type' => 'text', 'name' => 'b']]],
+        ]);
+
+        try {
+            $this->write($defs, ['a_b' => 'first', 'a' => ['b' => 'second']]);
+            $this->fail('Expected colliding storage paths to be rejected.');
+        } catch (InvalidArgumentException $error) {
+            $this->assertStringContainsString('collide', $error->getMessage());
+        }
+
+        $this->assertSame('', get_post_meta($this->post, 'kcf_a_b', true));
     }
 }
