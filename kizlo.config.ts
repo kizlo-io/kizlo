@@ -46,8 +46,12 @@ const kizloCore = defineFixture({
 const wordpressClientFixtures = [
 	...coreFixtures,
 	kizloCore,
-	woocommerce({ plugins: ["woocommerce", { path: "plugins/kizlo-woocommerce" }] }),
-	cf7({ plugins: ["contact-form-7", { path: "plugins/kizlo-cf7" }] }),
+	woocommerce({
+		plugins: [{ name: "woocommerce", source: "woocommerce", version: "11.0.1" }, { path: "plugins/kizlo-woocommerce" }],
+	}),
+	cf7({
+		plugins: [{ name: "contact-form-7", source: "contact-form-7", version: "6.1.7" }, { path: "plugins/kizlo-cf7" }],
+	}),
 ]
 
 /**

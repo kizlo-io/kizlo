@@ -22,9 +22,10 @@ export async function isSeeded(): Promise<boolean> {
 	return marker.code === 0 && marker.stdout.trim() === SEED_VERSION
 }
 
-/** Resolve a `PluginSource` to the `(name, source)` pair `ensurePlugin` needs. */
-export function resolvePluginSource(plugin: PluginSource): [name: string, source: string] {
-	return typeof plugin === "string" ? [plugin, plugin] : [plugin.name, plugin.source]
+/** Resolve a `PluginSource` to the arguments `ensurePlugin` needs. */
+export function resolvePluginSource(plugin: PluginSource): [name: string, source: string, version?: string] {
+	if (typeof plugin === "string") return [plugin, plugin]
+	return plugin.version === undefined ? [plugin.name, plugin.source] : [plugin.name, plugin.source, plugin.version]
 }
 
 /**
@@ -33,7 +34,7 @@ export function resolvePluginSource(plugin: PluginSource): [name: string, source
  * download (`source` = release zip URL or wp.org slug) happens only when the files
  * are absent (i.e. after `wp reset` wipes the volume).
  */
-export async function ensurePlugin(name: string, source: string): Promise<void> {
+export async function ensurePlugin(name: string, source: string, version?: string): Promise<void> {
 	const active = await compose(["exec", "-T", "wp-cli", "wp", "plugin", "is-active", name])
 	if (active.code === 0) return
 
@@ -43,7 +44,8 @@ export async function ensurePlugin(name: string, source: string): Promise<void> 
 		return
 	}
 
-	await wpCli(["plugin", "install", source, "--activate"])
+	const versionArg = version === undefined ? [] : [`--version=${version}`]
+	await wpCli(["plugin", "install", source, ...versionArg, "--activate"])
 }
 
 /**

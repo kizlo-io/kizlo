@@ -1,11 +1,22 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+
+const mocks = vi.hoisted(() => ({
+	compose: vi.fn(),
+	wpCli: vi.fn<(args: string[]) => Promise<string>>(),
+}))
+
+vi.mock("./docker", () => ({
+	compose: mocks.compose,
+	wpCli: mocks.wpCli,
+}))
+
 import { githubRelease, kizloRelease } from "./constants"
 import type { Fixture, SettleContext } from "./types"
 import { isLocalPlugin } from "./types"
-import { credentialsPath, findConfigDir, recordedPort, resolvePluginSource, settleFixtures } from "./utils"
+import { credentialsPath, ensurePlugin, findConfigDir, recordedPort, resolvePluginSource, settleFixtures } from "./utils"
 
 describe("githubRelease", () => {
 	test("builds a release-zip URL where the asset is named after the tag", () => {
@@ -31,6 +42,33 @@ describe("resolvePluginSource", () => {
 			"kizlo",
 			"https://example.com/kizlo.zip",
 		])
+	})
+
+	test("keeps an optional wp.org version with its source", () => {
+		expect(resolvePluginSource({ name: "woocommerce", source: "woocommerce", version: "11.0.1" })).toEqual([
+			"woocommerce",
+			"woocommerce",
+			"11.0.1",
+		])
+	})
+})
+
+describe("ensurePlugin", () => {
+	beforeEach(() => {
+		mocks.compose.mockReset().mockResolvedValue({ code: 1, stdout: "", stderr: "" })
+		mocks.wpCli.mockReset().mockResolvedValue("")
+	})
+
+	test("installs an unpinned source unchanged", async () => {
+		await ensurePlugin("contact-form-7", "contact-form-7")
+
+		expect(mocks.wpCli).toHaveBeenCalledWith(["plugin", "install", "contact-form-7", "--activate"])
+	})
+
+	test("passes a pinned wp.org version to wp-cli", async () => {
+		await ensurePlugin("woocommerce", "woocommerce", "11.0.1")
+
+		expect(mocks.wpCli).toHaveBeenCalledWith(["plugin", "install", "woocommerce", "--version=11.0.1", "--activate"])
 	})
 })
 
