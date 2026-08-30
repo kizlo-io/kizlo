@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Declare HPOS compatibility so WooCommerce no longer flags the plugin as incompatible
