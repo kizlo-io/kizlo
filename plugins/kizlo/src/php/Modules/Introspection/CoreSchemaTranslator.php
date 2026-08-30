@@ -176,6 +176,14 @@ final class CoreSchemaTranslator
     private static function resolveType(array $schema): ?array
     {
         $schema = self::alias($schema);
+
+        // A named reference carries its type from the schema it points at. Keep
+        // it intact so SchemaValidator can resolve the target and police the
+        // small set of metadata a reference may carry beside it.
+        if (isset($schema['$ref'])) {
+            return $schema;
+        }
+
         $union  = isset($schema['anyOf']) || isset($schema['oneOf']);
 
         if (is_array($schema['type'] ?? null)) {

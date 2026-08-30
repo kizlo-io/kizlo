@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Preserve named schema references during WordPress introspection translation
