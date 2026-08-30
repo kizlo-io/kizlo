@@ -55,11 +55,13 @@ export interface SeedContext {
 /**
  * A plugin to ensure installed + active during bootstrap. A bare string is a
  * wp.org slug (the installed name and the install source are the same). The
- * object form is for any other source — a zip URL or a local path — where the
- * installed slug (`name`, used for activation checks) can't be derived from the
- * source. `source` is passed straight to `wp plugin install`.
+ * object form names an install source explicitly, either a wp.org slug or a zip
+ * URL, when the installed slug (`name`, used for activation checks) cannot be
+ * derived from the source or the wp.org release must be pinned. `version` is
+ * passed to `wp plugin install --version` when present. `source` is passed
+ * straight to `wp plugin install`.
  */
-export type PluginSource = string | { name: string; source: string }
+export type PluginSource = string | { name: string; source: string; version?: string }
 
 /**
  * A local plugin directory to bind-mount into the dev stack (`kizlo dev`) instead

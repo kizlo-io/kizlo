@@ -31,7 +31,9 @@ import { defineFixture } from "kizlo/test"
 
 export const blogFixture = defineFixture({
   name: "blog",
-  plugins: ["wordpress-seo"], // wp.org slug, zip URL, or a local { path }
+  plugins: [
+    { name: "wordpress-seo", source: "wordpress-seo", version: "26.3" },
+  ],
   async seed(ctx) {
     const post = await ctx.service.posts.create({
       slug: "hello-world-test",
@@ -45,6 +47,9 @@ export const blogFixture = defineFixture({
   },
 })
 ```
+
+Use a bare wp.org slug when the fixture should track its newest release. Use the object form with `version` when
+the stack must install the same release after every reset. A zip URL pins itself, so it does not need `version`.
 
 Register it on local WordPress for both `kizlo dev` and `kizlo test`:
 
