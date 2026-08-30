@@ -33,7 +33,7 @@
 		"postinstall": "pnpm lint:ws && node scripts/postinstall.mjs",
 		"typecheck": "turbo run typecheck",
 		"changeset:version": "changeset version && node scripts/stamp-template-version.mjs && biome format --write templates/*/template.json",
-		"test": "turbo run test --filter \"./packages/*\"",
+		"test": "turbo run test --filter \"./packages/*\" --filter @kizlo/plugin-kizlo",
 		"test:only": "turbo run test --filter",
 		"test:watch": "vitest",
 		"check": "biome check .",

@@ -55,15 +55,34 @@ class FieldDefinitionsTest extends TestCase
                 'name'    => 'plan',
                 'choices' => [
                     ['value' => 'free', 'label' => 'Free'],
-                    ['value' => '', 'label' => 'Dropped'],
-                    ['label' => 'No value dropped'],
+                    ['value' => 'paid', 'label' => ''],
                 ],
                 'default' => 'free',
             ],
         ]);
 
-        $this->assertSame([['value' => 'free', 'label' => 'Free']], $result[0]['choices']);
+        $this->assertSame([
+            ['value' => 'free', 'label' => 'Free'],
+            ['value' => 'paid', 'label' => 'paid'],
+        ], $result[0]['choices']);
         $this->assertSame('free', $result[0]['default']);
+    }
+
+    public function test_textarea_defaults_preserve_line_breaks(): void
+    {
+        $result = FieldDefinitions::normalize([
+            ['type' => 'textarea', 'name' => 'summary', 'default' => "first\r\nsecond"],
+        ]);
+
+        $this->assertSame("first\r\nsecond", $result[0]['default']);
+    }
+
+    public function test_rejects_fractional_repeater_bounds_during_normalization(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        FieldDefinitions::normalize([
+            ['type' => 'repeater', 'name' => 'items', 'min' => 0.5, 'fields' => []],
+        ]);
     }
 
     public function test_recurses_into_groups_and_repeaters(): void

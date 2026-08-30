@@ -150,4 +150,49 @@ class CustomFieldsWriteTest extends SeoTestCase
 
         $this->assertNull($this->validate($this->request('POST', ['custom' => ['download' => $attachment]])));
     }
+
+    /** @dataProvider invalidConstrainedValueProvider */
+    public function test_number_constraints_and_calendar_dates_reject_invalid_content(array $raw, mixed $value): void
+    {
+        $this->seed([$raw]);
+
+        $result = $this->validate($this->request('POST', ['custom' => [$raw['name'] => $value]]));
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+    }
+
+    /** @return array<string, array{0: array<string, mixed>, 1: mixed}> */
+    public function invalidConstrainedValueProvider(): array
+    {
+        $number = ['type' => 'number', 'name' => 'score', 'min' => 0, 'max' => 10, 'step' => 2];
+        return [
+            'below minimum' => [$number, -1],
+            'above maximum' => [$number, 11],
+            'off step' => [$number, 3],
+            'non leap day' => [['type' => 'date', 'name' => 'launch'], '2025-02-29'],
+            'invalid month and day' => [['type' => 'date', 'name' => 'launch'], '2026-13-40'],
+        ];
+    }
+
+    public function test_number_constraints_accept_a_value_on_step(): void
+    {
+        $this->seed([['type' => 'number', 'name' => 'score', 'min' => 0, 'max' => 10, 'step' => 2]]);
+
+        $this->assertNull($this->validate($this->request('POST', ['custom' => ['score' => 4]])));
+    }
+
+    public function test_required_group_needs_one_populated_descendant(): void
+    {
+        $this->seed([[
+            'type' => 'group',
+            'name' => 'details',
+            'required' => true,
+            'fields' => [['type' => 'text', 'name' => 'note']],
+        ]]);
+
+        $empty = $this->validate($this->request('POST', ['custom' => ['details' => ['note' => '']]]));
+
+        $this->assertInstanceOf(WP_Error::class, $empty);
+        $this->assertNull($this->validate($this->request('POST', ['custom' => ['details' => ['note' => 'Present']]])));
+    }
 }

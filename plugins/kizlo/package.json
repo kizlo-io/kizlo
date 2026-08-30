@@ -6,6 +6,7 @@
 	"scripts": {
 		"build": "wp-scripts build",
 		"dev": "wp-scripts start",
+		"test": "vitest run src/js",
 		"typecheck": "tsc --noEmit && composer phpstan",
 		"clean": "git clean -xdf .cache .turbo .fallow vendor build node_modules"
 	},
@@ -38,6 +39,9 @@
 		"@wordpress/plugins": "^7.52.0",
 		"@wordpress/scripts": "^32.0.0",
 		"glob": "^7.2.3",
+		"react": "catalog:react19",
+		"react-dom": "catalog:react19",
+		"vitest": "catalog:",
 		"tailwindcss": "^4.2.3"
 	}
 }

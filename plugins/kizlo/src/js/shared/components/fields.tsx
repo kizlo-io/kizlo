@@ -30,6 +30,7 @@ interface TextInputFieldProps<TFieldValues extends FieldValues = FieldValues, TC
 	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
 	type?: "text" | "password"
 	placeholder?: string
+	disabled?: boolean
 }
 
 export function TextInputField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
@@ -40,6 +41,7 @@ export function TextInputField<TFieldValues extends FieldValues = FieldValues, T
 	description,
 	descMode,
 	placeholder,
+	disabled,
 }: TextInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
 		<Controller
@@ -54,6 +56,7 @@ export function TextInputField<TFieldValues extends FieldValues = FieldValues, T
 						desc={description}
 						descMode={descMode}
 						placeholder={placeholder}
+						disabled={disabled}
 						value={field.value ?? ""}
 						onChange={field.onChange}
 					/>
@@ -149,6 +152,9 @@ export function TextareaInputField<TFieldValues extends FieldValues = FieldValue
 interface NumberInputFieldProps<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>
 	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
 	placeholder?: string
+	min?: number
+	max?: number
+	step?: number
 }
 
 export function NumberInputField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
@@ -158,6 +164,9 @@ export function NumberInputField<TFieldValues extends FieldValues = FieldValues,
 	description,
 	descMode,
 	placeholder,
+	min,
+	max,
+	step,
 }: NumberInputFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
 		<Controller
@@ -171,6 +180,9 @@ export function NumberInputField<TFieldValues extends FieldValues = FieldValues,
 						desc={description}
 						descMode={descMode}
 						placeholder={placeholder}
+						min={min}
+						max={max}
+						step={step}
 						value={field.value == null ? "" : String(field.value)}
 						onChange={(value) => field.onChange(value === "" ? null : Number(value))}
 					/>
@@ -189,6 +201,7 @@ interface SelectFieldProps<TFieldValues extends FieldValues = FieldValues, TCont
 	extends BaseFieldProps<TFieldValues, TContext, TTransformedValues> {
 	options: SelectOption[]
 	placeholder?: string
+	allowEmpty?: boolean
 }
 
 export function SelectField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
@@ -199,6 +212,7 @@ export function SelectField<TFieldValues extends FieldValues = FieldValues, TCon
 	description,
 	descMode,
 	placeholder,
+	allowEmpty,
 }: SelectFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
 		<Controller
@@ -213,6 +227,7 @@ export function SelectField<TFieldValues extends FieldValues = FieldValues, TCon
 						descMode={descMode}
 						options={options}
 						placeholder={placeholder}
+						allowEmpty={allowEmpty}
 						value={field.value ?? ""}
 						onChange={field.onChange}
 					/>
@@ -232,6 +247,7 @@ interface ComboboxFieldProps<TFieldValues extends FieldValues = FieldValues, TCo
 	options: SelectOption[]
 	placeholder?: string
 	multiple?: boolean
+	onValueChange?: (value: string | string[]) => void
 }
 
 export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TContext = any, TTransformedValues = TFieldValues>({
@@ -243,6 +259,7 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 	descMode,
 	placeholder,
 	multiple = false,
+	onValueChange,
 }: ComboboxFieldProps<TFieldValues, TContext, TTransformedValues>) {
 	return (
 		<Controller
@@ -259,7 +276,10 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 							options={options}
 							placeholder={placeholder}
 							value={field.value ?? []}
-							onChange={field.onChange}
+							onChange={(value) => {
+								onValueChange?.(value)
+								field.onChange(value)
+							}}
 						/>
 					) : (
 						<Combobox
@@ -271,7 +291,11 @@ export function ComboboxField<TFieldValues extends FieldValues = FieldValues, TC
 							placeholder={placeholder}
 							allowReset={false}
 							value={field.value ?? ""}
-							onChange={(value) => field.onChange(value ?? "")}
+							onChange={(value) => {
+								const next = value ?? ""
+								onValueChange?.(next)
+								field.onChange(next)
+							}}
 						/>
 					)}
 					<FieldError message={fieldState.error?.message} />

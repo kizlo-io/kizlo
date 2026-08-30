@@ -29,6 +29,7 @@ function fieldSchema(definition: CustomFieldDefinition): z.ZodTypeAny {
 				if (definition.required && (value === null || value === undefined)) {
 					ctx.addIssue({ code: "custom", message: "This field is required." })
 				}
+				if (typeof value === "number") refineNumber(value, definition, ctx)
 			})
 		case "toggle":
 			return z.boolean().optional()
@@ -46,7 +47,11 @@ function fieldSchema(definition: CustomFieldDefinition): z.ZodTypeAny {
 				}
 			})
 		case "group":
-			return z.object(Object.fromEntries(definition.fields.map((child) => [child.name, fieldSchema(child)])))
+			return z.object(Object.fromEntries(definition.fields.map((child) => [child.name, fieldSchema(child)]))).superRefine((value, ctx) => {
+				if (definition.required && !hasPopulatedValue(value)) {
+					ctx.addIssue({ code: "custom", message: "Enter at least one value in this group." })
+				}
+			})
 		case "repeater":
 			return repeaterSchema(definition)
 	}
@@ -69,10 +74,38 @@ function stringSchema(required: boolean, format?: "email" | "url" | "date"): z.Z
 		if (format === "url" && !z.url().safeParse(value).success) {
 			ctx.addIssue({ code: "custom", message: "Enter a valid URL." })
 		}
-		if (format === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+		if (format === "date" && !isCalendarDate(value)) {
 			ctx.addIssue({ code: "custom", message: "Enter a date (YYYY-MM-DD)." })
 		}
 	})
+}
+
+function refineNumber(value: number, definition: Extract<CustomFieldDefinition, { type: "number" }>, ctx: z.RefinementCtx): void {
+	if (definition.min != null && value < definition.min) ctx.addIssue({ code: "custom", message: `Enter at least ${definition.min}.` })
+	if (definition.max != null && value > definition.max) ctx.addIssue({ code: "custom", message: `Enter at most ${definition.max}.` })
+	if (definition.step != null && definition.step > 0) {
+		const origin = definition.min ?? 0
+		const quotient = (value - origin) / definition.step
+		if (Math.abs(quotient - Math.round(quotient)) > 1e-9) {
+			ctx.addIssue({ code: "custom", message: `Use increments of ${definition.step} from ${origin}.` })
+		}
+	}
+}
+
+function isCalendarDate(value: string): boolean {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+	if (!match) return false
+	const year = Number(match[1])
+	const month = Number(match[2])
+	const day = Number(match[3])
+	const date = new Date(Date.UTC(year, month - 1, day))
+	return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+
+function hasPopulatedValue(value: unknown): boolean {
+	if (Array.isArray(value)) return value.some(hasPopulatedValue)
+	if (value && typeof value === "object") return Object.values(value).some(hasPopulatedValue)
+	return value !== null && value !== undefined && value !== ""
 }
 
 function repeaterSchema(definition: Extract<CustomFieldDefinition, { type: "repeater" }>): z.ZodTypeAny {

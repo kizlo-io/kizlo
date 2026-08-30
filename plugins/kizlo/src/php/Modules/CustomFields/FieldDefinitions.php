@@ -95,8 +95,11 @@ class FieldDefinitions
     private static function normalizeConfig(string $type, array $entry, array $prev_children): array
     {
         return match ($type) {
-            'text', 'textarea', 'url', 'email', 'date' => [
+            'text', 'url', 'email', 'date' => [
                 'default' => self::stringOrNull($entry['default'] ?? null),
+            ],
+            'textarea' => [
+                'default' => self::textareaOrNull($entry['default'] ?? null),
             ],
             'richtext' => [
                 'default' => isset($entry['default']) && $entry['default'] !== ''
@@ -175,6 +178,14 @@ class FieldDefinitions
         return sanitize_text_field((string) $value);
     }
 
+    private static function textareaOrNull(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        return sanitize_textarea_field((string) $value);
+    }
+
     private static function numberOrNull(mixed $value): int|float|null
     {
         if ($value === null || $value === '' || !is_numeric($value)) {
@@ -187,6 +198,10 @@ class FieldDefinitions
     {
         if ($value === null || $value === '' || !is_numeric($value)) {
             return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_INT) === false) {
+            throw new \InvalidArgumentException('Repeater row bounds must be whole numbers.');
         }
         return (int) $value;
     }
@@ -213,16 +228,14 @@ class FieldDefinitions
 
         $result = [];
         foreach ($choices as $choice) {
-            if (!is_array($choice) || !isset($choice['value'])) {
+            if (!is_array($choice)) {
                 continue;
             }
-            $value = sanitize_text_field((string) $choice['value']);
-            if ($value === '') {
-                continue;
-            }
+            $value = sanitize_text_field((string) ($choice['value'] ?? ''));
+            $label = sanitize_text_field((string) ($choice['label'] ?? ''));
             $result[] = [
                 'value' => $value,
-                'label' => sanitize_text_field((string) ($choice['label'] ?? $value)),
+                'label' => $label !== '' ? $label : $value,
             ];
         }
         return $result;

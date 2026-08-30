@@ -17,6 +17,7 @@ export interface BaseInputProps {
 
 export interface TextInputProps extends Omit<React.HTMLAttributes<HTMLInputElement>, "onChange">, BaseInputProps {
 	type?: "text" | "password" | "email" | "url" | "date"
+	disabled?: boolean
 }
 
 export function TextInput({ ...props }: TextInputProps) {
@@ -31,6 +32,7 @@ export function TextInput({ ...props }: TextInputProps) {
 				>["label"]
 			}
 			placeholder={props.placeholder}
+			disabled={props.disabled}
 			value={props.value ?? ""}
 			onChange={(e) => {
 				props.onChange?.(e)
@@ -88,7 +90,6 @@ export interface TextareaInputProps extends Omit<React.HTMLAttributes<HTMLInputE
 export function TextareaInput({ ...props }: TextareaInputProps) {
 	return (
 		<TextareaControl
-			id={`${props.name}-textarea-input`}
 			name={props.name}
 			label={
 				(<FieldLabel label={props.label} desc={props.desc} descMode={props.descMode} />) as React.ComponentProps<
@@ -106,7 +107,11 @@ export function TextareaInput({ ...props }: TextareaInputProps) {
 	)
 }
 
-export interface NumberInputProps extends Omit<React.HTMLAttributes<HTMLInputElement>, "onChange">, BaseInputProps {}
+export interface NumberInputProps extends Omit<React.HTMLAttributes<HTMLInputElement>, "onChange">, BaseInputProps {
+	min?: number
+	max?: number
+	step?: number
+}
 
 export function NumberInput({ ...props }: NumberInputProps) {
 	return (
@@ -119,12 +124,15 @@ export function NumberInput({ ...props }: NumberInputProps) {
 				>["label"]
 			}
 			placeholder={props.placeholder}
+			min={props.min}
+			max={props.max}
+			step={props.step}
 			value={props.value ?? ""}
 			onChange={(e) => {
 				props.onChange?.(e ?? "")
 			}}
 			onKeyDown={(e) => {
-				if (["e", "E", "+", "-"].includes(e.key)) {
+				if (["e", "E", "+"].includes(e.key)) {
 					e.preventDefault()
 				}
 				props.onKeyDown?.(e)

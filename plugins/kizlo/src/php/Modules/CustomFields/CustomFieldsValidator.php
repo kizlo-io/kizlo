@@ -48,8 +48,241 @@ class CustomFieldsValidator
     {
         self::assertValidNames($definitions);
         self::assertUniqueNames($definitions);
+        self::assertUniqueStoragePaths($definitions);
+        self::assertConfigurations($definitions);
         self::assertSafeTypeChanges($definitions, self::flattenTypes($previous));
         self::assertKeyLengths($definitions, '', []);
+    }
+
+    /**
+     * Reject definitions whose flattened WordPress meta keys can overlap. A
+     * repeater index is represented as a numeric wildcard, so this catches both
+     * direct group collisions (`a_b` vs `a > b`) and indexed repeater collisions
+     * (`a_0_b` vs `a > row 0 > b`) at any nesting depth.
+     *
+     * @param array<int, array<string, mixed>> $definitions
+     */
+    private static function assertUniqueStoragePaths(array $definitions): void
+    {
+        $patterns = self::storagePatterns($definitions, [], []);
+
+        for ($left = 0; $left < count($patterns); $left++) {
+            for ($right = $left + 1; $right < count($patterns); $right++) {
+                if (!self::patternsOverlap($patterns[$left]['tokens'], $patterns[$right]['tokens'])) {
+                    continue;
+                }
+
+                throw new InvalidArgumentException(
+                    'Custom field storage paths collide: "'
+                    . implode(' › ', $patterns[$left]['trail'])
+                    . '" and "'
+                    . implode(' › ', $patterns[$right]['trail'])
+                    . '" can write the same WordPress meta key. Rename one of the fields.'
+                );
+            }
+        }
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $definitions
+     * @param array<int, string>               $prefix
+     * @param array<int, string>               $trail
+     * @return array<int, array{tokens: array<int, string>, trail: array<int, string>}>
+     */
+    private static function storagePatterns(array $definitions, array $prefix, array $trail): array
+    {
+        $patterns = [];
+        foreach ($definitions as $definition) {
+            $name       = (string) $definition['name'];
+            $type       = (string) $definition['type'];
+            $field      = array_merge($prefix, self::literalTokens($name));
+            $fieldTrail = array_merge($trail, [$definition['label'] ?: $name]);
+
+            if ($type !== 'group') {
+                $patterns[] = ['tokens' => $field, 'trail' => $fieldTrail];
+            }
+
+            if ($type === 'group') {
+                $patterns = array_merge(
+                    $patterns,
+                    self::storagePatterns($definition['fields'] ?? [], array_merge($field, ['_']), $fieldTrail)
+                );
+            } elseif ($type === 'repeater') {
+                $patterns = array_merge(
+                    $patterns,
+                    self::storagePatterns($definition['fields'] ?? [], array_merge($field, ['_', '*', '_']), $fieldTrail)
+                );
+            }
+        }
+        return $patterns;
+    }
+
+    /** @return array<int, string> */
+    private static function literalTokens(string $value): array
+    {
+        return str_split($value);
+    }
+
+    /**
+     * Decide whether two token patterns have any concrete string in common.
+     * `*` means one or more decimal digits. The product walk below is a small
+     * NFA intersection, avoiding guesses about repeater indexes.
+     *
+     * @param array<int, string> $left
+     * @param array<int, string> $right
+     */
+    private static function patternsOverlap(array $left, array $right): bool
+    {
+        $queue = [[[0, false], [0, false]]];
+        $seen  = [];
+
+        while ($queue !== []) {
+            [$leftState, $rightState] = array_shift($queue);
+            foreach (self::epsilonClosure($leftState, $left) as $closedLeft) {
+                foreach (self::epsilonClosure($rightState, $right) as $closedRight) {
+                    $key = implode(':', [(int) $closedLeft[0], (int) $closedLeft[1], (int) $closedRight[0], (int) $closedRight[1]]);
+                    if (isset($seen[$key])) {
+                        continue;
+                    }
+                    $seen[$key] = true;
+
+                    if ($closedLeft[0] === count($left) && $closedRight[0] === count($right)) {
+                        return true;
+                    }
+
+                    foreach (self::stateTransitions($closedLeft, $left) as [$leftLabel, $nextLeft]) {
+                        foreach (self::stateTransitions($closedRight, $right) as [$rightLabel, $nextRight]) {
+                            if (self::transitionLabelsOverlap($leftLabel, $rightLabel)) {
+                                $queue[] = [$nextLeft, $nextRight];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param array{0: int, 1: bool} $state
+     * @param array<int, string>      $tokens
+     * @return array<int, array{0: int, 1: bool}>
+     */
+    private static function epsilonClosure(array $state, array $tokens): array
+    {
+        $states = [$state];
+        if ($state[1] && ($tokens[$state[0]] ?? null) === '*') {
+            $states[] = [$state[0] + 1, false];
+        }
+        return $states;
+    }
+
+    /**
+     * @param array{0: int, 1: bool} $state
+     * @param array<int, string>      $tokens
+     * @return array<int, array{0: string, 1: array{0: int, 1: bool}}>
+     */
+    private static function stateTransitions(array $state, array $tokens): array
+    {
+        $token = $tokens[$state[0]] ?? null;
+        if ($token === null) {
+            return [];
+        }
+        if ($token === '*') {
+            return [['digit', [$state[0], true]]];
+        }
+        return [[$token, [$state[0] + 1, false]]];
+    }
+
+    private static function transitionLabelsOverlap(string $left, string $right): bool
+    {
+        if ($left === 'digit') {
+            return $right === 'digit' || ctype_digit($right);
+        }
+        if ($right === 'digit') {
+            return ctype_digit($left);
+        }
+        return $left === $right;
+    }
+
+    /** @param array<int, array<string, mixed>> $definitions */
+    private static function assertConfigurations(array $definitions): void
+    {
+        foreach ($definitions as $definition) {
+            $type  = (string) $definition['type'];
+            $label = (string) ($definition['label'] ?: $definition['name']);
+
+            if ($type === 'number') {
+                $min  = $definition['min'] ?? null;
+                $max  = $definition['max'] ?? null;
+                $step = $definition['step'] ?? null;
+                if ($min !== null && $max !== null && $min > $max) {
+                    throw new InvalidArgumentException("Custom field \"{$label}\" has a minimum greater than its maximum.");
+                }
+                if ($step !== null && $step <= 0) {
+                    throw new InvalidArgumentException("Custom field \"{$label}\" must have a positive step.");
+                }
+            }
+
+            if ($type === 'repeater') {
+                $min = $definition['min'] ?? null;
+                $max = $definition['max'] ?? null;
+                if (($min !== null && $min < 0) || ($max !== null && $max < 0)) {
+                    throw new InvalidArgumentException("Custom field \"{$label}\" cannot have negative row bounds.");
+                }
+                if ($min !== null && $max !== null && $min > $max) {
+                    throw new InvalidArgumentException("Custom field \"{$label}\" has minimum rows greater than maximum rows.");
+                }
+                if (!empty($definition['required']) && $max === 0) {
+                    throw new InvalidArgumentException("Required custom field \"{$label}\" must allow at least one row.");
+                }
+            }
+
+            if ($type === 'group' && !empty($definition['required']) && empty($definition['fields'])) {
+                throw new InvalidArgumentException("Required custom field \"{$label}\" needs at least one child field.");
+            }
+
+            if (in_array($type, ['select', 'multiselect'], true)) {
+                self::assertChoices($definition, $label);
+            }
+
+            if (array_key_exists('default', $definition) && $definition['default'] !== null && $definition['default'] !== '') {
+                // Required constrains editor content, not whether a definition must
+                // preselect a default. Validate only the default's type constraints.
+                $default_definition             = $definition;
+                $default_definition['required'] = false;
+                CustomFieldsStore::assertDefinitionValue($default_definition, $definition['default'], ["{$label} default"]);
+            }
+
+            if (in_array($type, FieldDefinitions::CONTAINER_TYPES, true)) {
+                self::assertConfigurations($definition['fields'] ?? []);
+            }
+        }
+    }
+
+    private static function assertChoices(array $definition, string $label): void
+    {
+        $seen = [];
+        foreach ($definition['choices'] ?? [] as $choice) {
+            $value = (string) ($choice['value'] ?? '');
+            if ($value === '') {
+                throw new InvalidArgumentException("Custom field \"{$label}\" has a choice with an empty value.");
+            }
+            if (isset($seen[$value])) {
+                throw new InvalidArgumentException("Custom field \"{$label}\" has duplicate choice value \"{$value}\".");
+            }
+            $seen[$value] = true;
+        }
+        if (!empty($definition['required']) && $seen === []) {
+            throw new InvalidArgumentException("Required custom field \"{$label}\" needs at least one choice.");
+        }
+
+        if ($definition['type'] === 'multiselect') {
+            $defaults = $definition['default'] ?? [];
+            if (count($defaults) !== count(array_unique($defaults))) {
+                throw new InvalidArgumentException("Custom field \"{$label}\" has duplicate default selections.");
+            }
+        }
     }
 
     /**
@@ -86,6 +319,13 @@ class CustomFieldsValidator
      */
     public static function assertKeyLengthsOnly(array $definitions): void
     {
+        self::assertKeyLengths($definitions, '', []);
+    }
+
+    /** Final storage safeguard for callers writing previously saved definitions. */
+    public static function assertStorageSafetyOnly(array $definitions): void
+    {
+        self::assertUniqueStoragePaths($definitions);
         self::assertKeyLengths($definitions, '', []);
     }
 

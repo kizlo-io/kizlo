@@ -240,11 +240,23 @@ class CustomFieldsStore
      */
     public static function assertWritable(array $definitions, array $values): void
     {
-        CustomFieldsValidator::assertKeyLengthsOnly($definitions);
+        CustomFieldsValidator::assertStorageSafetyOnly($definitions);
 
         foreach ($definitions as $definition) {
-            self::assertValueValid($definition, $values[$definition['name']] ?? null, [$definition['label'] ?: $definition['name']]);
+            self::assertDefinitionValue($definition, $values[$definition['name']] ?? null, [$definition['label'] ?: $definition['name']]);
         }
+    }
+
+    /**
+     * Validate one value against its definition. Definition defaults use this
+     * same gate, so configuration and content cannot disagree about valid values.
+     *
+     * @param array<int, string> $trail Human label path for error reporting.
+     * @throws InvalidArgumentException
+     */
+    public static function assertDefinitionValue(array $definition, mixed $value, array $trail): void
+    {
+        self::assertValueValid($definition, $value, $trail);
     }
 
     /**
@@ -258,6 +270,9 @@ class CustomFieldsStore
 
         if ($type === 'group') {
             $group = is_array($value) ? $value : [];
+            if ($definition['required'] && !self::hasPopulatedValue($group)) {
+                throw new InvalidArgumentException("Custom field \"{$label}\" requires at least one populated value.");
+            }
             foreach ($definition['fields'] as $child) {
                 self::assertValueValid($child, $group[$child['name']] ?? null, array_merge($trail, [$child['label'] ?: $child['name']]));
             }
@@ -300,6 +315,24 @@ class CustomFieldsStore
                 if (!is_numeric($value)) {
                     throw new InvalidArgumentException("Custom field \"{$label}\" must be a number.");
                 }
+                $number = (float) $value;
+                $min    = $definition['min'] ?? null;
+                $max    = $definition['max'] ?? null;
+                $step   = $definition['step'] ?? null;
+                if ($min !== null && $number < (float) $min) {
+                    throw new InvalidArgumentException("Custom field \"{$label}\" must be at least {$min}.");
+                }
+                if ($max !== null && $number > (float) $max) {
+                    throw new InvalidArgumentException("Custom field \"{$label}\" must be at most {$max}.");
+                }
+                if ($step !== null) {
+                    $origin    = $min ?? 0;
+                    $quotient  = ($number - (float) $origin) / (float) $step;
+                    $remainder = abs($quotient - round($quotient));
+                    if ($remainder > 1.0E-9) {
+                        throw new InvalidArgumentException("Custom field \"{$label}\" must follow a step of {$step} from {$origin}.");
+                    }
+                }
                 break;
             case 'email':
                 if (!is_email((string) $value)) {
@@ -312,7 +345,7 @@ class CustomFieldsStore
                 }
                 break;
             case 'date':
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $value)) {
+                if (!self::isCalendarDate((string) $value)) {
                     throw new InvalidArgumentException("Custom field \"{$label}\" must be a date (YYYY-MM-DD).");
                 }
                 break;
@@ -340,6 +373,27 @@ class CustomFieldsStore
                 }
                 break;
         }
+    }
+
+    private static function hasPopulatedValue(mixed $value): bool
+    {
+        if (is_array($value)) {
+            foreach ($value as $child) {
+                if (self::hasPopulatedValue($child)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return $value !== null && $value !== '';
+    }
+
+    private static function isCalendarDate(string $value): bool
+    {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches)) {
+            return false;
+        }
+        return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
     }
 
     /**
