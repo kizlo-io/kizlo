@@ -2,7 +2,7 @@ import { arrayable, BooleanLike, lenient, MediaImage, Metadata, NumberLike } fro
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import type { WPK_Post } from "./types"
+import type { WP_CustomFields } from "../wordpress"
 
 const WP_POST_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
 const WP_POST_FORMATS = ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"] as const
@@ -41,6 +41,10 @@ export const PostTagRef = z.object({
 })
 export type PostTagRef = z.infer<typeof PostTagRef>
 
+export type PostCustomFields = WP_CustomFields<"postTypes.post">
+
+export const PostCustomFieldsSchema: z.ZodType<PostCustomFields, PostCustomFields> = customFieldsSchema<PostCustomFields>()
+
 export const Post = z.object({
 	id: z.number(),
 	slug: z.string(),
@@ -60,12 +64,12 @@ export const Post = z.object({
 	categories: z.array(PostCategoryRef),
 	tags: z.array(PostTagRef),
 	seo: Seo.nullable(),
-	custom: customFieldsSchema<WPK_Post["kizlo"]["custom"]>(),
+	custom: PostCustomFieldsSchema,
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	meta: Metadata,
 })
-export type Post = z.output<typeof Post>
+export type Post = Omit<z.output<typeof Post>, "custom"> & { custom: PostCustomFields }
 
 // ====================================================
 // RETRIEVE
@@ -83,7 +87,7 @@ export type RetrievePostInput = z.input<typeof RetrievePostInput>
 // ====================================================
 
 export const PostList = z.object({ items: z.array(Post), meta: ListMetadata })
-export type PostList = z.output<typeof PostList>
+export type PostList = Omit<z.output<typeof PostList>, "items"> & { items: Post[] }
 
 export const PostOrderBy = z.enum(WP_POST_ORDER_BYES)
 export type PostOrderBy = z.infer<typeof PostOrderBy>

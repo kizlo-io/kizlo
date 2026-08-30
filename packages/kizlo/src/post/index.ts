@@ -1,7 +1,7 @@
 import { normalizeArrayableValue } from "@kizlo/shared"
 import { compare } from "../shared/crypto"
 import { parseIdentifier } from "../shared/identifier"
-import { createProcedure } from "../shared/procedure"
+import { createProcedure, schemaType } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
 import { GET_POST_ERROR_MAP, LIST_POST_ERROR_MAP } from "./error"
 import { ListPostInput, Post, PostList, RetrievePostInput } from "./schema"
@@ -15,7 +15,7 @@ export const POST_PROCEDURES = {
 			path: "/posts/{identifier}",
 			params: RetrievePostInput.pick({ identifier: true }),
 			query: RetrievePostInput.pick({ password: true, previewToken: true }).optional(),
-			output: Post,
+			output: schemaType<Post>(Post),
 			errors: GET_POST_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
@@ -79,7 +79,7 @@ export const POST_PROCEDURES = {
 			method: "GET",
 			path: "/posts",
 			query: ListPostInput.optional(),
-			output: PostList,
+			output: schemaType<PostList>(PostList),
 			errors: LIST_POST_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {

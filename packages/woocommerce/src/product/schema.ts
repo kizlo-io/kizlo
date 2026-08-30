@@ -141,6 +141,8 @@ export const ProductRecommendations = z.object({
 })
 export type ProductRecommendations = z.infer<typeof ProductRecommendations>
 
+export const ProductCustomFieldsSchema: z.ZodType<ProductCustomFields, ProductCustomFields> = customFieldsSchema<ProductCustomFields>()
+
 export const Product = ProductSummary.extend({
 	weight: z.string(),
 	dimensions: ProductDimensions,
@@ -150,13 +152,13 @@ export const Product = ProductSummary.extend({
 	saleStartsAt: z.number().nullable(),
 	saleEndsAt: z.number().nullable(),
 	seo: Seo.nullable(),
-	custom: customFieldsSchema<ProductCustomFields>(),
+	custom: ProductCustomFieldsSchema,
 	recommendations: ProductRecommendations.nullable(),
 })
-export type Product = z.infer<typeof Product>
+export type Product = Omit<z.infer<typeof Product>, "custom"> & { custom: ProductCustomFields }
 
 export const ProductList = z.object({ items: z.array(Product), meta: ListMetadata })
-export type ProductList = z.infer<typeof ProductList>
+export type ProductList = Omit<z.infer<typeof ProductList>, "items"> & { items: Product[] }
 
 export const RetrieveProductInput = z.object({
 	identifier: IdentifierInput,

@@ -1,6 +1,6 @@
 import { normalizeArrayableValue } from "@kizlo/shared"
 import { parseIdentifier } from "../shared/identifier"
-import { createProcedure } from "../shared/procedure"
+import { createProcedure, schemaType } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
 import { GET_CATEGORY_ERROR_MAP, LIST_CATEGORY_ERROR_MAP } from "./error"
 import { Category, CategoryList, ListCategoryInput, RetrieveCategoryInput } from "./schema"
@@ -13,7 +13,7 @@ export const CATEGORY_PROCEDURES = {
 			method: "GET",
 			path: "/categories/{identifier}",
 			params: RetrieveCategoryInput.pick({ identifier: true }),
-			output: Category,
+			output: schemaType<Category>(Category),
 			errors: GET_CATEGORY_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
@@ -44,7 +44,7 @@ export const CATEGORY_PROCEDURES = {
 			method: "GET",
 			path: "/categories",
 			query: ListCategoryInput.optional(),
-			output: CategoryList,
+			output: schemaType<CategoryList>(CategoryList),
 			errors: LIST_CATEGORY_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {

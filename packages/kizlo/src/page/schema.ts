@@ -2,7 +2,7 @@ import { arrayable, lenient, MediaImage, Metadata, NumberLike } from "@kizlo/sha
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import type { WPK_Page } from "./types"
+import type { WP_CustomFields } from "../wordpress"
 
 const WP_PAGE_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
 const WP_PAGE_ORDER_BYES = [
@@ -34,6 +34,10 @@ export const PageAuthorRef = z.object({
 })
 export type PageAuthorRef = z.infer<typeof PageAuthorRef>
 
+export type PageCustomFields = WP_CustomFields<"postTypes.page">
+
+export const PageCustomFieldsSchema: z.ZodType<PageCustomFields, PageCustomFields> = customFieldsSchema<PageCustomFields>()
+
 export const Page = z.object({
 	id: z.number(),
 	slug: z.string(),
@@ -51,12 +55,12 @@ export const Page = z.object({
 	author: PageAuthorRef.nullable(),
 	featuredMedia: MediaImage.nullable(),
 	seo: Seo.nullable(),
-	custom: customFieldsSchema<WPK_Page["kizlo"]["custom"]>(),
+	custom: PageCustomFieldsSchema,
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	meta: Metadata,
 })
-export type Page = z.output<typeof Page>
+export type Page = Omit<z.output<typeof Page>, "custom"> & { custom: PageCustomFields }
 
 // ====================================================
 // RETRIEVE
@@ -74,7 +78,7 @@ export type RetrievePageInput = z.input<typeof RetrievePageInput>
 // ====================================================
 
 export const PageList = z.object({ items: z.array(Page), meta: ListMetadata })
-export type PageList = z.output<typeof PageList>
+export type PageList = Omit<z.output<typeof PageList>, "items"> & { items: Page[] }
 
 export const PageOrderBy = z.enum(WP_PAGE_ORDER_BYES)
 export type PageOrderBy = z.infer<typeof PageOrderBy>

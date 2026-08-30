@@ -2,7 +2,7 @@ import { describe, expectTypeOf, it } from "vitest"
 import z from "zod/v4"
 import { defineErrorMap } from "./error"
 import { createMiddleware } from "./middleware"
-import { createProcedure, type Procedure } from "./procedure"
+import { createProcedure, type Procedure, schemaType } from "./procedure"
 
 // ====================================================
 // Positional extractors for the `Procedure<Scope, Input, Output, Errors>` tuple.
@@ -62,6 +62,15 @@ describe("createProcedure — api scope", () => {
 
 		expectTypeOf<OutputOf<typeof proc>>().toEqualTypeOf<{ when: string }>()
 		expectTypeOf<OutputOf<typeof proc>>().not.toBeAny()
+	})
+
+	it("preserves an explicitly declared client output type", () => {
+		type DeferredOutput = { custom: { projectField: string } }
+		const proc = createProcedure({ scope: "api", path: "/x", output: schemaType<DeferredOutput>() }, async () => ({
+			custom: { projectField: "value" },
+		}))
+
+		expectTypeOf<OutputOf<typeof proc>>().toEqualTypeOf<DeferredOutput>()
 	})
 
 	it("types the handler `input` with the parsed (output-side) request shape", () => {

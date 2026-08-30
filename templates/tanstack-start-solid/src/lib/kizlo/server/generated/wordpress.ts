@@ -14,4 +14,10 @@ declare module "kizlo" {
 	interface WordPressClientRegistry {
 		endpoints: typeof endpoints
 	}
+	interface WordPressEndpointRegistry {
+		[path: string]: any
+	}
+	interface WordPressCustomFieldsRegistry {
+		[path: string]: Record<string, unknown>
+	}
 }

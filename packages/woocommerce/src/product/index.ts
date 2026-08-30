@@ -1,4 +1,4 @@
-import { createProcedure, deserializeListMetadata } from "kizlo"
+import { createProcedure, deserializeListMetadata, schemaType } from "kizlo"
 import { GET_PRODUCT_ERROR_MAP, LIST_PRODUCT_ERROR_MAP } from "./error"
 import { ListProductInput, Product, ProductFilters, ProductList, RetrieveProductFiltersInput, RetrieveProductInput } from "./schema"
 import {
@@ -19,7 +19,7 @@ export const PRODUCT_PROCEDURES = {
 			path: "/products/{identifier}",
 			params: RetrieveProductInput.pick({ identifier: true }),
 			query: RetrieveProductInput.pick({ previewToken: true, recommendations: true }).optional(),
-			output: Product,
+			output: schemaType<Product>(Product),
 			errors: GET_PRODUCT_ERROR_MAP,
 		},
 		async ({ context, input, errors }) => {
@@ -68,7 +68,7 @@ export const PRODUCT_PROCEDURES = {
 			method: "GET",
 			path: "/products",
 			query: ListProductInput.optional(),
-			output: ProductList,
+			output: schemaType<ProductList>(ProductList),
 			errors: LIST_PRODUCT_ERROR_MAP,
 		},
 		async ({ context, input, errors }) => {

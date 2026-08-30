@@ -64,6 +64,38 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 			description: "Fields accepted when creating a book.",
 			properties: { title: { type: "string", required: true } },
 		},
+		"post-types.book.item": {
+			type: "object",
+			properties: {
+				kizlo: {
+					type: "object",
+					required: true,
+					properties: {
+						custom: {
+							type: "object",
+							required: true,
+							properties: { isbn: { type: "string", required: true } },
+						},
+					},
+				},
+			},
+		},
+		"taxonomies.genre.item": {
+			type: "object",
+			properties: {
+				kizlo: {
+					type: "object",
+					required: true,
+					properties: {
+						custom: {
+							type: "object",
+							required: true,
+							properties: { shelf: { type: "integer", required: true } },
+						},
+					},
+				},
+			},
+		},
 	},
 	apis: {
 		"post-types.book": {

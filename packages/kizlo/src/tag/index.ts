@@ -1,6 +1,6 @@
 import { normalizeArrayableValue } from "@kizlo/shared"
 import { parseIdentifier } from "../shared/identifier"
-import { createProcedure } from "../shared/procedure"
+import { createProcedure, schemaType } from "../shared/procedure"
 import { deserializeListMetadata } from "../shared/serialize"
 import { GET_TAG_ERROR_MAP, LIST_TAG_ERROR_MAP } from "./error"
 import { ListTagInput, RetrieveTagInput, Tag, TagList } from "./schema"
@@ -13,7 +13,7 @@ export const TAG_PROCEDURES = {
 			method: "GET",
 			path: "/tags/{identifier}",
 			params: RetrieveTagInput.pick({ identifier: true }),
-			output: Tag,
+			output: schemaType<Tag>(Tag),
 			errors: GET_TAG_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
@@ -44,7 +44,7 @@ export const TAG_PROCEDURES = {
 			method: "GET",
 			path: "/tags",
 			query: ListTagInput.optional(),
-			output: TagList,
+			output: schemaType<TagList>(TagList),
 			errors: LIST_TAG_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
