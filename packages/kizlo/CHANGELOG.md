@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.18.0
+
+### Minor Changes
+
+- [#179](https://github.com/kizlo-io/kizlo/pull/179) [`b3f71aa`](https://github.com/kizlo-io/kizlo/commit/b3f71aa2c967b3f8d507105e12f1ac13a19ae14d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Preserve generated endpoint, procedure, and custom-field types across published declarations.
+
 ## 0.17.0
 
 ### Minor Changes
