@@ -11,7 +11,7 @@
  * Text Domain: kizlo-woocommerce
  * Domain Path: /languages
  * Requires at least: 6.5
- * Tested up to: 6.4
+ * Tested up to: 6.7
  * Requires PHP: 8.2
  * Requires Plugins: kizlo, woocommerce
  * Kizlo Requires: kizlo 0.12.0, woocommerce 10.9
@@ -27,6 +27,16 @@ define('KIZLO_WOOCOMMERCE_URL', plugin_dir_url(__FILE__));
 define('KIZLO_WOOCOMMERCE_BASENAME', plugin_basename(__FILE__));
 
 require_once KIZLO_WOOCOMMERCE_PATH . 'vendor/autoload.php';
+
+add_action('before_woocommerce_init', static function (): void {
+    if (!class_exists(Automattic\WooCommerce\Utilities\FeaturesUtil::class)) return;
+
+    Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+        'custom_order_tables',
+        KIZLO_WOOCOMMERCE_FILE,
+        true
+    );
+});
 
 /**
  * Start through Kizlo's gate, so the `Kizlo Requires` header above decides whether
