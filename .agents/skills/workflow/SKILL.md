@@ -1,11 +1,17 @@
 ---
 name: workflow
-description: Takes a Linear issue from first read to open PR under this repo's branch, changelog, commit, and PR conventions. Use when the user hands over a Linear issue to pick up or continue, e.g. "do KIZ-70", "pick up KIZ-82", "implement this issue", or pastes a linear.app issue URL.
+description: Takes an implementation-ready Kizlo Linear issue from technical brief to open PR under this repo's branch, changelog, commit, and PR conventions. Use only in a fresh Codex session after planner confirms the saved issue is ready. Never run in a session that planned, drafted, or updated that issue.
 ---
 
 # Workflow, take an issue from Linear to open PR
 
 Input is an issue key (`KIZ-70`) or a `linear.app` URL; ask if neither is given. One team, `Kizlo`, key `KIZ`.
+
+**Fresh-session prerequisite:** this workflow never runs in a Codex session that asked planning questions, drafted the issue, or updated it in Linear. A new user message in the same conversation is not a fresh session. After planning, stop and require the user to start a new session with the issue key. Re-fetching the updated issue does not remove this boundary.
+
+In that fresh session, every issue handoff starts with a read-only `planner` check. This workflow begins only after that check confirms both an eligible status and its Definition of Ready. Eligible means `Backlog` or `Todo`, or `In Progress` or `In Review` when resuming work that already exists. `Planning` returns to `planner`; `Done`, `Canceled`, and `Duplicate` stop unless the user explicitly reopens them.
+
+If this skill is invoked directly, fetch the issue read-only before doing anything else. It must have a clear title, problem or user outcome, expected behaviour, defined scope, testable acceptance, planned test cases or an appropriate alternative verification, no unresolved product decision, and no unavailable dependency. If any check fails, return it to `planner`; do not brief it here and do not touch git.
 
 **Nothing touches git until the user says go**, because handing over an issue key is a request to understand it, not a decision to build it now. That go-ahead then covers the rest: worktree, branch, commits, pushes, draft PR, without asking again, since work that exists only on this machine can be lost. This overrides the standing per-action commit-approval rule, for this workflow only. One gate remains at the end, **report against the issue's acceptance and ask before marking the PR ready for review**, as that is the point it asks for someone's time.
 
@@ -16,7 +22,7 @@ No em-dash and no LLM filler anywhere. No agent or vendor attribution in any com
 `get_issue` with the key. These are design documents, so read all of it and treat two sections as binding:
 
 - **Out of scope**, left alone even when it sits in the file you are editing. If it blocks you, say so and stop rather than widening.
-- **Acceptance**, which names the behaviour to build and usually the test that proves it. Write that test.
+- **Acceptance**, which names the behaviour to build and the planned cases that prove it. Write those tests when automated coverage is appropriate; otherwise perform the issue's stated alternative verification.
 
 Then open the files the issue points at, before saying anything about it. A brief written from the issue text alone repeats the ticket back; the value is what the code does today versus what the issue assumes. Where they contradict, the code wins.
 
