@@ -113,6 +113,43 @@ class SpecTranslationTest extends IntrospectionTestCase
         $this->assertSame(['type' => 'integer'], $translated['quantity']);
     }
 
+    public function test_a_reference_needs_no_type_and_keeps_its_metadata(): void
+    {
+        $translated = kizlo_translate_spec_schema([
+            '$ref'        => 'kizlo.media-image',
+            'required'    => true,
+            'nullable'    => true,
+            'description' => 'The resolved image.',
+        ]);
+
+        $this->assertSame([
+            '$ref'        => 'kizlo.media-image',
+            'required'    => true,
+            'nullable'    => true,
+            'description' => 'The resolved image.',
+        ], $translated);
+    }
+
+    public function test_a_reference_survives_inside_a_nested_shape(): void
+    {
+        $translated = kizlo_translate_spec_schema([
+            'type'       => 'object',
+            'properties' => [
+                'custom' => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'image' => ['$ref' => 'kizlo.media-image', 'required' => true, 'nullable' => true],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertSame(
+            'kizlo.media-image',
+            $translated['properties']['custom']['properties']['image']['$ref'],
+        );
+    }
+
     // ============================================================
     // CONTEXT AND REQUIREDNESS
     // ============================================================
