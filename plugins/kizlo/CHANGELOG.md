@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2] - 2026-08-30
+### Fixed
+- Preserve named schema references during WordPress introspection translation
+
 ## [0.13.1] - 2026-08-30
 ### Fixed
 - Fix custom-field initialization, validation, error recovery, and nested value storage
@@ -151,6 +155,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.13.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.13.1...kizlo-v0.13.2
 [0.13.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.13.0...kizlo-v0.13.1
 [0.13.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.12.0...kizlo-v0.13.0
 [0.12.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.11.0...kizlo-v0.12.0
