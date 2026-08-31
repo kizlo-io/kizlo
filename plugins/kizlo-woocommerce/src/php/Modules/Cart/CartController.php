@@ -15,8 +15,8 @@ use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
  * The only thing Store API doesn't give us is merging a guest cart into a
  * user's cart on login, so that's all this class registers.
  *
- * Current-user switching for headless requests is centralised in
- * {@see \Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceModule::maybeSwitchToCartUser()},
+ * Current-user switching for this route is centralised in
+ * {@see \Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceModule::maybeSwitchKizloCartUser()},
  * which runs on rest_dispatch_request — so by the time this callback runs,
  * get_current_user_id() already reflects the resolved cart owner.
  */
