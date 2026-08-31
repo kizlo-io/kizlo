@@ -36,6 +36,59 @@ use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 final class KizloBlocks
 {
     /**
+     * `extensions.kizlo` on a Store API cart.
+     *
+     * The namespace is registered so its response shape is explicit. Kizlo does
+     * not currently add cart-level fields; cart item fields live on the item
+     * extension below.
+     *
+     * @return array<string, mixed>
+     */
+    public static function storeCart(): array
+    {
+        return [];
+    }
+
+    /**
+     * `extensions.kizlo` on a Store API cart item.
+     *
+     * @return array<string, mixed>
+     */
+    public static function storeCartItem(): array
+    {
+        return [
+            'product_id' => [
+                'description' => 'The base product ID for this cart line.',
+                'type'        => 'integer',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'variation_id' => [
+                'description' => 'The variation ID, or zero when the line is not a variation.',
+                'type'        => 'integer',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'slug' => [
+                'description' => 'The base product slug.',
+                'type'        => 'string',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'url' => [
+                'description' => 'The base product headless URL, or null when unavailable.',
+                'type'        => ['string', 'null'],
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'custom' => array_merge(self::customFields(), [
+                'context'  => ['view', 'edit'],
+                'readonly' => true,
+            ]),
+        ];
+    }
+
+    /**
      * `extensions.kizlo` on a Store API product.
      *
      * @return array<string, mixed>

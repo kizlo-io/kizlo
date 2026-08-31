@@ -26,7 +26,7 @@
 	"require-dev": {
 		"phpstan/phpstan": "^2.2",
 		"szepeviktor/phpstan-wordpress": "^2.0",
-		"php-stubs/woocommerce-stubs": "^10.9",
+		"php-stubs/woocommerce-stubs": "^11.0",
 		"automattic/jetpack-changelogger": "^6.0",
 		"phpunit/phpunit": "^9.6",
 		"wp-phpunit/wp-phpunit": "^6.4",

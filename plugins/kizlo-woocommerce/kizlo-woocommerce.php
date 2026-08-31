@@ -14,8 +14,8 @@
  * Tested up to: 6.7
  * Requires PHP: 8.2
  * Requires Plugins: kizlo, woocommerce
- * Kizlo Requires: kizlo 0.12.0, woocommerce 10.9
- * WC tested up to: 10.9
+ * Kizlo Requires: kizlo 0.12.0, woocommerce 11.0.1
+ * WC tested up to: 11.0.1
  */
 
 defined('ABSPATH') || exit;

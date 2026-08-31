@@ -134,7 +134,7 @@ export function deserializeProductSummary(data: WCSK_Product | WCSK_ProductSumma
 				id: term.id,
 				name: term.name,
 				slug: term.slug,
-				isDefault: term.default,
+				isDefault: term.default ?? false,
 			})),
 		})),
 		variations: data.variations.map((variation) => ({
@@ -169,7 +169,7 @@ export function deserializeProductRecommendations(data: WCSK_ProductDetail): Pro
 	}
 }
 
-function productCustomFields(value: unknown): ProductCustomFields {
+export function productCustomFields(value: unknown): ProductCustomFields {
 	return (typeof value === "object" && value !== null && !Array.isArray(value) ? value : {}) as ProductCustomFields
 }
 
@@ -290,7 +290,7 @@ function deserializeEmbeddedProducts(collections: WCSK_ProductSummary[][] | unde
 	return (collections ?? []).flat().map(deserializeProductSummary)
 }
 
-function deserializeExtensions(value: unknown): { extensions: Record<string, unknown>; kizlo: Record<string, unknown> } {
+export function deserializeExtensions(value: unknown): { extensions: Record<string, unknown>; kizlo: Record<string, unknown> } {
 	const all = asRecord(value)
 	const { kizlo: rawKizlo, ...extensions } = all
 

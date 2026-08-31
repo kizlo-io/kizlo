@@ -73,8 +73,8 @@ final class WooCommerceSchemas
     {
         return [
             'type'                 => 'object',
+            '$extends'             => self::STORE_CART,
             'description'          => 'The Store API cart, plus the two fields the headless session adds. Its WooCommerce half is described in full by woocommerce.store.cart.',
-            'additionalProperties' => true,
             'properties'           => [
                 'guest_token' => [
                     'type'        => 'string',

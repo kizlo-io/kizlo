@@ -7,6 +7,7 @@ use Automattic\WooCommerce\StoreApi\RoutesController;
 use Automattic\WooCommerce\StoreApi\StoreApi;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
 use Kizlo\WooCommerce\Modules\Contract\StoreApiRoutes;
+use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 use Kizlo\WooCommerce\Tests\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
@@ -121,6 +122,58 @@ class StoreApiRoutesTest extends TestCase
         $this->assertArrayNotHasKey('custom_fields', $properties);
         $this->assertArrayNotHasKey('hs_code', $properties);
         $this->assertArrayNotHasKey('extend', $properties);
+    }
+
+    public function test_cart_contract_matches_runtime_fee_payment_extension_and_address_shapes(): void
+    {
+        $cart = $this->routeSchema('woocommerce.store.cart')['properties'];
+
+        $fee = $cart['fees']['items']['properties'];
+        $this->assertArrayHasKey('key', $fee);
+        $this->assertArrayNotHasKey('id', $fee);
+        $this->assertSame('string', $cart['payment_methods']['items']['type']);
+        $this->assertSame('string', $cart['payment_requirements']['items']['type']);
+        $this->assertTrue($cart['extensions']['additionalProperties']);
+        $this->assertTrue($cart['items']['items']['properties']['item_data']['items']['properties']['display']['nullable']);
+
+        $item_extensions = $cart['items']['items']['properties']['extensions'];
+        $this->assertTrue($item_extensions['additionalProperties']);
+        $this->assertSame(
+            ['product_id', 'variation_id', 'slug', 'url', 'custom'],
+            array_keys($item_extensions['properties']['kizlo']['properties']),
+        );
+
+        $scalar = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
+        $this->assertSame($scalar, $cart['billing_address']['additionalProperties']);
+        $this->assertSame($scalar, $cart['shipping_address']['additionalProperties']);
+    }
+
+    public function test_cart_customer_update_addresses_are_partial_open_objects(): void
+    {
+        $operation = array_values(array_filter(
+            $this->declarations(),
+            static fn(array $operation): bool => $operation['operation'] === 'update_customer',
+        ))[0];
+
+        foreach (['billing_address', 'shipping_address'] as $name) {
+            $address = $operation['input']['properties'][$name];
+
+            $this->assertSame(['anyOf' => [['type' => 'string'], ['type' => 'boolean']]], $address['additionalProperties']);
+            foreach ($address['properties'] as $property) {
+                $this->assertArrayNotHasKey('required', $property);
+            }
+        }
+    }
+
+    public function test_merged_cart_schema_extends_the_store_cart(): void
+    {
+        $method = new ReflectionMethod(WooCommerceSchemas::class, 'cart');
+        $method->setAccessible(true);
+        $cart = $method->invoke(null);
+
+        $this->assertSame('woocommerce.store.cart', $cart['$extends']);
+        $this->assertArrayNotHasKey('additionalProperties', $cart);
+        $this->assertSame(['guest_token', 'user_id'], array_keys($cart['properties']));
     }
 
     public function test_every_required_overlay_argument_still_exists_upstream(): void

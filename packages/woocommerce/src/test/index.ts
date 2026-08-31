@@ -34,6 +34,43 @@ async function upsertProduct(service: SeedContext["service"], product: SeedProdu
 	return created.data.id
 }
 
+async function upsertVariableProduct(service: SeedContext["service"]): Promise<{ productId: number; variationId: number }> {
+	const slug = "test-product-variable"
+	const existing = await service.get<WC_Product[]>(`${WC_CORE_BASE}/products`, { searchParams: { slug } })
+	let productId = existing.data?.[0]?.id
+
+	if (!productId) {
+		const created = await service.post<WC_Product>(`${WC_CORE_BASE}/products`, {
+			body: {
+				name: "Test Product Variable",
+				slug,
+				type: "variable",
+				status: "publish",
+				attributes: [{ name: "Size", visible: true, variation: true, options: ["Small", "Large"] }],
+			},
+		})
+		if (created.error) throw created.error
+		productId = created.data.id
+	}
+
+	const variations = await service.get<Array<{ id: number; sku: string }>>(`${WC_CORE_BASE}/products/${productId}/variations`, {
+		searchParams: { per_page: 100 },
+	})
+	const existingVariation = variations.data?.find((variation) => variation.sku === "TEST-VARIATION-LARGE")
+	if (existingVariation) return { productId, variationId: existingVariation.id }
+
+	const createdVariation = await service.post<{ id: number }>(`${WC_CORE_BASE}/products/${productId}/variations`, {
+		body: {
+			regular_price: "15",
+			sku: "TEST-VARIATION-LARGE",
+			status: "publish",
+			attributes: [{ name: "Size", option: "Large" }],
+		},
+	})
+	if (createdVariation.error) throw createdVariation.error
+	return { productId, variationId: createdVariation.data.id }
+}
+
 async function upsertCoupon(service: SeedContext["service"], coupon: (typeof COUPONS)[number]): Promise<void> {
 	const existing = await service.get<Array<{ id: number }>>(`${WC_CORE_BASE}/coupons`, { searchParams: { code: coupon.code } })
 	if (existing.data?.[0]) return
@@ -83,6 +120,30 @@ async function enableBankTransfer(service: SeedContext["service"]): Promise<void
 	if (updated.error) throw updated.error
 }
 
+async function enableFlatRate(service: SeedContext["service"]): Promise<void> {
+	const zones = await service.get<Array<{ id: number; name: string }>>(`${WC_CORE_BASE}/shipping/zones`, {})
+	let zoneId = zones.data?.find((zone) => zone.name === "Kizlo Test Zone")?.id
+
+	if (!zoneId) {
+		const created = await service.post<{ id: number }>(`${WC_CORE_BASE}/shipping/zones`, { body: { name: "Kizlo Test Zone", order: 0 } })
+		if (created.error) throw created.error
+		zoneId = created.data.id
+	}
+
+	const locations = await service.put(`${WC_CORE_BASE}/shipping/zones/${zoneId}/locations`, {
+		body: [{ code: "US", type: "country" }],
+	})
+	if (locations.error) throw locations.error
+
+	const methods = await service.get<Array<{ id: number; method_id: string }>>(`${WC_CORE_BASE}/shipping/zones/${zoneId}/methods`, {})
+	if (methods.data?.some((method) => method.method_id === "flat_rate")) return
+
+	const createdMethod = await service.post(`${WC_CORE_BASE}/shipping/zones/${zoneId}/methods`, {
+		body: { method_id: "flat_rate", enabled: true, settings: { cost: "5" } },
+	})
+	if (createdMethod.error) throw createdMethod.error
+}
+
 /**
  * WooCommerce bundles Action Scheduler, which keeps its actions in the posts table until it
  * migrates to its own tables, and registers two global post statuses (`in-progress`, `failed`)
@@ -129,8 +190,10 @@ export function woocommerce(opts: { plugins?: DevPluginSource[] } = {}) {
 			}
 			if (productIds[0]) await linkProductCategory(service, productIds[0])
 			await linkRecommendations(service, productIds)
+			await upsertVariableProduct(service)
 			for (const coupon of COUPONS) await upsertCoupon(service, coupon)
 			await enableBankTransfer(service)
+			await enableFlatRate(service)
 			return { productId }
 		},
 		async cleanup({ service, userId }) {
