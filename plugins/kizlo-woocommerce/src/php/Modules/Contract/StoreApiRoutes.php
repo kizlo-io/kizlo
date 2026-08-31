@@ -12,7 +12,7 @@ use Throwable;
 /**
  * The `wc/store/v1` operations this plugin's clients consume.
  *
- * Sixteen of them, and not one upstream shape is written out here. WooCommerce registers
+ * Seventeen of them, and not one upstream shape is written out here. WooCommerce registers
  * these routes from `AbstractRoute::get_args()` and builds their responses from
  * the schema classes behind `SchemaController`, so both halves are already
  * described in PHP by the plugin that serves them. This class asks those objects
@@ -63,6 +63,7 @@ final class StoreApiRoutes
     public const PRODUCTS_API_ID = 'woocommerce.store.products';
     public const CART_API_ID     = 'woocommerce.store.cart';
     public const CHECKOUT_API_ID = 'woocommerce.store.checkout';
+    public const ORDERS_API_ID   = 'woocommerce.store.orders';
 
     /**
      * Errors any cart or checkout route can answer with before its own handler runs.
@@ -101,7 +102,7 @@ final class StoreApiRoutes
 
     public static function register(): void
     {
-        for ($index = 0; $index < 16; $index++) {
+        for ($index = 0; $index < 17; $index++) {
             kizlo_register_route_spec(
                 static fn(): array => self::routeSpec($index),
             );
@@ -118,6 +119,7 @@ final class StoreApiRoutes
                 WooCommerceSchemas::STORE_CART,
                 WooCommerceSchemas::STORE_CHECKOUT,
                 WooCommerceSchemas::STORE_CHECKOUT_ORDER,
+                WooCommerceSchemas::STORE_ORDER,
                 WooCommerceSchemas::STORE_PRODUCT,
                 WooCommerceSchemas::STORE_PRODUCT_SUMMARY,
                 WooCommerceSchemas::STORE_PRODUCT_DETAIL,
@@ -169,6 +171,7 @@ final class StoreApiRoutes
                     WooCommerceSchemas::STORE_CART                    => 'cart',
                     WooCommerceSchemas::STORE_CHECKOUT                => 'checkout',
                     WooCommerceSchemas::STORE_CHECKOUT_ORDER          => 'checkout-order',
+                    WooCommerceSchemas::STORE_ORDER                   => 'order',
                     WooCommerceSchemas::STORE_PRODUCT                 => 'product',
                     WooCommerceSchemas::STORE_PRODUCT_COLLECTION_DATA => 'product-collection-data',
                 ] as $schemaId => $identifier
@@ -185,6 +188,10 @@ final class StoreApiRoutes
 
                 if ($identifier === 'cart') {
                     $properties = self::normalizeCartProperties($properties);
+                }
+
+                if ($identifier === 'order') {
+                    $properties = self::normalizeOrderProperties($schemas, $properties);
                 }
 
                 // Collection data carries a `kizlo` block added by a route
@@ -268,6 +275,7 @@ final class StoreApiRoutes
             self::products($routes),
             self::cart($routes),
             self::checkout($routes),
+            self::orders($routes),
         );
     }
 
@@ -323,6 +331,65 @@ final class StoreApiRoutes
         ], WooCommerceSchemas::STORE_CART . '.items.extensions', required: true);
         $item_extensions['additionalProperties'] = true;
         unset($item_extensions);
+
+        $address_value = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
+        $properties['billing_address']['additionalProperties'] = $address_value;
+        $properties['shipping_address']['additionalProperties'] = $address_value;
+
+        return $properties;
+    }
+
+    /**
+     * Correct the Store API order schema to match its executable response.
+     *
+     * WooCommerce 11.0.1 emits fees without declaring them, returns numeric fee
+     * keys, omits the declared item type, and does not emit the item extensions
+     * inherited from ProductSchema. OrderModule supplies the runtime extension
+     * data; this method describes that repaired response.
+     *
+     * @param array<string, array<string, mixed>> $properties
+     * @return array<string, array<string, mixed>>
+     */
+    private static function normalizeOrderProperties(SchemaController $schemas, array $properties): array
+    {
+        $fee = self::properties($schemas, 'order-fee', WooCommerceSchemas::STORE_ORDER . '.fees') ?? [];
+        if (isset($fee['id'])) {
+            $fee['key'] = $fee['id'];
+            $fee['key']['type'] = 'integer';
+            $fee['key']['description'] = 'Runtime WooCommerce order-item ID for the fee.';
+            unset($fee['id']);
+        }
+
+        $properties['fees'] = [
+            'type'        => 'array',
+            'required'    => true,
+            'description' => 'Fees applied to the order. Returned by WooCommerce but absent from OrderSchema::get_properties().',
+            'items'       => [
+                'type'       => 'object',
+                'properties' => $fee,
+            ],
+        ];
+
+        $properties['payment_requirements']['items'] = ['type' => 'string'];
+
+        $item = &$properties['items']['items']['properties'];
+        unset($item['type']);
+        $item['id']['description'] = 'The immutable WooCommerce order-item ID.';
+        $item['item_data']['items']['properties']['display']['nullable'] = true;
+        $item['extensions'] = [
+            'type'                 => 'object',
+            'required'             => true,
+            'additionalProperties' => true,
+            'description'          => 'Store API product extension namespaces for the current product behind this order line.',
+            'properties'           => kizlo_translate_spec_properties([
+                'kizlo' => [
+                    'description' => 'Current product enrichment registered by Kizlo.',
+                    'type'        => ['object', 'null'],
+                    'properties'  => KizloBlocks::storeOrderItem(),
+                ],
+            ], WooCommerceSchemas::STORE_ORDER . '.items.extensions', required: true),
+        ];
+        unset($item);
 
         $address_value = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
         $properties['billing_address']['additionalProperties'] = $address_value;
@@ -641,6 +708,52 @@ final class StoreApiRoutes
                         'type'        => 'string',
                         'format'      => 'email',
                         'description' => 'The billing email on the order, checked alongside the key on a guest retry.',
+                    ],
+                ],
+            ),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function orders(RoutesController $routes): array
+    {
+        return [
+            self::declaration(
+                routes: $routes,
+                identifier: 'order',
+                api: self::ORDERS_API_ID,
+                operation: 'get',
+                method: 'GET',
+                summary: 'Retrieve an order belonging to the current shopper',
+                description: 'Registered owners are authorized by the headless session user. Guest orders require both the order key and matching billing email.',
+                errors: [
+                    'woocommerce_rest_invalid_billing_email',
+                    'woocommerce_rest_invalid_order',
+                    'woocommerce_rest_invalid_user',
+                    'woocommerce_rest_unknown_server_error',
+                ],
+                responses: [
+                    '200' => ['description' => 'The customer-facing order.', 'body' => ['$ref' => WooCommerceSchemas::STORE_ORDER]],
+                    '401' => ['description' => 'The guest order credentials are missing or invalid.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                    '403' => ['description' => 'The order belongs to a different registered customer.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                    '404' => ['description' => 'The order does not exist.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+                ],
+                extra: [
+                    'id' => [
+                        'type'        => 'integer',
+                        'required'    => true,
+                        'description' => 'The WooCommerce order ID.',
+                    ],
+                    'key' => [
+                        'type'        => 'string',
+                        'description' => 'The order key required to authorize a guest order.',
+                    ],
+                    'billing_email' => [
+                        'type'        => 'string',
+                        'format'      => 'email',
+                        'description' => 'The billing email required to authorize a guest order.',
                     ],
                 ],
             ),

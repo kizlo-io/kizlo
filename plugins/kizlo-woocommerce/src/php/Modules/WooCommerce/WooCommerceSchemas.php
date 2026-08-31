@@ -54,6 +54,7 @@ final class WooCommerceSchemas
     public const STORE_CART                    = 'woocommerce.store.cart';
     public const STORE_CHECKOUT                = 'woocommerce.store.checkout';
     public const STORE_CHECKOUT_ORDER          = 'woocommerce.store.checkout-order';
+    public const STORE_ORDER                   = 'woocommerce.store.order';
     public const STORE_PRODUCT                 = 'woocommerce.store.product';
     public const STORE_PRODUCT_SUMMARY         = 'woocommerce.store.product-summary';
     public const STORE_PRODUCT_DETAIL          = 'woocommerce.store.product-detail';

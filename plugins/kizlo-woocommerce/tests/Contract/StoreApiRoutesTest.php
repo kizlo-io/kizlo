@@ -30,7 +30,7 @@ class StoreApiRoutesTest extends TestCase
         $registered = rest_get_server()->get_routes();
         $derived    = $this->declarations();
 
-        $this->assertCount(16, $derived);
+        $this->assertCount(17, $derived);
 
         foreach ($derived as $operation) {
             $path = sprintf('/%s%s', $operation['namespace'], $operation['route']);
@@ -163,6 +163,43 @@ class StoreApiRoutesTest extends TestCase
                 $this->assertArrayNotHasKey('required', $property);
             }
         }
+    }
+
+    public function test_order_contract_repairs_runtime_fields_and_declares_the_customer_route(): void
+    {
+        $operation = array_values(array_filter(
+            $this->declarations(),
+            static fn(array $operation): bool => $operation['id'] === StoreApiRoutes::ORDERS_API_ID,
+        ))[0];
+
+        $this->assertSame('get', $operation['operation']);
+        $this->assertSame('GET', $operation['method']);
+        $this->assertSame(['id', 'key', 'billing_email'], array_keys($operation['input']['properties']));
+        $this->assertTrue($operation['input']['properties']['id']['required']);
+        $this->assertArrayNotHasKey('context', $operation['input']['properties']);
+        $this->assertSame('woocommerce.store.order', $operation['responses']['200']['body']['$ref']);
+
+        $order = $this->routeSchema(WooCommerceSchemas::STORE_ORDER)['properties'];
+        $this->assertArrayHasKey('fees', $order);
+        $this->assertSame('string', $order['payment_requirements']['items']['type']);
+
+        $fee = $order['fees']['items']['properties'];
+        $this->assertSame('integer', $fee['key']['type']);
+        $this->assertArrayNotHasKey('id', $fee);
+
+        $item = $order['items']['items']['properties'];
+        $this->assertArrayNotHasKey('type', $item);
+        $this->assertSame('integer', $item['id']['type']);
+        $this->assertTrue($item['item_data']['items']['properties']['display']['nullable']);
+        $this->assertTrue($item['extensions']['additionalProperties']);
+        $this->assertSame(
+            ['product_id', 'variation_id', 'product_exists', 'slug', 'url', 'custom'],
+            array_keys($item['extensions']['properties']['kizlo']['properties']),
+        );
+
+        $scalar = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
+        $this->assertSame($scalar, $order['billing_address']['additionalProperties']);
+        $this->assertSame($scalar, $order['shipping_address']['additionalProperties']);
     }
 
     public function test_merged_cart_schema_extends_the_store_cart(): void

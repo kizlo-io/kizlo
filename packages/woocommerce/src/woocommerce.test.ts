@@ -6,6 +6,7 @@ import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
 import { woocommerce } from "./index"
+import { Order } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
 import type { BillingAddress } from "./schema"
@@ -632,6 +633,99 @@ test("checkout.retry refuses a body with no billing address", async () => {
 	// The refusal is Kizlo's own, so nothing reached WooCommerce and the order still holds what it did.
 	const stored = await storedOrder(order.id)
 	expect(stored.shipping.address_1).toBe(STORED_SHIPPING.address_1)
+})
+
+// ==================================================
+// ORDERS: wc/store/v1
+// ==================================================
+
+function guestClient() {
+	const auth = createAuthAdapter({ getUser: () => null })
+	return getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth } }).client.woocommerce
+}
+
+test("orders.get returns an order to its registered owner", async () => {
+	const order = await createPendingOrder(getTestCredentials().users.user.id)
+
+	const result = await client().orders.get.call({ params: { orderId: order.id } })
+
+	expect(Order.safeParse(result).success).toBe(true)
+	expect(result.id).toBe(order.id)
+	expect(result.status).toBe("pending")
+	expect(result.items[0]).toMatchObject({ productId, product: { custom: { product_note: "Fixture product" } } })
+	expect(result.items[0]).not.toHaveProperty("key")
+	expect(result.items[0]?.product).not.toHaveProperty("permalink")
+})
+
+test("orders.get returns a guest order with its key and billing email", async () => {
+	const order = await createPendingOrder()
+
+	const result = await guestClient().orders.get.call({
+		params: { orderId: order.id },
+		query: { key: order.order_key, billingEmail: ORDER_EMAIL },
+	})
+
+	expect(Order.safeParse(result).success).toBe(true)
+	expect(result.id).toBe(order.id)
+})
+
+test("orders.get refuses missing or incorrect guest credentials", async () => {
+	const order = await createPendingOrder()
+	const orders = guestClient().orders
+
+	await expect(orders.get.call({ params: { orderId: order.id } })).rejects.toMatchObject({ code: "ORDER_FORBIDDEN", status: 403 })
+	await expect(
+		orders.get.call({ params: { orderId: order.id }, query: { key: "wc_order_wrong", billingEmail: ORDER_EMAIL } }),
+	).rejects.toMatchObject({ code: "ORDER_FORBIDDEN", status: 403 })
+	await expect(
+		orders.get.call({ params: { orderId: order.id }, query: { key: order.order_key, billingEmail: "wrong@example.com" } }),
+	).rejects.toMatchObject({ code: "ORDER_FORBIDDEN", status: 403 })
+})
+
+test("orders.get refuses a different registered owner", async () => {
+	const order = await createPendingOrder(getTestCredentials().users.admin.id)
+
+	await expect(client().orders.get.call({ params: { orderId: order.id } })).rejects.toMatchObject({
+		code: "ORDER_FORBIDDEN",
+		status: 403,
+	})
+})
+
+test("orders.get maps a missing order without leaking its authorization path", async () => {
+	await expect(client().orders.get.call({ params: { orderId: 99999999 } })).rejects.toMatchObject({
+		code: "ORDER_NOT_FOUND",
+		status: 404,
+	})
+})
+
+test("orders.get keeps the transaction after its product is deleted", async () => {
+	const createdProduct = await admin().post<{ id: number }>(`${WC_CORE_BASE}/products`, {
+		body: { name: "Disposable order product", type: "simple", status: "publish", regular_price: "12" },
+	})
+	if (createdProduct.error) throw createdProduct.error
+
+	const createdOrder = await admin().post<SeededOrder>(`${WC_CORE_BASE}/orders`, {
+		body: {
+			status: "pending",
+			customer_id: getTestCredentials().users.user.id,
+			billing: { ...STORED_SHIPPING, email: ORDER_EMAIL },
+			shipping: STORED_SHIPPING,
+			line_items: [{ product_id: createdProduct.data.id, quantity: 1 }],
+		},
+	})
+	if (createdOrder.error) throw createdOrder.error
+
+	const deleted = await admin().delete(`${WC_CORE_BASE}/products/${createdProduct.data.id}`, { searchParams: { force: true } })
+	if (deleted.error) throw deleted.error
+
+	const result = await client().orders.get.call({ params: { orderId: createdOrder.data.id } })
+
+	expect(result.items[0]).toMatchObject({
+		productId: createdProduct.data.id,
+		name: "Disposable order product",
+		quantity: 1,
+		product: null,
+	})
 })
 
 // ==================================================

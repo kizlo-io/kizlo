@@ -231,8 +231,8 @@ export function deserializeCart(data: WCK_Cart): Cart {
 		items: data.items.map(deserializeCartItem),
 		itemCount: data.items_count,
 		itemsWeight: data.items_weight,
-		billingAddress: deserializeBillingAddress(data.billing_address),
-		shippingAddress: deserializeShippingAddress(data.shipping_address),
+		billingAddress: deserializeCartBillingAddress(data.billing_address),
+		shippingAddress: deserializeCartShippingAddress(data.shipping_address),
 		shippingPackages: data.shipping_rates.map((pkg) => ({
 			id: pkg.package_id,
 			name: pkg.name,
@@ -354,7 +354,7 @@ function deserializeCartItem(item: WCK_CartItem): Cart["items"][number] {
 	}
 }
 
-function deserializeShippingAddress(address: WCK_Cart["shipping_address"]): CartShippingAddress {
+export function deserializeCartShippingAddress(address: WCK_Cart["shipping_address"]): CartShippingAddress {
 	return {
 		firstName: address.first_name,
 		lastName: address.last_name,
@@ -370,9 +370,9 @@ function deserializeShippingAddress(address: WCK_Cart["shipping_address"]): Cart
 	}
 }
 
-function deserializeBillingAddress(address: WCK_Cart["billing_address"]): CartBillingAddress {
+export function deserializeCartBillingAddress(address: WCK_Cart["billing_address"]): CartBillingAddress {
 	return {
-		...deserializeShippingAddress(address),
+		...deserializeCartShippingAddress(address),
 		email: address.email,
 		additionalFields: additionalAddressFields(address, BILLING_ADDRESS_KEYS),
 	}
