@@ -4,6 +4,14 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 	version: "1.0",
 	hash: `sha256:${"a".repeat(64)}`,
 	schemas: {
+		"kizlo.error": {
+			type: "object",
+			properties: {
+				code: { type: "string", required: true },
+				message: { type: "string", required: true },
+				data: { type: "object" },
+			},
+		},
 		"acme.entity": {
 			type: "object",
 			description: "A shared entity.",
@@ -122,7 +130,7 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 								},
 								body: { type: "array", items: { $ref: "acme.book" } },
 							},
-							"400": { content_type: "application/json", body: { type: "object" } },
+							"400": { content_type: "application/json", body: { $ref: "kizlo.error" } },
 						},
 					},
 					create: {
@@ -135,7 +143,7 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 						},
 						responses: {
 							"201": { content_type: "application/json", body: { $ref: "acme.book" } },
-							"400": { content_type: "application/json", body: { type: "object" } },
+							"400": { content_type: "application/json", body: { $ref: "kizlo.error" } },
 						},
 					},
 				},
@@ -150,7 +158,7 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 						},
 						responses: {
 							"200": { content_type: "application/json", body: { $ref: "acme.book" } },
-							"404": { content_type: "application/json", body: { type: "object" } },
+							"404": { content_type: "application/json", body: { $ref: "kizlo.error" } },
 						},
 					},
 					restore_revision: {
@@ -167,7 +175,7 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 						},
 						responses: {
 							"200": { content_type: "application/json", body: { $ref: "acme.book" } },
-							"404": { content_type: "application/json", body: { type: "object" } },
+							"404": { content_type: "application/json", body: { $ref: "kizlo.error" } },
 						},
 					},
 				},

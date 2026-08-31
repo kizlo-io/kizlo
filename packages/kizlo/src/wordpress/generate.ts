@@ -243,6 +243,10 @@ function isSuccessStatus(status: string): boolean {
 	return /^2\d\d$/.test(status)
 }
 
+function isWordPressErrorResponse(response: IntrospectionResponse): boolean {
+	return response.body?.$ref === "kizlo.error"
+}
+
 /**
  * Every failing status of an endpoint carries the same error union, so spelling one member per
  * status would repeat it four or five times for no discrimination anyone can act on. They collapse
@@ -254,7 +258,7 @@ function renderResult(apiId: string, operationId: string, operation: Introspecti
 	const name = endpointName(apiId, operationId, "EndpointResult")
 	const errors = operation.errors.map(literal).join(" | ") || "never"
 	const responses = sortedEntries(operation.responses)
-	const failures = responses.filter(([status]) => !isSuccessStatus(status))
+	const failures = responses.filter(([, response]) => isWordPressErrorResponse(response))
 	const headerNames = [...new Set(responses.flatMap(([, response]) => responseHeaderNames(response, context)))]
 		.sort((left, right) => left.localeCompare(right))
 		.map(literal)
@@ -262,7 +266,7 @@ function renderResult(apiId: string, operationId: string, operation: Introspecti
 	const sharedHeaderNames = headerNames ? `, ${headerNames}` : ""
 
 	const variants = responses
-		.filter(([status]) => isSuccessStatus(status))
+		.filter(([, response]) => !isWordPressErrorResponse(response))
 		.map(
 			([status, response]) =>
 				`WP_Success<${responseBody(response, context)}, ${status}, ${responseHeaders(response, context)}${sharedHeaderNames}>`,
@@ -349,6 +353,9 @@ function endpointDefinition(entry: WordPressEndpointEntry): WP_EndpointDefinitio
 	const responseContentTypes = Object.fromEntries(
 		sortedEntries(entry.operation.responses).map(([status, response]) => [status, response.content_type]),
 	)
+	const dataResponseStatuses = sortedEntries(entry.operation.responses)
+		.filter(([status, response]) => !isSuccessStatus(status) && !isWordPressErrorResponse(response))
+		.map(([status]) => status)
 	return {
 		namespace: entry.namespace,
 		path: entry.path,
@@ -356,6 +363,7 @@ function endpointDefinition(entry: WordPressEndpointEntry): WP_EndpointDefinitio
 		pathParameters,
 		...(entry.operation.input.content_type ? { requestContentType: entry.operation.input.content_type } : {}),
 		responseContentTypes,
+		...(dataResponseStatuses.length > 0 ? { dataResponseStatuses } : {}),
 	}
 }
 
@@ -376,6 +384,9 @@ function renderDefinition(definition: WP_EndpointDefinition): string {
 		`pathParameters: [${definition.pathParameters.map(literal).join(", ")}]`,
 		...(definition.requestContentType ? [`requestContentType: ${literal(definition.requestContentType)}`] : []),
 		`responseContentTypes: ${renderRecord(definition.responseContentTypes)}`,
+		...(definition.dataResponseStatuses?.length
+			? [`dataResponseStatuses: [${definition.dataResponseStatuses.map(literal).join(", ")}]`]
+			: []),
 	]
 	return `{ ${members.join(", ")} }`
 }

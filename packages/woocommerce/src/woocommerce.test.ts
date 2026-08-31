@@ -1,7 +1,7 @@
 import { type CookiesAdapter, createAuthAdapter } from "kizlo"
 import { getKizloClientTestInstance, getKizloTestInstance, getTestCredentials } from "kizlo/test-harness"
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { Cart } from "./cart/schema"
+import { Cart, type CartBillingAddress } from "./cart/schema"
 import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
@@ -9,7 +9,6 @@ import { woocommerce } from "./index"
 import { Order } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
-import type { BillingAddress } from "./schema"
 
 /**
  * The WooCommerce integration against a real WooCommerce, calling every route through the endpoints
@@ -498,6 +497,62 @@ test("checkout.get returns a checkout carrying the cart WooCommerce does not dec
 	expect(result.cart?.items).toEqual(cart.items)
 })
 
+test("checkout.confirm submits the caller's complete checkout and returns the created order", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+	const addressed = await client().cart.update.call({
+		body: { shippingAddress: { city: "Los Angeles", state: "CA", postcode: "90210", country: "US" } },
+	})
+	const shippingPackage = addressed.shippingPackages[0]
+	const rate = shippingPackage?.rates[0]
+	if (!shippingPackage || !rate) throw new Error("The checkout fixture exposed no shipping rate.")
+	await client().cart.selectShippingRate.call({ body: { packageId: shippingPackage.id, rateId: rate.id } })
+
+	const result = await client().checkout.confirm.call({
+		body: {
+			billingAddress: {
+				firstName: "Ada",
+				lastName: "Lovelace",
+				company: "",
+				address1: "1 Store Street",
+				address2: "",
+				city: "Los Angeles",
+				state: "CA",
+				postcode: "90210",
+				country: "US",
+				phone: "0123456789",
+				email: "ada@example.com",
+				additionalFields: {},
+			},
+			shippingAddress: {
+				firstName: "Ada",
+				lastName: "Lovelace",
+				company: "",
+				address1: "1 Store Street",
+				address2: "",
+				city: "Los Angeles",
+				state: "CA",
+				postcode: "90210",
+				country: "US",
+				phone: "0123456789",
+				additionalFields: {},
+			},
+			paymentMethod: "bacs",
+			customerNote: "Created through Kizlo",
+		},
+	})
+
+	expect(Checkout.safeParse(result).success).toBe(true)
+	expect(result).toMatchObject({
+		orderId: expect.any(Number),
+		orderNumber: expect.any(String),
+		orderKey: expect.any(String),
+		customerNote: "Created through Kizlo",
+		paymentMethod: "bacs",
+		paymentResult: { status: "success", details: expect.any(Array), redirectUrl: expect.any(String) },
+	})
+})
+
 /**
  * Retrying payment on an order that already exists, which is the one checkout call whose addresses
  * come from the caller rather than from the cart session.
@@ -522,16 +577,19 @@ const STORED_SHIPPING = {
 	country: "GB",
 }
 
-const RETRY_BILLING: BillingAddress = {
+const RETRY_BILLING: CartBillingAddress = {
 	firstName: "Retry",
 	lastName: "Payer",
+	company: "",
 	email: "retry.payer@example.com",
 	phone: "01610000000",
 	address1: "12 Fallback Street",
+	address2: "",
 	city: "Manchester",
 	postcode: "M1 1AA",
 	state: "",
 	country: "GB",
+	additionalFields: {},
 }
 
 type SeededOrder = { id: number; order_key: string; shipping: typeof STORED_SHIPPING; status: string }

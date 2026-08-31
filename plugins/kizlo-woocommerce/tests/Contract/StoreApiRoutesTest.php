@@ -202,6 +202,40 @@ class StoreApiRoutesTest extends TestCase
         $this->assertSame($scalar, $order['shipping_address']['additionalProperties']);
     }
 
+    public function test_checkout_contract_matches_runtime_fields_and_payment_statuses(): void
+    {
+        $scalar = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
+
+        foreach (['woocommerce.store.checkout', 'woocommerce.store.checkout-order'] as $id) {
+            $checkout = $this->routeSchema($id)['properties'];
+
+            $this->assertSame($scalar, $checkout['additional_fields']['additionalProperties']);
+            $this->assertSame($scalar, $checkout['billing_address']['additionalProperties']);
+            $this->assertSame($scalar, $checkout['shipping_address']['additionalProperties']);
+            $this->assertTrue($checkout['extensions']['additionalProperties']);
+            $this->assertArrayNotHasKey('enum', $checkout['payment_method']);
+            $this->assertSame('woocommerce.store.cart', $checkout['__experimentalCart']['$ref']);
+        }
+
+        $this->assertArrayNotHasKey('create_account', $this->routeSchema('woocommerce.store.checkout')['properties']);
+
+        $operations = array_column($this->declarations(), null, 'operation');
+        foreach (['process', 'process_order'] as $name) {
+            $operation = $operations[$name];
+
+            $this->assertSame([200, 202, 400, 500], array_keys($operation['responses']));
+            $this->assertTrue($operation['input']['properties']['billing_address']['required']);
+            $this->assertTrue($operation['input']['properties']['payment_method']['required']);
+            $this->assertArrayNotHasKey('required', $operation['input']['properties']['shipping_address']);
+            $this->assertArrayNotHasKey('enum', $operation['input']['properties']['payment_method']);
+            $this->assertSame($scalar, $operation['input']['properties']['billing_address']['additionalProperties']);
+            $this->assertSame($scalar, $operation['input']['properties']['shipping_address']['additionalProperties']);
+        }
+
+        $this->assertTrue($operations['process_order']['input']['properties']['key']['required']);
+        $this->assertArrayHasKey('create_account', $operations['process']['input']['properties']);
+    }
+
     public function test_merged_cart_schema_extends_the_store_cart(): void
     {
         $method = new ReflectionMethod(WooCommerceSchemas::class, 'cart');

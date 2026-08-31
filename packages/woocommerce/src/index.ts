@@ -6,6 +6,7 @@ import { ORDER_PROCEDURES } from "./order"
 import { PRODUCT_PROCEDURES } from "./product"
 
 export * from "./cart/schema"
+export * from "./checkout/schema"
 export * from "./order/schema"
 export * from "./product/schema"
 

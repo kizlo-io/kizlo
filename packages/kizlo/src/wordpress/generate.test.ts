@@ -21,7 +21,7 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export type WP_Success<T, S extends number, H extends Record<string, unknown>, K extends string = string> = { data: T; status: S; headers: WP_TypedHeaders<H, K>; error: null }
 	export type WP_Failure<E extends string, S extends number, H extends Record<string, unknown>, K extends string = string> = { data: null; status: S; headers: WP_TypedHeaders<H, K>; error: Error & { code: E } }
 	export type WP_TransportFailure<E extends string, K extends string = string> = WP_Failure<E, 0, Record<string, never>, K>
-	export interface WP_Endpoint<TInput, TResult> { namespace: string; path: string; method: string; pathParameters: string[]; responseContentTypes: Record<string, string | undefined>; readonly input?: TInput; readonly result?: TResult }
+	export interface WP_Endpoint<TInput, TResult> { namespace: string; path: string; method: string; pathParameters: string[]; responseContentTypes: Record<string, string | undefined>; dataResponseStatuses?: string[]; readonly input?: TInput; readonly result?: TResult }
 	export type WP_CallOptions = { signal?: AbortSignal }
 	export type WP_CallArguments<I> = Record<string, never> extends I ? [input?: I, options?: WP_CallOptions] : [input: I, options?: WP_CallOptions]
 	export type WP_Client<T> = { [K in keyof T]: T[K] extends WP_Endpoint<infer I, infer R> ? (...args: WP_CallArguments<I>) => Promise<R> : WP_Client<T[K]> }
@@ -199,6 +199,24 @@ describe("generateWordPressClient", () => {
 		expect(result).not.toContain("WP_TransportFailure")
 	})
 
+	test("types and marks declared data bodies returned with non-2xx statuses", () => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		const retrieve = document.apis["post-types.book"]?.paths["/post-types/book/{identifier}"]?.retrieve
+		if (!retrieve) throw new Error("Fixture is missing post-types.book.retrieve")
+
+		retrieve.responses["409"] = {
+			content_type: "application/json",
+			body: { $ref: "acme.book" },
+		}
+
+		const client = generateWordPressClient(document)
+		const result = /export type WP_PostTypesBookRetrieveEndpointResult =\n[\s\S]+?(?=\n\n)/.exec(client)?.[0] ?? ""
+
+		expect(result).toContain("WP_Success<WP_AcmeBook, 409")
+		expect(result).toContain("WP_Failure<")
+		expect(client).toContain('dataResponseStatuses: ["409"]')
+	})
+
 	test("shares declared header names across every result member", () => {
 		const client = generateWordPressClient(INTROSPECTION_FIXTURE)
 		const result = /export type WP_PostTypesBookListEndpointResult =\n[\s\S]+?(?=\n\n)/.exec(client)?.[0] ?? ""
@@ -229,12 +247,12 @@ describe("generateWordPressClient", () => {
 		retrieve.responses["401"] = {
 			content_type: "application/json",
 			headers: { type: "object", properties: { "Retry-After": { type: "integer", required: true } } },
-			body: { type: "object" },
+			body: { $ref: "kizlo.error" },
 		}
 		retrieve.responses["404"] = {
 			content_type: "application/json",
 			headers: { type: "object", properties: { "X-WP-Reason": { type: "string", required: true } } },
-			body: { type: "object" },
+			body: { $ref: "kizlo.error" },
 		}
 
 		const client = generateWordPressClient(document)

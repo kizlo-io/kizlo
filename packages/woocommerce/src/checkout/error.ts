@@ -1,4 +1,9 @@
 import { defineErrorMap } from "kizlo"
+import z from "zod"
+import { Cart } from "../cart/schema"
+
+const CheckoutValidationData = z.object({ fields: z.record(z.string(), z.string()) })
+const CheckoutConflictData = z.object({ cart: Cart.nullable() })
 
 export const GET_CHECKOUT_ERROR_MAP = defineErrorMap({
 	CHECKOUT_ORDER_NOT_FOUND: {
@@ -44,6 +49,19 @@ export const CONFIRM_CHECKOUT_ERROR_MAP = defineErrorMap({
 	CHECKOUT_VALIDATION_FAILED: {
 		status: 400,
 		message: "Checkout validation failed.",
+		data: CheckoutValidationData,
+	},
+	CHECKOUT_ACCOUNT_CREATION_FAILED: {
+		status: 400,
+		message: "The customer account could not be created.",
+	},
+	CHECKOUT_PAYMENT_RESULT_INVALID: {
+		status: 500,
+		message: "The payment gateway returned an invalid result.",
+	},
+	CHECKOUT_ORDER_CREATION_FAILED: {
+		status: 500,
+		message: "The checkout order could not be created.",
 	},
 	CHECKOUT_GUEST_DISABLED: {
 		status: 403,
@@ -56,30 +74,37 @@ export const CONFIRM_CHECKOUT_ERROR_MAP = defineErrorMap({
 	CHECKOUT_CART_EMPTY: {
 		status: 409,
 		message: "The cart is empty.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_CART_INVALID: {
 		status: 409,
 		message: "An item in the cart is no longer valid.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_COUPONS_REMOVED: {
 		status: 409,
 		message: "One or more coupons were removed from the cart.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_COUPON_RESERVATION_FAILED: {
 		status: 409,
 		message: "A coupon could not be reserved for this order.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_PRODUCT_INSUFFICIENT_STOCK: {
 		status: 409,
 		message: "Not enough stock for one or more items in the cart.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_PRODUCT_NOT_PURCHASABLE: {
 		status: 409,
 		message: "An item in the cart is no longer purchasable.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_PRODUCT_OUT_OF_STOCK: {
 		status: 409,
 		message: "An item in the cart is out of stock.",
+		data: CheckoutConflictData,
 	},
 })
 export type ConfirmCheckoutErrorMap = typeof CONFIRM_CHECKOUT_ERROR_MAP
@@ -100,6 +125,15 @@ export const RETRY_CHECKOUT_ERROR_MAP = defineErrorMap({
 	CHECKOUT_PAYMENT_METHOD_MISSING: {
 		status: 400,
 		message: "A payment method is required.",
+	},
+	CHECKOUT_VALIDATION_FAILED: {
+		status: 400,
+		message: "Checkout validation failed.",
+		data: CheckoutValidationData,
+	},
+	CHECKOUT_PAYMENT_RESULT_INVALID: {
+		status: 500,
+		message: "The payment gateway returned an invalid result.",
 	},
 	CHECKOUT_ORDER_FORBIDDEN: {
 		status: 403,
@@ -125,6 +159,11 @@ export const UPDATE_CHECKOUT_ERROR_MAP = defineErrorMap({
 		status: 400,
 		message: "The selected payment method is not available.",
 	},
+	CHECKOUT_VALIDATION_FAILED: {
+		status: 400,
+		message: "Checkout validation failed.",
+		data: CheckoutValidationData,
+	},
 	CHECKOUT_ORDER_NOT_FOUND: {
 		status: 404,
 		message: "No checkout order found.",
@@ -132,22 +171,27 @@ export const UPDATE_CHECKOUT_ERROR_MAP = defineErrorMap({
 	CHECKOUT_CART_EMPTY: {
 		status: 409,
 		message: "The cart is empty.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_CART_INVALID: {
 		status: 409,
 		message: "An item in the cart is no longer valid.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_PRODUCT_INSUFFICIENT_STOCK: {
 		status: 409,
 		message: "Not enough stock for one or more items in the cart.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_PRODUCT_NOT_PURCHASABLE: {
 		status: 409,
 		message: "An item in the cart is no longer purchasable.",
+		data: CheckoutConflictData,
 	},
 	CHECKOUT_PRODUCT_OUT_OF_STOCK: {
 		status: 409,
 		message: "An item in the cart is out of stock.",
+		data: CheckoutConflictData,
 	},
 })
 export type UpdateCheckoutErrorMap = typeof UPDATE_CHECKOUT_ERROR_MAP

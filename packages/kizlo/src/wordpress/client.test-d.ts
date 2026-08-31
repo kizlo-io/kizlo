@@ -318,7 +318,13 @@ describe("described WooCommerce routes", () => {
 	})
 
 	it("substitutes the order into the path a retry is paid on", async () => {
-		const order = { id: 12, key: "wc_order_x", billing_address: {} as never, shipping_address: {} as never }
+		const order = {
+			id: 12,
+			key: "wc_order_x",
+			billing_address: {} as never,
+			shipping_address: {} as never,
+			payment_method: "bacs",
+		}
 
 		expectTypeOf(await wordpress.woocommerce.store.checkout.processOrder(order)).toEqualTypeOf<
 			WP_EndpointResult<"woocommerce.store.checkout.processOrder">

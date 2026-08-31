@@ -1,127 +1,127 @@
 import type { WP_EndpointInput } from "kizlo"
-import { deserializeCart } from "../cart/utils"
-import type { BillingAddress, ShippingAddress } from "../schema"
-import type { Checkout } from "./schema"
+import type { CartBillingAddress, CartShippingAddress } from "../cart/schema"
+import type { WCK_Cart } from "../cart/types"
+import {
+	deserializeCart,
+	deserializeCartBillingAddress,
+	deserializeCartShippingAddress,
+	serializeCartBillingAddress,
+	serializeCartShippingAddress,
+} from "../cart/utils"
+import { deserializeExtensions } from "../product/utils"
+import type { Checkout, CheckoutAdditionalFields } from "./schema"
 import type { WCK_Checkout, WCK_CheckoutOrder } from "./types"
 
-/** The payment gateway IDs the generated contract enumerates, which is one install's list. */
 type Gateway = NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["payment_method"]>
 
+const CHECKOUT_KEYS = [
+	"__experimentalCart",
+	"additional_fields",
+	"billing_address",
+	"customer_id",
+	"customer_note",
+	"extensions",
+	"order_id",
+	"order_key",
+	"order_number",
+	"payment_method",
+	"payment_result",
+	"shipping_address",
+	"status",
+] as const satisfies readonly (keyof WCK_Checkout)[]
+
+const CHECKOUT_ORDER_KEYS = CHECKOUT_KEYS satisfies readonly (keyof WCK_CheckoutOrder)[]
+const _BILLING_ADDRESS_KEYS = [
+	"address_1",
+	"address_2",
+	"city",
+	"company",
+	"country",
+	"email",
+	"first_name",
+	"last_name",
+	"phone",
+	"postcode",
+	"state",
+] as const satisfies readonly (keyof WCK_Checkout["billing_address"])[]
+const _SHIPPING_ADDRESS_KEYS = [
+	"address_1",
+	"address_2",
+	"city",
+	"company",
+	"country",
+	"first_name",
+	"last_name",
+	"phone",
+	"postcode",
+	"state",
+] as const satisfies readonly (keyof WCK_Checkout["shipping_address"])[]
+const PAYMENT_RESULT_KEYS = ["payment_details", "payment_status", "redirect_url"] as const satisfies readonly (keyof NonNullable<
+	WCK_Checkout["payment_result"]
+>)[]
+const PAYMENT_DETAIL_KEYS = ["key", "value"] as const satisfies readonly (keyof NonNullable<
+	WCK_Checkout["payment_result"]
+>["payment_details"][number])[]
+
+function assertNoMissing<_T extends never>(): void {}
+assertNoMissing<Exclude<keyof WCK_Checkout, (typeof CHECKOUT_KEYS)[number]>>()
+assertNoMissing<Exclude<keyof WCK_CheckoutOrder, (typeof CHECKOUT_ORDER_KEYS)[number]>>()
+assertNoMissing<Exclude<keyof NonNullable<WCK_Checkout["payment_result"]>, (typeof PAYMENT_RESULT_KEYS)[number]>>()
+assertNoMissing<
+	Exclude<keyof NonNullable<WCK_Checkout["payment_result"]>["payment_details"][number], (typeof PAYMENT_DETAIL_KEYS)[number]>
+>()
+
 /**
- * A payment method the caller named, passed to WooCommerce as one.
- *
- * WooCommerce builds this argument's enum from `get_payment_gateway_ids()`, so the contract
- * enumerates the gateways enabled on the WordPress the client was generated against. That is true of
- * that install and says nothing about the one a build actually talks to, and WooCommerce agrees: its
- * own comment on the enum is that further validation happens during the request.
- *
- * So the enum is documentation here rather than a constraint, and the gateway a shopper chose is
- * sent whatever it is. WooCommerce rejects an unknown one with
- * `woocommerce_rest_checkout_payment_method_disabled`, which both callers already map.
+ * WooCommerce builds this enum from the gateways enabled on the WordPress used for generation.
+ * The target store performs the authoritative validation, so callers may send any gateway ID.
  */
+export function gateway(method: string): Gateway
+export function gateway(method: undefined): undefined
+export function gateway(method: string | undefined): Gateway | undefined
 export function gateway(method: string | undefined): Gateway | undefined {
 	return method as Gateway | undefined
 }
 
-/**
- * A Kizlo address in the shape WooCommerce registered its argument in.
- *
- * Kizlo's addresses are camelCase and WooCommerce's are snake_case, and until the contract described
- * the route nothing said so: the retry call passed a Kizlo address straight through as
- * `billing_address`, where every key missed and WooCommerce kept the address already on the order.
- *
- * Every field is required there, so an address given in part is sent filled out. An address that was
- * not given at all is a different thing and never reaches here: WooCommerce reads an absent
- * `shipping_address` as "use the billing address", and a blank one as an address, so a caller who
- * omitted it must leave the argument off the call rather than send this filled with empty strings.
- */
-export function serializeAddress(address: ShippingAddress) {
-	return {
-		first_name: address.firstName,
-		last_name: address.lastName,
-		address_1: address.address1,
-		address_2: address.address2 ?? "",
-		company: address.company ?? "",
-		city: address.city,
-		state: address.state,
-		country: address.country,
-		postcode: address.postcode,
-		phone: address.phone,
-	}
-}
-
-/** The same, plus the email WooCommerce carries on the billing address alone. */
-export function serializeBillingAddress(address: BillingAddress) {
-	return { ...serializeAddress(address), email: address.email }
-}
-
 export function deserializeCheckout(data: WCK_Checkout | WCK_CheckoutOrder): Checkout {
+	const { extensions } = deserializeExtensions(data.extensions)
+	const paymentResult = data.payment_result
+
 	return {
-		cart: data.__experimentalCart ? deserializeCart(data.__experimentalCart) : null,
-		shippingAddress: {
-			address1: data.shipping_address.address_1,
-			address2: data.shipping_address.address_2,
-			city: data.shipping_address.city,
-			company: data.shipping_address.company,
-			country: data.shipping_address.country,
-			firstName: data.shipping_address.first_name,
-			lastName: data.shipping_address.last_name,
-			phone: data.shipping_address.phone,
-			postcode: data.shipping_address.postcode,
-			state: data.shipping_address.state,
-		},
-		billingAddress: {
-			address1: data.billing_address.address_1,
-			address2: data.billing_address.address_2,
-			city: data.billing_address.city,
-			company: data.billing_address.company,
-			country: data.billing_address.country,
-			email: data.billing_address.email,
-			firstName: data.billing_address.first_name,
-			lastName: data.billing_address.last_name,
-			phone: data.billing_address.phone,
-			postcode: data.billing_address.postcode,
-			state: data.billing_address.state,
-		},
-		additionalFields: additionalFields(data.additional_fields),
+		orderId: data.order_id === 0 ? null : data.order_id,
+		orderNumber: data.order_number === "" || data.order_number === "0" ? null : data.order_number,
+		orderKey: data.order_key === "" ? null : data.order_key,
+		status: data.status,
+		customerId: data.customer_id === 0 ? null : data.customer_id,
 		customerNote: data.customer_note,
-		paymentMethod: data.payment_method,
-		paymentResult: data.payment_result?.payment_status
-			? {
-					status: paymentStatus(data.payment_result.payment_status),
-					redirectUrl: data.payment_result.redirect_url,
-					data: data.payment_result.payment_details,
-				}
-			: null,
+		billingAddress: deserializeCartBillingAddress(data.billing_address as WCK_Cart["billing_address"]),
+		shippingAddress: deserializeCartShippingAddress(data.shipping_address as WCK_Cart["shipping_address"]),
+		paymentMethod: data.payment_method === "" ? null : data.payment_method,
+		paymentResult:
+			paymentResult?.payment_status === undefined || paymentResult.payment_status === ""
+				? null
+				: {
+						status: paymentResult.payment_status,
+						details: paymentResult.payment_details,
+						redirectUrl: paymentResult.redirect_url === "" ? null : paymentResult.redirect_url,
+					},
+		additionalFields: checkoutAdditionalFields(data.additional_fields),
+		cart: data.__experimentalCart ? deserializeCart(data.__experimentalCart) : null,
+		extensions,
 	}
 }
 
-/**
- * WooCommerce registers `additional_fields` as a bare object, so the contract describes it as one
- * with undescribed contents: what a site's checkout fields are is a per-site question that no schema
- * can answer ahead of time. The values are scalars in practice, and anything else is dropped rather
- * than passed on to fail the procedure's own output validation with a less useful message.
- */
-function additionalFields(fields: Record<string, unknown> | undefined): Record<string, string | boolean> {
-	const kept: Record<string, string | boolean> = {}
-	for (const [key, value] of Object.entries(fields ?? {})) {
-		if (typeof value === "string" || typeof value === "boolean") kept[key] = value
-	}
-	return kept
+export function serializeCheckoutShippingAddress(address: CartShippingAddress) {
+	return serializeCartShippingAddress(address)
 }
 
-/**
- * WooCommerce names the four statuses in the field's description and declares the field a plain
- * string, so the contract cannot narrow it. `error` is the safe reading of anything unrecognized: a
- * gateway that answered with something new has not taken payment as far as this checkout knows.
- */
-function paymentStatus(status: string): NonNullable<Checkout["paymentResult"]>["status"] {
-	switch (status) {
-		case "success":
-		case "pending":
-		case "failure":
-			return status
-		default:
-			return "error"
-	}
+export function serializeCheckoutBillingAddress(address: CartBillingAddress) {
+	return serializeCartBillingAddress(address)
+}
+
+function checkoutAdditionalFields(fields: Record<string, unknown> | undefined): CheckoutAdditionalFields {
+	return Object.fromEntries(
+		Object.entries(fields ?? {}).filter(
+			(entry): entry is [string, string | boolean] => typeof entry[1] === "string" || typeof entry[1] === "boolean",
+		),
+	)
 }
