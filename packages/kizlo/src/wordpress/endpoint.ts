@@ -63,6 +63,7 @@ export function buildWordPressRequest(definition: WP_EndpointDefinition, input: 
 			method: definition.method,
 			...(hasBody ? { body: rest, requestContentType: definition.requestContentType } : { searchParams: rest }),
 			responseContentTypes: definition.responseContentTypes,
+			dataResponseStatuses: definition.dataResponseStatuses,
 		},
 		error: null,
 	}

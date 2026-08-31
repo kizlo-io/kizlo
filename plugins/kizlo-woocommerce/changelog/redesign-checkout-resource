@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Redesign the public Checkout resource around WooCommerce Store API contracts

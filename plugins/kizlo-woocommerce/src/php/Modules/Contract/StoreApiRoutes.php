@@ -194,6 +194,10 @@ final class StoreApiRoutes
                     $properties = self::normalizeOrderProperties($schemas, $properties);
                 }
 
+                if ($identifier === 'checkout' || $identifier === 'checkout-order') {
+                    $properties = self::normalizeCheckoutProperties($properties, $identifier);
+                }
+
                 // Collection data carries a `kizlo` block added by a route
                 // interceptor, which is a response filter and has no schema half for
                 // the derivation to find.
@@ -394,6 +398,30 @@ final class StoreApiRoutes
         $address_value = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
         $properties['billing_address']['additionalProperties'] = $address_value;
         $properties['shipping_address']['additionalProperties'] = $address_value;
+
+        return $properties;
+    }
+
+    /**
+     * Correct checkout fields whose runtime shape is wider than the generated
+     * schema, and remove the input-only account flag from response contracts.
+     *
+     * @param array<string, array<string, mixed>> $properties
+     * @return array<string, array<string, mixed>>
+     */
+    private static function normalizeCheckoutProperties(array $properties, string $identifier): array
+    {
+        $scalar = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
+
+        $properties['additional_fields']['additionalProperties'] = $scalar;
+        $properties['billing_address']['additionalProperties'] = $scalar;
+        $properties['shipping_address']['additionalProperties'] = $scalar;
+        $properties['extensions']['additionalProperties'] = true;
+        unset($properties['payment_method']['enum']);
+
+        if ($identifier === 'checkout') {
+            unset($properties['create_account']);
+        }
 
         return $properties;
     }
@@ -666,7 +694,7 @@ final class StoreApiRoutes
                     'woocommerce_rest_product_out_of_stock',
                     'woocommerce_rest_product_partially_out_of_stock',
                 ]),
-                responses: ['200' => $checkout],
+                responses: self::checkoutResponses($checkout),
             ),
             self::declaration(
                 routes: $routes,
@@ -686,9 +714,10 @@ final class StoreApiRoutes
                     'woocommerce_rest_invalid_order',
                     'woocommerce_rest_invalid_user',
                 ]),
-                responses: [
-                    '200' => ['description' => 'The paid order.', 'body' => ['$ref' => WooCommerceSchemas::STORE_CHECKOUT_ORDER]],
-                ],
+                responses: self::checkoutResponses([
+                    'description' => 'The order after its payment attempt.',
+                    'body'        => ['$ref' => WooCommerceSchemas::STORE_CHECKOUT_ORDER],
+                ]),
                 extra: [
                     'id' => [
                         'type'        => 'integer',
@@ -760,6 +789,24 @@ final class StoreApiRoutes
         ];
     }
 
+    /**
+     * Checkout processing always returns its resource body, including gateway
+     * outcomes whose HTTP status is not successful. WordPress errors use their
+     * separate error envelope at those same statuses.
+     *
+     * @param array<string, mixed> $response
+     * @return array<array-key, array<string, mixed>>
+     */
+    private static function checkoutResponses(array $response): array
+    {
+        return [
+            '200' => $response,
+            '202' => $response,
+            '400' => $response,
+            '500' => $response,
+        ];
+    }
+
     // ============================================================
     // DERIVATION
     // ============================================================
@@ -794,6 +841,10 @@ final class StoreApiRoutes
             'properties' => $extra + self::required($route === null ? [] : self::args($route, $method, $path), $required),
         ];
 
+        if ($api === self::CHECKOUT_API_ID) {
+            $input['properties'] = self::normalizeCheckoutInputProperties($input['properties'], $operation);
+        }
+
         if (in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
             $input['content_type'] = 'application/json';
         }
@@ -815,6 +866,54 @@ final class StoreApiRoutes
         }
 
         return $declaration;
+    }
+
+    /**
+     * Keep checkout mutations open to store-registered fields and gateways, then
+     * apply the requiredness enforced by the processing handlers.
+     *
+     * @param array<string, array<string, mixed>> $properties
+     * @return array<string, array<string, mixed>>
+     */
+    private static function normalizeCheckoutInputProperties(array $properties, string $operation): array
+    {
+        $scalar = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
+
+        foreach (['billing_address', 'shipping_address'] as $name) {
+            if (isset($properties[$name])) {
+                $properties[$name]['additionalProperties'] = $scalar;
+            }
+        }
+
+        if (isset($properties['additional_fields'])) {
+            $properties['additional_fields']['additionalProperties'] = $scalar;
+        }
+
+        if (isset($properties['extensions'])) {
+            $properties['extensions']['additionalProperties'] = true;
+        }
+
+        if (isset($properties['payment_method'])) {
+            unset($properties['payment_method']['enum']);
+        }
+
+        if ($operation === 'process' || $operation === 'process_order') {
+            foreach (['billing_address', 'payment_method'] as $name) {
+                if (isset($properties[$name])) {
+                    $properties[$name]['required'] = true;
+                }
+            }
+
+            if (isset($properties['shipping_address'])) {
+                unset($properties['shipping_address']['required']);
+            }
+        }
+
+        if ($operation === 'process_order' && isset($properties['key'])) {
+            $properties['key']['required'] = true;
+        }
+
+        return $properties;
     }
 
     /**

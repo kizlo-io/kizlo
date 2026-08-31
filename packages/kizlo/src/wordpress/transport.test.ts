@@ -135,6 +135,23 @@ describe("generated endpoints", () => {
 		expect(failed.status).toBe(400)
 	})
 
+	test("distinguishes declared non-2xx data from a WordPress error at the same status", async () => {
+		const fetch = vi
+			.fn<FetchFn>()
+			.mockResolvedValueOnce(Response.json({ payment_result: { payment_status: "failure" } }, { status: 400 }))
+			.mockResolvedValueOnce(
+				Response.json({ code: "invalid_checkout", message: "Invalid", data: { params: { email: "Required" } } }, { status: 400 }),
+			)
+		vi.stubGlobal("fetch", fetch)
+		const checkout = definition({ responseContentTypes: { "400": "application/json" }, dataResponseStatuses: ["400"] })
+
+		const data = await call<{ payment_result: { payment_status: string } }, "invalid_checkout">(checkout, {})
+		expect(data).toMatchObject({ status: 400, error: null, data: { payment_result: { payment_status: "failure" } } })
+
+		const failed = await call<never, "invalid_checkout">(checkout, {})
+		expect(failed).toMatchObject({ status: 400, data: null, error: { code: "invalid_checkout", data: { params: { email: "Required" } } } })
+	})
+
 	/**
 	 * Preparing a request can fail as readily as sending one, and a body that will not serialize is
 	 * the reachable case: it is caller data. It reports as a transport failure rather than rejecting,

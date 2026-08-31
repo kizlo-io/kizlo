@@ -162,6 +162,10 @@ export class WordPressTransport {
 		this.onResult?.({ url, status: response.status, headers: response.headers })
 
 		const expectedContentType = input.responseContentTypes?.[String(response.status)] ?? input.responseContentTypes?.default
+		const acceptsData =
+			response.ok ||
+			input.dataResponseStatuses?.includes(String(response.status)) === true ||
+			input.dataResponseStatuses?.includes("default") === true
 		const contentType =
 			response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() || expectedContentType || "application/json"
 		let body: Blob | string
@@ -176,7 +180,7 @@ export class WordPressTransport {
 			}
 		}
 
-		if (response.ok && typeof body === "string" && body.trim() === "") {
+		if (acceptsData && typeof body === "string" && body.trim() === "") {
 			return { data: null as TData, status: response.status, headers: response.headers, error: null }
 		}
 
@@ -196,15 +200,17 @@ export class WordPressTransport {
 					data: null,
 					status: response.status,
 					headers: response.headers,
-					error: new WP_Error<TCode>({ code: data.code, message: data.message }),
+					error: new WP_Error<TCode>({ code: data.code, message: data.message, data: data.data }),
 				}
 			}
 
-			return {
-				data: null,
-				status: response.status,
-				headers: response.headers,
-				error: new WP_Error<TCode>({ code: "unexpected_error", message: this.#snippet(String(body)) }),
+			if (!acceptsData) {
+				return {
+					data: null,
+					status: response.status,
+					headers: response.headers,
+					error: new WP_Error<TCode>({ code: "unexpected_error", message: this.#snippet(String(body)) }),
+				}
 			}
 		}
 

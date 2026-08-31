@@ -14,6 +14,19 @@ import type {
 type UpdateCustomerInput = WP_EndpointInput<"woocommerce.store.cart.updateCustomer">
 type SerializedBillingAddress = NonNullable<UpdateCustomerInput["billing_address"]>
 type SerializedShippingAddress = NonNullable<UpdateCustomerInput["shipping_address"]>
+type SerializedFullShippingAddress = Record<string, string | boolean> & {
+	first_name: string
+	last_name: string
+	company: string
+	address_1: string
+	address_2: string
+	city: string
+	state: string
+	postcode: string
+	country: string
+	phone: string
+}
+type SerializedFullBillingAddress = SerializedFullShippingAddress & { email: string }
 
 const CART_KEYS = [
 	"billing_address",
@@ -403,12 +416,14 @@ function additionalAddressFields(address: Record<string, unknown>, standardKeys:
 
 export function serializeCartUpdateInput(input: UpdateCartInput): UpdateCustomerInput {
 	return {
-		...(input.billingAddress !== undefined && { billing_address: serializeBillingAddress(input.billingAddress) }),
-		...(input.shippingAddress !== undefined && { shipping_address: serializeShippingAddress(input.shippingAddress) }),
+		...(input.billingAddress !== undefined && { billing_address: serializeCartBillingAddress(input.billingAddress) }),
+		...(input.shippingAddress !== undefined && { shipping_address: serializeCartShippingAddress(input.shippingAddress) }),
 	}
 }
 
-function serializeShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress {
+export function serializeCartShippingAddress(address: CartShippingAddress): SerializedFullShippingAddress
+export function serializeCartShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress
+export function serializeCartShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress {
 	return compactAddress({
 		...address.additionalFields,
 		first_name: address.firstName,
@@ -424,8 +439,10 @@ function serializeShippingAddress(address: NonNullable<UpdateCartInput["shipping
 	})
 }
 
-function serializeBillingAddress(address: NonNullable<UpdateCartInput["billingAddress"]>): SerializedBillingAddress {
-	return compactAddress({ ...serializeShippingAddress(address), email: address.email })
+export function serializeCartBillingAddress(address: CartBillingAddress): SerializedFullBillingAddress
+export function serializeCartBillingAddress(address: NonNullable<UpdateCartInput["billingAddress"]>): SerializedBillingAddress
+export function serializeCartBillingAddress(address: NonNullable<UpdateCartInput["billingAddress"]>): SerializedBillingAddress {
+	return compactAddress({ ...serializeCartShippingAddress(address), email: address.email })
 }
 
 function compactAddress<T extends Record<string, string | boolean | undefined>>(address: T): T {

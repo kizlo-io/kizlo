@@ -163,6 +163,7 @@ export type WP_CommonErrorCode =
 export interface WP_ErrorData<T extends string> {
 	code: T | WP_CommonErrorCode
 	message: string
+	data?: unknown
 }
 
 export interface WP_ListMetadata {
@@ -199,6 +200,7 @@ export interface WP_RequestInput {
 	method: WP_RequestMethod
 	requestContentType?: WP_RequestContentType
 	responseContentTypes?: Record<string, WP_ResponseContentType | undefined>
+	dataResponseStatuses?: string[]
 	signal?: AbortSignal
 	timeout?: Duration
 }
@@ -229,6 +231,8 @@ export interface WP_EndpointDefinition {
 	pathParameters: string[]
 	requestContentType?: WP_RequestContentType
 	responseContentTypes: Record<string, WP_ResponseContentType | undefined>
+	/** Non-2xx statuses whose declared body is data rather than a WordPress error envelope. */
+	dataResponseStatuses?: string[]
 }
 
 export interface WordPressCredentials {
