@@ -63,4 +63,17 @@ class CartModuleTest extends TestCase
         $this->assertArrayNotHasKey('additionalProperties', $properties['custom']);
         $this->assertSame([], KizloBlocks::storeCart());
     }
+
+    public function test_order_item_extension_schema_separates_product_availability(): void
+    {
+        $properties = KizloBlocks::storeOrderItem();
+
+        $this->assertSame(
+            ['product_id', 'variation_id', 'product_exists', 'slug', 'url', 'custom'],
+            array_keys($properties),
+        );
+        $this->assertSame('boolean', $properties['product_exists']['type']);
+        $this->assertSame(['string', 'null'], $properties['url']['type']);
+        $this->assertArrayNotHasKey('additionalProperties', $properties['custom']);
+    }
 }

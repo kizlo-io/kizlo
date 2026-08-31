@@ -2,9 +2,11 @@ import { createIntegration } from "kizlo"
 import { CART_PROCEDURES } from "./cart"
 import { CHECKOUT_PROCEDURES } from "./checkout"
 import { CUSTOMER_PROCEDURES } from "./customer"
+import { ORDER_PROCEDURES } from "./order"
 import { PRODUCT_PROCEDURES } from "./product"
 
 export * from "./cart/schema"
+export * from "./order/schema"
 export * from "./product/schema"
 
 export function woocommerce() {
@@ -21,6 +23,7 @@ export function woocommerce() {
 				"woocommerce.kizlo.cart",
 				"woocommerce.store.cart",
 				"woocommerce.store.checkout",
+				"woocommerce.store.orders",
 				"woocommerce.store.products",
 			],
 		},
@@ -29,6 +32,7 @@ export function woocommerce() {
 			products: PRODUCT_PROCEDURES,
 			checkout: CHECKOUT_PROCEDURES,
 			customers: CUSTOMER_PROCEDURES,
+			orders: ORDER_PROCEDURES,
 		},
 	})
 }

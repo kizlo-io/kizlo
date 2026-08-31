@@ -89,6 +89,55 @@ final class KizloBlocks
     }
 
     /**
+     * `extensions.kizlo` on a Store API order item.
+     *
+     * The order line itself is a transaction snapshot. These fields describe
+     * the current product behind it, and `product_exists` tells clients whether
+     * that enrichment can be used at all.
+     *
+     * @return array<string, mixed>
+     */
+    public static function storeOrderItem(): array
+    {
+        return [
+            'product_id' => [
+                'description' => 'The stored base product ID, or zero when unavailable.',
+                'type'        => 'integer',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'variation_id' => [
+                'description' => 'The stored variation ID, or zero for a simple product.',
+                'type'        => 'integer',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'product_exists' => [
+                'description' => 'Whether the exact product or variation behind this order line still exists.',
+                'type'        => 'boolean',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'slug' => [
+                'description' => 'The current base product slug, or an empty string when unavailable.',
+                'type'        => 'string',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'url' => [
+                'description' => 'The current base product headless URL, or null when unavailable.',
+                'type'        => ['string', 'null'],
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'custom' => array_merge(self::customFields(), [
+                'context'  => ['view', 'edit'],
+                'readonly' => true,
+            ]),
+        ];
+    }
+
+    /**
      * `extensions.kizlo` on a Store API product.
      *
      * @return array<string, mixed>
