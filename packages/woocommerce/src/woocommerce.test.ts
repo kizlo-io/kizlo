@@ -506,10 +506,9 @@ test("checkout.get returns a checkout carrying the cart WooCommerce does not dec
  * rather than trusting the response alone: what WooCommerce answers with and what it kept are the
  * same thing here only if the address actually landed on the order.
  *
- * The orders are guest orders, verified by key and billing email. An order owned by a registered
- * customer cannot be retried through Kizlo at all: WooCommerce checks the owner in the route's
- * permission callback, which runs before the plugin switches the request to the cart user, so the
- * check sees the application-password admin and answers 403.
+ * Registered orders are authorized against the customer identity Kizlo forwards. Guest orders
+ * continue to use their key and billing email, while an order belonging to any other registered
+ * user must remain unavailable.
  */
 const ORDER_EMAIL = "stored.shopper@example.com"
 
@@ -534,19 +533,19 @@ const RETRY_BILLING: BillingAddress = {
 	country: "GB",
 }
 
-type SeededOrder = { id: number; order_key: string; shipping: typeof STORED_SHIPPING }
+type SeededOrder = { id: number; order_key: string; shipping: typeof STORED_SHIPPING; status: string }
 
 /** The admin-authenticated client the test instance is wired with, for the wc/v3 routes Kizlo has no procedure for. */
 function admin() {
 	return kizlo.context.createServerContext().wordpress
 }
 
-async function createPendingOrder(): Promise<SeededOrder> {
+async function createPendingOrder(customerId = 0): Promise<SeededOrder> {
 	const created = await admin().post<SeededOrder>(`${WC_CORE_BASE}/orders`, {
 		body: {
 			status: "pending",
 			payment_method: "bacs",
-			customer_id: 0,
+			customer_id: customerId,
 			billing: { ...STORED_SHIPPING, email: ORDER_EMAIL },
 			shipping: STORED_SHIPPING,
 			line_items: [{ product_id: productId, quantity: 1 }],
@@ -561,6 +560,32 @@ async function storedOrder(id: number): Promise<SeededOrder> {
 	if (order.error) throw order.error
 	return order.data
 }
+
+test("checkout.retry pays an order owned by the headless customer", async () => {
+	const order = await createPendingOrder(getTestCredentials().users.user.id)
+
+	await client().checkout.retry.call({
+		params: { orderId: order.id },
+		body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress: RETRY_BILLING },
+	})
+
+	const stored = await storedOrder(order.id)
+	expect(stored.status).toBe("on-hold")
+})
+
+test("checkout.retry refuses an order owned by another registered user", async () => {
+	const order = await createPendingOrder(getTestCredentials().users.admin.id)
+
+	await expect(
+		client().checkout.retry.call({
+			params: { orderId: order.id },
+			body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress: RETRY_BILLING },
+		}),
+	).rejects.toMatchObject({ code: "CHECKOUT_ORDER_FORBIDDEN", status: 403 })
+
+	const stored = await storedOrder(order.id)
+	expect(stored.status).toBe("pending")
+})
 
 test("checkout.retry leaves an absent shipping address off the call, so WooCommerce falls back to billing", async () => {
 	const order = await createPendingOrder()

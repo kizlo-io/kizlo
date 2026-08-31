@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Authorize Store API order retries as the resolved customer

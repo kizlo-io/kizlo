@@ -31,7 +31,8 @@ class WooCommerceModule
         add_filter('woocommerce_persistent_cart_enabled', [$this, 'maybeDisablePersistentCart']);
         add_filter('woocommerce_store_api_disable_nonce_check', [$this, 'maybeDisableNonceCheck']);
         add_filter('rest_post_dispatch', [$this, 'addCartTokenHeader'], 10, 3);
-        add_filter('rest_dispatch_request', [$this, 'maybeSwitchToCartUser'], 10, 4);
+        add_filter('rest_request_before_callbacks', [$this, 'maybeSwitchStoreApiUser'], 10, 3);
+        add_filter('rest_dispatch_request', [$this, 'maybeSwitchKizloCartUser'], 10, 4);
     }
 
     public function maybeUseHeadlessSession(string $default): string
@@ -54,8 +55,8 @@ class WooCommerceModule
     /**
      * Bypass Store API's nonce check for our trusted server-to-server requests.
      *
-     * Reads the cached $trustedAdminAuth flag captured at rest_pre_dispatch time,
-     * before maybeSwitchToCartUser swapped current_user — by the time this
+     * Reads the cached $trustedAdminAuth flag captured by the route-family
+     * switch, before it swapped current_user — by the time this
      * filter actually runs (inside the route callback), current_user is the
      * cart owner, not the admin, so we can't recheck caps here.
      */
@@ -74,14 +75,36 @@ class WooCommerceModule
     }
 
     /**
-     * Switch the request to the cart owner just before the route callback runs.
+     * Switch Store API requests before WooCommerce checks route permissions.
      *
-     * Hooked on rest_dispatch_request which fires AFTER permission_callbacks
-     * (so kizlo_register_route's admin check still verifies the original App
-     * Password admin) but BEFORE the route handler executes. From here onward
-     * get_current_user_id() and WC()->customer reflect the actual customer
-     * (X-Kizlo-User-Id), so orders created at checkout are attributed
-     * correctly and address defaults are read from the right profile.
+     * WordPress has already run rest_authentication_errors at this point, so
+     * Kizlo's global guard has verified the App Password administrator. Store
+     * API permission callbacks now see the resolved customer and can authorize
+     * registered orders against the identity in X-Kizlo-User-Id.
+     */
+    public function maybeSwitchStoreApiUser(mixed $response, mixed $handler, mixed $request): mixed
+    {
+        if (! $this->isStoreApiRequest()) return $response;
+
+        return $this->switchToHeadlessUser($response, $request);
+    }
+
+    /**
+     * Switch Kizlo's cart request after its route permission callback.
+     *
+     * Kizlo-owned routes attach their own manage_options callback. Keeping this
+     * family on rest_dispatch_request lets that callback see the administrator,
+     * while the route handler still runs as the resolved customer.
+     */
+    public function maybeSwitchKizloCartUser(mixed $dispatch_result, mixed $request, mixed $route, mixed $handler): mixed
+    {
+        if (! $this->isKizloCartRequest()) return $dispatch_result;
+
+        return $this->switchToHeadlessUser($dispatch_result, $request);
+    }
+
+    /**
+     * Initialize the headless session, then bind WooCommerce to its owner.
      *
      * Cart/session initialisation is also deferred to this point: doing it
      * earlier (e.g. on wp_loaded) would mint guest tokens and run DB lookups
@@ -106,10 +129,9 @@ class WooCommerceModule
      * wc_load_cart() so the customer (and its shutdown hook) are bound to
      * the right identity from the start.
      */
-    public function maybeSwitchToCartUser(mixed $dispatch_result, mixed $request, mixed $route, mixed $handler): mixed
+    private function switchToHeadlessUser(mixed $result, mixed $request): mixed
     {
-        if (! $this->isHeadlessRequest()) return $dispatch_result;
-        if (! function_exists('wc_load_cart')) return $dispatch_result;
+        if (! function_exists('wc_load_cart')) return $result;
 
         // Capture admin-auth state BEFORE switching — see $trustedAdminAuth.
         $this->trustedAdminAuth = $this->isBasicAuthenticated() && current_user_can('manage_options');
@@ -118,7 +140,7 @@ class WooCommerceModule
         WC()->initialize_session();
 
         $session = WC()->session;
-        if (! $session instanceof SessionHandler) return $dispatch_result;
+        if (! $session instanceof SessionHandler) return $result;
 
         $target_user_id = $session->get_resolved_user_id() ?? 0;
         if (get_current_user_id() !== $target_user_id) {
@@ -145,7 +167,7 @@ class WooCommerceModule
             $this->applyGeoDefaults($request);
         }
 
-        return $dispatch_result;
+        return $result;
     }
 
     /**
@@ -235,7 +257,7 @@ class WooCommerceModule
         if (! $this->isHeadlessRequest()) return $response;
 
         // Never echo a cart token on error responses. Combined with deferring
-        // session init to maybeSwitchToCartUser this guarantees unauthenticated
+        // session init to the route-family switches guarantees unauthenticated
         // callers neither see nor cause a token to be minted.
         if ($response->get_status() >= 400) return $response;
 
@@ -256,12 +278,31 @@ class WooCommerceModule
      */
     private function isHeadlessRequest(): bool
     {
+        return $this->isStoreApiRequest() || $this->isKizloCartRequest();
+    }
+
+    private function isStoreApiRequest(): bool
+    {
         $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
         if ($uri === '') return false;
 
         $needles = [
             '/wp-json/wc/store/',
             'rest_route=/wc/store/',
+        ];
+
+        foreach ($needles as $needle) {
+            if (strpos($uri, $needle) !== false) return true;
+        }
+        return false;
+    }
+
+    private function isKizloCartRequest(): bool
+    {
+        $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+        if ($uri === '') return false;
+
+        $needles = [
             '/wp-json/' . KIZLO_API_NAMESPACE . '/cart',
             'rest_route=/' . KIZLO_API_NAMESPACE . '/cart',
         ];
