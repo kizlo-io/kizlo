@@ -51,9 +51,10 @@ function getCartHeaders(options: { userId?: number; token?: string; connInfo: Co
 	return headers
 }
 
-export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duration }) {
+export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duration; transitionGuestCart?: boolean }) {
 	const cookieName = options?.cookieName ?? "guest-session"
 	const ttlSeconds = seconds(options?.ttl ?? "48 hours")
+	const cookieOptions = { ...GUEST_COOKIE_OPTIONS, maxAge: ttlSeconds }
 
 	return createMiddleware(async ({ context, next }) => {
 		const connInfo = await context.getConnInfo()
@@ -63,34 +64,37 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 		if (!auth) {
 			if (!foundToken) {
 				const { jwt, sub } = await mintGuestToken(context.config.siteSecret, ttlSeconds)
-				await context.cookies.set({ name: cookieName, value: jwt, options: GUEST_COOKIE_OPTIONS })
+				await context.cookies.set({ name: cookieName, value: jwt, options: cookieOptions })
 				return next({ context: { sessionHeaders: getCartHeaders({ token: sub, connInfo }) } })
 			}
 
 			const [err, data] = await tryCatch(verifyToken(foundToken, context.config.siteSecret))
 			if (err) {
 				const { jwt } = await mintGuestToken(context.config.siteSecret, ttlSeconds)
-				await context.cookies.set({ name: cookieName, value: jwt, options: GUEST_COOKIE_OPTIONS })
+				await context.cookies.set({ name: cookieName, value: jwt, options: cookieOptions })
 				throw new KizloError("CART_SESSION_EXPIRED")
 			}
 
 			return next({ context: { sessionHeaders: getCartHeaders({ token: data.sub, connInfo }) } })
 		}
 
-		if (foundToken) {
+		let guestToken: string | undefined
+		if (foundToken && options?.transitionGuestCart) {
 			const [err, data] = await tryCatch(verifyToken(foundToken, context.config.siteSecret))
+			if (!err) guestToken = data.sub
+		}
 
-			if (!err) {
-				const response = await context.wordpress.woocommerce.kizlo.cart.merge(
-					{},
-					{ headers: getCartHeaders({ userId: auth.id, token: data.sub, connInfo }) },
-				)
-				if (response.error) context.logger.error("CART_MERGE_FAILED", response.error)
-			}
+		const result = await next({
+			context: { sessionHeaders: getCartHeaders({ userId: auth.id, token: guestToken, connInfo }) },
+		})
 
+		// A completed cart/checkout operation confirms that WordPress consumed
+		// the guest cart or found it already absent. Direct server calls have no
+		// response headers, so leave cleanup to a later writable request.
+		if (foundToken && options?.transitionGuestCart && context.headers) {
 			await context.cookies.delete(cookieName, GUEST_COOKIE_OPTIONS)
 		}
 
-		return next({ context: { sessionHeaders: getCartHeaders({ userId: auth.id, connInfo }) } })
+		return result
 	})
 }

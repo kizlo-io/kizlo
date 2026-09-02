@@ -36,6 +36,8 @@ namespace {
 
     function kizlo_route_match(string $route, \WP_REST_Request $request): bool {}
 
+    function kizlo_is_application_password_authenticated(): bool {}
+
     function kizlo_register_route(array $args): void {}
 
     /** @param callable(): array<string, mixed> $derive */

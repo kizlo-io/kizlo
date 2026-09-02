@@ -18,4 +18,19 @@ use WP_UnitTestCase;
  */
 abstract class TestCase extends WP_UnitTestCase
 {
+    /** Authenticate the next REST dispatch as an administrator Application Password. */
+    protected function actingAsAdmin(): int
+    {
+        $admin = self::factory()->user->create(['role' => 'administrator']);
+        wp_set_current_user($admin);
+        $GLOBALS['wp_rest_application_password_uuid'] = 'test-application-password';
+
+        return $admin;
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['wp_rest_application_password_uuid']);
+        parent::tearDown();
+    }
 }

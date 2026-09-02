@@ -19,12 +19,11 @@ final class OperationErrors
     /**
      * What can fail before any route callback runs, whoever owns the route.
      *
-     * {@see \Kizlo\Modules\RestApi\RestGuard} filters `rest_authentication_errors`,
-     * which the server consults once per request rather than once per namespace,
-     * so a described `wp/v2` route answers `kizlo_rest_unauthorized` and
-     * `kizlo_rest_forbidden` exactly as a `kizlo/v1` route does. The three
-     * `rest_*` codes come from WordPress dispatching and validating arguments,
-     * which is equally namespace-blind.
+     * {@see \Kizlo\Modules\RestApi\RestGuard} runs before route callbacks and
+     * protects routes by default, so a described route can answer
+     * `kizlo_rest_unauthorized` and `kizlo_rest_forbidden`. Integrations may
+     * explicitly leave public routes on native permissions. The three `rest_*`
+     * codes come from WordPress dispatching and validating arguments.
      *
      * @var array<int, string>
      */

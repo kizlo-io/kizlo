@@ -11,9 +11,8 @@ namespace Kizlo\WooCommerce\Modules\WooCommerce;
  * WooCommerce's own controllers, because copying WooCommerce's field lists into
  * Kizlo's contract would create exactly the second source of truth this contract
  * exists to remove, and it would go stale on a WooCommerce release rather than on
- * a change here. What is left below is what nothing upstream describes: the two
- * fields the headless session adds to a cart, the result of a stock adjustment,
- * and the store's currency formatting.
+ * a change here. What is left below is what nothing upstream describes: the
+ * result of a stock adjustment and the store's currency formatting.
  *
  * The IDs live in one place because both halves reference them. They are
  * vendor-qualified because this is not the Kizlo plugin: `kizlo.*` is reserved
@@ -28,16 +27,6 @@ final class WooCommerceSchemas
      */
     public const ERROR = 'kizlo.error';
 
-    /**
-     * Bodies only a Kizlo route produces, so they sit under `kizlo` rather than
-     * beside WooCommerce's own.
-     *
-     * The segment is what tells a reader which side of the boundary a name is on:
-     * `woocommerce.kizlo.cart` is the cart this plugin's merge route answers with,
-     * `woocommerce.store.cart` is the one WooCommerce serves. Without it the two
-     * read as the same object, and they are not.
-     */
-    public const CART         = 'woocommerce.kizlo.cart';
     public const STOCK_RESULT = 'woocommerce.kizlo.stock-result';
 
     /**
@@ -62,34 +51,8 @@ final class WooCommerceSchemas
 
     public static function register(): void
     {
-        kizlo_register_route_schema(self::CART, static fn(): array => self::cart());
         kizlo_register_route_schema(self::STOCK_RESULT, static fn(): array => self::stockResult());
         kizlo_register_route_schema(self::CURRENCY_FORMAT, static fn(): array => self::currencyFormat());
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function cart(): array
-    {
-        return [
-            'type'                 => 'object',
-            '$extends'             => self::STORE_CART,
-            'description'          => 'The Store API cart, plus the two fields the headless session adds. Its WooCommerce half is described in full by woocommerce.store.cart.',
-            'properties'           => [
-                'guest_token' => [
-                    'type'        => 'string',
-                    'required'    => true,
-                    'description' => 'The guest cart token this session is keyed to. Empty once the cart belongs to a user.',
-                ],
-                'user_id'     => [
-                    'type'        => 'integer',
-                    'required'    => true,
-                    'nullable'    => true,
-                    'description' => 'The resolved cart owner, or null for a guest cart.',
-                ],
-            ],
-        ];
     }
 
     /**

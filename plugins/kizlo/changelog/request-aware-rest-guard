@@ -1,0 +1,4 @@
+Significance: minor
+Type: security
+
+Require administrator Application Password authentication through a request-aware REST route policy.

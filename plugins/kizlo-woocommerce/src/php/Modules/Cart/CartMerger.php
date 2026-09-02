@@ -5,82 +5,142 @@ namespace Kizlo\WooCommerce\Modules\Cart;
 use WP_Error;
 use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
 
-/**
- * Merges a guest cart (identified by its X-Kizlo-Guest-Token) into the cart
- * currently bound to the request. The current request must already resolve to
- * an authenticated user (X-Kizlo-User-Id present) — otherwise there is nothing
- * to merge into.
- *
- * Strategy: re-add each guest item via the Store API CartController so stock,
- * price, and validation rules re-run. The guest session row is then deleted.
- */
-class CartMerger
+/** Merge one guest cart into an authenticated customer's cart exactly once. */
+final class CartMerger
 {
-    public static function merge(string $guest_token): true|WP_Error
+    private const LOCK_TIMEOUT_SECONDS = 5;
+
+    /** @var array<int, array{code: string, message: string}> */
+    private static array $mergeErrors = [];
+
+    /**
+     * The customer session is initialized inside the advisory lock. A second
+     * request therefore loads the customer cart only after the first merge has
+     * been persisted, avoiding a stale shutdown save that could undo it.
+     *
+     * @param callable(): (true|WP_Error) $initialize
+     */
+    public static function merge(string $guestToken, callable $initialize): true|WP_Error
     {
-        $session = WC()->session;
-        if (! $session instanceof SessionHandler) {
-            return new WP_Error(
-                'kizlo_session_unavailable',
-                'Headless session handler is not active for this request.',
-                ['status' => 500]
-            );
-        }
+        self::$mergeErrors = [];
 
-        if ($session->get_resolved_user_id() === null) {
-            return new WP_Error(
-                'kizlo_user_required',
-                'Merge requires an authenticated request (X-Kizlo-User-Id).',
-                ['status' => 400]
-            );
-        }
-
-        if (! str_starts_with($guest_token, SessionHandler::PREFIX_GUEST)) {
+        if (! SessionHandler::isValidGuestToken($guestToken)) {
             return new WP_Error(
                 'kizlo_invalid_guest_token',
-                'Guest token must reference a guest session.',
-                ['status' => 400]
+                'Guest token must have the complete headless session shape.',
+                ['status' => 401]
             );
         }
 
-        $guest_data = $session->get_session($guest_token, null);
-        if ($guest_data === null) {
+        $lockName = self::lockName($guestToken);
+        if (! self::acquireLock($lockName)) {
             return new WP_Error(
-                'kizlo_guest_cart_not_found',
-                'Guest cart not found or already expired.',
-                ['status' => 404]
+                'kizlo_cart_merge_lock_unavailable',
+                'The guest cart is already being merged. Retry the request.',
+                ['status' => 503]
             );
         }
 
-        $cart_contents = self::unserialize_cart($guest_data['cart'] ?? null);
+        try {
+            $initialized = $initialize();
+            if ($initialized instanceof WP_Error) return $initialized;
 
-        $controller = CartSerializer::cart_controller();
-        foreach ($cart_contents as $item) {
-            try {
-                $controller->add_to_cart([
-                    'id'             => (int) ($item['product_id'] ?? 0),
-                    'quantity'       => (int) ($item['quantity'] ?? 1),
-                    'variation_id'   => (int) ($item['variation_id'] ?? 0),
-                    'variation'      => (array) ($item['variation'] ?? []),
-                    'cart_item_data' => array_diff_key(
-                        (array) $item,
-                        array_flip(['key', 'product_id', 'variation_id', 'variation', 'quantity', 'data', 'data_hash', 'line_tax_data', 'line_subtotal', 'line_subtotal_tax', 'line_total', 'line_tax'])
-                    ),
-                ]);
-            } catch (\Throwable) {
-                // Skip items that fail validation (e.g. out of stock) so the
-                // merge proceeds for everything else.
-                continue;
+            $session = WC()->session;
+            if (! $session instanceof SessionHandler) {
+                return new WP_Error(
+                    'kizlo_session_unavailable',
+                    'Headless session handler is not active for this request.',
+                    ['status' => 500]
+                );
             }
+
+            if ($session->get_resolved_user_id() === null) {
+                return new WP_Error(
+                    'kizlo_user_required',
+                    'A resolved user identity is required to merge a guest cart.',
+                    ['status' => 401]
+                );
+            }
+
+            // Always re-read after taking the lock. Absence means a previous
+            // request completed this transition and is an idempotent success.
+            $guestData = $session->get_session($guestToken, null);
+            if ($guestData === null) return true;
+
+            $controller = CartSerializer::cart_controller();
+            foreach (self::unserializeCart($guestData['cart'] ?? null) as $item) {
+                try {
+                    $controller->add_to_cart([
+                        'id'             => (int) ($item['product_id'] ?? 0),
+                        'quantity'       => (int) ($item['quantity'] ?? 1),
+                        'variation_id'   => (int) ($item['variation_id'] ?? 0),
+                        'variation'      => (array) ($item['variation'] ?? []),
+                        'cart_item_data' => array_diff_key(
+                            (array) $item,
+                            array_flip(['key', 'product_id', 'variation_id', 'variation', 'quantity', 'data', 'data_hash', 'line_tax_data', 'line_subtotal', 'line_subtotal_tax', 'line_total', 'line_tax'])
+                        ),
+                    ]);
+                } catch (\Throwable $error) {
+                    self::$mergeErrors[] = [
+                        'code'    => method_exists($error, 'getErrorCode')
+                            ? (string) $error->getErrorCode()
+                            : 'kizlo_cart_merge_item_rejected',
+                        'message' => $error->getMessage() !== ''
+                            ? $error->getMessage()
+                            : 'A guest cart item could not be restored.',
+                    ];
+                }
+            }
+
+            CartSerializer::calculate_totals();
+            WC()->cart->set_session();
+
+            if (! $session->persist()) {
+                return new WP_Error(
+                    'kizlo_cart_merge_persistence_failed',
+                    'The customer cart could not be persisted. The guest cart was retained.',
+                    ['status' => 500]
+                );
+            }
+
+            $session->delete_session($guestToken);
+
+            return true;
+        } finally {
+            self::releaseLock($lockName);
         }
-
-        $session->delete_session($guest_token);
-        CartSerializer::calculate_totals();
-
-        return true;
     }
 
-    private static function unserialize_cart(mixed $raw): array
+    /** Add rejected guest lines to WooCommerce's existing cart `errors` field. */
+    public static function addErrors(WP_Error $errors): void
+    {
+        foreach (self::$mergeErrors as $error) {
+            $errors->add($error['code'], $error['message']);
+        }
+    }
+
+    private static function lockName(string $guestToken): string
+    {
+        return 'kizlo_cart_' . substr(hash('sha256', $guestToken), 0, 48);
+    }
+
+    private static function acquireLock(string $name): bool
+    {
+        global $wpdb;
+
+        return (string) $wpdb->get_var(
+            $wpdb->prepare('SELECT GET_LOCK(%s, %d)', $name, self::LOCK_TIMEOUT_SECONDS)
+        ) === '1';
+    }
+
+    private static function releaseLock(string $name): void
+    {
+        global $wpdb;
+        $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $name));
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private static function unserializeCart(mixed $raw): array
     {
         if (is_array($raw)) return $raw;
         if (! is_string($raw) || $raw === '') return [];

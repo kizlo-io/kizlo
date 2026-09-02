@@ -30,7 +30,7 @@ export const CART_PROCEDURES = {
 			path: "/cart",
 			output: Cart,
 			errors: GET_CART_ERROR_MAP,
-			middlewares: [sessionMiddleware()],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, errors }) => {
 			const response = await context.wordpress.woocommerce.store.cart.get({}, { headers: context.sessionHeaders })
@@ -55,7 +55,7 @@ export const CART_PROCEDURES = {
 			output: Cart,
 			body: UpdateCartInput,
 			errors: UPDATE_CART_ERROR_MAP,
-			middlewares: [sessionMiddleware()],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input: { body: input }, errors }) => {
 			const response = await context.wordpress.woocommerce.store.cart.updateCustomer(serializeCartUpdateInput(input), {
@@ -88,7 +88,7 @@ export const CART_PROCEDURES = {
 			body: SelectCartShippingRateInput,
 			output: Cart,
 			errors: SELECT_SHIPPING_RATE_ERROR_MAP,
-			middlewares: [sessionMiddleware()],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input: { body }, errors }) => {
 			const response = await context.wordpress.woocommerce.store.cart.selectShippingRate(
@@ -121,7 +121,7 @@ export const CART_PROCEDURES = {
 				body: AddCartItemInput,
 				output: Cart,
 				errors: ADD_CART_ITEM_ERROR_MAP,
-				middlewares: [sessionMiddleware()],
+				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { body: input }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.addItem(
@@ -172,7 +172,7 @@ export const CART_PROCEDURES = {
 				body: UpdateCartItemInput.pick({ quantity: true }),
 				output: Cart,
 				errors: UPDATE_CART_ITEM_ERROR_MAP,
-				middlewares: [sessionMiddleware()],
+				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { params, body }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.updateItem(
@@ -210,7 +210,7 @@ export const CART_PROCEDURES = {
 				params: RemoveCartItemInput.pick({ key: true }),
 				output: Cart,
 				errors: REMOVE_CART_ITEM_ERROR_MAP,
-				middlewares: [sessionMiddleware()],
+				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { params }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.removeItem({ key: params.key }, { headers: context.sessionHeaders })
@@ -239,7 +239,7 @@ export const CART_PROCEDURES = {
 				body: ApplyCouponInput,
 				output: Cart,
 				errors: APPLY_COUPON_ERROR_MAP,
-				middlewares: [sessionMiddleware()],
+				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { body }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.applyCoupon(
@@ -271,7 +271,7 @@ export const CART_PROCEDURES = {
 				params: RemoveCouponInput.pick({ code: true }),
 				output: Cart,
 				errors: REMOVE_COUPON_ERROR_MAP,
-				middlewares: [sessionMiddleware()],
+				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.removeCoupon(
