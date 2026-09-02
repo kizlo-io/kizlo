@@ -104,9 +104,9 @@ const runArgs = {
 } satisfies ArgsDef
 
 /**
- * Run the project's tests. When `test.local` is set, boot (+ seed) local WordPress first, run the
- * suite (JS then the plugin's PHPUnit) against it, then leave it up (or tear down). Without
- * `test.local`, there's no Docker WordPress to manage — just run the project's own test script.
+ * Run the project's tests. When the test stack is enabled (`local` with `test.enable !== false`), boot
+ * (+ seed) local WordPress first, run the suite (JS then the plugin's PHPUnit) against it, then leave it
+ * up (or tear down). Otherwise there's no Docker WordPress to manage — just run the project's own test script.
  */
 async function runSuite({ args }: CommandContext<typeof runArgs>): Promise<void> {
 	const cfg = await resolveTestConfig(process.cwd())

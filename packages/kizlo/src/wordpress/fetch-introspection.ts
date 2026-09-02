@@ -18,7 +18,7 @@ export interface IntrospectionFetchResult {
  * WordPress could not be asked, or did not answer with a contract: a transport failure, a non-2xx
  * status, a body that is not JSON. A document that parsed is never one of these, however much of it
  * WordPress had to exclude, because what to do about an exclusion is the generator's policy and not
- * this function's. It reports; {@link generateWordPressOnce} decides.
+ * this function's. It reports; {@link generateIntrospectionOnce} decides.
  */
 export class IntrospectionFetchError extends Error {
 	/**

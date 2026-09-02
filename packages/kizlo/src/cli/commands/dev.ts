@@ -22,12 +22,12 @@ async function resolve(cwd: string): Promise<{ cfg: ResolvedDevConfig; stack: Do
 
 /**
  * The lifecycle subcommands (`stop`/`reset`) only act on local WordPress. A project pointing at its
- * own WordPress (no `dev.local`) has nothing to manage, so print a plain note and exit cleanly. Returns
+ * own WordPress (no `local`) has nothing to manage, so print a plain note and exit cleanly. Returns
  * true when local WordPress is configured and the caller may proceed.
  */
 async function requireLocalWordPress(cwd: string): Promise<boolean> {
 	if (await usesLocalWordPress(cwd)) return true
-	note("This project doesn't run local WordPress — set `dev.local: true` in kizlo.config.ts to add it.")
+	note("This project doesn't run local WordPress — set `local: true` in kizlo.config.ts to add it.")
 	return false
 }
 
@@ -364,7 +364,7 @@ async function watchOnly(cwd: string): Promise<void> {
 async function bringUp(): Promise<void> {
 	const cwd = process.cwd()
 	if (!(await usesLocalWordPress(cwd))) {
-		note("This project doesn't run local WordPress — running the contract watcher only. Set `dev.local` in kizlo.config.ts to add it.")
+		note("This project doesn't run local WordPress — running the contract watcher only. Set `local` in kizlo.config.ts to add it.")
 		await watchOnly(cwd)
 		return
 	}

@@ -123,7 +123,7 @@ export class Context {
 		const options = { credentials: config.credentials, onResult: (result: WordPressTransportResult) => this.warnIfOutdated(result) }
 		const transport = new WordPressTransport(options)
 		// The generated endpoints are inert data, so the client is the pair: the tree overlaid on the
-		// transport it runs against. The cast hands back whatever shape that project's `wordpress.ts` declares.
+		// transport it runs against. The cast hands back whatever shape that project's `introspection.ts` declares.
 		this.wordpress = createWordPressClient(transport, config.wordpressEndpoints ?? {}) as ActiveWordPressClient
 		this.settings = new SettingsService(this.wordpress)
 		this.email = new EmailService(this.wordpress)

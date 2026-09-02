@@ -1,6 +1,6 @@
 {
 	"extends": "@tooling/typescript/base.json",
-	"include": ["src/**/*", "*.ts", "../../wordpress.ts"],
+	"include": ["src/**/*", "*.ts", "../../introspection.ts"],
 	"compilerOptions": {
 		"types": ["node"]
 	}

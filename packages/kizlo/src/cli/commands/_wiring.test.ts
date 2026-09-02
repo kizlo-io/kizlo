@@ -5,7 +5,25 @@ import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { ScaffoldContext } from "../presets"
 import { changesFor, patchEntries, readManifest } from "../presets/template"
-import { applyProjectPatches } from "./_wiring"
+import { applyProjectPatches, kizloConfigTemplate } from "./_wiring"
+
+describe("kizloConfigTemplate", () => {
+	it("emits the dir and alias with no local block when local WordPress is off", () => {
+		const config = kizloConfigTemplate("src/lib/kizlo", "@")
+		expect(config).toContain('dir: "src/lib/kizlo"')
+		expect(config).toContain('alias: "@/"')
+		expect(config).not.toContain("local")
+	})
+
+	it("emits a `local: { dev, test }` block for a local-WordPress scaffold", () => {
+		const config = kizloConfigTemplate("src/lib/kizlo", "@", true)
+		expect(config).toContain('dir: "src/lib/kizlo"')
+		expect(config).toContain("local: { dev: {}, test: {} }")
+		// No trace of the removed flat keys the redesign dropped.
+		expect(config).not.toContain("dev: { local")
+		expect(config).not.toContain("wordpressClientDir")
+	})
+})
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const templateDir = path.resolve(here, "../../../../../templates/nextjs")

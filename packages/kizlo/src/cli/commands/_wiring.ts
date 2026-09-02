@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import * as p from "@clack/prompts"
-import { CONTRACT_BARREL, WORDPRESS_STUB } from "../daemon/generate"
+import { CONTRACT_BARREL, INTROSPECTION_STUB } from "../daemon/generate"
 import type { ScaffoldContext, ScaffoldFile } from "../presets"
 import { applyPatchToSource, patchChanged, type ResolvedPatch, renderPatchCode, resolvePatchTargetPath } from "../presets/patch"
 import { type PatchEntry, resolvePatch, type TemplateConfig } from "../presets/template"
@@ -9,13 +9,13 @@ import { aliasWithSlash, resolveModuleImport, writeFileIfAbsent } from "../utils
 import { orCancel } from "./_setup"
 
 /** The kizlo.config.ts a scaffolded project gets: the Kizlo directory, the import-alias preference, and —
- *  when local WordPress is chosen — `dev.local` + `test.local` so `kizlo dev` and `kizlo test` boot the
+ *  when local WordPress is chosen — a `local: { dev, test }` block so `kizlo dev` and `kizlo test` boot the
  *  fixed `.kizlo/local` install. The alias is always written — `""` for relative imports included — so it
  *  records a made decision a later `kizlo init` reads back instead of prompting for it again. The alias
  *  is written in its canonical `@/` form (never a bare `@`) so it reads like the imports it produces. */
 export function kizloConfigTemplate(dir: string, alias: string, localWordPress = false): string {
 	const aliasLine = `\n\talias: "${aliasWithSlash(alias)}",`
-	const localLines = localWordPress ? `\n\tdev: { local: true },\n\ttest: { local: true },` : ""
+	const localLines = localWordPress ? `\n\tlocal: { dev: {}, test: {} },` : ""
 	return `import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
@@ -88,7 +88,7 @@ export function writeGeneratedContract(cwd: string, serverDirRel: string): void 
 	const generatedDirRel = path.join(serverDirRel, "generated")
 	writeFileIfAbsent(path.join(cwd, generatedDirRel, "contract.json"), "{}\n")
 	writeFileIfAbsent(path.join(cwd, generatedDirRel, "index.ts"), CONTRACT_BARREL)
-	writeFileIfAbsent(path.join(cwd, generatedDirRel, "wordpress.ts"), WORDPRESS_STUB)
+	writeFileIfAbsent(path.join(cwd, generatedDirRel, "introspection.ts"), INTROSPECTION_STUB)
 }
 
 /**

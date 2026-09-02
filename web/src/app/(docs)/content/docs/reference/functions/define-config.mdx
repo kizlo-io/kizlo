@@ -19,9 +19,20 @@ defineConfig(config)
   type={`KizloGlobalConfig`}
 />
 
-### `dev`
+### `local`
 
-The local WordPress and contract watcher run by `kizlo dev`.
+Local Docker WordPress, off unless set. `true` enables both stacks with defaults; the object form enables and
+configures them, and holds the stack name, the per-branch `worktrees` toggle, and the two stacks.
+
+<AutoTypeTable
+  path="../packages/kizlo/src/config.ts"
+  name="KizloLocalConfig"
+  type={`KizloLocalConfig`}
+/>
+
+### `local.dev`
+
+The dev stack run by `kizlo dev`.
 
 <AutoTypeTable
   path="../packages/kizlo/src/config.ts"
@@ -29,9 +40,10 @@ The local WordPress and contract watcher run by `kizlo dev`.
   type={`KizloDevConfig`}
 />
 
-### `test`
+### `local.test`
 
-The WordPress test environment run by `kizlo test`.
+The test stack run by `kizlo test`. Its `version` and `fixtures` fall back to `local.dev` unless `inherit` is
+`false`.
 
 <AutoTypeTable
   path="../packages/kizlo/src/config.ts"
@@ -45,16 +57,15 @@ The same config object, unchanged. `defineConfig` is an identity function that e
 
 ## Examples
 
-Run local WordPress with `dev.local` and `test.local` (the install folder is fixed, so there's nothing else to
-set). `create`/`init` write these when you choose local WordPress:
+Run local WordPress by declaring the stacks under `local` (the install folder is fixed, so there's nothing
+else to set). `create`/`init` write this when you choose local WordPress:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
   dir: "src/lib/kizlo",
-  dev: { local: true },
-  test: { local: true },
+  local: { dev: {}, test: {} },
 })
 ```
 
@@ -66,27 +77,28 @@ import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
   dir: "src/lib/kizlo",
-  worktrees: true,
-  dev: { local: true },
-  test: { local: true },
+  local: { worktrees: true, dev: {}, test: {} },
 })
 ```
 
-Both stacks boot current WordPress unless you say otherwise. `version` takes a Docker Hub tag, and each
-command reads its own, so you can build against current WordPress while the suite proves the oldest version
-you support:
+Both stacks boot current WordPress unless you say otherwise. `version` takes a Docker Hub tag. Set it on the
+dev stack and the test stack inherits it; pin the test stack on its own to prove the oldest version you
+support:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
   dir: "src/lib/kizlo",
-  dev: { local: true, version: "7.1.0" },
-  test: { local: true, version: "6.8.2-php8.3-apache" },
+  local: {
+    dev: { version: "7.1.0" },
+    test: { version: "6.8.2-php8.3-apache" },
+  },
 })
 ```
 
-Seed both from shared fixtures, and override ports where they clash:
+Seed both from shared fixtures: the dev stack declares them and the test stack inherits them, so a fixture is
+never added to one and forgotten in the other:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
@@ -95,7 +107,20 @@ import { blogFixture } from "./fixtures/blog"
 export default defineConfig({
   dir: "src/lib/kizlo",
   alias: "@",
-  dev: { local: true, fixtures: [blogFixture] },
-  test: { local: true, fixtures: [blogFixture] },
+  local: {
+    dev: { fixtures: [blogFixture] },
+    test: {},
+  },
+})
+```
+
+Generate only the [introspection](/docs/concepts/introspection) for a package that ships procedures but no
+server, by setting `dir.introspection` and leaving `local` off:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  dir: { introspection: "." },
 })
 ```

@@ -1,7 +1,7 @@
 /**
- * Repo-only, and never scaffolded: wiring writes a fresh stub from the CLI's `WORDPRESS_STUB`.
+ * Repo-only, and never scaffolded: wiring writes a fresh stub from the CLI's `INTROSPECTION_STUB`.
  * Kept empty on purpose. Compiling the framework's own source against a tree with nothing in it is
- * what proves it still typechecks in a project that has not generated a client yet, so only a
+ * what proves it still typechecks in a project that has not generated an introspection yet, so only a
  * template that cannot build without endpoints should borrow the repo's own (see `nextjs`).
  */
 import type { WP_Client } from "kizlo"
