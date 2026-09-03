@@ -80,7 +80,7 @@ class WooCommerceModule
      * WordPress has already run rest_authentication_errors at this point, so
      * Kizlo's global guard has verified the App Password administrator. Store
      * API permission callbacks now see the resolved customer and can authorize
-     * registered orders against the identity in X-Kizlo-User-Id.
+     * registered orders against the identity in X-Kizlo-User-Email.
      */
     public function maybeSwitchStoreApiUser(mixed $response, mixed $handler, mixed $request): mixed
     {
