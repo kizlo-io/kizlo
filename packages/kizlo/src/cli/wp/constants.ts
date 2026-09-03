@@ -47,10 +47,7 @@ export const CREDENTIALS_REL = ".kizlo/test.json"
  * working dir rather than next to the generated files on purpose: it describes one machine's last
  * fetch, so a fresh clone has to regenerate rather than trust a cache it never populated.
  */
-export const WORDPRESS_META_REL = ".kizlo/wordpress.meta.json"
-
-/** Same, for the standalone client written by `wordpressClientDir`. Separate so the two never share one ETag. */
-export const WORDPRESS_CLIENT_META_REL = ".kizlo/wordpress.client.meta.json"
+export const INTROSPECTION_META_REL = ".kizlo/introspection.meta.json"
 
 /**
  * Fixed folder the local WordPress install lives in, relative to the config root. The whole install

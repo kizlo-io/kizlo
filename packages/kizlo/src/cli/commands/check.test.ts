@@ -9,7 +9,7 @@ import { findGeneratedFileMismatches, formatGeneratedFileDiff } from "./check"
 describe("generated file checks", () => {
 	test("accepts every configured file when each contains the generated output", () => {
 		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-check-"))
-		const files = [path.join(cwd, "wordpress.ts"), path.join(cwd, "app/wordpress.ts")]
+		const files = [path.join(cwd, "introspection.ts"), path.join(cwd, "app/introspection.ts")]
 		for (const file of files) {
 			fs.mkdirSync(path.dirname(file), { recursive: true })
 			fs.writeFileSync(file, "current\n")
@@ -20,8 +20,8 @@ describe("generated file checks", () => {
 
 	test("reports stale and missing files without writing either one", () => {
 		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-check-"))
-		const stale = path.join(cwd, "wordpress.ts")
-		const missing = path.join(cwd, "app/wordpress.ts")
+		const stale = path.join(cwd, "introspection.ts")
+		const missing = path.join(cwd, "app/introspection.ts")
 		fs.writeFileSync(stale, "old field\n")
 
 		const mismatches = findGeneratedFileMismatches([stale, missing], "new field\n")
@@ -30,7 +30,7 @@ describe("generated file checks", () => {
 		expect(fs.readFileSync(stale, "utf8")).toBe("old field\n")
 		expect(fs.existsSync(missing)).toBe(false)
 		expect(formatGeneratedFileDiff(cwd, mismatches[0] as (typeof mismatches)[number])).toContain(
-			"--- wordpress.ts\tcommitted\n+++ wordpress.ts\tgenerated\n@@ -1,1 +1,1 @@\n-old field\n+new field",
+			"--- introspection.ts\tcommitted\n+++ introspection.ts\tgenerated\n@@ -1,1 +1,1 @@\n-old field\n+new field",
 		)
 	})
 })

@@ -3,7 +3,7 @@ import path from "node:path"
 import z from "zod/v4"
 import type { KizloGlobalConfig } from "../../config"
 import { detectPackageManager, type PackageManager } from "../utils"
-import { DEFAULT_WORDPRESS_TAG, LOCAL_DIR_REL, WORDPRESS_META_REL } from "../wp/constants"
+import { DEFAULT_WORDPRESS_TAG, INTROSPECTION_META_REL, LOCAL_DIR_REL } from "../wp/constants"
 import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
 import { WORDPRESS_TAG_PATTERN } from "../wp/version"
@@ -16,57 +16,127 @@ const fixtureSchema = z.custom<Fixture>(
 )
 
 /**
- * `dev.version` / `test.version`. Validated against Docker's tag grammar here rather than at boot,
- * so `"wordpress:7.1.0"`, which would resolve to `wordpress:wordpress:7.1.0`, is named as a config
- * mistake instead of surfacing as a pull failure seconds into starting a stack.
+ * `local.dev.version` / `local.test.version`. Validated against Docker's tag grammar here rather than
+ * at boot, so `"wordpress:7.1.0"`, which would resolve to `wordpress:wordpress:7.1.0`, is named as a
+ * config mistake instead of surfacing as a pull failure seconds into starting a stack.
  */
 const versionSchema = z
 	.string()
 	.regex(WORDPRESS_TAG_PATTERN, 'must be a WordPress image tag, like "7.1.0" or "7.1.0-php8.3-apache" (no "wordpress:" prefix)')
 
+/**
+ * A key that moved in the config redesign. It accepts only `undefined`, so an absent key passes and a
+ * present one fails validation with a message naming where it went: a hard cutover with no silent
+ * fallback. {@link loadConfigFile} surfaces the message through `z.prettifyError`.
+ */
+const removedKey = (message: string) => z.undefined({ error: message }).optional()
+
+const dirSchema = z.union([
+	z.string(),
+	z.object({
+		server: z.string().optional(),
+		contract: z.string().optional(),
+		introspection: z.string().optional(),
+	}),
+])
+
+const devStackSchema = z.object({
+	enable: z.boolean().optional(),
+	port: z.number().int().positive().optional(),
+	version: versionSchema.optional(),
+	dbPort: z.number().int().positive().optional(),
+	fixtures: z.array(fixtureSchema).optional(),
+})
+
+const testStackSchema = z.object({
+	enable: z.boolean().optional(),
+	inherit: z.boolean().optional(),
+	port: z.number().int().positive().optional(),
+	version: versionSchema.optional(),
+	fixtures: z.array(fixtureSchema).optional(),
+	packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]).optional(),
+	command: z.string().optional(),
+})
+
+const localSchema = z.union([
+	z.boolean(),
+	z.object({
+		enable: z.boolean().optional(),
+		name: z.string().optional(),
+		worktrees: z.boolean().optional(),
+		dev: devStackSchema.optional(),
+		test: testStackSchema.optional(),
+	}),
+])
+
 /** Runtime shape of `kizlo.config.*` — mirrors {@link KizloGlobalConfig}. */
 const configSchema = z.object({
-	dir: z.string().optional(),
+	dir: dirSchema.optional(),
 	alias: z.string().optional(),
-	name: z.string().optional(),
-	worktrees: z.boolean().optional(),
-	wordpressClientDir: z.string().optional(),
-	dev: z
-		.object({
-			local: z.boolean().optional(),
-			port: z.number().int().positive().optional(),
-			version: versionSchema.optional(),
-			dbPort: z.number().int().positive().optional(),
-			fixtures: z.array(fixtureSchema).optional(),
-		})
-		.optional(),
-	test: z
-		.object({
-			local: z.boolean().optional(),
-			port: z.number().int().positive().optional(),
-			version: versionSchema.optional(),
-			fixtures: z.array(fixtureSchema).optional(),
-			packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]).optional(),
-			command: z.string().optional(),
-		})
-		.optional(),
+	local: localSchema.optional(),
+	// Keys removed in the config redesign, each failing with the replacement to move to.
+	wordpressClientDir: removedKey("`wordpressClientDir` has been removed. Use `dir: { introspection }` instead."),
+	name: removedKey("`name` is no longer a config root key. Move it under `local.name`."),
+	worktrees: removedKey("`worktrees` is no longer a config root key. Move it under `local.worktrees`."),
+	dev: removedKey("`dev` is no longer a config root key. Move it under `local.dev`."),
+	test: removedKey("`test` is no longer a config root key. Move it under `local.test`."),
 })
 
 /** Parsed config shape — mirrors {@link KizloGlobalConfig}, with every block optional. */
 type LoadedConfig = z.infer<typeof configSchema>
 
-export interface ResolvedConfig {
-	cwd: string
-	/** Kizlo's home directory. */
+/** The object form of `local`, with the two booleans and the stacks it can carry. */
+type LocalObject = Exclude<NonNullable<LoadedConfig["local"]>, boolean>
+type DevStack = NonNullable<LocalObject["dev"]>
+type TestStack = NonNullable<LocalObject["test"]>
+
+interface ResolvedLocal {
+	/** Whether local WordPress is on at all (`local === true` or the object with `enable !== false`). */
+	enabled: boolean
+	name?: string
+	worktrees?: boolean
+	dev: DevStack
+	test: TestStack
+}
+
+/** Normalize `local` (absent, `true`, `false`, or the object form) into one shape the resolvers read. */
+function resolveLocal(fileConfig?: LoadedConfig): ResolvedLocal {
+	const local = fileConfig?.local
+	if (local === true) return { enabled: true, dev: {}, test: {} }
+	if (!local) return { enabled: false, dev: {}, test: {} }
+	return {
+		enabled: local.enable !== false,
+		name: local.name,
+		worktrees: local.worktrees,
+		dev: local.dev ?? {},
+		test: local.test ?? {},
+	}
+}
+
+/** The server sources a project has, when `dir` resolves one: watched, and the source of the contract. */
+export interface ResolvedServer {
+	/** Server sources directory (watched by `kizlo dev`). */
 	dir: string
-	serverDir: string
-	serverEntry: string
-	generatedDir: string
+	/** The server entry (`index.ts`) whose `procedures` export builds the contract. */
+	entry: string
+	/** Directory `contract.json` and the generated barrel are written to. */
+	contractDir: string
 	contractPath: string
 	barrelPath: string
-	wordpressPath: string
+}
+
+export interface ResolvedConfig {
+	cwd: string
+	/**
+	 * The server layout, present only when `dir` resolves a `server` path: the string form always does,
+	 * the object form only when `server` is set. Absent means introspection-only: nothing to watch, no
+	 * contract to build.
+	 */
+	server?: ResolvedServer
+	/** The generated `introspection.ts`, always written whether or not a server is present. */
+	introspectionPath: string
 	/** Fetch cache, under `.kizlo/` rather than the generated dir: it is local state, not an artifact. */
-	wordpressMetaPath: string
+	introspectionMetaPath: string
 }
 
 export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
@@ -74,6 +144,14 @@ export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config
 export const DEFAULT_DEV_PORT = 8080
 export const DEFAULT_DEV_DB_PORT = 3307
 const DEFAULT_TEST_PORT = 8889
+
+/** The generated introspection artifact's filename, written under its resolved directory. */
+const INTROSPECTION_FILE = "introspection.ts"
+
+/** Strip a leading `./` and trailing slashes so a config path joins cleanly. */
+function normalizeDir(value: string): string {
+	return value.replace(/^\.\//, "").replace(/\/+$/, "")
+}
 
 async function loadConfigFile(cwd: string): Promise<LoadedConfig | undefined> {
 	const file = CONFIG_FILES.map((name) => path.join(cwd, name)).find((p) => fs.existsSync(p))
@@ -97,40 +175,63 @@ async function loadConfigFile(cwd: string): Promise<LoadedConfig | undefined> {
 }
 
 /**
- * Resolve the Kizlo server layout from an explicit `dir` — the `--dir` flag or `dir` in
- * `kizlo.config.*`. Returns `undefined` when neither is set: there's no Kizlo server to
- * generate a contract from, so callers skip generation and (for `dev`) run local WordPress
- * alone. There's intentionally no default path — a missing `dir` means "no server", not
- * "look under `lib/kizlo`".
+ * Resolve what Kizlo generates and watches from `dir`: the `--dir` flag or `dir` in `kizlo.config.*`.
+ * A string is the home Kizlo owns the layout under (sources in `<dir>/server`, generated files under
+ * `<dir>/server/generated`); the object form sets `server` / `contract` / `introspection` independently.
+ *
+ * The introspection is always generated at its resolved path, so a project with no server still gets it.
+ * `server` is present only when `dir` resolves a server path (the string form always does, the object
+ * form only when `server` is set), and its absence means there is nothing to watch and no contract to
+ * build. Returns `undefined` only when nothing at all is configured (no `dir`, or an object naming
+ * neither a server nor an introspection path): there is then nothing to generate.
  */
 export async function resolveConfig(cwd: string, flags?: { dir?: string }): Promise<ResolvedConfig | undefined> {
 	const fileConfig = await loadConfigFile(cwd)
 	const raw = flags?.dir ?? fileConfig?.dir
-	if (!raw) return undefined
-	const dir = raw.replace(/^\.\//, "").replace(/\/+$/, "")
-	const serverDir = path.join(dir, "server")
-	const generatedDir = path.join(serverDir, "generated")
+	if (raw === undefined) return undefined
+
+	if (typeof raw === "string") {
+		const home = normalizeDir(raw)
+		const serverDir = path.join(home, "server")
+		const contractDir = path.join(serverDir, "generated")
+		return {
+			cwd,
+			server: {
+				dir: serverDir,
+				entry: path.join(serverDir, "index.ts"),
+				contractDir,
+				contractPath: path.join(contractDir, "contract.json"),
+				barrelPath: path.join(contractDir, "index.ts"),
+			},
+			introspectionPath: path.join(contractDir, INTROSPECTION_FILE),
+			introspectionMetaPath: INTROSPECTION_META_REL,
+		}
+	}
+
+	const serverDir = raw.server ? normalizeDir(raw.server) : undefined
+	const contractDir = serverDir ? (raw.contract ? normalizeDir(raw.contract) : path.join(serverDir, "generated")) : undefined
+	const server: ResolvedServer | undefined =
+		serverDir && contractDir
+			? {
+					dir: serverDir,
+					entry: path.join(serverDir, "index.ts"),
+					contractDir,
+					contractPath: path.join(contractDir, "contract.json"),
+					barrelPath: path.join(contractDir, "index.ts"),
+				}
+			: undefined
+
+	// Where the introspection lands: an explicit `introspection` dir wins, else it sits beside the
+	// contract under a server's `generated/`. With neither there is nothing to generate.
+	const introspectionDir = raw.introspection ? normalizeDir(raw.introspection) : contractDir
+	if (!introspectionDir) return undefined
 
 	return {
 		cwd,
-		dir,
-		serverDir,
-		serverEntry: path.join(serverDir, "index.ts"),
-		generatedDir,
-		contractPath: path.join(generatedDir, "contract.json"),
-		barrelPath: path.join(generatedDir, "index.ts"),
-		wordpressPath: path.join(generatedDir, "wordpress.ts"),
-		wordpressMetaPath: WORDPRESS_META_REL,
+		server,
+		introspectionPath: path.join(introspectionDir, INTROSPECTION_FILE),
+		introspectionMetaPath: INTROSPECTION_META_REL,
 	}
-}
-
-/**
- * The directory `wordpress.ts` is written to for a workspace with no Kizlo server, from `wordpressClientDir`
- * in `kizlo.config.*`. Resolved on its own rather than through {@link resolveConfig}, which describes a
- * server layout and returns nothing without `dir` — the two are independent.
- */
-export async function resolveWordPressClientDir(cwd: string): Promise<string | undefined> {
-	return (await loadConfigFile(cwd))?.wordpressClientDir
 }
 
 /**
@@ -210,7 +311,7 @@ export function stackProject(baseName: string, kind: "dev" | "test"): string {
 export interface ResolvedTestConfig {
 	/** Directory holding `kizlo.config.*` (the credentials artifact root). */
 	configDir: string
-	/** True when `test.local` is set — `kizlo test` boots local WordPress before running the suite. */
+	/** True when local WordPress is enabled and the test stack is on, so `kizlo test` boots it before running the suite. */
 	local: boolean
 	/** Docker compose project name (`kizlo-<name>-test`). */
 	project: string
@@ -223,8 +324,8 @@ export interface ResolvedTestConfig {
 	 */
 	portExplicit: boolean
 	/**
-	 * WordPress image tag the stack boots (`wordpress:<tag>`), from `test.version` or the version
-	 * Kizlo pins. Supplied to compose as `WP_IMAGE_TAG`.
+	 * WordPress image tag the stack boots (`wordpress:<tag>`), from `local.test.version`, the inherited
+	 * `local.dev.version`, or the version Kizlo pins. Supplied to compose as `WP_IMAGE_TAG`.
 	 */
 	wordpressTag: string
 	fixtures: Fixture[]
@@ -234,24 +335,27 @@ export interface ResolvedTestConfig {
 }
 
 /**
- * Resolve the `test` block from `kizlo.config.*` into concrete values for the
- * `test` command, applying defaults (port 8889, auto-detected package manager)
- * and anchoring the credentials artifact to the config directory.
+ * Resolve the test stack (`local.test`) into concrete values for the `test` command, applying defaults
+ * (port 8889, auto-detected package manager) and anchoring the credentials artifact to the config
+ * directory. `version` and `fixtures` fall back to the dev stack unless `test.inherit` is `false`;
+ * `port`, `packageManager`, and `command` are never inherited.
  */
 export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig> {
 	const configDir = findConfigDir(cwd)
 	const fileConfig = await loadConfigFile(configDir)
-	const test = fileConfig?.test ?? {}
+	const local = resolveLocal(fileConfig)
+	const { dev, test } = local
+	const inherit = test.inherit !== false
 
 	return {
 		configDir,
-		local: Boolean(test.local),
-		project: stackProject(resolveStackName(configDir, { name: fileConfig?.name, worktrees: fileConfig?.worktrees }), "test"),
+		local: local.enabled && test.enable !== false,
+		project: stackProject(resolveStackName(configDir, { name: local.name, worktrees: local.worktrees }), "test"),
 		command: test.command,
 		port: test.port ?? DEFAULT_TEST_PORT,
-		portExplicit: test.port !== undefined && !fileConfig?.worktrees,
-		wordpressTag: test.version ?? DEFAULT_WORDPRESS_TAG,
-		fixtures: test.fixtures ?? [],
+		portExplicit: test.port !== undefined && !local.worktrees,
+		wordpressTag: test.version ?? (inherit ? dev.version : undefined) ?? DEFAULT_WORDPRESS_TAG,
+		fixtures: test.fixtures ?? (inherit ? dev.fixtures : undefined) ?? [],
 		credentialsPath: credentialsPath(cwd),
 		packageManager: test.packageManager ?? (await detectPackageManager(configDir)) ?? "npm",
 	}
@@ -264,19 +368,19 @@ export interface ResolvedDevConfig {
 	project: string
 	port: number
 	/**
-	 * True when `dev.port` was set in config — the user owns collisions, so don't auto-step.
+	 * True when `local.dev.port` was set in config, so the user owns collisions and we don't auto-step.
 	 * Always false under `worktrees`: a pinned port names one stack, and there is a stack per branch.
 	 */
 	portExplicit: boolean
 	/** Host port the dev MySQL is published on (bound to `127.0.0.1`) for direct DB access. */
 	dbPort: number
 	/**
-	 * True when `dev.dbPort` was set in config — the user owns collisions, so don't auto-step.
+	 * True when `local.dev.dbPort` was set in config, so the user owns collisions and we don't auto-step.
 	 * Always false under `worktrees`, for the same reason as {@link ResolvedDevConfig.portExplicit}.
 	 */
 	dbPortExplicit: boolean
 	/**
-	 * WordPress image tag the stack boots (`wordpress:<tag>`), from `dev.version` or the version
+	 * WordPress image tag the stack boots (`wordpress:<tag>`), from `local.dev.version` or the version
 	 * Kizlo pins. Supplied to compose as `WP_IMAGE_TAG`.
 	 */
 	wordpressTag: string
@@ -289,45 +393,35 @@ export interface ResolvedDevConfig {
 }
 
 /**
- * Whether this project runs local WordPress under `kizlo dev` — `dev.local` is `true` in
- * `kizlo.config.*`. When false, `kizlo dev` has nothing to boot and runs the contract watcher alone,
- * the path a project pointing at its own WordPress takes. The flag is written by `create`/`init` when
- * local WordPress is chosen, and lives next to the rest of the `dev` config, so it's committed and
- * survives `kizlo dev reset`.
+ * Whether this project runs local WordPress under `kizlo dev`: local is enabled and the dev stack is
+ * on (`local.dev.enable !== false`) in `kizlo.config.*`. When false, `kizlo dev` has nothing to boot and
+ * runs the contract watcher alone, the path a project pointing at its own WordPress takes. Written by
+ * `create`/`init` when local WordPress is chosen, so it's committed and survives `kizlo dev reset`.
  */
 export async function usesLocalWordPress(cwd: string): Promise<boolean> {
-	const fileConfig = await loadConfigFile(findConfigDir(cwd))
-	return Boolean(fileConfig?.dev?.local)
+	const local = resolveLocal(await loadConfigFile(findConfigDir(cwd)))
+	return local.enabled && local.dev.enable !== false
 }
 
 /**
- * Whether this project runs local WordPress under `kizlo test` — `test.local` is `true` in
- * `kizlo.config.*`. When false, `kizlo test` skips the Docker WordPress + seed and just runs the
- * project's own test script.
- */
-export async function testUsesLocalWordPress(cwd: string): Promise<boolean> {
-	const fileConfig = await loadConfigFile(findConfigDir(cwd))
-	return Boolean(fileConfig?.test?.local)
-}
-
-/**
- * Resolve the `dev` block from `kizlo.config.*` into concrete values for the `dev` command, applying
- * defaults (port 8080). The install folder is fixed at `.kizlo/local` — no longer a config choice — so
- * there's nothing required here. Callers gate on {@link usesLocalWordPress} first, since a project
- * without local WordPress runs the watcher alone rather than reaching here.
+ * Resolve the dev stack (`local.dev`) into concrete values for the `dev` command, applying defaults
+ * (port 8080). The install folder is fixed at `.kizlo/local` (no longer a config choice), so there's
+ * nothing required here. Callers gate on {@link usesLocalWordPress} first, since a project without
+ * local WordPress runs the watcher alone rather than reaching here.
  */
 export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> {
 	const configDir = findConfigDir(cwd)
 	const fileConfig = await loadConfigFile(configDir)
-	const dev = fileConfig?.dev ?? {}
+	const local = resolveLocal(fileConfig)
+	const { dev } = local
 
 	return {
 		configDir,
-		project: stackProject(resolveStackName(configDir, { name: fileConfig?.name, worktrees: fileConfig?.worktrees }), "dev"),
+		project: stackProject(resolveStackName(configDir, { name: local.name, worktrees: local.worktrees }), "dev"),
 		port: dev.port ?? DEFAULT_DEV_PORT,
-		portExplicit: dev.port !== undefined && !fileConfig?.worktrees,
+		portExplicit: dev.port !== undefined && !local.worktrees,
 		dbPort: dev.dbPort ?? DEFAULT_DEV_DB_PORT,
-		dbPortExplicit: dev.dbPort !== undefined && !fileConfig?.worktrees,
+		dbPortExplicit: dev.dbPort !== undefined && !local.worktrees,
 		wordpressTag: dev.version ?? DEFAULT_WORDPRESS_TAG,
 		fixtures: dev.fixtures ?? [],
 		wordpressPath: LOCAL_DIR_REL,

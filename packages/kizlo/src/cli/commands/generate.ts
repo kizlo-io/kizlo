@@ -1,8 +1,8 @@
 import path from "node:path"
 import { defineCommand } from "citty"
 import type { WordPressCredentials } from "../../wordpress/types"
-import { resolveConfig, resolveWordPressClientDir } from "../daemon/config"
-import { generateOnce, generateWorkspaceClientOnce, PartialContractError, reportGenerationError } from "../daemon/generate"
+import { resolveConfig } from "../daemon/config"
+import { generateOnce, PartialContractError, reportGenerationError } from "../daemon/generate"
 import { log } from "../daemon/logger"
 import { testWordPressCredentials } from "./_test-wordpress"
 
@@ -12,7 +12,7 @@ import { testWordPressCredentials } from "./_test-wordpress"
  * mode did not do to the files on disk.
  */
 function fail(message: string, error: unknown): never {
-	if (error instanceof PartialContractError) log.error(`${error.message} The generated client on disk is unchanged.`)
+	if (error instanceof PartialContractError) log.error(`${error.message} The generated introspection on disk is unchanged.`)
 	else reportGenerationError(message, error)
 	process.exit(1)
 }
@@ -29,7 +29,7 @@ export const generate = defineCommand({
 		},
 		strict: {
 			type: "boolean",
-			description: "Fail instead of generating a client WordPress had to exclude routes or types from",
+			description: "Fail instead of generating an introspection WordPress had to exclude routes or types from",
 		},
 		test: {
 			type: "boolean",
@@ -51,38 +51,33 @@ export const generate = defineCommand({
 		}
 		const options = { credentials, strict }
 
-		// A package or workspace that ships procedures has no server to build a contract from, but its
-		// procedures still call the generated tree, so it needs the client on its own. Which WordPress
-		// that describes is the usual `KIZLO_*` credential resolution, like every other command.
-		const wordpressClientDir = await resolveWordPressClientDir(cwd)
-		if (wordpressClientDir) {
-			try {
-				const result = await generateWorkspaceClientOnce(cwd, wordpressClientDir, options)
-				const file = path.resolve(cwd, wordpressClientDir, "wordpress.ts")
-				log.success(`WordPress client ${result === "generated" ? "written to" : "already current at"} ${file}`)
-			} catch (error) {
-				fail("Failed to generate the WordPress client:", error)
-			}
-		}
-
 		const cfg = await resolveConfig(cwd, { dir: args.dir })
 		if (!cfg) {
-			// Only worth saying when nothing at all was generated.
-			if (!wordpressClientDir) {
-				log.info("No Kizlo server directory configured, nothing to generate. Set `dir` in kizlo.config.ts or pass --dir.")
-			}
+			log.info("Nothing to generate. Set `dir` in kizlo.config.ts or pass --dir.")
 			return
 		}
-		let ok: boolean
+
+		let result: Awaited<ReturnType<typeof generateOnce>>
 		try {
-			ok = await generateOnce(cfg, options)
+			result = await generateOnce(cfg, options)
 		} catch (error) {
 			fail("Failed to generate the Kizlo contract:", error)
 		}
-		if (!ok) {
-			log.error(`No Kizlo server found in ${cfg.serverEntry}`)
+
+		if (result.contract === "empty" && cfg.server) {
+			log.error(`No Kizlo server found in ${cfg.server.entry}`)
 			process.exit(1)
 		}
+
+		// Introspection-only: a package that ships procedures but no server. Name the file, since there is
+		// no contract line to imply the generation happened.
+		if (result.contract === "none") {
+			const file = path.resolve(cwd, cfg.introspectionPath)
+			log.success(`WordPress introspection ${result.introspection === "generated" ? "written to" : "already current at"} ${file}`)
+			return
+		}
+
+		if (result.introspection === "generated") log.success("WordPress introspection generated")
 		log.success("Contract generated")
 	},
 })

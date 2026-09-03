@@ -3,8 +3,8 @@ import path from "node:path"
 import { defineCommand } from "citty"
 import { createTwoFilesPatch } from "diff"
 import type { WordPressCredentials } from "../../wordpress/types"
-import { resolveConfig, resolveWordPressClientDir } from "../daemon/config"
-import { generateWordPressSource, reportGenerationError } from "../daemon/generate"
+import { resolveConfig } from "../daemon/config"
+import { generateIntrospectionSource, reportGenerationError } from "../daemon/generate"
 import { log } from "../daemon/logger"
 import { testWordPressCredentials } from "./_test-wordpress"
 
@@ -30,15 +30,10 @@ export function formatGeneratedFileDiff(cwd: string, mismatch: GeneratedFileMism
 	return createTwoFilesPatch(file, file, mismatch.actual, mismatch.expected, "committed", "generated", { context: 3 })
 }
 
-/** Every WordPress client the project configuration says it owns, with duplicates collapsed. */
-async function wordPressClientFiles(cwd: string, dir?: string): Promise<string[]> {
-	const files = new Set<string>()
-	const workspaceDir = await resolveWordPressClientDir(cwd)
-	if (workspaceDir) files.add(path.resolve(cwd, workspaceDir, "wordpress.ts"))
-
+/** The generated introspection the project configuration owns, if any. */
+async function introspectionFiles(cwd: string, dir?: string): Promise<string[]> {
 	const config = await resolveConfig(cwd, { dir })
-	if (config) files.add(path.resolve(cwd, config.wordpressPath))
-	return [...files]
+	return config ? [path.resolve(cwd, config.introspectionPath)] : []
 }
 
 export const check = defineCommand({
@@ -58,9 +53,9 @@ export const check = defineCommand({
 	},
 	async run({ args }) {
 		const cwd = process.cwd()
-		const files = await wordPressClientFiles(cwd, args.dir)
+		const files = await introspectionFiles(cwd, args.dir)
 		if (files.length === 0) {
-			log.info("No generated WordPress client configured, nothing to check.")
+			log.info("No generated WordPress introspection configured, nothing to check.")
 			return
 		}
 
@@ -77,16 +72,16 @@ export const check = defineCommand({
 
 		let expected: string
 		try {
-			expected = await generateWordPressSource(cwd, { credentials, strict: true })
+			expected = await generateIntrospectionSource(cwd, { credentials, strict: true })
 		} catch (error) {
-			reportGenerationError("Failed to check the generated WordPress client:", error)
+			reportGenerationError("Failed to check the generated WordPress introspection:", error)
 			process.exitCode = 1
 			return
 		}
 
 		const mismatches = findGeneratedFileMismatches(files, expected)
 		if (mismatches.length === 0) {
-			log.success(`${files.length === 1 ? "WordPress client is" : "WordPress clients are"} current`)
+			log.success("WordPress introspection is current")
 			return
 		}
 
@@ -95,7 +90,7 @@ export const check = defineCommand({
 			process.stderr.write(`${formatGeneratedFileDiff(cwd, mismatch)}\n`)
 		}
 		const command = ["kizlo generate", args.test ? "--test" : "", args.dir ? `--dir ${args.dir}` : ""].filter(Boolean).join(" ")
-		log.info(`Run \`${command}\` and commit the updated client.`)
+		log.info(`Run \`${command}\` and commit the updated introspection.`)
 		process.exitCode = 1
 	},
 })

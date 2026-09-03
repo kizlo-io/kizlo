@@ -301,15 +301,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		expect(fs.existsSync(path.join(dir, "src/app/blog/[slug]/page.tsx"))).toBe(true)
 
 		// kizlo.config.ts is written by create (not copied). With no local WordPress chosen, there's no
-		// `dev`/`test` block: the install folder is fixed at `.kizlo/local`, and the `local` flags are only
-		// written when local WordPress is chosen.
+		// `local` block: the install folder is fixed at `.kizlo/local`, and the stacks are only written
+		// when local WordPress is chosen.
 		const config = fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")
 		expect(config).toContain('dir: "src/lib/kizlo"')
 		// The alias is persisted in its canonical `@/` form (how it's written and declared in tsconfig),
 		// not a bare `@`, so create and init record it the same way.
 		expect(config).toContain('alias: "@/"')
-		expect(config).not.toContain("dev:")
-		expect(config).not.toContain("test:")
+		expect(config).not.toContain("local:")
 
 		// The scaffold ignores `.env` and the `.kizlo/` working dir (which holds the local WordPress install).
 		const gitignore = fs.readFileSync(path.join(dir, ".gitignore"), "utf8").split(/\r?\n/)
@@ -337,8 +336,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		await applyManifestWiring(dir, templateDir, manifest, { includeExamples: false, localDev: true })
 
 		const config = fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")
-		expect(config).toContain("dev: { local: true }")
-		expect(config).toContain("test: { local: true }")
+		expect(config).toContain("local: true")
 	})
 
 	it("skips only the example pages when declined, still writing the core layout", async () => {

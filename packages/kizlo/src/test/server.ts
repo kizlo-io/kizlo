@@ -1,4 +1,4 @@
-import { endpoints } from "../../../../wordpress"
+import { endpoints } from "../../../../introspection"
 import { geoMock } from "../adapters/geo"
 import { consoleLog } from "../adapters/logger"
 import type { ServiceAdapters } from "../adapters/types"

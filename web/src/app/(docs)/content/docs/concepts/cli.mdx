@@ -82,8 +82,8 @@ public env var (e.g. `import.meta.env.VITE_KIZLO_BASE_URL`) to set it per enviro
 
 ## `kizlo check`
 
-`check` compares each configured `wordpress.ts` with the contract published by WordPress. It exits non-zero
-and prints a unified diff when a committed client is stale. It never changes the file.
+`check` compares the configured `introspection.ts` with the contract published by WordPress. It exits non-zero
+and prints a unified diff when the committed introspection is stale. It never changes the file.
 
 ```package-install
 npx kizlo check
@@ -140,7 +140,7 @@ everything that passed validation and reports what it had to drop, and `generate
 routes keep regenerating while the broken plugin gets fixed.
 
 Every exclusion is printed with the schema or route it landed on, then a count of what's missing from the
-generated client. Warnings are separate: a warning means a declaration lost a constraint, and the type it
+generated introspection. Warnings are separate: a warning means a declaration lost a constraint, and the type it
 produces is still correct.
 
 Pass `--strict` to refuse a partial contract instead:
@@ -149,9 +149,9 @@ Pass `--strict` to refuse a partial contract instead:
 npx kizlo generate --strict
 ```
 
-Strict generation prints the same diagnostics, exits non-zero, and leaves the client already on disk
-untouched, so a build never replaces a complete client with one that's quietly short of routes. Reach for it
-in CI, where a missing route typechecks clean and ships the gap. It governs the WordPress client only, since
+Strict generation prints the same diagnostics, exits non-zero, and leaves the introspection already on disk
+untouched, so a build never replaces a complete introspection with one that's quietly short of routes. Reach
+for it in CI, where a missing route typechecks clean and ships the gap. It governs the introspection only, since
 `contract.json` is built from your own procedures and has no third-party contributors.
 
 `kizlo dev` is always partial. A watcher that refused to write would leave you working against a client that
@@ -170,14 +170,14 @@ the same file.
 npx kizlo dev
 ```
 
-When [`dev.local`](#configuration) is set, `kizlo dev` also runs local WordPress alongside the watcher: a
+When [`local`](#configuration) is set, `kizlo dev` also runs local WordPress alongside the watcher: a
 long-lived Docker WordPress on `http://localhost:8080` you build your app against. Without it (a project
 pointed at your own WordPress), it runs the watcher alone. What sets local WordPress apart from the test
 environment:
 
 - **Every file is editable.** The whole install (core, themes, uploads, plugins) lives in `.kizlo/local`,
   bind-mounted into the container. Browse and edit it from your file manager, and changes are live.
-- **Plugins come from your [`dev.fixtures`](#configuration)**, the same fixtures the test environment uses. Each
+- **Plugins come from your [`local.dev.fixtures`](#configuration)**, the same fixtures the test environment uses. Each
   fixture installs the plugins it needs (a wp.org slug or zip source), or bind-mounts a local
   `{ path: "..." }` over `wp-content/plugins` so plugin source edits show up live.
 - **Your data survives.** It's never wiped on start; fixtures seed only on a fresh install.
@@ -196,11 +196,11 @@ you need to act on it outside a `kizlo dev` run.
 
 `kizlo create` and `kizlo init` offer to set up local WordPress during onboarding. Choose it and they
 provision the `.kizlo/local` install, write the connection to `.env`, and set
-[`dev.local`](#configuration) and [`test.local`](#configuration) in `kizlo.config.ts` for you. There's no
+[`local`](#configuration) with its `dev` and `test` stacks in `kizlo.config.ts` for you. There's no
 folder to pick: the install location is fixed.
 
 <Callout>
-  `dev.local` is committed, so a teammate who clones the repo gets local WordPress on their first `kizlo dev`
+  `local` is committed, so a teammate who clones the repo gets local WordPress on their first `kizlo dev`
   (it provisions their own `.kizlo/local`). The install and credentials stay per-machine and gitignored.
 </Callout>
 
@@ -247,7 +247,7 @@ On reruns of an existing install, fixtures don't re-run, so your manual edits ar
 
 ## `kizlo test`
 
-With [`test.local`](#configuration) set, `kizlo test` runs your test suite against **real WordPress**, with no
+With [`local`](#configuration) set, `kizlo test` runs your test suite against **real WordPress**, with no
 mocks. It boots a Docker-based WordPress (on `http://localhost:8889`, independent of your local dev
 WordPress), seeds it with your [fixtures](#configuration), then runs your project's own test command against
 it:
@@ -271,7 +271,7 @@ npx kizlo test --reset --teardown   # a clean install, torn down afterward
 
 Under the hood `test` runs your package manager's `test` script (`pnpm test`, `npm test`, or `bun run test`),
 detected from your lockfile, or whatever you set as the test [`command`](#configuration). Its output streams
-straight to your terminal, and `kizlo test` exits with your suite's exit code. Without `test.local`, `kizlo
+straight to your terminal, and `kizlo test` exits with your suite's exit code. With the test stack off, `kizlo
 test` skips the Docker WordPress entirely and just runs that script.
 
 <Callout>
@@ -305,32 +305,41 @@ import { defineConfig } from "kizlo/config"
 export default defineConfig({
   dir: "src/lib/kizlo",
   alias: "@",
-  dev: {
-    local: true,
-    port: 8080,
-    dbPort: 3307,
-    fixtures: [],
-  },
-  test: {
-    local: true,
-    port: 8889,
-    fixtures: [],
+  local: {
+    dev: {
+      version: "latest",
+      port: 8080,
+      dbPort: 3307,
+      fixtures: [],
+    },
+    test: {
+      port: 8889,
+    },
   },
 })
 ```
 
+Everything about generation lives under `dir`; everything about the local stacks lives under `local`. `dir`
+takes a string (the home directory Kizlo owns) or an object that sets `server`, `contract`, and
+`introspection` paths on their own. Omit `server` and there are no sources to watch and no contract, only the
+generated [introspection](/docs/concepts/introspection).
+
 | Field | Used by | Meaning |
 | --- | --- | --- |
-| `dir` | all | Kizlo's home directory, where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory) |
+| `dir` | all | Kizlo's home directory, where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory). Pass an object (`{ server, contract, introspection }`) to set each path on its own |
 | `alias` | `init` | Import-alias prefix for generated imports, e.g. `@`. Blank means relative imports |
-| `name` | `dev`, `test` | Base name for the Docker projects (`<name>-dev`, `<name>-test`). Defaults to the sanitized `package.json` name, then the config dir basename |
-| `worktrees` | `dev`, `test` | Append the checked-out branch to `name`, so each branch gets its own Docker projects (`<name>-<branch>-dev`). Off unless set. Turn it on when you keep several checkouts of one project, typically [git worktrees](/docs/concepts/development-and-testing#one-stack-per-branch), so their WordPress and database stop being shared |
-| `dev.local` | `dev` | Run local WordPress under `kizlo dev`. When `true`, `kizlo dev` boots a Docker WordPress in `.kizlo/local`; unset or `false` runs the watcher alone. Set by `create`/`init` when you choose local WordPress |
-| `dev.port` | `dev` | Port local WordPress listens on under `kizlo dev`. Defaults to `8080` |
-| `dev.dbPort` | `dev` | Host port the local MySQL is published on (bound to `127.0.0.1`) so you can point a SQL client at the database. Defaults to `3307`; change it if it clashes |
-| `dev.fixtures` | `dev` | [Fixtures](/docs/concepts/development-and-testing#fixtures) to build local WordPress from, matching the test environment. Each declares the plugins it needs (wp.org slugs / zip sources to install, or `{ path }` local dirs bind-mounted live into `wp-content/plugins` by basename) and is seeded on a **fresh** install (first `kizlo dev` / after `reset`) |
-| `test.local` | `test` | Run local WordPress under `kizlo test`. When `true`, `kizlo test` boots a disposable Docker WordPress, seeds it, and runs your suite against it; unset or `false` just runs your test script. Set by `create`/`init` when you choose local WordPress |
-| `test.port` | `test` | Port test WordPress listens on. Defaults to `8889` |
-| `test.fixtures` | `test` | Fixtures to install and seed onto test WordPress: core content plus any integration's fixtures |
-| `test.packageManager` | `test` | Package manager for the test command. Auto-detected from your lockfile when unset |
-| `test.command` | `test` | Override the test command entirely, instead of `<packageManager> test` |
+| `local` | `dev`, `test` | Local Docker WordPress, off unless set. `true` enables both stacks with defaults; the object form enables and configures them |
+| `local.name` | `dev`, `test` | Base name for the Docker projects (`<name>-dev`, `<name>-test`). Defaults to the sanitized `package.json` name, then the config dir basename |
+| `local.worktrees` | `dev`, `test` | Append the checked-out branch to `name`, so each branch gets its own Docker projects (`<name>-<branch>-dev`). Off unless set. Turn it on when you keep several checkouts of one project, typically [git worktrees](/docs/concepts/development-and-testing#one-stack-per-branch), so their WordPress and database stop being shared |
+| `local.dev.enable` | `dev` | Run the dev stack. On by default when `local` is set; `false` keeps local WordPress on for `kizlo test` while `kizlo dev` runs the watcher alone |
+| `local.dev.version` | `dev` | WordPress image tag the dev stack boots (the tag after `wordpress:`). Defaults to `latest` |
+| `local.dev.port` | `dev` | Port local WordPress listens on under `kizlo dev`. Defaults to `8080` |
+| `local.dev.dbPort` | `dev` | Host port the local MySQL is published on (bound to `127.0.0.1`) so you can point a SQL client at the database. Defaults to `3307`; change it if it clashes |
+| `local.dev.fixtures` | `dev` | [Fixtures](/docs/concepts/development-and-testing#fixtures) to build local WordPress from, matching the test environment. Each declares the plugins it needs (wp.org slugs / zip sources to install, or `{ path }` local dirs bind-mounted live into `wp-content/plugins` by basename) and is seeded on a **fresh** install (first `kizlo dev` / after `reset`) |
+| `local.test.enable` | `test` | Run the test stack. On by default when `local` is set; `false` keeps local WordPress on for `kizlo dev` while `kizlo test` runs your test script alone |
+| `local.test.inherit` | `test` | Fall back to the dev stack's `version` and `fixtures` when the test stack omits them (default `true`). Set `false` to configure the test stack independently |
+| `local.test.version` | `test` | WordPress image tag the test stack boots. Falls back to `local.dev.version` unless `inherit` is `false` |
+| `local.test.port` | `test` | Port test WordPress listens on. Defaults to `8889` |
+| `local.test.fixtures` | `test` | Fixtures to install and seed onto test WordPress. Falls back to `local.dev.fixtures` unless `inherit` is `false` |
+| `local.test.packageManager` | `test` | Package manager for the test command. Auto-detected from your lockfile when unset |
+| `local.test.command` | `test` | Override the test command entirely, instead of `<packageManager> test` |

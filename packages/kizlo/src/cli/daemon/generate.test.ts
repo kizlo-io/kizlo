@@ -7,14 +7,12 @@ import { afterEach, describe, expect, test, vi } from "vitest"
 import type { IntrospectionDocument } from "../../wordpress/introspection"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import { assertGeneratedClientCompiles, GeneratedClientTypeError } from "../../wordpress/typecheck"
-import { WORDPRESS_CLIENT_META_REL } from "../wp/constants"
 import type { ResolvedConfig } from "./config"
 import {
 	CONTRACT_BARREL,
+	generateIntrospectionOnce,
+	generateIntrospectionSource,
 	generateOnce,
-	generateWordPressOnce,
-	generateWordPressSource,
-	generateWorkspaceClientOnce,
 	LegacyRouterExportError,
 	PartialContractError,
 	reportGenerationError,
@@ -40,14 +38,24 @@ function refused(): GeneratedClientTypeError {
 function config(cwd: string): ResolvedConfig {
 	return {
 		cwd,
-		dir: "src/kizlo",
-		serverDir: "src/kizlo/server",
-		serverEntry: "src/kizlo/server/index.ts",
-		generatedDir: "src/kizlo/server/generated",
-		contractPath: "src/kizlo/server/generated/contract.json",
-		barrelPath: "src/kizlo/server/generated/index.ts",
-		wordpressPath: "src/kizlo/server/generated/wordpress.ts",
-		wordpressMetaPath: ".kizlo/wordpress.meta.json",
+		server: {
+			dir: "src/kizlo/server",
+			entry: "src/kizlo/server/index.ts",
+			contractDir: "src/kizlo/server/generated",
+			contractPath: "src/kizlo/server/generated/contract.json",
+			barrelPath: "src/kizlo/server/generated/index.ts",
+		},
+		introspectionPath: "src/kizlo/server/generated/introspection.ts",
+		introspectionMetaPath: ".kizlo/introspection.meta.json",
+	}
+}
+
+/** A package with no server: only an introspection, at its own resolved path. */
+function standalone(cwd: string, introspectionDir = "src/generated"): ResolvedConfig {
+	return {
+		cwd,
+		introspectionPath: path.join(introspectionDir, "introspection.ts"),
+		introspectionMetaPath: ".kizlo/introspection.meta.json",
 	}
 }
 
@@ -76,7 +84,8 @@ function project(): ResolvedConfig {
 }
 
 function writeServer(cfg: ResolvedConfig, source: string): void {
-	const entry = path.join(cfg.cwd, cfg.serverEntry)
+	if (!cfg.server) throw new Error("writeServer needs a server-backed config")
+	const entry = path.join(cfg.cwd, cfg.server.entry)
 	fs.mkdirSync(path.dirname(entry), { recursive: true })
 	fs.writeFileSync(entry, source)
 }
@@ -121,11 +130,23 @@ describe("generateOnce", () => {
 		const kizloModule = path.resolve(here, "../../kizlo.ts")
 		writeServer(cfg, `import { createKizlo } from ${JSON.stringify(kizloModule)}\nexport const { procedures } = createKizlo()\n`)
 
-		await expect(generateOnce(cfg, { fetch: responder(modified()) })).resolves.toBe(true)
-		expect(JSON.parse(fs.readFileSync(path.join(cfg.cwd, cfg.contractPath), "utf8"))).toHaveProperty("posts")
-		expect(fs.readFileSync(path.join(cfg.cwd, cfg.barrelPath), "utf8")).toBe(CONTRACT_BARREL)
+		await expect(generateOnce(cfg, { fetch: responder(modified()) })).resolves.toMatchObject({ contract: "built" })
+		const server = cfg.server as NonNullable<ResolvedConfig["server"]>
+		expect(JSON.parse(fs.readFileSync(path.join(cfg.cwd, server.contractPath), "utf8"))).toHaveProperty("posts")
+		expect(fs.readFileSync(path.join(cfg.cwd, server.barrelPath), "utf8")).toBe(CONTRACT_BARREL)
 		expect(CONTRACT_BARREL).toContain('import type { procedures } from ".."')
 		expect(CONTRACT_BARREL).toContain("typeof procedures")
+		// The barrel re-exports from the introspection artifact, not the old wordpress.ts.
+		expect(CONTRACT_BARREL).toContain('from "./introspection"')
+	})
+
+	test("generates the introspection alone when no server is configured", async () => {
+		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
+		seedEnv(cwd)
+		const cfg = standalone(cwd)
+
+		await expect(generateOnce(cfg, { fetch: responder(modified()) })).resolves.toMatchObject({ contract: "none" })
+		expect(fs.readFileSync(path.join(cwd, cfg.introspectionPath), "utf8")).toContain("WP_AcmeBook")
 	})
 
 	test("gives a targeted migration error for a legacy router export", async () => {
@@ -137,7 +158,7 @@ describe("generateOnce", () => {
 	})
 })
 
-describe("generateWordPressOnce", () => {
+describe("generateIntrospectionOnce", () => {
 	test("fetches once, writes current output, and reuses the ETag without rewriting", async () => {
 		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
 		seedEnv(cwd)
@@ -147,12 +168,12 @@ describe("generateWordPressOnce", () => {
 			.mockResolvedValueOnce(modified())
 			.mockResolvedValueOnce(new Response(null, { status: 304 }))
 
-		expect(await generateWordPressOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })).toBe("generated")
-		const source = path.join(cwd, cfg.wordpressPath)
+		expect(await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })).toBe("generated")
+		const source = path.join(cwd, cfg.introspectionPath)
 		const first = fs.readFileSync(source, "utf8")
 		const mtime = fs.statSync(source).mtimeMs
 
-		expect(await generateWordPressOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })).toBe("unchanged")
+		expect(await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })).toBe("unchanged")
 		expect(fs.readFileSync(source, "utf8")).toBe(first)
 		expect(fs.statSync(source).mtimeMs).toBe(mtime)
 		expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("If-None-Match")).toBe('"fixture"')
@@ -168,13 +189,13 @@ describe("generateWordPressOnce", () => {
 		const cfg = config(cwd)
 		const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => modified())
 
-		await generateWordPressOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
-		const file = path.join(cwd, cfg.wordpressPath)
+		await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
+		const file = path.join(cwd, cfg.introspectionPath)
 		const generated = fs.readFileSync(file, "utf8")
 		fs.writeFileSync(file, contents)
 
 		// The ETag still matches, but the file it describes no longer does, so it must not be sent.
-		expect(await generateWordPressOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })).toBe("generated")
+		expect(await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })).toBe("generated")
 		expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("If-None-Match")).toBeNull()
 		expect(fs.readFileSync(file, "utf8")).toBe(generated)
 	})
@@ -197,10 +218,10 @@ describe("generateWordPressOnce", () => {
 				),
 			)
 
-		await generateWordPressOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
-		const before = fs.readFileSync(path.join(cwd, cfg.wordpressPath), "utf8")
-		await generateWordPressOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
-		const after = fs.readFileSync(path.join(cwd, cfg.wordpressPath), "utf8")
+		await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
+		const before = fs.readFileSync(path.join(cwd, cfg.introspectionPath), "utf8")
+		await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
+		const after = fs.readFileSync(path.join(cwd, cfg.introspectionPath), "utf8")
 		expect(after).not.toBe(before)
 		expect(after).toContain("WP_AcmeAlbum")
 	})
@@ -212,26 +233,26 @@ describe("generateWordPressOnce", () => {
 		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
 		seedEnv(cwd)
 		const cfg = config(cwd)
-		await generateWordPressOnce(cfg, { fetch: vi.fn(async () => modified()) as unknown as typeof globalThis.fetch })
-		const sourcePath = path.join(cwd, cfg.wordpressPath)
-		const metaPath = path.join(cwd, cfg.wordpressMetaPath)
+		await generateIntrospectionOnce(cfg, { fetch: vi.fn(async () => modified()) as unknown as typeof globalThis.fetch })
+		const sourcePath = path.join(cwd, cfg.introspectionPath)
+		const metaPath = path.join(cwd, cfg.introspectionMetaPath)
 		const source = fs.readFileSync(sourcePath, "utf8")
 		const meta = fs.readFileSync(metaPath, "utf8")
 
-		await expect(generateWordPressOnce(cfg, { fetch: vi.fn(next) as unknown as typeof globalThis.fetch })).rejects.toThrow()
+		await expect(generateIntrospectionOnce(cfg, { fetch: vi.fn(next) as unknown as typeof globalThis.fetch })).rejects.toThrow()
 		expect(fs.readFileSync(sourcePath, "utf8")).toBe(source)
 		expect(fs.readFileSync(metaPath, "utf8")).toBe(meta)
 	})
 })
 
-describe("generateWordPressSource", () => {
+describe("generateIntrospectionSource", () => {
 	test("returns current output without writing the client or its cache", async () => {
 		const cfg = project()
-		const source = await generateWordPressSource(cfg.cwd, { strict: true, fetch: responder(modified()) })
+		const source = await generateIntrospectionSource(cfg.cwd, { strict: true, fetch: responder(modified()) })
 
 		expect(source).toContain("WP_AcmeBook")
-		expect(fs.existsSync(path.join(cfg.cwd, cfg.wordpressPath))).toBe(false)
-		expect(fs.existsSync(path.join(cfg.cwd, cfg.wordpressMetaPath))).toBe(false)
+		expect(fs.existsSync(path.join(cfg.cwd, cfg.introspectionPath))).toBe(false)
+		expect(fs.existsSync(path.join(cfg.cwd, cfg.introspectionMetaPath))).toBe(false)
 	})
 })
 
@@ -239,11 +260,11 @@ describe("a contract WordPress excluded a contribution from", () => {
 	test("regenerates from the validated subset rather than leaving the client stale", async () => {
 		watchLog()
 		const cfg = project()
-		const source = path.join(cfg.cwd, cfg.wordpressPath)
-		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+		const source = path.join(cfg.cwd, cfg.introspectionPath)
+		await generateIntrospectionOnce(cfg, { fetch: responder(modified()) })
 		const before = fs.readFileSync(source, "utf8")
 
-		expect(await generateWordPressOnce(cfg, { fetch: responder(modified(excluded(), '"partial"')) })).toBe("generated")
+		expect(await generateIntrospectionOnce(cfg, { fetch: responder(modified(excluded(), '"partial"')) })).toBe("generated")
 		const after = fs.readFileSync(source, "utf8")
 		expect(after).not.toBe(before)
 		// The valid contributions in the same document, the one that arrived with it and the ones
@@ -256,14 +277,14 @@ describe("a contract WordPress excluded a contribution from", () => {
 		watchLog()
 		const cfg = project()
 
-		expect(await generateWordPressOnce(cfg, { fetch: responder(modified(excluded())) })).toBe("generated")
-		expect(fs.readFileSync(path.join(cfg.cwd, cfg.wordpressPath), "utf8")).toContain("WP_AcmeBook")
+		expect(await generateIntrospectionOnce(cfg, { fetch: responder(modified(excluded())) })).toBe("generated")
+		expect(fs.readFileSync(path.join(cfg.cwd, cfg.introspectionPath), "utf8")).toContain("WP_AcmeBook")
 	})
 
 	test("names every exclusion and says the client is short of them", async () => {
 		watchLog()
 		const cfg = project()
-		await generateWordPressOnce(cfg, { fetch: responder(modified(excluded())) })
+		await generateIntrospectionOnce(cfg, { fetch: responder(modified(excluded())) })
 
 		const errors = transcript("error")
 		expect(errors).toContain("vendor.money")
@@ -277,12 +298,14 @@ describe("a contract WordPress excluded a contribution from", () => {
 	test("strict generation rejects it, leaving the client and its meta untouched", async () => {
 		watchLog()
 		const cfg = project()
-		const source = path.join(cfg.cwd, cfg.wordpressPath)
-		const meta = path.join(cfg.cwd, cfg.wordpressMetaPath)
-		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+		const source = path.join(cfg.cwd, cfg.introspectionPath)
+		const meta = path.join(cfg.cwd, cfg.introspectionMetaPath)
+		await generateIntrospectionOnce(cfg, { fetch: responder(modified()) })
 		const [client, cache] = [fs.readFileSync(source, "utf8"), fs.readFileSync(meta, "utf8")]
 
-		await expect(generateWordPressOnce(cfg, { strict: true, fetch: responder(modified(excluded())) })).rejects.toThrow(PartialContractError)
+		await expect(generateIntrospectionOnce(cfg, { strict: true, fetch: responder(modified(excluded())) })).rejects.toThrow(
+			PartialContractError,
+		)
 		expect(fs.readFileSync(source, "utf8")).toBe(client)
 		expect(fs.readFileSync(meta, "utf8")).toBe(cache)
 		expect(transcript("error")).toContain("vendor.money")
@@ -291,10 +314,10 @@ describe("a contract WordPress excluded a contribution from", () => {
 	test("strict generation refetches, so a warm cache cannot answer 304 over an exclusion", async () => {
 		watchLog()
 		const cfg = project()
-		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+		await generateIntrospectionOnce(cfg, { fetch: responder(modified()) })
 
 		const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => modified(excluded()))
-		await expect(generateWordPressOnce(cfg, { strict: true, fetch: fetch as unknown as typeof globalThis.fetch })).rejects.toThrow(
+		await expect(generateIntrospectionOnce(cfg, { strict: true, fetch: fetch as unknown as typeof globalThis.fetch })).rejects.toThrow(
 			PartialContractError,
 		)
 		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("If-None-Match")).toBeNull()
@@ -304,8 +327,8 @@ describe("a contract WordPress excluded a contribution from", () => {
 		watchLog()
 		const cfg = project()
 
-		expect(await generateWordPressOnce(cfg, { strict: true, fetch: responder(modified()) })).toBe("generated")
-		expect(fs.readFileSync(path.join(cfg.cwd, cfg.wordpressPath), "utf8")).toContain("WP_AcmeBook")
+		expect(await generateIntrospectionOnce(cfg, { strict: true, fetch: responder(modified()) })).toBe("generated")
+		expect(fs.readFileSync(path.join(cfg.cwd, cfg.introspectionPath), "utf8")).toContain("WP_AcmeBook")
 	})
 })
 
@@ -322,23 +345,23 @@ describe("the plugin version WordPress stamps on the contract", () => {
 
 	test("names a plugin too old for this package at generation", async () => {
 		watchLog()
-		await generateWordPressOnce(project(), { fetch: responder(served("0.7.0")) })
+		await generateIntrospectionOnce(project(), { fetch: responder(served("0.7.0")) })
 		expect(transcript("warn")).toContain(pluginUpdateMessage("0.7.0"))
 	})
 
 	test("names it on a revalidated contract too, where nothing is generated", async () => {
 		watchLog()
 		const cfg = project()
-		await generateWordPressOnce(cfg, { fetch: responder(served(MIN_PLUGIN_VERSION)) })
-		expect(await generateWordPressOnce(cfg, { fetch: responder(served("0.6.0", null)) })).toBe("unchanged")
+		await generateIntrospectionOnce(cfg, { fetch: responder(served(MIN_PLUGIN_VERSION)) })
+		expect(await generateIntrospectionOnce(cfg, { fetch: responder(served("0.6.0", null)) })).toBe("unchanged")
 		expect(transcript("warn")).toContain(pluginUpdateMessage("0.6.0"))
 	})
 
 	test("says it once however often the client refetches", async () => {
 		watchLog()
 		const cfg = project()
-		await generateWordPressOnce(cfg, { fetch: responder(served("0.5.0")) })
-		await generateWordPressOnce(cfg, { fetch: responder(served("0.5.0", null)) })
+		await generateIntrospectionOnce(cfg, { fetch: responder(served("0.5.0")) })
+		await generateIntrospectionOnce(cfg, { fetch: responder(served("0.5.0", null)) })
 		const said = transcript("warn")
 			.split("\n")
 			.filter((line) => line.includes("Kizlo plugin outdated"))
@@ -347,7 +370,7 @@ describe("the plugin version WordPress stamps on the contract", () => {
 
 	test("says nothing about a plugin new enough", async () => {
 		watchLog()
-		await generateWordPressOnce(project(), { fetch: responder(served(MIN_PLUGIN_VERSION)) })
+		await generateIntrospectionOnce(project(), { fetch: responder(served(MIN_PLUGIN_VERSION)) })
 		expect(transcript("warn")).not.toContain("Kizlo plugin outdated")
 	})
 })
@@ -355,14 +378,14 @@ describe("the plugin version WordPress stamps on the contract", () => {
 describe("a document that would not compile", () => {
 	test("refuses it, leaving the client and its ETag cache as they were", async () => {
 		const cfg = project()
-		await generateWordPressOnce(cfg, { fetch: responder(modified()) })
+		await generateIntrospectionOnce(cfg, { fetch: responder(modified()) })
 
-		const client = path.resolve(cfg.cwd, cfg.wordpressPath)
-		const meta = path.resolve(cfg.cwd, cfg.wordpressMetaPath)
+		const client = path.resolve(cfg.cwd, cfg.introspectionPath)
+		const meta = path.resolve(cfg.cwd, cfg.introspectionMetaPath)
 		const before = { client: fs.readFileSync(client, "utf8"), meta: fs.readFileSync(meta, "utf8") }
 
 		vi.mocked(assertGeneratedClientCompiles).mockRejectedValueOnce(refused())
-		await expect(generateWordPressOnce(cfg, { fetch: responder(modified(altered(), '"altered"')) })).rejects.toThrow(
+		await expect(generateIntrospectionOnce(cfg, { fetch: responder(modified(altered(), '"altered"')) })).rejects.toThrow(
 			GeneratedClientTypeError,
 		)
 
@@ -371,20 +394,19 @@ describe("a document that would not compile", () => {
 	})
 
 	/**
-	 * The workspace client stamps its ETag cache and writes the file separately. Stamping it for a
+	 * A server-less package's introspection stamps its ETag cache and writes the file. Stamping it for a
 	 * generation that was then refused would answer the next poll with a 304 and never retry.
 	 */
-	test("refuses the workspace client without stamping its ETag cache", async () => {
-		const cfg = project()
-		const meta = path.resolve(cfg.cwd, WORDPRESS_CLIENT_META_REL)
+	test("refuses a server-less introspection without stamping its ETag cache", async () => {
+		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
+		seedEnv(cwd)
+		const cfg = standalone(cwd)
 
 		vi.mocked(assertGeneratedClientCompiles).mockRejectedValueOnce(refused())
-		await expect(generateWorkspaceClientOnce(cfg.cwd, "src/generated", { fetch: responder(modified()) })).rejects.toThrow(
-			GeneratedClientTypeError,
-		)
+		await expect(generateIntrospectionOnce(cfg, { fetch: responder(modified()) })).rejects.toThrow(GeneratedClientTypeError)
 
-		expect(fs.existsSync(meta)).toBe(false)
-		expect(fs.existsSync(path.resolve(cfg.cwd, "src/generated/wordpress.ts"))).toBe(false)
+		expect(fs.existsSync(path.resolve(cwd, cfg.introspectionMetaPath))).toBe(false)
+		expect(fs.existsSync(path.resolve(cwd, cfg.introspectionPath))).toBe(false)
 	})
 
 	test("reports it as a diagnosis, naming the schema, without a stack", async () => {
@@ -392,7 +414,7 @@ describe("a document that would not compile", () => {
 		const cfg = project()
 
 		vi.mocked(assertGeneratedClientCompiles).mockRejectedValueOnce(refused())
-		await generateWordPressOnce(cfg, { fetch: responder(modified()) }).catch((error: unknown) => {
+		await generateIntrospectionOnce(cfg, { fetch: responder(modified()) }).catch((error: unknown) => {
 			reportGenerationError("WordPress client generation failed", error)
 		})
 

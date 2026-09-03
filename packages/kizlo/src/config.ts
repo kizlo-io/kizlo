@@ -1,13 +1,29 @@
 import type { Fixture } from "./test"
 
+/**
+ * Where Kizlo generates, and what it watches. A string is the home directory Kizlo owns the layout
+ * under: sources in `<dir>/server`, and the generated files (`contract.json`, the barrel, and
+ * `introspection.ts`) under `<dir>/server/generated`. The object form sets each path on its own. Omit
+ * `server` and there are no sources to watch and no contract is built, so only the introspection is
+ * generated (the shape a package that ships procedures but no server takes).
+ */
+export type KizloDir =
+	| string
+	| {
+			/** Server sources (extensions and procedures). Watched by `kizlo dev`; its presence is what builds a contract. */
+			server?: string
+			/** Where `contract.json` and the generated barrel are written. Defaults to `generated/` under `server`. */
+			contract?: string
+			/** Where the generated `introspection.ts` is written. Defaults to `generated/` under `server`. */
+			introspection?: string
+	  }
+
 export interface KizloDevConfig {
 	/**
-	 * Run local WordPress under `kizlo dev`. When `true`, `kizlo dev` boots a Docker WordPress in
-	 * `.kizlo/local` alongside the contract watcher; when unset or `false`, it runs the watcher alone
-	 * (for a project pointing at your own WordPress). Set for you by `kizlo create` / `kizlo init`
-	 * when you choose local WordPress.
+	 * Run the dev stack. On by default when local WordPress is enabled; set `false` to keep local
+	 * WordPress on for `kizlo test` while `kizlo dev` runs the contract watcher alone.
 	 */
-	local?: boolean
+	enable?: boolean
 
 	/** Published WP port (default 8080). */
 	port?: number
@@ -17,8 +33,8 @@ export interface KizloDevConfig {
 	 * Hub: a bare version (`"7.1.0"`), or a full tag (`"7.1.0-php8.3-apache"`) when you need
 	 * a specific PHP. Defaults to `latest`, so an unconfigured project gets current WordPress.
 	 *
-	 * Worth setting once you commit a generated WordPress client, which is derived from
-	 * whatever the stack serves: on `latest` that client goes stale the day WordPress ships.
+	 * Worth setting once you commit a generated introspection, which is derived from
+	 * whatever the stack serves: on `latest` that introspection goes stale the day WordPress ships.
 	 *
 	 * An existing install keeps the core files it was provisioned with, so changing this
 	 * takes effect on the next `kizlo dev reset` and Kizlo says so when the two disagree.
@@ -48,33 +64,36 @@ export interface KizloDevConfig {
 
 export interface KizloTestConfig {
 	/**
-	 * Run local WordPress under `kizlo test`. When `true`, `kizlo test` boots a disposable Docker
-	 * WordPress, seeds it, and runs your suite against it; when unset or `false`, `kizlo test` just
-	 * runs your project's test script. Set for you by `kizlo create` / `kizlo init` when you choose
-	 * local WordPress.
+	 * Run the test stack. On by default when local WordPress is enabled; set `false` to keep local
+	 * WordPress on for `kizlo dev` while `kizlo test` just runs the project's own test script.
 	 */
-	local?: boolean
+	enable?: boolean
+
+	/**
+	 * Fall back to the dev stack's `version` and `fixtures` when this stack leaves them unset (default
+	 * `true`), so the two stacks a local-WordPress project always wants together are declared once.
+	 * Set `false` to configure the test stack independently, taking Kizlo's defaults where it is silent.
+	 */
+	inherit?: boolean
+
 	/** Published WP port (default 8889). */
 	port?: number
+
 	/**
 	 * WordPress version the local stack boots, given as the tag after `wordpress:` on Docker
-	 * Hub: a bare version (`"7.1.0"`), or a full tag (`"7.1.0-php8.3-apache"`) when you need
-	 * a specific PHP. Defaults to `latest`, so an unconfigured project gets current WordPress.
-	 *
-	 * Worth setting once you commit a generated WordPress client, which is derived from
-	 * whatever the stack serves: on `latest` that client goes stale the day WordPress ships.
-	 *
-	 * An existing install keeps the core files it was provisioned with, so changing this
-	 * takes effect on the next `kizlo test reset` and Kizlo says so when the two disagree.
+	 * Hub. Falls back to the dev stack's `version` unless `inherit` is `false`; defaults to `latest`.
 	 */
 	version?: string
-	/** Integration fixtures to install + seed. */
+
+	/** Integration fixtures to install + seed. Falls back to the dev stack's `fixtures` unless `inherit` is `false`. */
 	fixtures?: Fixture[]
+
 	/**
 	 * Package manager used to launch the test script (default: auto-detected from
 	 * the lockfile / package.json `packageManager`).
 	 */
 	packageManager?: "npm" | "pnpm" | "yarn" | "bun"
+
 	/**
 	 * Override the test command entirely. Default: `<packageManager> test` (the
 	 * project's own `test` script, never hardcoded to Vitest).
@@ -82,21 +101,12 @@ export interface KizloTestConfig {
 	command?: string
 }
 
-export interface KizloGlobalConfig {
+export interface KizloLocalConfig {
 	/**
-	 * Kizlo's home directory. Kizlo owns the layout inside it: your server
-	 * (`server/`, whose `index.ts` exports `procedures` plus your integrations), the
-	 * browser `client.ts`, and the generated contract.
-	 * @default 'src/lib/kizlo' (or 'lib/kizlo' without a src dir)
+	 * Enable local Docker WordPress (default `true` in this object form). Set `false` to keep the
+	 * stacks configured but off, the same as omitting `local` entirely.
 	 */
-	dir?: string
-
-	/**
-	 * Import alias prefix for generated imports (e.g. `@`). Recorded by `kizlo init`
-	 * from your `--alias` flag or its prompt, so later runs reuse it instead of asking
-	 * again; an empty string (`""`) is the recorded choice to use relative imports.
-	 */
-	alias?: string
+	enable?: boolean
 
 	/**
 	 * Base name for the local Docker stacks (`kizlo-<name>-dev`, `kizlo-<name>-test`). Defaults
@@ -106,8 +116,8 @@ export interface KizloGlobalConfig {
 
 	/**
 	 * Give each branch its own local Docker stacks, by appending the checked-out branch to
-	 * {@link name} (`kizlo-<name>-<branch>-dev`). Off unless set, since the stacks it isolates
-	 * are the ones an existing project is already using.
+	 * {@link KizloLocalConfig.name} (`kizlo-<name>-<branch>-dev`). Off unless set, since the stacks it
+	 * isolates are the ones an existing project is already using.
 	 *
 	 * Turn it on when you work in several checkouts at once, typically git worktrees: without it
 	 * every checkout of a project resolves to one stack, so parallel `kizlo dev` and `kizlo test`
@@ -117,21 +127,34 @@ export interface KizloGlobalConfig {
 	 */
 	worktrees?: boolean
 
-	/**
-	 * Directory to write the WordPress client into, as `<wordpressClientDir>/wordpress.ts`. For a package or
-	 * workspace that ships procedures but no Kizlo server: there is no procedure tree to build a contract from,
-	 * yet those procedures still call the generated tree, so they need the client on its own.
-	 *
-	 * Independent of `dir`. An app leaves this unset and gets its client inside `dir` alongside the
-	 * contract; set both only if a project is somehow each of those things at once.
-	 */
-	wordpressClientDir?: string
-
-	/** Local WordPress and contract watcher run by `kizlo dev`. */
+	/** The dev stack run by `kizlo dev`. */
 	dev?: KizloDevConfig
 
-	/** WordPress test environment run by `kizlo test`. */
+	/** The test stack run by `kizlo test`. Inherits `version` and `fixtures` from {@link KizloLocalConfig.dev}. */
 	test?: KizloTestConfig
+}
+
+export interface KizloGlobalConfig {
+	/**
+	 * Where Kizlo generates, and what it watches. A string names the home directory Kizlo owns the
+	 * layout under; the object form sets the server, contract, and introspection paths independently.
+	 * @default 'src/lib/kizlo' (or 'lib/kizlo' without a src dir)
+	 */
+	dir?: KizloDir
+
+	/**
+	 * Import alias prefix for generated imports (e.g. `@`). Recorded by `kizlo init`
+	 * from your `--alias` flag or its prompt, so later runs reuse it instead of asking
+	 * again; an empty string (`""`) is the recorded choice to use relative imports.
+	 */
+	alias?: string
+
+	/**
+	 * Local Docker WordPress, off unless set. `true` enables both the dev and test stacks with
+	 * defaults; the object form enables and configures them, and is where the stack name, the
+	 * per-branch `worktrees` toggle, and the two stacks live.
+	 */
+	local?: boolean | KizloLocalConfig
 }
 
 export function defineConfig(config: KizloGlobalConfig): KizloGlobalConfig {

@@ -131,7 +131,7 @@ describe("createWordPressClient", () => {
 
 /**
  * The migrated modules address their routes by path rather than holding a WordPress shape of their
- * own, so these assert against whatever this repo's `wordpress.ts` currently declares.
+ * own, so these assert against whatever this repo's `introspection.ts` currently declares.
  */
 describe("addressing an endpoint by path", () => {
 	it("exposes only generated raw operation paths", () => {
@@ -167,7 +167,7 @@ describe("addressing an endpoint by path", () => {
 
 /**
  * The routes WordPress serves and Kizlo only describes. Asserted against this repo's generated
- * `wordpress.ts`, so a contract that stops matching the call sites fails here rather than in the
+ * `introspection.ts`, so a contract that stops matching the call sites fails here rather than in the
  * procedure that makes the call.
  */
 describe("described WordPress core routes", () => {
@@ -221,7 +221,7 @@ describe("described WordPress core routes", () => {
 
 /**
  * The WooCommerce routes the plugin describes and WooCommerce serves. Asserted against this repo's
- * generated `wordpress.ts` the same way the core block above is, so a WooCommerce release that moves
+ * generated `introspection.ts` the same way the core block above is, so a WooCommerce release that moves
  * one of these shapes fails here rather than inside the integration that calls it.
  */
 describe("described WooCommerce routes", () => {

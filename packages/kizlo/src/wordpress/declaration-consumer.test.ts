@@ -4,7 +4,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import ts from "typescript"
 import { expect, test } from "vitest"
-import { WORDPRESS_STUB } from "../cli/daemon/generate"
+import { INTROSPECTION_STUB } from "../cli/daemon/generate"
 import { generateWordPressClient } from "./generate"
 import type { IntrospectionDocument, IntrospectionSchema } from "./introspection"
 
@@ -241,7 +241,7 @@ function compile(dir: string): string[] {
 		strict: true,
 		target: ts.ScriptTarget.ES2022,
 	}
-	const files = [path.join(dir, "wordpress.ts"), path.join(dir, "usage.ts")]
+	const files = [path.join(dir, "introspection.ts"), path.join(dir, "usage.ts")]
 	const program = ts.createProgram(files, options)
 	return ts
 		.getPreEmitDiagnostics(program)
@@ -254,17 +254,17 @@ test("published declarations retain generated registries across regeneration", (
 
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-declaration-consumer-"))
 	try {
-		fs.writeFileSync(path.join(dir, "wordpress.ts"), WORDPRESS_STUB)
+		fs.writeFileSync(path.join(dir, "introspection.ts"), INTROSPECTION_STUB)
 		fs.writeFileSync(path.join(dir, "usage.ts"), STUB_USAGE)
 		expect(compile(dir)).toEqual([])
 
-		fs.writeFileSync(path.join(dir, "wordpress.ts"), generateWordPressClient(introspection("initial")))
+		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(introspection("initial")))
 		fs.writeFileSync(path.join(dir, "usage.ts"), usage("initial"))
 		expect(compile(dir)).toEqual([])
 
 		// Simulate a schema change in the consuming app. Only its generated module and call-site
 		// expectations change; both packages remain on the declarations built before this test.
-		fs.writeFileSync(path.join(dir, "wordpress.ts"), generateWordPressClient(introspection("updated")))
+		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(introspection("updated")))
 		fs.writeFileSync(path.join(dir, "usage.ts"), usage("updated"))
 		expect(compile(dir)).toEqual([])
 	} finally {

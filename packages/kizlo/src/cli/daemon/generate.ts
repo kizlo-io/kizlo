@@ -11,7 +11,6 @@ import { type IntrospectionDiagnostic, type IntrospectionDocument, Introspection
 import { assertGeneratedClientCompiles, GeneratedClientTypeError } from "../../wordpress/typecheck"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { loadEnvFiles } from "../utils"
-import { WORDPRESS_CLIENT_META_REL } from "../wp/constants"
 import type { ResolvedConfig } from "./config"
 import { importIgnoringVirtualModules } from "./jiti"
 import { log } from "./logger"
@@ -26,7 +25,7 @@ export const CONTRACT_BARREL = [
 	`import contractJson from "./contract.json"`,
 	``,
 	`export const contract = contractJson as unknown as typeof procedures`,
-	`export { endpoints, type WordPressClient } from "./wordpress"`,
+	`export { endpoints, type WordPressClient } from "./introspection"`,
 	``,
 ].join("\n")
 
@@ -41,13 +40,13 @@ export class LegacyRouterExportError extends Error {
 }
 
 /**
- * `wordpress.ts` before the first generation. WordPress is reachable but untyped until then, so a
+ * `introspection.ts` before the first generation. WordPress is reachable but untyped until then, so a
  * freshly scaffolded project compiles, including Kizlo's own procedures, before it has ever
- * connected. `kizlo dev` / `kizlo generate` replaces this with the real client. `any` rather than an
- * empty tree on purpose: every endpoint a procedure names has to resolve to something until the
+ * connected. `kizlo dev` / `kizlo generate` replaces this with the real introspection. `any` rather than
+ * an empty tree on purpose: every endpoint a procedure names has to resolve to something until the
  * real shapes arrive, which `WP_Client` preserves by passing `any` through.
  */
-export const WORDPRESS_STUB = [
+export const INTROSPECTION_STUB = [
 	// The import is load-bearing: without one, `declare module "kizlo"` has no module to augment.
 	`import type { WP_Client } from "kizlo"`,
 	``,
@@ -142,8 +141,8 @@ function formatDiagnostic(diagnostic: IntrospectionDiagnostic): string {
  * partial contract is worth is the generator's call rather than the transport's. Taking it is the
  * default: a third-party plugin's broken declaration then costs its own routes and nothing else,
  * where refusing the document costs the project every route that still works, for a mistake in code
- * it does not own. Strict generation makes the opposite trade for CI, where a client silently short
- * of routes typechecks clean and ships the gap.
+ * it does not own. Strict generation makes the opposite trade for CI, where an introspection silently
+ * short of routes typechecks clean and ships the gap.
  */
 export class PartialContractError extends Error {
 	readonly excluded: number
@@ -169,7 +168,7 @@ export function reportGenerationError(message: string, error: unknown): void {
 export interface GenerateWordPressOptions {
 	credentials?: WordPressCredentials
 	fetch?: typeof globalThis.fetch
-	/** Refuse a document WordPress had to exclude anything from, leaving the client on disk untouched. */
+	/** Refuse a document WordPress had to exclude anything from, leaving the introspection on disk untouched. */
 	strict?: boolean
 }
 
@@ -189,7 +188,7 @@ function reportDiagnostics(document: IntrospectionDocument, strict: boolean): vo
 	if (strict) throw new PartialContractError(excluded.size)
 	log.warn(
 		`Generating without the ${excluded.size} excluded ${excluded.size === 1 ? "contribution" : "contributions"} above. ` +
-			"Their routes and types are missing from the client; `kizlo generate --strict` refuses the contract instead.",
+			"Their routes and types are missing from the introspection; `kizlo generate --strict` refuses the contract instead.",
 	)
 }
 
@@ -225,7 +224,7 @@ async function fetchDocument(
 	// from a partial generation would answer "unchanged" and pass a run whose whole job is to fail.
 	const result = await fetchIntrospection(credentials, { etag: options.strict ? undefined : etag, fetch: options.fetch })
 	// Before the 304, which carries the header too: a project generating nothing new still has a plugin
-	// its client may have outgrown.
+	// its introspection may have outgrown.
 	reportPluginVersion(result.pluginVersion)
 
 	if (result.status === "not-modified") return undefined
@@ -235,11 +234,11 @@ async function fetchDocument(
 }
 
 /**
- * Produce the WordPress client without writing it or its ETag cache. Health checks use this to ask
+ * Produce the introspection source without writing it or its ETag cache. Health checks use this to ask
  * the same generator as `kizlo generate` what should be on disk, while leaving a contributor's
  * checkout untouched. Callers choose strictness just as generation does.
  */
-export async function generateWordPressSource(cwd: string, options: GenerateWordPressOptions = {}): Promise<string> {
+export async function generateIntrospectionSource(cwd: string, options: GenerateWordPressOptions = {}): Promise<string> {
 	const result = await fetchDocument(cwd, options)
 	if (!result?.document) throw new Error("WordPress introspection returned no document.")
 
@@ -248,84 +247,72 @@ export async function generateWordPressSource(cwd: string, options: GenerateWord
 	return generated.source
 }
 
-export async function generateWordPressOnce(
+/**
+ * Write `introspection.ts` at its resolved path, revalidating against the ETag cache. The one place
+ * the introspection reaches disk, whether or not the project has a server: a server-backed app writes
+ * it under `generated/`, and a package that only ships procedures writes it at its own `dir.introspection`.
+ */
+export async function generateIntrospectionOnce(
 	cfg: ResolvedConfig,
 	options: GenerateWordPressOptions = {},
 ): Promise<"generated" | "unchanged"> {
-	const metaPath = path.resolve(cfg.cwd, cfg.wordpressMetaPath)
-	const etag = readWordPressMeta(metaPath, path.resolve(cfg.cwd, cfg.wordpressPath))?.etag
-	const result = await fetchDocument(cfg.cwd, options, etag)
+	const file = path.resolve(cfg.cwd, cfg.introspectionPath)
+	const metaPath = path.resolve(cfg.cwd, cfg.introspectionMetaPath)
+	const result = await fetchDocument(cfg.cwd, options, readWordPressMeta(metaPath, file)?.etag)
 	if (!result?.document) return "unchanged"
 
-	const generated = generateWordPressModule(result.document)
-	await assertGeneratedClientCompiles(generated)
-
-	writeGeneratedWordPress(cfg, generated.source, wordPressMeta(result.etag, result.document.hash))
-	return "generated"
-}
-
-/**
- * Write `<dir>/wordpress.ts` once for a whole workspace. Every package that ships procedures compiles
- * against the same file, so there is one description of WordPress in the repo rather than one per
- * package drifting apart. One shape too: a package that only wants the types today still gets the
- * class, so reaching for the runtime later needs no regeneration.
- */
-export async function generateWorkspaceClientOnce(
-	cwd: string,
-	dir: string,
-	options: GenerateWordPressOptions = {},
-): Promise<"generated" | "unchanged"> {
-	const file = path.resolve(cwd, dir, "wordpress.ts")
-	// Its own cache file, not the app's: a project setting both would otherwise have two generated
-	// files revalidating against one ETag, and the loser would refetch the whole document every poll.
-	const metaPath = path.resolve(cwd, WORDPRESS_CLIENT_META_REL)
-	const result = await fetchDocument(cwd, options, readWordPressMeta(metaPath, file)?.etag)
-	if (!result?.document) return "unchanged"
-
-	// Before the ETag cache, not only before the client: a refused generation that had already
+	// Before the ETag cache, not only before the file: a refused generation that had already
 	// stamped the cache would answer its own next poll with a 304 and never retry.
 	const generated = generateWordPressModule(result.document)
 	await assertGeneratedClientCompiles(generated)
 
-	const contents = generated.source
-	fs.mkdirSync(path.dirname(metaPath), { recursive: true })
-	atomicWrite(metaPath, wordPressMeta(result.etag, result.document.hash))
-	if (fs.existsSync(file) && fs.readFileSync(file, "utf8") === contents) return "unchanged"
-
 	fs.mkdirSync(path.dirname(file), { recursive: true })
-	atomicWrite(file, contents)
+	fs.mkdirSync(path.dirname(metaPath), { recursive: true })
+	atomicWrite(file, generated.source)
+	atomicWrite(metaPath, wordPressMeta(result.etag, result.document.hash))
 	return "generated"
 }
 
-function writeGeneratedWordPress(cfg: ResolvedConfig, client: string, meta: string): void {
-	const metaPath = path.resolve(cfg.cwd, cfg.wordpressMetaPath)
-	fs.mkdirSync(path.resolve(cfg.cwd, cfg.generatedDir), { recursive: true })
-	fs.mkdirSync(path.dirname(metaPath), { recursive: true })
-	atomicWrite(path.resolve(cfg.cwd, cfg.wordpressPath), client)
-	atomicWrite(metaPath, meta)
+/** What a run of {@link generateOnce} did. */
+export interface GenerateResult {
+	/** The introspection artifact: freshly written, or already current (an unchanged 304). */
+	introspection: "generated" | "unchanged"
+	/**
+	 * The contract:
+	 * - `built`: a server was present and its `contract.json` + barrel were written;
+	 * - `empty`: a server path was present but its entry exports no `procedures`;
+	 * - `none`: no server is configured, so only the introspection was generated.
+	 */
+	contract: "built" | "empty" | "none"
 }
 
 /**
- * Loads the Kizlo server, builds its contract, and writes `contract.json` and
- * the generated barrel. Returns false when the entry has no Kizlo server.
+ * Generate everything `dir` resolves: the introspection always, plus the contract and barrel when a
+ * server is present. The server is loaded before the introspection is fetched, so a legacy `router`
+ * export is named as a migration error even with WordPress unreachable; a server whose entry exports no
+ * `procedures` still gets its introspection, and reports `contract: "empty"`.
  */
-export async function generateOnce(cfg: ResolvedConfig, options: GenerateWordPressOptions = {}): Promise<boolean> {
+export async function generateOnce(cfg: ResolvedConfig, options: GenerateWordPressOptions = {}): Promise<GenerateResult> {
 	loadEnvFiles(cfg.cwd)
-	const entry = path.resolve(cfg.cwd, cfg.serverEntry)
-	const server = await importIgnoringVirtualModules<{ procedures?: AnyProcedureTree; router?: unknown }>(cfg.cwd, entry)
 
-	if (!server.procedures) {
-		if (server.router) throw new LegacyRouterExportError(cfg.serverEntry)
-		return false
+	let procedures: AnyProcedureTree | undefined
+	if (cfg.server) {
+		const entry = path.resolve(cfg.cwd, cfg.server.entry)
+		const server = await importIgnoringVirtualModules<{ procedures?: AnyProcedureTree; router?: unknown }>(cfg.cwd, entry)
+		if (!server.procedures && server.router) throw new LegacyRouterExportError(cfg.server.entry)
+		procedures = server.procedures
 	}
 
-	const contract = JSON.stringify(await generateContract(server.procedures))
-	const wordpress = await generateWordPressOnce(cfg, options)
+	const introspection = await generateIntrospectionOnce(cfg, options)
 
-	fs.mkdirSync(path.resolve(cfg.cwd, cfg.generatedDir), { recursive: true })
-	atomicWrite(path.resolve(cfg.cwd, cfg.contractPath), contract)
-	atomicWrite(path.resolve(cfg.cwd, cfg.barrelPath), CONTRACT_BARREL)
+	if (!cfg.server) return { introspection, contract: "none" }
+	if (!procedures) return { introspection, contract: "empty" }
 
-	if (wordpress === "generated") log.success("WordPress client generated")
-	return true
+	const contract = JSON.stringify(await generateContract(procedures))
+	fs.mkdirSync(path.resolve(cfg.cwd, cfg.server.contractDir), { recursive: true })
+	atomicWrite(path.resolve(cfg.cwd, cfg.server.contractPath), contract)
+	atomicWrite(path.resolve(cfg.cwd, cfg.server.barrelPath), CONTRACT_BARREL)
+
+	if (introspection === "generated") log.success("WordPress introspection generated")
+	return { introspection, contract: "built" }
 }
