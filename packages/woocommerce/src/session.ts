@@ -36,13 +36,13 @@ function encodeSecret(secret: string): Uint8Array {
 	return new TextEncoder().encode(secret)
 }
 
-function getCartHeaders(options: { userId?: number; token?: string; connInfo: ConnInfo | null }) {
-	const { connInfo, userId, token } = options
+function getCartHeaders(options: { email?: string; token?: string; connInfo: ConnInfo | null }) {
+	const { connInfo, email, token } = options
 
 	const headers: Record<string, string> = {}
 
 	if (token) headers["X-Kizlo-Guest-Token"] = token
-	if (userId) headers["X-Kizlo-User-Id"] = String(userId)
+	if (email) headers["X-Kizlo-User-Email"] = email
 	if (connInfo?.city) headers["X-Kizlo-Geo-City"] = connInfo.city
 	if (connInfo?.state) headers["X-Kizlo-Geo-State"] = connInfo.state
 	if (connInfo?.country) headers["X-Kizlo-Geo-Country"] = connInfo.country
@@ -57,10 +57,10 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 
 	return createMiddleware(async ({ context, next }) => {
 		const connInfo = await context.getConnInfo()
-		const auth = await context.getAuthUser()
+		const session = await context.getSession()
 		const foundToken = await context.cookies.get(cookieName)
 
-		if (!auth) {
+		if (!session) {
 			if (!foundToken) {
 				const { jwt, sub } = await mintGuestToken(context.config.siteSecret, ttlSeconds)
 				await context.cookies.set({ name: cookieName, value: jwt, options: GUEST_COOKIE_OPTIONS })
@@ -83,7 +83,7 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 			if (!err) {
 				const response = await context.wordpress.woocommerce.kizlo.cart.merge(
 					{},
-					{ headers: getCartHeaders({ userId: auth.id, token: data.sub, connInfo }) },
+					{ headers: getCartHeaders({ email: session.email, token: data.sub, connInfo }) },
 				)
 				if (response.error) context.logger.error("CART_MERGE_FAILED", response.error)
 			}
@@ -91,6 +91,6 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 			await context.cookies.delete(cookieName, GUEST_COOKIE_OPTIONS)
 		}
 
-		return next({ context: { sessionHeaders: getCartHeaders({ userId: auth.id, connInfo }) } })
+		return next({ context: { sessionHeaders: getCartHeaders({ email: session.email, connInfo }) } })
 	})
 }

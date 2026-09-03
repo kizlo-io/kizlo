@@ -3,11 +3,10 @@ import type { TestAuthAdapterUser } from "./users"
 
 export function testAuthAdapter(user: TestAuthAdapterUser): AuthAdapter {
 	return {
-		getUser(): AuthUser {
+		getSession(): AuthUser {
 			return {
-				id: user.wpUserId,
+				id: user.id,
 				email: user.email,
-				phone: user.phone,
 				firstName: user.firstName,
 				lastName: user.lastName,
 			}

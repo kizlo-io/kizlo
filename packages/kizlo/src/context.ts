@@ -72,7 +72,7 @@ export interface ContextConfig {
 	integrationPlugins?: IntegrationPluginRequirement[]
 }
 
-export type AuthUserFn = () => Promise<AuthUser | null>
+export type SessionFn = () => Promise<AuthUser | null>
 export type ConnInfoFn = () => Promise<ConnInfo | null>
 export type VerifyCaptchaFn = (token: string) => Promise<boolean>
 export type VerifyPreviewTokenFn = (token: string) => Promise<PreviewTokenPayload | null>
@@ -99,8 +99,8 @@ export interface ProcedureContext {
 	config: ContextConfig
 	/** Resolve the caller's connection info (IP, geo) via the geo adapter, or `null`. */
 	getConnInfo: ConnInfoFn
-	/** Resolve the authenticated user via the auth adapter, or `null`. */
-	getAuthUser: AuthUserFn
+	/** Resolve the authenticated session via the auth adapter, or `null`. */
+	getSession: SessionFn
 	/** Read and write cookies through the cookies adapter. */
 	cookies: CookiesStorage
 	/** Verify a CAPTCHA token via the captcha adapter. */
@@ -182,7 +182,7 @@ export class Context {
 			email: this.email,
 			getConnInfo: this.createConnInfoFn(request),
 			verifyCaptcha: this.createVerifyCaptchaFn(request),
-			getAuthUser: this.createGetUserFn(request),
+			getSession: this.createGetSessionFn(request),
 			verifyPreviewToken: this.createVerifyPreviewTokenFn(),
 			cookies: this.createRestCookieStorage(request, headers),
 			invokedBy: "client",
@@ -201,7 +201,7 @@ export class Context {
 			wordpress: this.wordpress,
 			settings: this.settings,
 			email: this.email,
-			getAuthUser: this.createGetUserFn(null),
+			getSession: this.createGetSessionFn(null),
 			getConnInfo: this.createConnInfoFn(null),
 			verifyCaptcha: this.createVerifyCaptchaFn(null),
 			verifyPreviewToken: this.createVerifyPreviewTokenFn(),
@@ -255,9 +255,9 @@ export class Context {
 		}
 	}
 
-	private createGetUserFn(request: Request | null): AuthUserFn {
+	private createGetSessionFn(request: Request | null): SessionFn {
 		return async () => {
-			return (await Promise.resolve(this.config.adapters?.auth?.getUser?.(request))) ?? null
+			return (await Promise.resolve(this.config.adapters?.auth?.getSession?.(request))) ?? null
 		}
 	}
 
