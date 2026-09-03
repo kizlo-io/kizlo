@@ -212,7 +212,12 @@ async function deleteAllOrdersFor(service: SeedContext["service"], customerId: n
 }
 
 async function resetCart(service: SeedContext["service"], customerId: number): Promise<void> {
+	// Identity is email-only now, so look up the customer's email to key the
+	// session at the same row the tests wrote to.
+	const customer = await service.get<{ email: string }>(`${WC_CORE_BASE}/customers/${customerId}`, {})
+	const email = customer.data?.email
+	if (!email) return
 	await service.delete(`${WC_STORE_BASE}/cart/items`, {
-		headers: { "X-Kizlo-User-Id": String(customerId) },
+		headers: { "X-Kizlo-User-Email": email },
 	})
 }

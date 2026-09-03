@@ -55,10 +55,10 @@ class CommentSubmission
                         'description'       => 'The comment being replied to.',
                         'sanitize_callback' => 'absint',
                     ],
-                    'user_id' => [
-                        'type'              => 'integer',
-                        'description'       => 'The commenting WordPress user. Omitted for a guest.',
-                        'sanitize_callback' => 'absint',
+                    'user_email' => [
+                        'type'              => 'string',
+                        'description'       => 'The signed-in commenter\'s email, forwarded as the authenticated identity. Matched to a WordPress user to record authorship; distinct from the guest-entered author_email. Omitted for a guest.',
+                        'sanitize_callback' => 'sanitize_email',
                     ],
                     'author_name' => [
                         'type'              => 'string',
@@ -101,7 +101,6 @@ class CommentSubmission
                 'comment_on_trash',
                 'comment_reply_to_unapproved_comment',
                 'comment_save_error',
-                'kizlo_invalid_user',
                 'not_logged_in',
                 'require_name_email',
                 'require_valid_comment',
@@ -114,15 +113,6 @@ class CommentSubmission
 
     public function submit(WP_REST_Request $request): WP_REST_Response | WP_Error
     {
-        $user_id = (int) $request->get_param('user_id');
-        if ($user_id > 0 && ! get_userdata($user_id)) {
-            return new WP_Error(
-                'kizlo_invalid_user',
-                'The supplied user_id does not match any WordPress user.',
-                ['status' => 400]
-            );
-        }
-
         $comment_data = [
             'comment_post_ID' => (int) $request->get_param('post_id'),
             'comment_parent'  => (int) $request->get_param('parent'),
@@ -132,6 +122,13 @@ class CommentSubmission
             'url'             => (string) $request->get_param('author_url'),
         ];
 
+        // user_email is the authenticated identity, a trusted signal distinct
+        // from the guest-entered author_email above. Only a resolved match is
+        // attributed to that account; an authenticated email with no match, and
+        // any guest author_email, fall through to guest author-email attribution.
+        $user_email = (string) $request->get_param('user_email');
+        $author     = $user_email !== '' ? get_user_by('email', $user_email) : false;
+
         $orig_remote_addr = $_SERVER['REMOTE_ADDR']     ?? null;
         $orig_user_agent  = $_SERVER['HTTP_USER_AGENT'] ?? null;
         $orig_user_id     = get_current_user_id();
@@ -139,7 +136,7 @@ class CommentSubmission
         $_SERVER['REMOTE_ADDR']     = (string) $request->get_param('author_ip');
         $_SERVER['HTTP_USER_AGENT'] = substr((string) $request->get_param('user_agent'), 0, 254);
 
-        wp_set_current_user($user_id > 0 ? $user_id : 0);
+        wp_set_current_user($author ? (int) $author->ID : 0);
 
         try {
             $result = wp_handle_comment_submission($comment_data);

@@ -25,7 +25,6 @@ export const LIST_COMMENT_ERROR_MAP = defineErrorMap({
 export type ListCommentErrorMap = typeof LIST_COMMENT_ERROR_MAP
 
 export const SUBMIT_COMMENT_ERROR_MAP = defineErrorMap({
-	COMMENT_USER_NOT_FOUND: {},
 	COMMENT_ID_NOT_FOUND: {},
 	COMMENT_CLOSED: {},
 	COMMENT_LOGIN_REQUIRED: {},

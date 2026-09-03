@@ -15,6 +15,7 @@ class WooCommerceModuleTest extends TestCase
     private WP_REST_Server $server;
     private int $adminId;
     private int $customerId;
+    private string $customerEmail;
     private ?int $permissionUser = null;
     private RestGuard $guard;
     private WooCommerceModule $module;
@@ -23,9 +24,10 @@ class WooCommerceModuleTest extends TestCase
     {
         parent::setUp();
 
-        $this->adminId    = self::factory()->user->create(['role' => 'administrator']);
-        $this->customerId = self::factory()->user->create(['role' => 'subscriber']);
-        $this->guard      = new RestGuard();
+        $this->adminId       = self::factory()->user->create(['role' => 'administrator']);
+        $this->customerId    = self::factory()->user->create(['role' => 'subscriber']);
+        $this->customerEmail = (string) get_userdata($this->customerId)->user_email;
+        $this->guard         = new RestGuard();
         $this->module     = new WooCommerceModule();
 
         add_filter('rest_authentication_errors', [$this->guard, 'requireAdmin'], 100);
@@ -56,7 +58,7 @@ class WooCommerceModuleTest extends TestCase
         unset(
             $_SERVER['PHP_AUTH_USER'],
             $_SERVER['HTTP_AUTHORIZATION'],
-            $_SERVER['HTTP_X_KIZLO_USER_ID'],
+            $_SERVER['HTTP_X_KIZLO_USER_EMAIL'],
         );
         $_SERVER['REQUEST_URI'] = '/';
 
@@ -123,8 +125,8 @@ class WooCommerceModuleTest extends TestCase
         $this->permissionUser = null;
 
         wp_set_current_user($authenticatedUser);
-        $_SERVER['REQUEST_URI']          = '/wp-json' . $route;
-        $_SERVER['HTTP_X_KIZLO_USER_ID'] = (string) $this->customerId;
+        $_SERVER['REQUEST_URI']             = '/wp-json' . $route;
+        $_SERVER['HTTP_X_KIZLO_USER_EMAIL'] = $this->customerEmail;
 
         if ($authenticatedUser === $this->adminId) {
             $_SERVER['PHP_AUTH_USER'] = 'administrator';

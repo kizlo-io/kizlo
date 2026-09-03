@@ -13,7 +13,7 @@ use WP_Error;
  * other unauthenticated caller have no legitimate reason to hit /wp-json/*.
  *
  * The lockdown is unconditional and intentional: cart routes accept a
- * X-Kizlo-User-Id header that is trusted without cryptographic verification,
+ * X-Kizlo-User-Email header that is trusted without cryptographic verification,
  * so opening the API to anonymous callers would let anyone act as any user.
  * The trust boundary is HTTP Basic auth with an admin Application Password —
  * everything past it is treated as a legitimate request from the SDK.

@@ -8,8 +8,8 @@ use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
 /**
  * Merges a guest cart (identified by its X-Kizlo-Guest-Token) into the cart
  * currently bound to the request. The current request must already resolve to
- * an authenticated user (X-Kizlo-User-Id present) — otherwise there is nothing
- * to merge into.
+ * an authenticated user (X-Kizlo-User-Email present) — otherwise there is
+ * nothing to merge into.
  *
  * Strategy: re-add each guest item via the Store API CartController so stock,
  * price, and validation rules re-run. The guest session row is then deleted.
@@ -30,7 +30,7 @@ class CartMerger
         if ($session->get_resolved_user_id() === null) {
             return new WP_Error(
                 'kizlo_user_required',
-                'Merge requires an authenticated request (X-Kizlo-User-Id).',
+                'Merge requires an authenticated request (X-Kizlo-User-Email).',
                 ['status' => 400]
             );
         }

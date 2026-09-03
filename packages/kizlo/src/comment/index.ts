@@ -128,16 +128,20 @@ export const COMMENT_PROCEDURES = {
 				if (!valid) throw errors.COMMENT_CAPTCHA_INVALID()
 			}
 
-			const response = await context.wordpress.kizlo.comments.create({
+			// user_email is the authenticated identity the server trusts to attribute
+			// authorship; author_email stays the guest form field the commenter typed.
+			const submission = {
 				author_ip: connInfo.ip,
 				user_agent: connInfo.userAgent,
 				content: input.body.content,
 				post_id: input.body.postId,
-				author_email: session?.email ?? input.body.authorEmail,
+				user_email: session?.email,
+				author_email: input.body.authorEmail,
 				author_name: input.body.authorName,
 				author_url: input.body.authorUrl,
 				parent: input.body.parentId,
-			})
+			}
+			const response = await context.wordpress.kizlo.comments.create(submission)
 			if (response.error) {
 				switch (response.error.code) {
 					case "require_name_email": {
@@ -145,9 +149,6 @@ export const COMMENT_PROCEDURES = {
 					}
 					case "require_valid_email": {
 						throw errors.COMMENT_INVALID_EMAIL()
-					}
-					case "kizlo_invalid_user": {
-						throw errors.COMMENT_USER_NOT_FOUND()
 					}
 					case "require_valid_comment": {
 						throw errors.COMMENT_EMPTY_CONTENT()

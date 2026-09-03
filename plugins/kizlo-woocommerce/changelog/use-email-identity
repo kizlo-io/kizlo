@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Create a WooCommerce customer on demand from the email identity when none exists

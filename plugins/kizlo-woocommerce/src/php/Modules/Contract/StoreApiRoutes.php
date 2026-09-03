@@ -51,7 +51,7 @@ use Throwable;
  * ## The session headers are not input
  *
  * Every cart and checkout operation is keyed to a cart by `X-Kizlo-Guest-Token`
- * or `X-Kizlo-User-Id`, which {@see \Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler}
+ * or `X-Kizlo-User-Email`, which {@see \Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler}
  * reads off the request. Headers are not parameters and do not belong in `input`:
  * a generated client passes them through the per-call options instead, which is
  * where the extension's session middleware already puts them.
