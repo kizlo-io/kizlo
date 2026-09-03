@@ -68,6 +68,5 @@ export default defineConfig({
 	local: {
 		worktrees: true,
 		dev: { version: WORDPRESS_VERSION, fixtures: introspectionFixtures },
-		test: {},
 	},
 })

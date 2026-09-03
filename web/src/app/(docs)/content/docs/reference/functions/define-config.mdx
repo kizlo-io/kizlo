@@ -57,27 +57,27 @@ The same config object, unchanged. `defineConfig` is an identity function that e
 
 ## Examples
 
-Run local WordPress by declaring the stacks under `local` (the install folder is fixed, so there's nothing
-else to set). `create`/`init` write this when you choose local WordPress:
+Run local WordPress with `local: true`, which turns on both stacks with defaults (the install folder is
+fixed, so there's nothing else to set). `create`/`init` write this when you choose local WordPress:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
   dir: "src/lib/kizlo",
-  local: { dev: {}, test: {} },
+  local: true,
 })
 ```
 
-Give each branch its own local WordPress with `worktrees`, so parallel checkouts of the project stop
-sharing one database:
+Reach for the object form to configure the stacks. Give each branch its own local WordPress with
+`worktrees`, so parallel checkouts of the project stop sharing one database:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
   dir: "src/lib/kizlo",
-  local: { worktrees: true, dev: {}, test: {} },
+  local: { worktrees: true },
 })
 ```
 
@@ -109,7 +109,6 @@ export default defineConfig({
   alias: "@",
   local: {
     dev: { fixtures: [blogFixture] },
-    test: {},
   },
 })
 ```

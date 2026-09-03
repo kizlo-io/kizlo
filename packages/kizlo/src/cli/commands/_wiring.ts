@@ -8,14 +8,15 @@ import { type PatchEntry, resolvePatch, type TemplateConfig } from "../presets/t
 import { aliasWithSlash, resolveModuleImport, writeFileIfAbsent } from "../utils"
 import { orCancel } from "./_setup"
 
-/** The kizlo.config.ts a scaffolded project gets: the Kizlo directory, the import-alias preference, and —
- *  when local WordPress is chosen — a `local: { dev, test }` block so `kizlo dev` and `kizlo test` boot the
- *  fixed `.kizlo/local` install. The alias is always written — `""` for relative imports included — so it
- *  records a made decision a later `kizlo init` reads back instead of prompting for it again. The alias
- *  is written in its canonical `@/` form (never a bare `@`) so it reads like the imports it produces. */
+/** The kizlo.config.ts a scaffolded project gets: the Kizlo directory, the import-alias preference, and,
+ *  when local WordPress is chosen, `local: true` so `kizlo dev` and `kizlo test` boot the fixed
+ *  `.kizlo/local` install (both stacks on with defaults; the object form is for configuring them). The
+ *  alias is always written (`""` for relative imports included) so it records a made decision a later
+ *  `kizlo init` reads back instead of prompting for it again. The alias is written in its canonical `@/`
+ *  form (never a bare `@`) so it reads like the imports it produces. */
 export function kizloConfigTemplate(dir: string, alias: string, localWordPress = false): string {
 	const aliasLine = `\n\talias: "${aliasWithSlash(alias)}",`
-	const localLines = localWordPress ? `\n\tlocal: { dev: {}, test: {} },` : ""
+	const localLines = localWordPress ? `\n\tlocal: true,` : ""
 	return `import { defineConfig } from "kizlo/config"
 
 export default defineConfig({

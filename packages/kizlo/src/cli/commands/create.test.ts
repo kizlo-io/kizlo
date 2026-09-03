@@ -336,7 +336,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		await applyManifestWiring(dir, templateDir, manifest, { includeExamples: false, localDev: true })
 
 		const config = fs.readFileSync(path.join(dir, "kizlo.config.ts"), "utf8")
-		expect(config).toContain("local: { dev: {}, test: {} }")
+		expect(config).toContain("local: true")
 	})
 
 	it("skips only the example pages when declined, still writing the core layout", async () => {

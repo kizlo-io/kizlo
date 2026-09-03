@@ -15,13 +15,14 @@ describe("kizloConfigTemplate", () => {
 		expect(config).not.toContain("local")
 	})
 
-	it("emits a `local: { dev, test }` block for a local-WordPress scaffold", () => {
+	it("emits `local: true` for a local-WordPress scaffold", () => {
 		const config = kizloConfigTemplate("src/lib/kizlo", "@", true)
 		expect(config).toContain('dir: "src/lib/kizlo"')
-		expect(config).toContain("local: { dev: {}, test: {} }")
-		// No trace of the removed flat keys the redesign dropped.
+		expect(config).toContain("local: true")
+		// No trace of the removed flat keys the redesign dropped, and no redundant empty stack objects.
 		expect(config).not.toContain("dev: { local")
 		expect(config).not.toContain("wordpressClientDir")
+		expect(config).not.toContain("{}")
 	})
 })
 
