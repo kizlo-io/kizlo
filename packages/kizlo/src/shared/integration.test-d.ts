@@ -32,7 +32,7 @@ const loyalty = createIntegration({
 	},
 })
 
-const adapterOnly = createIntegration({ id: "auth-provider", adapters: { auth: { getUser: () => null } } })
+const adapterOnly = createIntegration({ id: "auth-provider", adapters: { auth: { getSession: () => null } } })
 const emptyProcedures = createIntegration({ id: "empty", procedures: {} })
 
 describe("InferIntegrationProcedures", () => {

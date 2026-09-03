@@ -1,5 +1,6 @@
 import { pluginUpdateMessage } from "@kizlo/shared"
 import { afterEach, describe, expect, test, vi } from "vitest"
+import type { AuthAdapter } from "./adapters/auth"
 import { Context, type ContextConfig } from "./context"
 
 type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -84,6 +85,29 @@ describe("WordPress setup warnings", () => {
 
 		expect(warn).toHaveBeenCalledTimes(1)
 		expect(String(warn.mock.calls[0]?.[0])).toContain(pluginUpdateMessage("0.7.0"))
+	})
+})
+
+describe("auth session", () => {
+	test("passes the request to the adapter and returns the resolved session", async () => {
+		const session = { id: "auth-1", email: "ada@example.com", firstName: "Ada", lastName: "Lovelace" }
+		const getSession = vi.fn<AuthAdapter["getSession"]>().mockResolvedValue(session)
+		const context = createContext("https://session.example", { adapters: { auth: { getSession } } })
+		const httpRequest = new Request("https://app.example/api")
+
+		await expect(context.createRestContext(httpRequest).getSession()).resolves.toEqual(session)
+		expect(getSession).toHaveBeenCalledTimes(1)
+		expect(getSession).toHaveBeenCalledWith(httpRequest)
+	})
+
+	test("returns null when the adapter reports no session", async () => {
+		const context = createContext("https://session.example", { adapters: { auth: { getSession: () => null } } })
+
+		await expect(context.createRestContext(new Request("https://app.example/api")).getSession()).resolves.toBeNull()
+	})
+
+	test("returns null server-side when no auth adapter is configured", async () => {
+		await expect(createContext("https://session.example").createServerContext().getSession()).resolves.toBeNull()
 	})
 })
 

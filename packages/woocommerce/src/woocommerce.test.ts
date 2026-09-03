@@ -20,7 +20,7 @@ import { deserializeProduct } from "./product/utils"
  *
  * The cart is keyed to the signed-in test user rather than a guest token, because a direct
  * `.call()` gets the server context and its cookie storage has no adapter behind it. The
- * `X-Kizlo-User-Id` header the middleware sends instead is what carries identity between the calls
+ * `X-Kizlo-User-Email` header the middleware sends instead is what carries identity between the calls
  * below, so a cart that survives from one test to the next is that header working.
  */
 let kizlo: ReturnType<typeof instance>
@@ -248,7 +248,7 @@ test("the cart survives between calls, so the session header carries identity", 
 
 test("an API guest cart is available to a server-rendered storefront request", async () => {
 	const apiUrl = "http://test.local/api/kizlo"
-	const guestAuth = createAuthAdapter({ getUser: () => null })
+	const guestAuth = createAuthAdapter({ getSession: () => null })
 	const guestApi = getKizloTestInstance({ baseUrl: apiUrl, integrations: [woocommerce()], adapters: { auth: guestAuth } })
 	let guestSetCookie: string | undefined
 
@@ -392,7 +392,7 @@ function store() {
 
 /** What the session middleware sends, so these land on the same cart as the tests above. */
 function session() {
-	return { headers: { "X-Kizlo-User-Id": String(getTestCredentials().users.user.id) } }
+	return { headers: { "X-Kizlo-User-Email": getTestCredentials().users.user.email } }
 }
 
 test("cart.addItem without a product cannot resolve one", async () => {
@@ -698,7 +698,7 @@ test("checkout.retry refuses a body with no billing address", async () => {
 // ==================================================
 
 function guestClient() {
-	const auth = createAuthAdapter({ getUser: () => null })
+	const auth = createAuthAdapter({ getSession: () => null })
 	return getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth } }).client.woocommerce
 }
 
@@ -797,4 +797,20 @@ test("customers.get reads the signed-in customer through the generated endpoint"
 	expect(Customer.safeParse(result).success).toBe(true)
 	expect(result.id).toBe(creds.users.user.id)
 	expect(result.email).toBe(creds.users.user.email)
+})
+
+test("an email-authenticated cart add operates on the matching WordPress customer", async () => {
+	const creds = getTestCredentials()
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+
+	// The cart add and the customer read share one identity: the email the session forwards, resolved
+	// to the seeded WordPress user, not any numeric id the caller supplied.
+	const customer = await client().customers.get.call()
+	expect(customer.id).toBe(creds.users.user.id)
+	expect(customer.email).toBe(creds.users.user.email)
+
+	const cart = await client().cart.get.call()
+	expect(cart.items).toEqual(expect.arrayContaining([expect.objectContaining({ productId, quantity: 1 })]))
+	await emptyCart()
 })

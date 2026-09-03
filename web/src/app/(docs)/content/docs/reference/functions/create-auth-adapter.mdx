@@ -4,8 +4,8 @@ description: Build a custom auth adapter that resolves the caller's identity.
 ---
 
 `createAuthAdapter` declares a custom auth adapter, typed against the `AuthAdapter` contract. Kizlo calls it to
-resolve who is making a request, mapping your session to a WordPress user. Provide the result through an
-[integration](/docs/reference/functions/create-integration)'s `adapters.auth`.
+resolve the session behind a request, the third-party identity independent of any WordPress user. Provide the
+result through an [integration](/docs/reference/functions/create-integration)'s `adapters.auth`.
 
 Reach for this when you bring your own session layer. For common providers, use a prebuilt adapter instead. Those
 live in the adapter guides, not here.
@@ -22,7 +22,8 @@ createAuthAdapter(adapter)
   type={`AuthAdapter`}
 />
 
-`getUser` returns the resolved user, whose `id` is the WordPress user the caller maps to:
+`getSession` returns the resolved session. Its `id` is the identity provider's own id, never a WordPress user
+id; `email` is the one join key Kizlo uses to map the session to a WordPress user:
 
 <AutoTypeTable
   path="../packages/kizlo/src/adapters/auth.ts"
@@ -42,15 +43,15 @@ import { createAuthAdapter } from "kizlo"
 import { getSession } from "../session"
 
 export const auth = createAuthAdapter({
-  async getUser(request) {
+  async getSession(request) {
     const session = await getSession(request)
     if (!session) return null
 
     return {
-      id: session.wpUserId,
+      id: session.userId,
+      email: session.email,
       firstName: session.firstName,
       lastName: session.lastName,
-      email: session.email,
     }
   },
 })

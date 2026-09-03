@@ -120,21 +120,20 @@ export const COMMENT_PROCEDURES = {
 			if (!connInfo?.ip) throw new Error("Connection IP is required.")
 			if (!connInfo?.userAgent) throw new Error("Connection user agent is required.")
 
-			const user = await context.getAuthUser()
+			const session = await context.getSession()
 
-			if (!user) {
+			if (!session) {
 				if (!input.body.captchaToken) throw errors.COMMENT_CAPTCHA_REQUIRED()
 				const valid = await context.verifyCaptcha(input.body.captchaToken)
 				if (!valid) throw errors.COMMENT_CAPTCHA_INVALID()
 			}
 
 			const response = await context.wordpress.kizlo.comments.create({
-				user_id: user?.id,
 				author_ip: connInfo.ip,
 				user_agent: connInfo.userAgent,
 				content: input.body.content,
 				post_id: input.body.postId,
-				author_email: input.body.authorEmail,
+				author_email: session?.email ?? input.body.authorEmail,
 				author_name: input.body.authorName,
 				author_url: input.body.authorUrl,
 				parent: input.body.parentId,

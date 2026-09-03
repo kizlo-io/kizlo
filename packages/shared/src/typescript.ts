@@ -10,6 +10,8 @@ export type Prettify<T> = {
 
 export type Promisify<T> = T | Promise<T>
 
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+
 export type UnionToIntersection<U> = (U extends any ? (x: U) => void : never) extends (x: infer I) => void ? I : never
 
 export type Pathname = `/${string}`

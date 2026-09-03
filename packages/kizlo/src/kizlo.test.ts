@@ -136,14 +136,14 @@ function config(integrations?: readonly ReturnType<typeof createIntegration>[]) 
 
 describe("integration composition", () => {
 	test("uses an adapter bundled by a provider integration without app wiring", async () => {
-		const kizlo = new Kizlo(config([createIntegration({ id: "provider", adapters: { auth: authMock({ mockUserId: 42 }) } })]))
+		const kizlo = new Kizlo(config([createIntegration({ id: "provider", adapters: { auth: authMock({ id: "42" }) } })]))
 
-		await expect(kizlo.context.createServerContext().getAuthUser()).resolves.toMatchObject({ id: 42 })
+		await expect(kizlo.context.createServerContext().getSession()).resolves.toMatchObject({ id: "42" })
 	})
 
 	test("resolves integration adapters from left to right without erasing concrete values", () => {
-		const firstAuth = authMock({ mockUserId: 1 })
-		const secondAuth = authMock({ mockUserId: 2 })
+		const firstAuth = authMock({ id: "1" })
+		const secondAuth = authMock({ id: "2" })
 		const logger = vi.fn()
 		const captcha = vi.fn(async () => true)
 		const integrations = [
