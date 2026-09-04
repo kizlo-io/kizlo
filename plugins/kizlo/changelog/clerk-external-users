@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Add provider-neutral external user lifecycle endpoints for signed identity-provider webhooks.

@@ -16,7 +16,9 @@ A plugin that connects your WordPress with the Kizlo framework, headlessly.
 
 == Changelog ==
 
-= 0.13.2 =
-* Fixed: Preserve named schema references during WordPress introspection translation
+= 0.14.0 =
+* Added: Add provider-neutral external user lifecycle endpoints for signed identity-provider webhooks.
+* Changed: Attribute an authenticated commenter to the matching WordPress user
+* Security: Require administrator Application Password authentication through a request-aware REST route policy.
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo/CHANGELOG.md).

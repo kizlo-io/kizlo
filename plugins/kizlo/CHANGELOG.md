@@ -4,6 +4,16 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-09-04
+### Added
+- Add provider-neutral external user lifecycle endpoints for signed identity-provider webhooks.
+
+### Changed
+- Attribute an authenticated commenter to the matching WordPress user
+
+### Security
+- Require administrator Application Password authentication through a request-aware REST route policy.
+
 ## [0.13.2] - 2026-08-30
 ### Fixed
 - Preserve named schema references during WordPress introspection translation
@@ -155,6 +165,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.14.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.13.2...kizlo-v0.14.0
 [0.13.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.13.1...kizlo-v0.13.2
 [0.13.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.13.0...kizlo-v0.13.1
 [0.13.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.12.0...kizlo-v0.13.0
