@@ -1,4 +1,4 @@
-import type { User } from "@clerk/backend"
+import type { ClerkClient, User } from "@clerk/backend"
 
 /** A single email address on a {@link clerkUserFixture}. Verified and primary unless overridden. */
 export interface FixtureEmail {
@@ -63,4 +63,23 @@ export function clerkUserFixture(options: ClerkUserFixtureOptions = {}): User {
 		primaryEmailAddressId: emailAddresses[primaryEmailIndex === -1 ? 0 : primaryEmailIndex]?.id ?? null,
 		primaryPhoneNumberId: phoneNumbers[primaryPhoneIndex === -1 ? 0 : primaryPhoneIndex]?.id ?? null,
 	} as unknown as User
+}
+
+/**
+ * Build a `ClerkClient` stub for testing the adapter without a live Clerk instance. `user` is the
+ * signed-in user its `authenticateRequest` reports and `users.getUser` returns; omit it (or pass
+ * `null`) for an unauthenticated client. Only the members the adapter calls are implemented.
+ */
+export function clerkClientFixture(options: { user?: User | null } = {}): ClerkClient {
+	const user = options.user ?? null
+
+	return {
+		authenticateRequest: async () => (user ? { isSignedIn: true, toAuth: () => ({ userId: user.id }) } : { isSignedIn: false }),
+		users: {
+			getUser: async () => {
+				if (!user) throw new Error("clerkClientFixture: getUser called on an unauthenticated client")
+				return user
+			},
+		},
+	} as unknown as ClerkClient
 }

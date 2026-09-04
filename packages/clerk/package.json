@@ -56,10 +56,8 @@
 		"prepack": "bun ../../scripts/prepare-package-for-publish.ts",
 		"clean": "git clean -xdf .cache .turbo .kizlo .fallow dist node_modules"
 	},
-	"dependencies": {
-		"@clerk/backend": "^3.17.1"
-	},
 	"devDependencies": {
+		"@clerk/backend": "^3.17.1",
 		"@tooling/typescript": "workspace:*",
 		"@types/node": "catalog:",
 		"kizlo": "workspace:*",
@@ -68,6 +66,7 @@
 		"vitest": "catalog:"
 	},
 	"peerDependencies": {
+		"@clerk/backend": ">=3.0.0",
 		"kizlo": ">=0.16.0"
 	}
 }

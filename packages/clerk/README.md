@@ -45,23 +45,33 @@ to that identity. There is no WordPress user id to inject and no create-on-signu
 race to manage: the WordPress user is materialized lazily by the endpoints that
 need one.
 
-1. In the [Clerk dashboard](https://dashboard.clerk.com), open **API keys** and
-   copy the **Publishable key** and **Secret key** for your instance.
-2. For networkless session verification, also copy the **JWKS public key** under
-   **API keys → Show JWT public key → PEM** and pass it as `jwtKey`. Without it,
-   each request verifies the session against Clerk's API.
+You pass in a configured Clerk backend client, so keys live where Clerk already
+reads them (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) and never on this
+adapter. Use your framework's `clerkClient`, or build one directly:
 
 ```ts
 import { clerk } from "@kizlo/clerk"
+import { createClerkClient } from "@clerk/backend"
 
-const auth = clerk({
+const client = createClerkClient({
 	secretKey: process.env.CLERK_SECRET_KEY!,
 	publishableKey: process.env.CLERK_PUBLISHABLE_KEY!,
-	jwtKey: process.env.CLERK_JWT_KEY, // optional, enables networkless verification
+	// jwtKey: process.env.CLERK_JWT_KEY, // optional: networkless session verification
 })
+
+const auth = clerk({ client })
+```
+
+In Next.js, hand it the app's client instead of building your own:
+
+```ts
+import { clerkClient } from "@clerk/nextjs/server"
+
+const auth = clerk({ client: await clerkClient() })
 ```
 
 Register it like any other Kizlo integration; it contributes the `auth` adapter.
+`@clerk/backend` is a peer dependency, so it uses the version your app installs.
 
 ### Email resolution
 
@@ -70,8 +80,7 @@ sign-ins, set `emailDomain` to synthesize a stable address from the phone number
 
 ```ts
 clerk({
-	secretKey: process.env.CLERK_SECRET_KEY!,
-	publishableKey: process.env.CLERK_PUBLISHABLE_KEY!,
+	client,
 	emailDomain: "phone.example.com", // 14155550100 -> 14155550100@phone.example.com
 })
 ```

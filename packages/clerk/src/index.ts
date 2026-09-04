@@ -1,14 +1,14 @@
-import { createClerkClient, type User } from "@clerk/backend"
+import type { ClerkClient, User } from "@clerk/backend"
 import { type AuthUser, createAuthAdapter, createIntegration } from "kizlo"
 
 /** Options for the {@link clerk} integration. */
 export interface ClerkOptions {
-	/** Clerk secret key (`sk_...`), used to authenticate Backend API calls. */
-	secretKey: string
-	/** Clerk publishable key (`pk_...`), used to identify the instance during request verification. */
-	publishableKey: string
-	/** JWKS public key (PEM). When set, session verification is networkless. */
-	jwtKey?: string
+	/**
+	 * A configured Clerk backend client. Use the app's `clerkClient` (`@clerk/nextjs`, `@clerk/express`)
+	 * or build one with `createClerkClient` from `@clerk/backend`. Keys and any networkless `jwtKey` live
+	 * on this client, so they are configured once where Clerk already reads them.
+	 */
+	client: ClerkClient
 	/**
 	 * Resolve the email that keys this session to a WordPress user. Overrides the built-in
 	 * primary-verified-email and phone-synthesis resolution. Return the address; throw to reject.
@@ -29,21 +29,15 @@ type Meta = NonNullable<AuthUser["meta"]>
  * materialized lazily by the endpoints that need one.
  */
 export function clerk(options: ClerkOptions) {
-	const client = createClerkClient({
-		secretKey: options.secretKey,
-		publishableKey: options.publishableKey,
-		jwtKey: options.jwtKey,
-	})
-
 	const auth = createAuthAdapter({
 		async getSession(request) {
 			if (!request) return null
 
-			const state = await client.authenticateRequest(request)
+			const state = await options.client.authenticateRequest(request)
 			if (!state.isSignedIn) return null
 
 			const { userId } = state.toAuth()
-			const user = await client.users.getUser(userId)
+			const user = await options.client.users.getUser(userId)
 			return mapUser(user, options)
 		},
 	})
