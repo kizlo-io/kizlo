@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Redesign the public Cart resource around complete Store API data and require WooCommerce 11.0.1

@@ -1,4 +1,0 @@
-Significance: minor
-Type: fixed
-
-Merge guest carts safely within authenticated cart and checkout requests.

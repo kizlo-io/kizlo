@@ -4,6 +4,19 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-09-04
+### Added
+- Add a public customer-facing Order resource backed by the WooCommerce Store API
+- Create a WooCommerce customer on demand from the email identity when none exists
+
+### Changed
+- Redesign the public Cart resource around complete Store API data and require WooCommerce 11.0.1
+- Redesign the public Checkout resource around WooCommerce Store API contracts
+
+### Fixed
+- Authorize Store API order retries as the resolved customer
+- Merge guest carts safely within authenticated cart and checkout requests.
+
 ## [0.3.1] - 2026-08-30
 ### Fixed
 - Declare HPOS compatibility so WooCommerce no longer flags the plugin as incompatible
@@ -37,6 +50,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.4.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.3.1...kizlo-woocommerce-v0.4.0
 [0.3.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.3.0...kizlo-woocommerce-v0.3.1
 [0.3.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.2.0...kizlo-woocommerce-v0.3.0
 [0.2.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.1.0...kizlo-woocommerce-v0.2.0
