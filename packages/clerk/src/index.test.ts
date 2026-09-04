@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { type ClerkOptions, clerk } from "./index"
 import { type ClerkUserFixtureOptions, clerkClientFixture, clerkUserFixture } from "./test/index"
 
@@ -68,7 +68,7 @@ describe("getSession", () => {
 		expect(session?.email).toBe("primary@home.com")
 	})
 
-	it("falls back to another verified email when the primary is unverified", async () => {
+	it("uses the primary email when it is unverified", async () => {
 		const session = await adapterFor(
 			{},
 			{
@@ -80,29 +80,37 @@ describe("getSession", () => {
 			},
 		).getSession(request())
 
-		expect(session?.email).toBe("verified@work.com")
+		expect(session?.email).toBe("primary@home.com")
 	})
 
-	it("synthesizes an email for a phone-only user when emailDomain is set", async () => {
+	it("uses resolveEmail when no primary email exists", async () => {
 		const session = await adapterFor(
-			{ emailDomain: "phone.example.com" },
+			{ resolveEmail: (user) => `phone+${user.id}@example.com` },
 			{ id: "user_4", phones: [{ phone: "+1 (415) 555-0100", primary: true }] },
 		).getSession(request())
 
-		expect(session?.email).toBe("14155550100@phone.example.com")
+		expect(session?.email).toBe("phone+user_4@example.com")
 	})
 
 	it("throws naming the missing option when no email can be resolved", async () => {
 		const adapter = adapterFor({}, { id: "user_5", phones: [{ phone: "+14155550100" }] })
-		await expect(adapter.getSession(request())).rejects.toThrow(/emailDomain/)
+		await expect(adapter.getSession(request())).rejects.toThrow(/resolveEmail/)
 	})
 
-	it("lets resolveEmail take over the mapping", async () => {
+	it("prefers the primary email over resolveEmail and every secondary address", async () => {
+		const resolveEmail = vi.fn(() => "custom@x.com")
 		const session = await adapterFor(
-			{ resolveEmail: (user) => `custom+${user.id}@x.com` },
-			{ id: "user_6", emails: [{ email: "ignored@x.com", primary: true }] },
+			{ resolveEmail },
+			{
+				id: "user_6",
+				emails: [
+					{ email: "secondary@x.com", verified: true },
+					{ email: "primary@x.com", verified: false, primary: true },
+				],
+			},
 		).getSession(request())
 
-		expect(session?.email).toBe("custom+user_6@x.com")
+		expect(session?.email).toBe("primary@x.com")
+		expect(resolveEmail).not.toHaveBeenCalled()
 	})
 })
