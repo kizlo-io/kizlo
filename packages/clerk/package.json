@@ -1,0 +1,73 @@
+{
+	"name": "@kizlo/clerk",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "Clerk authentication adapter for Kizlo.",
+	"keywords": [
+		"wordpress",
+		"headless",
+		"clerk",
+		"auth",
+		"authentication",
+		"kizlo"
+	],
+	"license": "Apache-2.0",
+	"author": "Kizlo",
+	"sideEffects": false,
+	"homepage": "https://github.com/kizlo-io/kizlo/tree/main/packages/clerk#readme",
+	"bugs": "https://github.com/kizlo-io/kizlo/issues",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kizlo-io/kizlo.git",
+		"directory": "packages/clerk"
+	},
+	"engines": {
+		"node": ">=22.14.0"
+	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		"./package.json": "./package.json",
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
+		},
+		"./test": {
+			"import": {
+				"types": "./dist/test.d.ts",
+				"default": "./dist/test.js"
+			}
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsdown",
+		"dev": "tsdown -w",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests",
+		"prepack": "bun ../../scripts/prepare-package-for-publish.ts",
+		"clean": "git clean -xdf .cache .turbo .kizlo .fallow dist node_modules"
+	},
+	"dependencies": {
+		"@clerk/backend": "^3.17.1"
+	},
+	"devDependencies": {
+		"@tooling/typescript": "workspace:*",
+		"@types/node": "catalog:",
+		"kizlo": "workspace:*",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"peerDependencies": {
+		"kizlo": ">=0.16.0"
+	}
+}

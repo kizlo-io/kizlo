@@ -1,0 +1,12 @@
+{
+	"extends": "@tooling/typescript/base.json",
+	"compilerOptions": {
+		// Consume `kizlo` as its published `dist` types, the same way the build config resolves it,
+		// rather than the base config's source `paths`. Pulling kizlo's source into this program alongside
+		// `@clerk/backend`'s `.d.mts` global declarations suppresses the generated `declare module "kizlo"`
+		// endpoint augmentation, leaving kizlo's own WordPress transport untyped. This adapter only touches
+		// kizlo's `AuthUser`/`createAuthAdapter`/`createIntegration` surface, never the endpoint tree.
+		"paths": {}
+	},
+	"include": ["src/**/*", "*.ts"]
+}
