@@ -14,7 +14,7 @@
 <h3 align="center">Clerk Authentication Adapter</h3>
 
 <p align="center">
-  Resolve a verified Clerk session into a Kizlo auth identity
+  Resolve Clerk sessions and synchronize users with WordPress
 </p>
 
 <p align="center">
@@ -41,9 +41,7 @@ pnpm add @kizlo/clerk
 ## Setup
 
 Kizlo keys a session on **email**, so this adapter maps a verified Clerk session
-to that identity. There is no WordPress user id to inject and no create-on-signup
-race to manage: the WordPress user is materialized lazily by the endpoints that
-need one.
+to that identity. Webhook synchronization is optional.
 
 You pass in a configured Clerk backend client, so keys live where Clerk already
 reads them (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) and never on this
@@ -75,19 +73,62 @@ Register it like any other Kizlo integration; it contributes the `auth` adapter.
 
 ### Email resolution
 
-By default the adapter uses the user's **primary verified email**. For phone-only
-sign-ins, set `emailDomain` to synthesize a stable address from the phone number:
+The adapter uses the user's primary email address, even when Clerk has not
+verified it. For users without a primary email, pass `resolveEmail`:
 
 ```ts
 clerk({
 	client,
-	emailDomain: "phone.example.com", // 14155550100 -> 14155550100@phone.example.com
+	resolveEmail(user) {
+		const phone = user.phoneNumbers[0]?.phoneNumber
+		if (!phone) throw new Error(`Missing identity for ${user.id}`)
+		return `${phone.replace(/\D/g, "")}@phone.example.com`
+	},
 })
 ```
 
-To take full control of the mapping, pass `resolveEmail(clerkUser)` and return the
-address yourself. If no email can be resolved and no `emailDomain` or
-`resolveEmail` is configured, `getSession` throws naming the missing option.
+`resolveEmail` runs only when the user has no primary email. If neither source
+returns an address, authentication and built-in webhook synchronization throw an
+error that names the missing option.
+
+### Synchronize WordPress users
+
+Add a webhook signing secret to create, update, and delete the matching
+WordPress user when Clerk emits `user.created`, `user.updated`, or `user.deleted`:
+
+```ts
+const auth = clerk({
+	client,
+	webhooks: {
+		signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET!,
+	},
+})
+```
+
+In the Clerk Dashboard, create an endpoint at
+`https://your-app.example/api/kizlo/clerk/webhooks` and subscribe to those three
+events. Replace `/api/kizlo` if your Kizlo handler uses a different base path.
+
+The built-in handler links users by their stable Clerk ID. It creates a
+subscriber when no WordPress account has the same email, updates names and
+profile metadata, and permanently deletes the linked account and its content.
+Administrator and other privileged accounts are protected from updates and
+deletion.
+
+To process verified events yourself, provide `handler`. A custom handler replaces
+the built-in lifecycle behavior and receives every Clerk event:
+
+```ts
+clerk({
+	client,
+	webhooks: {
+		signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET!,
+		async handler(event, context) {
+			context.logger.info("Clerk webhook", event.type)
+		},
+	},
+})
+```
 
 ## Documentation
 
