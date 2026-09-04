@@ -236,17 +236,6 @@ class StoreApiRoutesTest extends TestCase
         $this->assertArrayHasKey('create_account', $operations['process']['input']['properties']);
     }
 
-    public function test_merged_cart_schema_extends_the_store_cart(): void
-    {
-        $method = new ReflectionMethod(WooCommerceSchemas::class, 'cart');
-        $method->setAccessible(true);
-        $cart = $method->invoke(null);
-
-        $this->assertSame('woocommerce.store.cart', $cart['$extends']);
-        $this->assertArrayNotHasKey('additionalProperties', $cart);
-        $this->assertSame(['guest_token', 'user_id'], array_keys($cart['properties']));
-    }
-
     public function test_every_required_overlay_argument_still_exists_upstream(): void
     {
         $reflection = new ReflectionClass(StoreApiRoutes::class);

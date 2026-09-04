@@ -268,6 +268,7 @@ test("an API guest cart is available to a server-rendered storefront request", a
 	expect(guestSetCookie).toContain("Path=/")
 	expect(guestSetCookie).toContain("HttpOnly")
 	expect(guestSetCookie).toContain("SameSite=Lax")
+	expect(guestSetCookie).toContain("Max-Age=172800")
 
 	const cookieHeader = guestSetCookie.split(";", 1)[0]
 	if (!cookieHeader) throw new Error("The guest session cookie had no name/value pair.")

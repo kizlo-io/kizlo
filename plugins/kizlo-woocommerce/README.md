@@ -41,9 +41,13 @@ See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `C
 
 ## Auth
 
-The companion plugin's REST endpoints use the same Application Password auth as Kizlo core. See [Kizlo core's auth section](../kizlo/README.md#auth) for setup.
+The companion plugin uses Kizlo core's administrator Application Password guard for identity-sensitive routes. Missing or invalid Application Password authentication returns `401`; valid non-administrator credentials return `403`.
 
-Cart and Store API requests additionally carry identity headers (`X-Kizlo-User-Id`, `X-Kizlo-Guest-Token`, …) that the headless session handler uses to resolve the cart owner without cookies.
+The protected families are `/wc/store/v1/cart`, `/wc/store/v1/checkout`, `/wc/store/v1/order`, `/wc/v3/customers`, and `/wc/v3/orders`, including their descendants. Other WooCommerce routes use their native permissions, so public Store API product and catalog requests remain anonymous and ignore Kizlo identity headers.
+
+Cart and checkout requests carry identity headers (`X-Kizlo-User-Email` as the sole user identity, plus `X-Kizlo-Guest-Token`) that the headless session handler validates before selecting a cart. An email with no WordPress account resolves to a customer created on demand. When a user signs in with a guest cart, the plugin merges line items during that original request. It does not merge coupons, addresses, or shipping selections. Rejected guest lines are returned in the Store API cart's existing `errors` field.
+
+Guest tokens, the signed Kizlo cookie, and WooCommerce's server session all expire after 48 hours. The cookie uses `Path=/`, `HttpOnly`, and `SameSite=Lax`. Cookie deletion is optional cleanup after a successful writable cart or checkout response; repeated requests remain safe when a Server Component cannot emit `Set-Cookie`.
 
 ## Development
 

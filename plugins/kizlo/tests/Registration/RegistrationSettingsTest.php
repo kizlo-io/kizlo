@@ -68,7 +68,7 @@ class RegistrationSettingsTest extends TestCase
 
     public function test_settings_can_be_edited_for_an_inactive_definition(): void
     {
-        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+        $this->actingAsAdmin();
 
         $definition = new PostTypeRegistration();
         $definition->setData(['key' => 'book', 'singular_label' => 'Book', 'plural_label' => 'Books', 'active' => false]);
@@ -90,7 +90,7 @@ class RegistrationSettingsTest extends TestCase
 
     public function test_put_updates_definition_and_settings_in_one_request(): void
     {
-        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+        $this->actingAsAdmin();
 
         $definition = new PostTypeRegistration();
         $definition->setData(['key' => 'book', 'singular_label' => 'Book', 'plural_label' => 'Books', 'active' => true, 'supports' => ['title']]);
@@ -111,7 +111,7 @@ class RegistrationSettingsTest extends TestCase
 
     public function test_post_creates_a_definition(): void
     {
-        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+        $this->actingAsAdmin();
 
         $request = new \WP_REST_Request('POST', '/kizlo/v1/settings/post_types');
         $request->set_header('Content-Type', 'application/json');

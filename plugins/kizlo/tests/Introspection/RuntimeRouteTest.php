@@ -139,7 +139,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
         wp_set_current_user(0);
 
         $this->assertSame(
-            403,
+            401,
             $this->dispatch('GET', '/kizlo/v1/open')->get_status(),
             'The supplied permission callback must not have replaced the admin-only check.',
         );

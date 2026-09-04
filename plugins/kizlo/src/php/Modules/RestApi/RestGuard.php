@@ -3,9 +3,10 @@
 namespace Kizlo\Modules\RestApi;
 
 use WP_Error;
+use WP_REST_Request;
 
 /**
- * Global REST API lockdown.
+ * Request-aware REST API lockdown.
  *
  * Kizlo runs as a server-to-server headless adapter: the SDK on the
  * application server is the only client that should ever reach this site's
@@ -18,25 +19,38 @@ use WP_Error;
  * The trust boundary is HTTP Basic auth with an admin Application Password —
  * everything past it is treated as a legitimate request from the SDK.
  *
- * Covers every namespace — wp/v2, wc/v3, wc/store/v1, kizlo/v1, and anything
- * else a plugin registers — without per-route changes. OPTIONS preflights and
- * the /wp-json/ index are intentionally included.
+ * Routes are protected by default. Integrations may make a narrow route family
+ * public with `kizlo_rest_route_requires_admin`; Kizlo-owned routes stay behind
+ * this guard.
  */
 class RestGuard
 {
     public function register(): void
     {
-        add_filter('rest_authentication_errors', [$this, 'requireAdmin'], 100);
+        add_filter('rest_request_before_callbacks', [$this, 'requireAdmin'], 0, 3);
     }
 
-    public function requireAdmin(mixed $result): mixed
+    public function requireAdmin(mixed $result, mixed $handler = null, mixed $request = null): mixed
     {
         if (is_wp_error($result)) return $result;
 
-        if (! is_user_logged_in()) {
+        if ($request instanceof WP_REST_Request) {
+            /**
+             * Whether this REST route requires an administrator authenticated
+             * with a WordPress Application Password.
+             *
+             * @param bool            $required Protected by default.
+             * @param WP_REST_Request $request  The current REST request.
+             */
+            $required = str_starts_with($request->get_route(), '/kizlo/')
+                || (bool) apply_filters('kizlo_rest_route_requires_admin', true, $request);
+            if (! $required) return $result;
+        }
+
+        if (! self::isApplicationPasswordAuthenticated() || ! is_user_logged_in()) {
             return new WP_Error(
                 'kizlo_rest_unauthorized',
-                'Authentication required.',
+                'Administrator Application Password authentication required.',
                 ['status' => 401]
             );
         }
@@ -50,5 +64,19 @@ class RestGuard
         }
 
         return $result;
+    }
+
+    /**
+     * WordPress sets this request-global only after an Application Password has
+     * been successfully verified. It deliberately identifies the mechanism,
+     * not a particular credential UUID, so passwords remain independently
+     * rotatable.
+     */
+    public static function isApplicationPasswordAuthenticated(): bool
+    {
+        global $wp_rest_application_password_uuid;
+
+        return is_string($wp_rest_application_password_uuid)
+            && $wp_rest_application_password_uuid !== '';
     }
 }

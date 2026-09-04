@@ -231,15 +231,6 @@ abstract class SeoTestCase extends TestCase
         }
     }
 
-    /** Promote the current user to an administrator (needed for capability-gated paths). */
-    protected function actingAsAdmin(): int
-    {
-        $admin = self::factory()->user->create(['role' => 'administrator']);
-        wp_set_current_user($admin);
-
-        return $admin;
-    }
-
     /**
      * Recursively find the first graph node whose `@type` matches (string or in an array).
      *

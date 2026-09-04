@@ -39,7 +39,9 @@ See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `C
 
 ## Auth
 
-Requests to the plugin use HTTP Basic auth with a WordPress [Application Password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/) belonging to an admin user. Generate one at **WP Admin → Users → Profile → Application Passwords** and treat it like a service credential — server-side only, kept in a secrets manager, rotatable.
+Kizlo-protected REST routes require HTTP Basic auth with a WordPress [Application Password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/) belonging to an administrator. Missing or invalid Application Password authentication returns `401`; a valid non-administrator Application Password returns `403`. A WordPress login cookie alone is not sufficient.
+
+Generate an Application Password at **WP Admin → Users → Profile → Application Passwords** and treat it like a server-side, rotatable service credential. Kizlo-owned routes are always protected. Active integrations may leave narrowly selected third-party routes on their native permission callbacks; for example, the WooCommerce integration keeps its public Store API catalog public while protecting cart, checkout, order, and customer identity routes.
 
 ## Development
 
@@ -47,4 +49,4 @@ Dev loop, linting, tests, and PR conventions live in the monorepo's [CONTRIBUTIN
 
 ## License
 
-GPLv2 or later — see the plugin header in [`kizlo.php`](kizlo.php).
+GPLv2 or later; see the plugin header in [`kizlo.php`](kizlo.php).

@@ -66,9 +66,57 @@ class IntrospectEndpointTest extends IntrospectionTestCase
     public function test_an_authenticated_non_administrator_is_rejected_with_403(): void
     {
         wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+        $GLOBALS['wp_rest_application_password_uuid'] = 'test-application-password';
 
         $this->assertSame(403, $this->get()->get_status());
         $this->assertSame(403, (new RestGuard())->requireAdmin(null)->get_error_data()['status']);
+    }
+
+    public function test_cookie_authentication_alone_is_rejected_with_401(): void
+    {
+        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+
+        $result = (new RestGuard())->requireAdmin(null);
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame(401, $result->get_error_data()['status']);
+    }
+
+    public function test_an_invalid_basic_authorization_header_is_rejected_with_401(): void
+    {
+        wp_set_current_user(0);
+
+        $response = $this->get(['Authorization' => 'Basic ' . base64_encode('admin:not-a-password')]);
+
+        $this->assertSame(401, $response->get_status());
+    }
+
+    public function test_a_route_policy_can_leave_an_integration_route_public(): void
+    {
+        $request = new WP_REST_Request('GET', '/acme/v1/public');
+        $filter  = static fn(bool $required, WP_REST_Request $found): bool => $found === $request ? false : $required;
+        add_filter('kizlo_rest_route_requires_admin', $filter, 10, 2);
+
+        try {
+            $this->assertNull((new RestGuard())->requireAdmin(null, null, $request));
+        } finally {
+            remove_filter('kizlo_rest_route_requires_admin', $filter, 10);
+        }
+    }
+
+    public function test_a_route_policy_cannot_make_a_kizlo_route_public(): void
+    {
+        $request = new WP_REST_Request('GET', '/kizlo/v1/introspect');
+        $filter  = static fn(): bool => false;
+        add_filter('kizlo_rest_route_requires_admin', $filter);
+
+        try {
+            $result = (new RestGuard())->requireAdmin(null, null, $request);
+            $this->assertInstanceOf(WP_Error::class, $result);
+            $this->assertSame(401, $result->get_error_data()['status']);
+        } finally {
+            remove_filter('kizlo_rest_route_requires_admin', $filter);
+        }
     }
 
     public function test_an_administrator_gets_the_document(): void
