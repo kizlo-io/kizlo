@@ -208,8 +208,9 @@ built-in `consoleLog` prints; a one-liner can forward each `payload` to your pla
 
 You rarely write an adapter from scratch. Kizlo ships implementations for the common cases: `turnstile`,
 `recaptcha`, and `hcaptcha` for captcha; `consoleLog` for logging; `geoVercelNext` for reading geo on Vercel.
-The [framework integration](/docs/installation) can wire defaults such as its cookie store. Add a later
-integration to override a capability or provide one Kizlo does not ship (`auth` is always yours to write).
+For auth, the separate `@kizlo/clerk` package maps a verified [Clerk](https://clerk.com) session onto the
+contract above. The [framework integration](/docs/installation) can wire defaults such as its cookie store. Add
+a later integration to override a capability or provide one Kizlo does not ship.
 
 Because an adapter is just a contract, it's also the natural place to substitute behaviour in
 [tests](/docs/concepts/development-and-testing). Each capability has a **mock**, such as `authMock` and
