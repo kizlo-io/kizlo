@@ -12,7 +12,7 @@ class CustomFieldSettingsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+        $this->actingAsAdmin();
     }
 
     /** @dataProvider settingsRoutes */

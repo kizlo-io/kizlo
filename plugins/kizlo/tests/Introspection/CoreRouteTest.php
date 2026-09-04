@@ -156,9 +156,8 @@ class CoreRouteTest extends IntrospectionTestCase
     // ============================================================
 
     /**
-     * `RestGuard` filters `rest_authentication_errors`, which the server consults
-     * once per request rather than once per namespace, so the lockdown is in front
-     * of `wp/v2` as much as `kizlo/v1`.
+     * `RestGuard` protects routes by default before their callbacks, so the
+     * lockdown is in front of `wp/v2` as much as `kizlo/v1`.
      */
     public function test_a_described_route_inherits_the_guard_errors(): void
     {

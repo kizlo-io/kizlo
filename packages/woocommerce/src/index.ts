@@ -21,7 +21,6 @@ export function woocommerce() {
 			endpoints: [
 				"woocommerce.customers",
 				"woocommerce.products",
-				"woocommerce.kizlo.cart",
 				"woocommerce.store.cart",
 				"woocommerce.store.checkout",
 				"woocommerce.store.orders",

@@ -90,6 +90,16 @@ function kizlo_route_match(string $route, WP_REST_Request $request): bool
 }
 
 /**
+ * Whether WordPress successfully authenticated this request with an
+ * Application Password. This identifies the authentication mechanism without
+ * binding integrations to a particular password UUID.
+ */
+function kizlo_is_application_password_authenticated(): bool
+{
+    return \Kizlo\Modules\RestApi\RestGuard::isApplicationPasswordAuthenticated();
+}
+
+/**
  * Register an admin-only REST API endpoint under `kizlo/v1`.
  *
  * Passing an `id` opts the route into introspection. The declaration is then flat:

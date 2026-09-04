@@ -14,7 +14,7 @@ export const CHECKOUT_PROCEDURES = {
 			path: "/checkout",
 			output: Checkout,
 			errors: GET_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware()],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.get({}, { headers: context.sessionHeaders })
@@ -39,7 +39,7 @@ export const CHECKOUT_PROCEDURES = {
 			body: UpdateCheckoutInput,
 			output: Checkout,
 			errors: UPDATE_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware()],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.update(
@@ -94,7 +94,7 @@ export const CHECKOUT_PROCEDURES = {
 			body: ConfirmCheckoutInput,
 			output: Checkout,
 			errors: CONFIRM_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware()],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.process(
@@ -180,7 +180,7 @@ export const CHECKOUT_PROCEDURES = {
 			body: RetryCheckoutInput.omit({ orderId: true }),
 			output: Checkout,
 			errors: RETRY_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware()],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.processOrder(

@@ -382,13 +382,11 @@ describe("described WooCommerce routes", () => {
 		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.customers.list">["role"]>>().toExtend<string>()
 	})
 
-	it("names the routes Kizlo serves apart from the ones WooCommerce serves", () => {
-		// The `kizlo` segment is the boundary: everything under it this plugin serves itself, and
-		// everything beside it WooCommerce does. Two carts live here and they are different objects.
-		expectTypeOf<WP_EndpointResult<"woocommerce.kizlo.cart.merge">>().not.toBeNever()
+	it("keeps Kizlo-owned order routes apart from WooCommerce's Store API", () => {
+		// @ts-expect-error the removed merge endpoint no longer contributes a cart subtree
+		wordpress.woocommerce.kizlo.cart
 		expectTypeOf<WP_EndpointResult<"woocommerce.kizlo.orders.manageStock">>().not.toBeNever()
 		expectTypeOf<WP_EndpointResult<"woocommerce.store.cart.get">>().not.toBeNever()
-		expectTypeOf<WP_EndpointData<"woocommerce.kizlo.cart.merge">>().toHaveProperty("guest_token")
 		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.get">>().not.toHaveProperty("guest_token")
 	})
 })

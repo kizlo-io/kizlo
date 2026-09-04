@@ -14,7 +14,7 @@
  * Tested up to: 6.7
  * Requires PHP: 8.2
  * Requires Plugins: kizlo, woocommerce
- * Kizlo Requires: kizlo 0.12.0, woocommerce 11.0.1
+ * Kizlo Requires: kizlo 0.14.0, woocommerce 11.0.1
  * WC tested up to: 11.0.1
  */
 
@@ -41,8 +41,8 @@ add_action('before_woocommerce_init', static function (): void {
 /**
  * Start through Kizlo's gate, so the `Kizlo Requires` header above decides whether
  * anything here runs. This plugin describes the WooCommerce contract with core
- * functions (`kizlo_register_route_spec()` and friends) that arrived in Kizlo
- * 0.12.0, and calling one of those against an older core is a fatal.
+ * functions (`kizlo_register_route_spec()` and friends) and the request-aware
+ * REST route policy that are available in Kizlo 0.14.0.
  *
  * The `function_exists` check is the one requirement the header cannot express:
  * a core old enough to lack the gate is too old to be asked to apply it. Falling
@@ -57,7 +57,7 @@ add_action('kizlo_loaded', function (): void {
             printf(
                 '<div class="notice notice-error"><p><strong>%s</strong> %s</p></div>',
                 esc_html('Kizlo WooCommerce'),
-                esc_html('did not start. It needs Kizlo 0.12.0 or newer.')
+                esc_html('did not start. It needs Kizlo 0.14.0 or newer.')
             );
         });
 

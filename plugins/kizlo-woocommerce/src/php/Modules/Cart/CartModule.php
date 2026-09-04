@@ -17,8 +17,7 @@ class CartModule
     public function register(): void
     {
         add_action('woocommerce_blocks_loaded', [$this, 'extendShopApiCartSchema'], PHP_INT_MAX);
-
-        (new CartController())->register();
+        add_action('woocommerce_store_api_cart_errors', [CartMerger::class, 'addErrors']);
     }
 
     public function extendShopApiCartSchema()

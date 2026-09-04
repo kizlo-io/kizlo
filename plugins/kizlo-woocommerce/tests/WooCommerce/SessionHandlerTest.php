@@ -2,6 +2,8 @@
 
 namespace Kizlo\WooCommerce\Tests\WooCommerce;
 
+use WP_Error;
+use WP_REST_Request;
 use WP_User;
 use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
 use Kizlo\WooCommerce\Tests\TestCase;
@@ -10,7 +12,7 @@ class SessionHandlerTest extends TestCase
 {
     public function tearDown(): void
     {
-        unset($_SERVER['HTTP_X_KIZLO_USER_EMAIL']);
+        SessionHandler::clearPreparedIdentity();
         parent::tearDown();
     }
 
@@ -19,11 +21,11 @@ class SessionHandlerTest extends TestCase
         $email = 'new-shopper@example.com';
         $this->assertFalse(get_user_by('email', $email));
 
-        $handler = $this->resolve($email);
+        $identity = $this->resolve($email);
+        $this->assertIsArray($identity);
 
-        $userId = $handler->get_resolved_user_id();
+        $userId = $identity['user_id'];
         $this->assertNotNull($userId);
-        $this->assertSame((string) $userId, $handler->get_guest_token());
 
         $user = get_user_by('email', $email);
         $this->assertInstanceOf(WP_User::class, $user);
@@ -35,21 +37,21 @@ class SessionHandlerTest extends TestCase
     {
         $email = 'returning-shopper@example.com';
 
-        $first  = $this->resolve($email)->get_resolved_user_id();
-        $second = $this->resolve($email)->get_resolved_user_id();
+        $first  = $this->resolve($email)['user_id'];
+        $second = $this->resolve($email)['user_id'];
 
         $this->assertNotNull($first);
         $this->assertSame($first, $second);
         $this->assertCount(1, $this->usersWithEmail($email));
     }
 
-    public function test_concurrent_requests_for_a_new_email_converge_on_one_user(): void
+    public function test_repeated_requests_for_a_new_email_converge_on_one_user(): void
     {
         $email = 'converging-shopper@example.com';
 
         $ids = [];
         for ($i = 0; $i < 5; $i++) {
-            $ids[] = $this->resolve($email)->get_resolved_user_id();
+            $ids[] = $this->resolve($email)['user_id'];
         }
 
         $this->assertCount(1, array_unique($ids));
@@ -62,47 +64,60 @@ class SessionHandlerTest extends TestCase
         $email      = 'subscriber@example.com';
         $existingId = self::factory()->user->create(['role' => 'subscriber', 'user_email' => $email]);
 
-        $handler = $this->resolve($email);
+        $identity = $this->resolve($email);
 
-        $this->assertSame($existingId, $handler->get_resolved_user_id());
+        $this->assertSame($existingId, $identity['user_id']);
         $this->assertCount(1, $this->usersWithEmail($email));
     }
 
-    public function test_refuses_a_privileged_match_and_falls_back_to_guest(): void
+    public function test_refuses_a_privileged_match_with_an_error_and_creates_nothing(): void
     {
         $email = 'editor@example.com';
         self::factory()->user->create(['role' => 'administrator', 'user_email' => $email]);
 
-        $handler = $this->resolve($email);
+        $identity = $this->resolve($email);
 
-        $this->assertNull($handler->get_resolved_user_id());
-        $this->assertStringStartsWith(SessionHandler::PREFIX_GUEST, $handler->get_guest_token());
+        $this->assertInstanceOf(WP_Error::class, $identity);
+        $this->assertSame('kizlo_forbidden_identity', $identity->get_error_code());
         // The privileged account is left untouched; nothing new is created.
         $this->assertCount(1, $this->usersWithEmail($email));
     }
 
-    public function test_a_request_without_an_email_header_is_an_unchanged_guest(): void
+    public function test_a_request_without_an_email_header_resolves_no_user(): void
     {
-        $handler = $this->resolve(null);
+        $identity = $this->resolve(null);
 
-        $this->assertNull($handler->get_resolved_user_id());
-        $this->assertStringStartsWith(SessionHandler::PREFIX_GUEST, $handler->get_guest_token());
+        $this->assertIsArray($identity);
+        $this->assertNull($identity['user_id']);
+        $this->assertNull($identity['guest_token']);
     }
 
-    /** Drive the header path and return an initialized handler without its shutdown save. */
-    private function resolve(?string $email): SessionHandler
+    public function test_an_unresolved_guest_request_initializes_a_fresh_token(): void
     {
-        if ($email === null) {
-            unset($_SERVER['HTTP_X_KIZLO_USER_EMAIL']);
-        } else {
-            $_SERVER['HTTP_X_KIZLO_USER_EMAIL'] = $email;
-        }
+        SessionHandler::prepareIdentity(['user_id' => null, 'guest_token' => null]);
 
         $handler = new SessionHandler();
         $handler->init();
         remove_action('shutdown', [$handler, 'save_data'], 20);
 
-        return $handler;
+        $this->assertNull($handler->get_resolved_user_id());
+        $this->assertStringStartsWith(SessionHandler::PREFIX_GUEST, $handler->get_guest_token());
+        $this->assertTrue(SessionHandler::isValidGuestToken($handler->get_guest_token()));
+    }
+
+    /**
+     * Resolve a request's identity through the request-scoped path.
+     *
+     * @return array{user_id: ?int, guest_token: ?string}|WP_Error
+     */
+    private function resolve(?string $email): array|WP_Error
+    {
+        $request = new WP_REST_Request('GET', '/wc/store/v1/cart');
+        if ($email !== null) {
+            $request->set_header(SessionHandler::HEADER_USER_EMAIL, $email);
+        }
+
+        return SessionHandler::resolveIdentity($request, true);
     }
 
     /** @return WP_User[] */
