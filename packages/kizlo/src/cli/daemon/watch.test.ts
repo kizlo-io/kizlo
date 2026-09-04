@@ -13,9 +13,6 @@ const SKIPPED = "Watcher already running — skipping the contract watcher."
 
 const CREDENTIALS: WordPressCredentials = { url: "https://wp.example", username: "admin", password: "secret" }
 
-/** A workspace carrying only the generated client, the lighter of the two shapes the poll refreshes. */
-const CLIENT_DIR = "src/generated"
-
 afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
@@ -45,18 +42,28 @@ function serving(): typeof globalThis.fetch {
 	return vi.fn(async () => Response.json(INTROSPECTION_FIXTURE, { headers: { etag: '"fixture"' } })) as unknown as typeof globalThis.fetch
 }
 
-/** An app carrying its own service, written somewhere the workspace client will not land on. */
+/** A package with only the introspection — the lighter of the two shapes the poll refreshes. */
+function standalone(cwd: string): ResolvedConfig {
+	return {
+		cwd,
+		introspectionPath: "src/generated/introspection.ts",
+		introspectionMetaPath: ".kizlo/introspection.meta.json",
+	}
+}
+
+/** An app carrying its own server next to the introspection. */
 function config(cwd: string): ResolvedConfig {
 	return {
 		cwd,
-		dir: "kizlo",
-		serverDir: "src/server",
-		serverEntry: "src/server/index.ts",
-		generatedDir: "src/service",
-		contractPath: "src/service/contract.json",
-		barrelPath: "src/service/index.ts",
-		wordpressPath: "src/service/wordpress.ts",
-		wordpressMetaPath: ".kizlo/wordpress.json",
+		server: {
+			dir: "src/server",
+			entry: "src/server/index.ts",
+			contractDir: "src/service",
+			contractPath: "src/service/contract.json",
+			barrelPath: "src/service/index.ts",
+		},
+		introspectionPath: "src/service/introspection.ts",
+		introspectionMetaPath: ".kizlo/introspection.meta.json",
 	}
 }
 
@@ -66,12 +73,10 @@ function answering(response: () => Response): typeof globalThis.fetch {
 }
 
 /** A refresh whose transport can be swapped between passes, the way a poll's answer changes under it. */
-function poll(cwd: string, cfg?: ResolvedConfig, stack?: StackWatch): (fetch: typeof globalThis.fetch) => Promise<void> {
+function poll(cwd: string, cfg: ResolvedConfig = standalone(cwd), stack?: StackWatch): (fetch: typeof globalThis.fetch) => Promise<void> {
 	let current: typeof globalThis.fetch = serving()
 	const refresh = createWordPressRefresh(
-		cwd,
 		cfg,
-		CLIENT_DIR,
 		{
 			credentials: CREDENTIALS,
 			fetch: ((input, init) => current(input, init)) as typeof globalThis.fetch,
@@ -100,7 +105,7 @@ describe("createWordPressRefresh", () => {
 		for (let attempt = 0; attempt < 4; attempt++) await pass(refusing("offline"))
 
 		expect(lines("error")).toHaveLength(1)
-		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
+		expect(lines("error")[0]).toContain("Failed to update the WordPress introspection:")
 	})
 
 	test("reports again when the failure changes", async () => {
@@ -126,7 +131,7 @@ describe("createWordPressRefresh", () => {
 		await pass(refusing("offline"))
 		await pass(serving())
 
-		expect(lines("success")).toContain("Updating the WordPress client again")
+		expect(lines("success")).toContain("Updating the WordPress introspection again")
 
 		await pass(refusing("offline"))
 		expect(lines("error")).toHaveLength(2)
@@ -140,13 +145,14 @@ describe("createWordPressRefresh", () => {
 		await pass(serving())
 
 		expect(lines("error")).toHaveLength(0)
-		expect(lines("success")).not.toContain("Updating the WordPress client again")
+		expect(lines("success")).not.toContain("Updating the WordPress introspection again")
 	})
 
 	test("ends the session when nothing answered and the stack has stopped", async () => {
 		watchLog()
+		const cwd = workspace()
 		const stack = watching("stopped")
-		const pass = poll(workspace(), undefined, stack)
+		const pass = poll(cwd, standalone(cwd), stack)
 
 		await pass(refusing("fetch failed"))
 
@@ -156,27 +162,29 @@ describe("createWordPressRefresh", () => {
 
 	test("keeps retrying when nothing answered but the stack is still up", async () => {
 		watchLog()
+		const cwd = workspace()
 		const stack = watching("running")
-		const pass = poll(workspace(), undefined, stack)
+		const pass = poll(cwd, standalone(cwd), stack)
 
 		await pass(refusing("fetch failed"))
 		await pass(refusing("fetch failed"))
 		await pass(serving())
 
 		expect(stack.onStopped).not.toHaveBeenCalled()
-		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
-		expect(lines("success")).toContain("Updating the WordPress client again")
+		expect(lines("error")[0]).toContain("Failed to update the WordPress introspection:")
+		expect(lines("success")).toContain("Updating the WordPress introspection again")
 	})
 
 	test("keeps retrying when docker could not say whether the stack is up", async () => {
 		watchLog()
+		const cwd = workspace()
 		const stack = watching("unknown")
-		const pass = poll(workspace(), undefined, stack)
+		const pass = poll(cwd, standalone(cwd), stack)
 
 		await pass(refusing("fetch failed"))
 
 		expect(stack.onStopped).not.toHaveBeenCalled()
-		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
+		expect(lines("error")[0]).toContain("Failed to update the WordPress introspection:")
 	})
 
 	test.each([
@@ -184,19 +192,21 @@ describe("createWordPressRefresh", () => {
 		["WordPress answers with something that will not parse", () => new Response("<html>", { status: 200 })],
 	])("never ends the session when %s", async (_case, response) => {
 		watchLog()
+		const cwd = workspace()
 		const stack = watching("stopped")
-		const pass = poll(workspace(), undefined, stack)
+		const pass = poll(cwd, standalone(cwd), stack)
 
 		await pass(answering(response))
 
 		expect(stack.onStopped).not.toHaveBeenCalled()
-		expect(lines("error")[0]).toContain("Failed to update the WordPress client:")
+		expect(lines("error")[0]).toContain("Failed to update the WordPress introspection:")
 	})
 
 	test("asks docker once while the poll goes on failing", async () => {
 		watchLog()
+		const cwd = workspace()
 		const stack = watching("running")
-		const pass = poll(workspace(), undefined, stack)
+		const pass = poll(cwd, standalone(cwd), stack)
 
 		await pass(refusing("fetch failed"))
 		await pass(refusing("fetch failed"))
@@ -207,8 +217,9 @@ describe("createWordPressRefresh", () => {
 
 	test("asks again on the first failure after WordPress answered", async () => {
 		watchLog()
+		const cwd = workspace()
 		const stack = watching("running")
-		const pass = poll(workspace(), undefined, stack)
+		const pass = poll(cwd, standalone(cwd), stack)
 
 		await pass(refusing("fetch failed"))
 		await pass(serving())
@@ -217,19 +228,7 @@ describe("createWordPressRefresh", () => {
 		expect(stack.status).toHaveBeenCalledTimes(2)
 	})
 
-	test("ends the session once when a pass refreshes both generations", async () => {
-		watchLog()
-		const cwd = workspace()
-		const stack = watching("stopped")
-		const pass = poll(cwd, config(cwd), stack)
-
-		await pass(refusing("fetch failed"))
-		await pass(refusing("fetch failed"))
-
-		expect(stack.onStopped).toHaveBeenCalledTimes(1)
-	})
-
-	test("names each generation in its own failure, and repeats neither", async () => {
+	test("refreshes the introspection for a server-backed app too", async () => {
 		watchLog()
 		const cwd = workspace()
 		const pass = poll(cwd, config(cwd))
@@ -238,9 +237,8 @@ describe("createWordPressRefresh", () => {
 		await pass(refusing("offline"))
 
 		const errors = lines("error")
-		expect(errors).toHaveLength(2)
-		expect(errors[0]).toContain("Failed to update the WordPress service:")
-		expect(errors[1]).toContain("Failed to update the WordPress client:")
+		expect(errors).toHaveLength(1)
+		expect(errors[0]).toContain("Failed to update the WordPress introspection:")
 	})
 })
 
@@ -251,7 +249,7 @@ describe("createWordPressRefresh", () => {
  */
 function unstartable(): string {
 	const cwd = workspace()
-	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { wordpressClientDir: "${CLIENT_DIR}" }\n`)
+	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: { introspection: "." } }\n`)
 	for (const key of ["KIZLO_MODE", "KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD"]) {
 		vi.stubEnv(key, "")
 	}

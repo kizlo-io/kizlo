@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest"
 import { sessionMiddleware } from "./session"
 
 const SECRET = "a sufficiently long session test secret"
+const EMAIL = "shopper@example.com"
 
 type StoredCookie = {
 	name: string
@@ -12,7 +13,7 @@ type StoredCookie = {
 async function mintCookie(): Promise<StoredCookie> {
 	let stored: StoredCookie | undefined
 	const context = testContext({
-		auth: null,
+		session: null,
 		cookie: null,
 		set: (cookie) => {
 			stored = cookie
@@ -38,13 +39,13 @@ describe("sessionMiddleware", () => {
 		const remove = vi.fn(() => {
 			events.push("delete")
 		})
-		const context = testContext({ auth: { id: 42 }, cookie: cookie.value, remove, headers: new Headers() })
+		const context = testContext({ session: { email: EMAIL }, cookie: cookie.value, remove, headers: new Headers() })
 
 		await run(sessionMiddleware({ transitionGuestCart: true }), context, async (injected) => {
 			events.push("next")
 			expect(injected.sessionHeaders).toMatchObject({
 				"X-Kizlo-Guest-Token": expect.stringMatching(/^t_[a-f0-9]{30}$/),
-				"X-Kizlo-User-Id": "42",
+				"X-Kizlo-User-Email": EMAIL,
 			})
 			return { output: "cart", context: injected }
 		})
@@ -56,7 +57,7 @@ describe("sessionMiddleware", () => {
 	test("retains the cookie when the original operation fails", async () => {
 		const cookie = await mintCookie()
 		const remove = vi.fn()
-		const context = testContext({ auth: { id: 42 }, cookie: cookie.value, remove, headers: new Headers() })
+		const context = testContext({ session: { email: EMAIL }, cookie: cookie.value, remove, headers: new Headers() })
 
 		await expect(
 			run(sessionMiddleware({ transitionGuestCart: true }), context, async () => {
@@ -69,7 +70,7 @@ describe("sessionMiddleware", () => {
 	test("retains the cookie for a successful direct server invocation", async () => {
 		const cookie = await mintCookie()
 		const remove = vi.fn()
-		const context = testContext({ auth: { id: 42 }, cookie: cookie.value, remove, headers: null })
+		const context = testContext({ session: { email: EMAIL }, cookie: cookie.value, remove, headers: null })
 
 		await run(sessionMiddleware({ transitionGuestCart: true }), context, async (injected) => ({ output: "cart", context: injected }))
 
@@ -79,10 +80,10 @@ describe("sessionMiddleware", () => {
 	test("order operations send only the authenticated user identity", async () => {
 		const cookie = await mintCookie()
 		const remove = vi.fn()
-		const context = testContext({ auth: { id: 42 }, cookie: cookie.value, remove, headers: new Headers() })
+		const context = testContext({ session: { email: EMAIL }, cookie: cookie.value, remove, headers: new Headers() })
 
 		await run(sessionMiddleware(), context, async (injected) => {
-			expect(injected.sessionHeaders).toEqual({ "X-Kizlo-User-Id": "42" })
+			expect(injected.sessionHeaders).toEqual({ "X-Kizlo-User-Email": EMAIL })
 			return { output: "order", context: injected }
 		})
 
@@ -91,7 +92,7 @@ describe("sessionMiddleware", () => {
 })
 
 function testContext(options: {
-	auth: { id: number } | null
+	session: { email: string } | null
 	cookie: string | null
 	headers?: Headers | null
 	remove?: () => void
@@ -104,7 +105,7 @@ function testContext(options: {
 			get: () => options.cookie,
 			set: options.set ?? (() => {}),
 		},
-		getAuthUser: () => options.auth,
+		getSession: () => options.session,
 		getConnInfo: () => null,
 		headers: options.headers === undefined ? new Headers() : options.headers,
 		wordpress: new Proxy(

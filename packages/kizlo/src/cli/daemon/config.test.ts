@@ -1,9 +1,10 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { DEFAULT_WORDPRESS_TAG } from "../wp/constants"
-import { resolveDevConfig, resolveStackName, resolveTestConfig, stackProject } from "./config"
+import { resolveConfig, resolveDevConfig, resolveStackName, resolveTestConfig, stackProject, usesLocalWordPress } from "./config"
+import { log } from "./logger"
 
 describe("resolveStackName", () => {
 	let dir: string
@@ -139,11 +140,11 @@ describe("stackProject", () => {
 	})
 })
 
-describe("wordpressTag", () => {
+describe("resolveConfig", () => {
 	let dir: string
 
 	beforeEach(() => {
-		dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-version-")))
+		dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-dir-")))
 	})
 
 	afterEach(() => {
@@ -154,24 +155,158 @@ describe("wordpressTag", () => {
 		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), `export default ${body}\n`)
 	}
 
+	test("returns undefined when nothing is configured to generate", async () => {
+		writeConfig('{ alias: "@/" }')
+		expect(await resolveConfig(dir)).toBeUndefined()
+	})
+
+	test("resolves the server layout and introspection from a `dir` string", async () => {
+		writeConfig('{ dir: "src/lib/kizlo" }')
+		const cfg = await resolveConfig(dir)
+		expect(cfg?.server).toEqual({
+			dir: path.join("src/lib/kizlo", "server"),
+			entry: path.join("src/lib/kizlo", "server", "index.ts"),
+			contractDir: path.join("src/lib/kizlo", "server", "generated"),
+			contractPath: path.join("src/lib/kizlo", "server", "generated", "contract.json"),
+			barrelPath: path.join("src/lib/kizlo", "server", "generated", "index.ts"),
+		})
+		expect(cfg?.introspectionPath).toBe(path.join("src/lib/kizlo", "server", "generated", "introspection.ts"))
+	})
+
+	test("resolves an introspection path with no server from `dir: { introspection }`", async () => {
+		writeConfig('{ dir: { introspection: "." } }')
+		const cfg = await resolveConfig(dir)
+		expect(cfg?.server).toBeUndefined()
+		expect(cfg?.introspectionPath).toBe("introspection.ts")
+	})
+
+	test("takes the `--dir` flag over the config `dir`", async () => {
+		writeConfig('{ dir: { introspection: "." } }')
+		const cfg = await resolveConfig(dir, { dir: "packages/api" })
+		expect(cfg?.server?.dir).toBe(path.join("packages/api", "server"))
+	})
+
+	test.each([
+		["wordpressClientDir", '{ wordpressClientDir: "." }', "dir: { introspection }"],
+		["root dev", "{ dev: { enable: true } }", "local.dev"],
+		["root test", "{ test: { enable: true } }", "local.test"],
+		["root name", '{ name: "shop" }', "local.name"],
+		["root worktrees", "{ worktrees: true }", "local.worktrees"],
+	])("rejects the removed key %s, naming its replacement", async (_label, body, replacement) => {
+		const errors: string[] = []
+		vi.spyOn(log, "error").mockImplementation((...args: unknown[]) => {
+			errors.push(args.map(String).join(" "))
+		})
+		vi.spyOn(process, "exit").mockImplementation((() => {
+			throw new Error("exit called")
+		}) as never)
+
+		writeConfig(body)
+		await expect(resolveConfig(dir)).rejects.toThrow("exit called")
+		expect(errors.join("\n")).toContain(replacement)
+		vi.restoreAllMocks()
+	})
+})
+
+describe("resolveDevConfig / resolveTestConfig", () => {
+	let dir: string
+
+	beforeEach(() => {
+		dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-local-")))
+	})
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true })
+	})
+
+	function writeConfig(body: string): void {
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), `export default ${body}\n`)
+	}
+
+	// A config body that defines two named fixtures inline, so the resolver sees real fixture objects
+	// (validated by the schema on `name`) the way a project's own config would.
+	const fixtureDefs = 'const a = { name: "fixture-a" }\nconst b = { name: "fixture-b" }\n'
+
+	function writeFixtureConfig(local: string): void {
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), `${fixtureDefs}export default { local: ${local} }\n`)
+	}
+
 	test("boots current WordPress when no version is configured", async () => {
 		// An unconfigured project gets current WordPress; a version baked into Kizlo would
 		// otherwise decide for every consumer at the moment Kizlo was published.
 		expect(DEFAULT_WORDPRESS_TAG).toBe("latest")
 
-		writeConfig("{ dev: { local: true }, test: { local: true } }")
+		writeConfig("{ local: true }")
 		expect((await resolveDevConfig(dir)).wordpressTag).toBe(DEFAULT_WORDPRESS_TAG)
 		expect((await resolveTestConfig(dir)).wordpressTag).toBe(DEFAULT_WORDPRESS_TAG)
 	})
 
-	test("takes the configured version, letting dev and test differ", async () => {
-		writeConfig('{ dev: { version: "7.1.0" }, test: { version: "6.8.2" } }')
+	test("reads the dev and test stacks under `local`", async () => {
+		writeConfig('{ local: { dev: { version: "7.1.0" }, test: { version: "6.8.2" } } }')
 		expect((await resolveDevConfig(dir)).wordpressTag).toBe("7.1.0")
 		expect((await resolveTestConfig(dir)).wordpressTag).toBe("6.8.2")
 	})
 
+	test("the test stack inherits the dev version and fixtures when it omits them", async () => {
+		writeFixtureConfig('{ dev: { version: "7.1.0", fixtures: [a, b] }, test: {} }')
+		const test = await resolveTestConfig(dir)
+		expect(test.wordpressTag).toBe("7.1.0")
+		expect(test.fixtures.map((f) => f.name)).toEqual(["fixture-a", "fixture-b"])
+	})
+
+	test("explicit test version and fixtures win over the dev stack", async () => {
+		writeFixtureConfig('{ dev: { version: "7.1.0", fixtures: [a] }, test: { version: "6.8.2", fixtures: [b] } }')
+		const test = await resolveTestConfig(dir)
+		expect(test.wordpressTag).toBe("6.8.2")
+		expect(test.fixtures.map((f) => f.name)).toEqual(["fixture-b"])
+	})
+
+	test("an explicit empty fixtures array seeds nothing, overriding the dev stack", async () => {
+		writeFixtureConfig("{ dev: { fixtures: [a, b] }, test: { fixtures: [] } }")
+		expect((await resolveTestConfig(dir)).fixtures).toEqual([])
+	})
+
+	test("`inherit: false` ignores the dev stack and takes Kizlo's defaults", async () => {
+		writeFixtureConfig('{ dev: { version: "7.1.0", fixtures: [a, b] }, test: { inherit: false } }')
+		const test = await resolveTestConfig(dir)
+		expect(test.wordpressTag).toBe(DEFAULT_WORDPRESS_TAG)
+		expect(test.fixtures).toEqual([])
+	})
+
+	test.each([
+		["both stacks on", "{ dev: {}, test: {} }", true, true],
+		["dev off", "{ dev: { enable: false }, test: {} }", false, true],
+		["test off", "{ dev: {}, test: { enable: false } }", true, false],
+		["local off", "false", false, false],
+		["local disabled by enable", "{ enable: false, dev: {}, test: {} }", false, false],
+	])("resolves local booleans: %s", async (_label, local, dev, test) => {
+		writeConfig(`{ local: ${local} }`)
+		expect(await usesLocalWordPress(dir)).toBe(dev)
+		expect((await resolveTestConfig(dir)).local).toBe(test)
+	})
+
+	test("reads the stack name and worktrees from `local`", async () => {
+		fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "ignored" }))
+		writeConfig('{ local: { name: "shop", dev: {}, test: {} } }')
+		expect((await resolveDevConfig(dir)).project).toBe("kizlo-shop-dev")
+		expect((await resolveTestConfig(dir)).project).toBe("kizlo-shop-test")
+	})
+
+	test("a set dev port leaves the test port at its default", async () => {
+		writeConfig("{ local: { dev: { port: 9090 }, test: {} } }")
+		expect((await resolveDevConfig(dir)).port).toBe(9090)
+		expect((await resolveTestConfig(dir)).port).toBe(8889)
+	})
+
+	test("a set dev dbPort never reaches the test config", async () => {
+		writeConfig("{ local: { dev: { dbPort: 3399 }, test: {} } }")
+		expect((await resolveDevConfig(dir)).dbPort).toBe(3399)
+		// The test config has no dbPort field at all — the dev-only key cannot leak into it.
+		expect("dbPort" in (await resolveTestConfig(dir))).toBe(false)
+	})
+
 	test("takes a full tag, for a caller pinning a specific PHP", async () => {
-		writeConfig('{ test: { version: "6.8.2-php8.3-apache" } }')
+		writeConfig('{ local: { test: { version: "6.8.2-php8.3-apache" } } }')
 		expect((await resolveTestConfig(dir)).wordpressTag).toBe("6.8.2-php8.3-apache")
 	})
 })

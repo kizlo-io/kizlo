@@ -55,8 +55,14 @@ class WooCommerceModule
     }
 
     /**
-     * Validate and initialize only cart, checkout and order Store API requests.
-     * The object id makes repeated filter passes for one request harmless.
+     * Validate and initialize only cart, checkout and order Store API requests,
+     * before WooCommerce checks route permissions. The object id makes repeated
+     * filter passes for one request harmless.
+     *
+     * WordPress has already run rest_authentication_errors at this point, so
+     * Kizlo's global guard has verified the App Password administrator. Store
+     * API permission callbacks now see the resolved customer and can authorize
+     * registered orders against the identity in X-Kizlo-User-Email.
      */
     public function maybeSwitchStoreApiUser(mixed $response, mixed $handler, mixed $request): mixed
     {

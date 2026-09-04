@@ -1,30 +1,32 @@
 ---
-title: WordPress client
+title: WordPress introspection
 icon: TreeStructure
 description: Generate and call the WordPress endpoints described by your active plugins.
 ---
 
-The generated **WordPress client** types the routes published by the plugins active on your WordPress site. You
-call it through `context.wordpress` in a procedure, event handler, fixture, or other server-side Kizlo code.
+The generated **introspection** types the routes published by the plugins active on your WordPress site: the
+`WP_*` types and an `endpoints` descriptor map, built from `GET /kizlo/v1/introspect`. It carries no request
+logic. The callable **client** is assembled from it, and you reach it through `context.wordpress` in a
+procedure, event handler, fixture, or other server-side Kizlo code.
 
-## Generate the client
+## Generate the introspection
 
-`kizlo init` and `kizlo create` write a stub at `<dir>/server/generated/wordpress.ts`. The first generation
+`kizlo init` and `kizlo create` write a stub at `<dir>/server/generated/introspection.ts`. The first generation
 replaces it with endpoints fetched from `GET /kizlo/v1/introspect` on your configured WordPress site.
 
-| Command | When it writes `wordpress.ts` |
+| Command | When it writes `introspection.ts` |
 | --- | --- |
 | `kizlo generate` | Once, before a build or typecheck |
 | `kizlo dev` | On startup and whenever the WordPress introspection document changes |
 
 For the default `dir: "src/lib/kizlo"`, the file lives at
-`src/lib/kizlo/server/generated/wordpress.ts`. A package without a Kizlo server can set
-[`wordpressClientDir`](/docs/concepts/cli#configuration) and receives `<wordpressClientDir>/wordpress.ts`
+`src/lib/kizlo/server/generated/introspection.ts`. A package without a Kizlo server can set
+[`dir: { introspection }`](/docs/concepts/cli#configuration) and receives `<introspection>/introspection.ts`
 instead.
 
 <Callout>
-  Commit `wordpress.ts`. It gives builds and teammates the same WordPress contract without requiring a live
-  site during installation. The `.kizlo/wordpress.meta.json` cache stays local and is regenerated as needed.
+  Commit `introspection.ts`. It gives builds and teammates the same WordPress contract without requiring a live
+  site during installation. The `.kizlo/introspection.meta.json` cache stays local and is regenerated as needed.
 </Callout>
 
 ## What the stub means
@@ -132,5 +134,5 @@ endpoint. Register its reusable response shapes with
 
 When the upstream API already exposes WordPress-style schemas, derive the declaration with
 [`kizlo_translate_spec_properties`](/docs/php/functions/translate-spec-properties) or
-[`kizlo_translate_spec_schema`](/docs/php/functions/translate-spec-schema). Regenerate the client after the
-companion plugin is active, then call the new API ID and operation through the naming rules above.
+[`kizlo_translate_spec_schema`](/docs/php/functions/translate-spec-schema). Regenerate the introspection after
+the companion plugin is active, then call the new API ID and operation through the naming rules above.

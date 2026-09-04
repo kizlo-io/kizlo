@@ -18,6 +18,7 @@ class WooCommerceModuleTest extends TestCase
     private WP_REST_Server $server;
     private int $adminId;
     private int $customerId;
+    private string $customerEmail;
     private ?int $permissionUser = null;
     private RestGuard $guard;
     private WooCommerceModule $module;
@@ -26,14 +27,15 @@ class WooCommerceModuleTest extends TestCase
     {
         parent::setUp();
 
-        $this->adminId    = self::factory()->user->create(['role' => 'administrator']);
-        $this->customerId = self::factory()->user->create([
+        $this->adminId       = self::factory()->user->create(['role' => 'administrator']);
+        $this->customerId    = self::factory()->user->create([
             'role'       => 'subscriber',
             'user_email' => 'customer@example.com',
             'user_login' => 'headless-customer',
         ]);
-        $this->guard      = new RestGuard();
-        $this->module     = new WooCommerceModule();
+        $this->customerEmail = (string) get_userdata($this->customerId)->user_email;
+        $this->guard         = new RestGuard();
+        $this->module        = new WooCommerceModule();
 
         add_filter('rest_request_before_callbacks', [$this->guard, 'requireAdmin'], 0, 3);
         add_filter('kizlo_rest_route_requires_admin', [$this->module, 'requiresKizloAdmin'], 10, 2);
@@ -59,6 +61,7 @@ class WooCommerceModuleTest extends TestCase
         remove_filter('woocommerce_session_handler', [$this->module, 'maybeUseHeadlessSession']);
         remove_filter('woocommerce_store_api_disable_nonce_check', [$this->module, 'maybeDisableNonceCheck']);
         remove_filter('rest_request_before_callbacks', [$this->module, 'maybeSwitchStoreApiUser'], 10);
+        SessionHandler::clearPreparedIdentity();
 
         parent::tearDown();
     }
@@ -102,7 +105,7 @@ class WooCommerceModuleTest extends TestCase
     public function test_store_api_permissions_and_callback_see_the_resolved_customer_once(): void
     {
         $request = $this->request('/wc/store/v1/cart/kizlo-auth-test', [
-            SessionHandler::HEADER_USER_ID => (string) $this->customerId,
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
         ]);
         $this->authenticateAs($this->adminId, true);
 
@@ -148,7 +151,7 @@ class WooCommerceModuleTest extends TestCase
         );
 
         $request = $this->request('/wc/store/v1/cart/kizlo-auth-test', [
-            SessionHandler::HEADER_USER_ID     => (string) $this->customerId,
+            SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
             SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
         ]);
         $this->authenticateAs($this->adminId, true);
@@ -169,7 +172,7 @@ class WooCommerceModuleTest extends TestCase
     public function test_public_catalog_routes_ignore_identity_headers_and_do_not_initialize_a_session(): void
     {
         $response = $this->dispatch('/wc/store/v1/kizlo-public-test', 0, false, [
-            SessionHandler::HEADER_USER_ID => (string) $this->customerId,
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
         ]);
 
         $this->assertSame(200, $response->get_status());
@@ -181,7 +184,7 @@ class WooCommerceModuleTest extends TestCase
     public function test_missing_application_password_authentication_rejects_before_session_initialization(): void
     {
         $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', 0, false, [
-            SessionHandler::HEADER_USER_ID => (string) $this->customerId,
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
         ]);
 
         $this->assertSame(401, $response->get_status());
@@ -192,7 +195,7 @@ class WooCommerceModuleTest extends TestCase
     public function test_cookie_authenticated_administrator_is_still_rejected(): void
     {
         $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', $this->adminId, false, [
-            SessionHandler::HEADER_USER_ID => (string) $this->customerId,
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
         ]);
 
         $this->assertSame(401, $response->get_status());
@@ -203,45 +206,38 @@ class WooCommerceModuleTest extends TestCase
     {
         $subscriberId = self::factory()->user->create(['role' => 'subscriber']);
         $response     = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', $subscriberId, true, [
-            SessionHandler::HEADER_USER_ID => (string) $this->customerId,
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
         ]);
 
         $this->assertSame(403, $response->get_status());
         $this->assertNull(WC()->session);
     }
 
-    public function test_invalid_and_conflicting_user_identities_are_rejected(): void
+    public function test_malformed_email_and_privileged_identities_are_rejected(): void
     {
-        self::factory()->user->create([
-            'role'       => 'subscriber',
-            'user_email' => 'other@example.com',
-        ]);
-        $invalid = SessionHandler::resolveIdentity(
-            $this->request('/wc/store/v1/cart', [SessionHandler::HEADER_USER_ID => '99999999']),
+        $malformed = SessionHandler::resolveIdentity(
+            $this->request('/wc/store/v1/cart', [SessionHandler::HEADER_USER_EMAIL => 'not-an-email']),
             true
         );
-        $conflict = SessionHandler::resolveIdentity(
+        $privileged = SessionHandler::resolveIdentity(
             $this->request('/wc/store/v1/cart', [
-                SessionHandler::HEADER_USER_ID    => (string) $this->customerId,
-                SessionHandler::HEADER_USER_EMAIL => 'other@example.com',
+                SessionHandler::HEADER_USER_EMAIL => (string) get_userdata($this->adminId)->user_email,
             ]),
             true
         );
 
-        $this->assertInstanceOf(WP_Error::class, $invalid);
-        $this->assertSame('kizlo_invalid_identity', $invalid->get_error_code());
-        $this->assertInstanceOf(WP_Error::class, $conflict);
-        $this->assertSame('kizlo_conflicting_identity', $conflict->get_error_code());
+        $this->assertInstanceOf(WP_Error::class, $malformed);
+        $this->assertSame('kizlo_invalid_identity', $malformed->get_error_code());
+        $this->assertInstanceOf(WP_Error::class, $privileged);
+        $this->assertSame('kizlo_forbidden_identity', $privileged->get_error_code());
     }
 
-    public function test_equivalent_user_identities_and_cart_transition_are_accepted(): void
+    public function test_email_identity_and_cart_transition_are_accepted(): void
     {
         $identity = SessionHandler::resolveIdentity(
             $this->request('/wc/store/v1/cart', [
-                SessionHandler::HEADER_USER_ID       => (string) $this->customerId,
-                SessionHandler::HEADER_USER_EMAIL    => 'customer@example.com',
-                SessionHandler::HEADER_USER_USERNAME => 'headless-customer',
-                SessionHandler::HEADER_GUEST_TOKEN   => self::GUEST_TOKEN,
+                SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
+                SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
             ]),
             true
         );
@@ -249,11 +245,25 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame(['user_id' => $this->customerId, 'guest_token' => self::GUEST_TOKEN], $identity);
     }
 
+    public function test_unknown_email_creates_a_customer_on_demand(): void
+    {
+        $this->assertFalse(get_user_by('email', 'new-shopper@example.com'));
+
+        $identity = SessionHandler::resolveIdentity(
+            $this->request('/wc/store/v1/cart', [SessionHandler::HEADER_USER_EMAIL => 'new-shopper@example.com']),
+            true
+        );
+
+        $created = get_user_by('email', 'new-shopper@example.com');
+        $this->assertInstanceOf(\WP_User::class, $created);
+        $this->assertSame(['user_id' => (int) $created->ID, 'guest_token' => null], $identity);
+    }
+
     public function test_user_plus_guest_is_rejected_for_order_routes(): void
     {
         $identity = SessionHandler::resolveIdentity(
             $this->request('/wc/store/v1/order/1', [
-                SessionHandler::HEADER_USER_ID     => (string) $this->customerId,
+                SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
                 SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
             ]),
             false

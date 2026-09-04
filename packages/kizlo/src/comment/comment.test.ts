@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "vitest"
+import { geoMock } from "../adapters/geo"
 import { getKizloTestInstance, getTestCredentials, type KizloTestInstance } from "../test/harness"
 import { WordPressTransport } from "../wordpress"
 import { WP_CORE_BASE } from "../wordpress/constants"
@@ -11,6 +12,7 @@ let rootId = 0
 let replyId = 0
 let otherPostId = 0
 let otherCommentId = 0
+let submittedCommentId = 0
 
 const ROOT_BODY = "Comment test root"
 const REPLY_BODY = "Comment test reply"
@@ -27,7 +29,9 @@ async function seedComment(post: number, content: string, parent = 0): Promise<n
 }
 
 beforeAll(async () => {
-	kizlo = getKizloTestInstance()
+	// A user agent is required by the submit procedure; the in-process call has no request header
+	// to carry one, so the geo mock supplies it. get/list ignore it.
+	kizlo = getKizloTestInstance({ adapters: { geo: geoMock({ userAgent: "kizlo-comment-test" }) } })
 	const creds = getTestCredentials()
 	adminWp = new WordPressTransport({
 		credentials: { url: creds.url, username: creds.users.admin.username, password: creds.users.admin.applicationPassword },
@@ -50,7 +54,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-	for (const id of [replyId, rootId, otherCommentId]) {
+	for (const id of [replyId, rootId, otherCommentId, submittedCommentId]) {
 		if (id) await adminWp.delete(`/comments/${id}`, { base: WP_CORE_BASE, searchParams: { force: true } })
 	}
 	for (const id of [postId, otherPostId]) {
@@ -125,4 +129,18 @@ test("comments.list accepts a single filter value as well as a list", async () =
 	// The public input is arrayable; the route only takes lists, so the collapse has to happen.
 	const result = await kizlo.client.comments.list.call({ query: { post: postId } })
 	expect(result.items.map((item) => item.id)).toContain(rootId)
+})
+
+test("comments.submit attributes the signed-in session, not a guest author email", async () => {
+	// The harness session is the test user. A guest authorEmail is also passed: authorship must
+	// follow the session's user_email (matched to the WordPress user), and the guest field must not
+	// take over — which is what the id/email header split replaced.
+	const creds = getTestCredentials()
+	const result = await kizlo.client.comments.submit.call({
+		body: { postId, content: "Signed-in over a guest email", authorEmail: "someone-else@example.test" },
+	})
+	submittedCommentId = result.id
+
+	expect(Comment.safeParse(result).success).toBe(true)
+	expect(result.author?.id).toBe(creds.users.user.id)
 })

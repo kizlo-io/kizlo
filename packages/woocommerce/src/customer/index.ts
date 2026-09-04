@@ -11,23 +11,27 @@ export const CUSTOMER_PROCEDURES = {
 			output: Customer,
 		},
 		async ({ context, errors }) => {
-			const auth = await context.getAuthUser()
-			if (!auth) throw errors.FORBIDDEN()
+			const session = await context.getSession()
+			if (!session) throw errors.FORBIDDEN()
 
-			const response = await context.wordpress.woocommerce.customers.retrieve({ id: auth.id })
+			// `role` defaults to `customer` on this endpoint, so a signed-in user with any other WordPress
+			// role (subscriber, shop_manager, ...) would be filtered out. `all` matches the old retrieve-by-id
+			// behaviour, which never looked at the role.
+			const response = await context.wordpress.woocommerce.customers.list({ email: session.email, role: "all" })
 			if (response.error) {
 				switch (response.error.code) {
-					case "wc_user_invalid_id":
-						throw errors.NOT_FOUND()
 					case "woocommerce_rest_cannot_view":
 						throw errors.FORBIDDEN()
 					default:
-						context.logger.error("Get customer unhandled error", response.error, { userId: auth.id, code: response.error.code })
+						context.logger.error("Get customer unhandled error", response.error, { email: session.email, code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()
 				}
 			}
 
-			return deserializeCustomer(response.data)
+			const customer = response.data[0]
+			if (!customer) throw errors.NOT_FOUND()
+
+			return deserializeCustomer(customer)
 		},
 	),
 }

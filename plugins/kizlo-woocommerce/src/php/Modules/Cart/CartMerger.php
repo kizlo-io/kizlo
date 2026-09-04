@@ -5,7 +5,14 @@ namespace Kizlo\WooCommerce\Modules\Cart;
 use WP_Error;
 use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
 
-/** Merge one guest cart into an authenticated customer's cart exactly once. */
+/**
+ * Merge one guest cart into an authenticated customer's cart exactly once.
+ *
+ * The current request must already resolve to a user (X-Kizlo-User-Email).
+ * Each guest item is re-added through the Store API CartController so stock,
+ * price, and validation rules re-run; the guest session row is deleted only
+ * after the customer cart is confirmed persisted.
+ */
 final class CartMerger
 {
     private const LOCK_TIMEOUT_SECONDS = 5;

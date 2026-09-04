@@ -85,35 +85,37 @@ in full. (`Promisify<T>` in the signatures is `T | Promise<T>`: return sync or a
 
 ```ts
 interface AuthUser {
-  id: number
-  email?: string
-  phone?: string
-  firstName: string
-  lastName: string
+  id: string
+  email: string
+  firstName?: string
+  lastName?: string
+  meta?: Record<string, JsonValue>
 }
 
 interface AuthAdapter {
-  getUser(request: Request | null): Promisify<AuthUser | null>
+  getSession(request: Request | null): Promisify<AuthUser | null>
 }
 ```
 
 Kizlo hands you the incoming `Request`; you read your session however you issue it (cookie, header, bearer
-token) and return the user, or `null` when no one's signed in. This is the seam between Kizlo and whatever owns
-your sessions. Wrap your provider in `createAuthAdapter` to fill in the contract:
+token) and return it, or `null` when no one's signed in. This is the seam between Kizlo and whatever owns your
+sessions. The `id` is your provider's own id, not a WordPress id; `email` is the one key Kizlo uses to map the
+session to a WordPress user, so any provider can supply it. Wrap your provider in `createAuthAdapter` to fill in
+the contract:
 
 ```ts
 import { createAuthAdapter } from "kizlo"
 
 export function myAuth() {
   return createAuthAdapter({
-    async getUser(request) {
+    async getSession(request) {
       const session = await mySessionStore.read(request)
       if (!session) return null
       return {
         id: session.userId,
+        email: session.email,
         firstName: session.firstName,
         lastName: session.lastName,
-        email: session.email,
       }
     },
   })
@@ -218,7 +220,7 @@ provider:
 const testAdapters = createIntegration({
   id: "test-adapters",
   adapters: {
-    auth: authMock({ mockUserId: 1 }), // every request is user 1
+    auth: authMock({ email: "user@example.com" }), // every request is this signed-in user
     geo: geoMock({ country: "IN" }),   // pinned location
   },
 })

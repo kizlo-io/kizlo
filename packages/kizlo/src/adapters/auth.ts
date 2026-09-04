@@ -1,23 +1,23 @@
-import type { Promisify } from "@kizlo/shared"
+import type { JsonValue, Promisify } from "@kizlo/shared"
 
 export interface AuthUser {
-	/** The WordPress user id this caller maps to. */
-	id: number
-	/** The user's email, if known. */
-	email?: string
-	/** The user's phone number, if known. */
-	phone?: string
-	/** The user's first name. */
-	firstName: string
-	/** The user's last name. */
-	lastName: string
+	/** The third-party auth id. This is the identity provider's own id, never a WordPress user id. */
+	id: string
+	/** The user's email. The single join key that maps this session to a WordPress user. */
+	email: string
+	/** The user's first name, if known. */
+	firstName?: string
+	/** The user's last name, if known. */
+	lastName?: string
+	/** Arbitrary claims the auth service carries alongside the identity. */
+	meta?: Record<string, JsonValue>
 }
 
-export type AuthGetUser = (request: Request | null) => Promisify<AuthUser | null>
+export type AuthGetSession = (request: Request | null) => Promisify<AuthUser | null>
 
 export interface AuthAdapter {
-	/** Resolve the authenticated user from the request, or `null` when there is no session. Receives `null` for server-side (non-HTTP) invocations. */
-	getUser: AuthGetUser
+	/** Resolve the authenticated session from the request, or `null` when there is no session. Receives `null` for server-side (non-HTTP) invocations. */
+	getSession: AuthGetSession
 }
 
 /** Author a custom auth adapter, typed against the {@link AuthAdapter} contract. */
@@ -25,15 +25,14 @@ export function createAuthAdapter(adapter: AuthAdapter): AuthAdapter {
 	return adapter
 }
 
-export function authMock(options?: { mockUserId?: number }): AuthAdapter {
+export function authMock(options?: { id?: string; email?: string }): AuthAdapter {
 	return {
-		getUser() {
+		getSession() {
 			return {
-				id: options?.mockUserId ?? 0,
+				id: options?.id ?? "auth-mock-user",
+				email: options?.email ?? "karan@gmail.com",
 				firstName: "Karan",
 				lastName: "Gill",
-				email: "karan@gmail.con",
-				phone: "12345678901",
 			}
 		},
 	}

@@ -42,8 +42,8 @@ const kizloCore = defineFixture({
 	},
 })
 
-/** The active plugins whose freshly seeded test contract is committed in both generated WordPress clients. */
-const wordpressClientFixtures = [
+/** The active plugins whose freshly seeded test contract is committed in the generated introspection. */
+const introspectionFixtures = [
 	...coreFixtures,
 	kizloCore,
 	woocommerce({
@@ -56,16 +56,17 @@ const wordpressClientFixtures = [
 
 /**
  * The WordPress both stacks boot. Pinned rather than left on the `latest` default because this repo
- * commits the generated WordPress clients, which are derived from whatever the stack serves: on a
- * moving tag they go stale the day WordPress ships, and the failure lands on whichever PR runs next
- * instead of on the one that changed something. Bumping this is how a core release enters the repo,
- * as a reviewed diff of the schema it changed.
+ * commits the generated introspection, which is derived from whatever the stack serves: on a moving
+ * tag it goes stale the day WordPress ships, and the failure lands on whichever PR runs next instead
+ * of on the one that changed something. Bumping this is how a core release enters the repo, as a
+ * reviewed diff of the schema it changed.
  */
 const WORDPRESS_VERSION = "7.1.0-apache"
 
 export default defineConfig({
-	worktrees: true,
-	wordpressClientDir: ".",
-	dev: { local: true, version: WORDPRESS_VERSION, fixtures: wordpressClientFixtures },
-	test: { local: true, version: WORDPRESS_VERSION, fixtures: wordpressClientFixtures },
+	dir: { introspection: "." },
+	local: {
+		worktrees: true,
+		dev: { version: WORDPRESS_VERSION, fixtures: introspectionFixtures },
+	},
 })

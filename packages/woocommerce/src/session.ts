@@ -36,13 +36,13 @@ function encodeSecret(secret: string): Uint8Array {
 	return new TextEncoder().encode(secret)
 }
 
-function getCartHeaders(options: { userId?: number; token?: string; connInfo: ConnInfo | null }) {
-	const { connInfo, userId, token } = options
+function getCartHeaders(options: { email?: string; token?: string; connInfo: ConnInfo | null }) {
+	const { connInfo, email, token } = options
 
 	const headers: Record<string, string> = {}
 
 	if (token) headers["X-Kizlo-Guest-Token"] = token
-	if (userId) headers["X-Kizlo-User-Id"] = String(userId)
+	if (email) headers["X-Kizlo-User-Email"] = email
 	if (connInfo?.city) headers["X-Kizlo-Geo-City"] = connInfo.city
 	if (connInfo?.state) headers["X-Kizlo-Geo-State"] = connInfo.state
 	if (connInfo?.country) headers["X-Kizlo-Geo-Country"] = connInfo.country
@@ -58,10 +58,10 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 
 	return createMiddleware(async ({ context, next }) => {
 		const connInfo = await context.getConnInfo()
-		const auth = await context.getAuthUser()
+		const session = await context.getSession()
 		const foundToken = await context.cookies.get(cookieName)
 
-		if (!auth) {
+		if (!session) {
 			if (!foundToken) {
 				const { jwt, sub } = await mintGuestToken(context.config.siteSecret, ttlSeconds)
 				await context.cookies.set({ name: cookieName, value: jwt, options: cookieOptions })
@@ -78,6 +78,9 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 			return next({ context: { sessionHeaders: getCartHeaders({ token: data.sub, connInfo }) } })
 		}
 
+		// A cart/checkout transition forwards the guest token alongside the
+		// user identity so WordPress merges the guest cart inside this one
+		// request. Order operations pass no token and never initiate a merge.
 		let guestToken: string | undefined
 		if (foundToken && options?.transitionGuestCart) {
 			const [err, data] = await tryCatch(verifyToken(foundToken, context.config.siteSecret))
@@ -85,7 +88,7 @@ export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duratio
 		}
 
 		const result = await next({
-			context: { sessionHeaders: getCartHeaders({ userId: auth.id, token: guestToken, connInfo }) },
+			context: { sessionHeaders: getCartHeaders({ email: session.email, token: guestToken, connInfo }) },
 		})
 
 		// A completed cart/checkout operation confirms that WordPress consumed

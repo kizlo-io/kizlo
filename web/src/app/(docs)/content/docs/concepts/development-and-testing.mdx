@@ -101,7 +101,7 @@ The value is the tag after `wordpress:` on Docker Hub. A bare version covers mos
 `6.8.2-php8.3-apache` when you need a specific PHP. Each command reads its own, so you can build against
 current WordPress while your suite proves you still work on the oldest version you support.
 
-Pin it once you commit a generated [WordPress client](/docs/concepts/wordpress-client). That client describes
+Pin it once you commit a generated [introspection](/docs/concepts/introspection). It describes
 the WordPress it was generated from, so on a moving version it goes stale the day WordPress ships, and the
 failure lands on whichever change you make next. A pinned version turns a core release into a diff you review.
 

@@ -10,16 +10,31 @@ use WP_User;
 /**
  * WooCommerce session handler for Kizlo's server-to-server Store API calls.
  *
- * Identity is validated from the matched REST request before WooCommerce is
- * initialized. The prepared identity is then consumed here so invalid or
- * conflicting headers can never silently fall back to a new guest cart.
+ * Identity is resolved and validated from the matched REST request before
+ * WooCommerce initializes, then consumed here, so an invalid or conflicting
+ * header can never silently fall back to a new guest cart:
+ *
+ *   - X-Kizlo-User-Email  → the signed-in user's email (sole identity)
+ *   - X-Kizlo-Guest-Token → an existing "t_" guest session (returning guest)
+ *   - neither             → a new "t_{random}" token, exposed via response header
+ *
+ * Email is the sole identity: the SDK's auth adapter is email-keyed and a
+ * logged-in email may not yet have a WordPress account (e.g. the Clerk driver),
+ * so a matching account is created on demand and the same email always lands on
+ * the same wp_woocommerce_sessions row, which is what makes carts sync across
+ * devices.
+ *
+ * Session keys must satisfy WC_Session_Handler::is_secure_customer_id() — that
+ * method is hard-coded to accept only numeric IDs or "t_"-prefixed tokens, so
+ * those are the shapes used to stay compatible with WC's native save path.
+ *
+ * The trust boundary is the WordPress REST API authentication (Application
+ * Password) enforced by Kizlo's guard; this handler performs no auth itself.
  */
 class SessionHandler extends WC_Session_Handler
 {
-    public const HEADER_USER_ID       = 'X-Kizlo-User-Id';
-    public const HEADER_USER_EMAIL    = 'X-Kizlo-User-Email';
-    public const HEADER_USER_USERNAME = 'X-Kizlo-User-Username';
-    public const HEADER_GUEST_TOKEN   = 'X-Kizlo-Guest-Token';
+    public const HEADER_USER_EMAIL  = 'X-Kizlo-User-Email';
+    public const HEADER_GUEST_TOKEN = 'X-Kizlo-Guest-Token';
 
     public const HEADER_GEO_COUNTRY  = 'X-Kizlo-Geo-Country';
     public const HEADER_GEO_STATE    = 'X-Kizlo-Geo-State';
@@ -60,42 +75,24 @@ class SessionHandler extends WC_Session_Handler
     }
 
     /**
-     * Validate every supplied identity before WooCommerce initializes.
+     * Resolve and validate the request identity before WooCommerce initializes.
+     * A valid email resolves to its account or creates a customer on demand; an
+     * unresolvable email, a malformed guest token, or a user-plus-guest pairing
+     * outside a transition is rejected rather than downgraded to a guest.
      *
      * @return array{user_id: ?int, guest_token: ?string}|WP_Error
      */
     public static function resolveIdentity(WP_REST_Request $request, bool $allowTransition): array|WP_Error
     {
-        $userIds = [];
-
-        $rawId = trim((string) $request->get_header(self::HEADER_USER_ID));
-        if ($rawId !== '') {
-            $user = ctype_digit($rawId) && (int) $rawId > 0 ? get_userdata((int) $rawId) : false;
-            if (! $user instanceof WP_User) return self::invalidIdentity(self::HEADER_USER_ID);
-            $userIds[] = (int) $user->ID;
-        }
+        $userId = null;
 
         $email = trim((string) $request->get_header(self::HEADER_USER_EMAIL));
         if ($email !== '') {
-            $user = is_email($email) ? get_user_by('email', $email) : false;
-            if (! $user instanceof WP_User) return self::invalidIdentity(self::HEADER_USER_EMAIL);
-            $userIds[] = (int) $user->ID;
-        }
+            if (! is_email($email)) return self::invalidIdentity(self::HEADER_USER_EMAIL);
 
-        $username = trim((string) $request->get_header(self::HEADER_USER_USERNAME));
-        if ($username !== '') {
-            $user = get_user_by('login', $username);
-            if (! $user instanceof WP_User) return self::invalidIdentity(self::HEADER_USER_USERNAME);
-            $userIds[] = (int) $user->ID;
-        }
-
-        $userIds = array_values(array_unique($userIds));
-        if (count($userIds) > 1) {
-            return new WP_Error(
-                'kizlo_conflicting_identity',
-                'The supplied user identity headers resolve to different users.',
-                ['status' => 401]
-            );
+            $resolved = self::resolveOrCreateUser($email);
+            if ($resolved instanceof WP_Error) return $resolved;
+            $userId = $resolved;
         }
 
         $guestToken = trim((string) $request->get_header(self::HEADER_GUEST_TOKEN));
@@ -103,7 +100,6 @@ class SessionHandler extends WC_Session_Handler
             return self::invalidIdentity(self::HEADER_GUEST_TOKEN);
         }
 
-        $userId = $userIds[0] ?? null;
         if ($userId !== null && $guestToken !== '' && ! $allowTransition) {
             return new WP_Error(
                 'kizlo_conflicting_identity',
@@ -207,5 +203,155 @@ class SessionHandler extends WC_Session_Handler
                 time()
             )
         );
+    }
+
+    /**
+     * Resolve an email to a WordPress user id, creating a customer account when
+     * none exists. The resolve-or-create runs under a per-email lock so
+     * concurrent requests for a new email converge on a single account rather
+     * than racing to insert duplicates.
+     */
+    private static function resolveOrCreateUser(string $email): int|WP_Error
+    {
+        $existing = get_user_by('email', $email);
+        if ($existing instanceof WP_User) {
+            return self::resolvableUserId($existing);
+        }
+
+        $lock = 'kizlo_wc_user_lock_' . md5($email);
+        if (! self::acquireLock($lock)) {
+            // Another request holds the lock and is mid-create; wait for the
+            // row it is inserting instead of creating a competing account.
+            $waited = self::waitForUser($email);
+            return $waited instanceof WP_User ? self::resolvableUserId($waited) : self::customerUnavailable();
+        }
+
+        try {
+            // Re-check inside the lock: the row may have appeared between the
+            // first lookup and acquiring the lock.
+            $existing = get_user_by('email', $email);
+            if ($existing instanceof WP_User) {
+                return self::resolvableUserId($existing);
+            }
+
+            return self::createCustomer($email);
+        } finally {
+            self::releaseLock($lock);
+        }
+    }
+
+    private static function createCustomer(string $email): int|WP_Error
+    {
+        $user_id = wp_insert_user([
+            'user_login' => self::uniqueLogin($email),
+            'user_email' => $email,
+            'user_pass'  => wp_generate_password(24, true, true),
+            'role'       => 'customer',
+        ]);
+
+        if (is_wp_error($user_id)) {
+            // Lost a create race (duplicate email) or another failure — fall
+            // back to whatever account now exists for this email.
+            $existing = get_user_by('email', $email);
+            return $existing instanceof WP_User ? self::resolvableUserId($existing) : self::customerUnavailable();
+        }
+
+        return (int) $user_id;
+    }
+
+    /** Derive a unique, WP-valid login from the email. */
+    private static function uniqueLogin(string $email): string
+    {
+        $base = sanitize_user($email, true);
+        if ($base === '') {
+            $base = 'kizlo_user';
+        }
+
+        $login  = $base;
+        $suffix = 2;
+        while (username_exists($login)) {
+            $login = $base . '_' . $suffix;
+            $suffix++;
+        }
+
+        return $login;
+    }
+
+    /**
+     * The id of an account allowed to own a headless cart. Privileged
+     * (edit_posts) accounts are refused by default so a forwarded email can
+     * never take over an editor's or admin's session; the filter lets a site
+     * adjust the rule.
+     */
+    private static function resolvableUserId(WP_User $user): int|WP_Error
+    {
+        $resolvable = (bool) apply_filters(
+            'kizlo_woocommerce_resolvable_cart_user',
+            ! user_can($user, 'edit_posts'),
+            $user
+        );
+
+        if (! $resolvable) {
+            return new WP_Error(
+                'kizlo_forbidden_identity',
+                'This email cannot own a headless cart.',
+                ['status' => 403]
+            );
+        }
+
+        return (int) $user->ID;
+    }
+
+    private static function customerUnavailable(): WP_Error
+    {
+        return new WP_Error(
+            'kizlo_customer_unavailable',
+            'The headless customer account could not be resolved. Retry the request.',
+            ['status' => 503]
+        );
+    }
+
+    /**
+     * Poll briefly for the account the lock holder is creating so a losing
+     * request converges on it instead of failing.
+     */
+    private static function waitForUser(string $email): ?WP_User
+    {
+        for ($i = 0; $i < 50; $i++) {
+            usleep(100_000); // 100ms, up to ~5s total
+            $existing = get_user_by('email', $email);
+            if ($existing instanceof WP_User) return $existing;
+        }
+
+        return null;
+    }
+
+    /**
+     * Best-effort cross-request lock. Uses the persistent object cache's atomic
+     * add when one is present, and falls back to a transient otherwise (the
+     * default per-request cache can't coordinate across requests). The create
+     * path re-checks and tolerates a lost race, so the lock only has to make
+     * duplicate creation rare, not impossible.
+     */
+    private static function acquireLock(string $key): bool
+    {
+        if (wp_using_ext_object_cache()) {
+            return wp_cache_add($key, 1, 'kizlo', 30);
+        }
+
+        if (get_transient($key) !== false) {
+            return false;
+        }
+        set_transient($key, 1, 30);
+        return true;
+    }
+
+    private static function releaseLock(string $key): void
+    {
+        if (wp_using_ext_object_cache()) {
+            wp_cache_delete($key, 'kizlo');
+            return;
+        }
+        delete_transient($key);
     }
 }
