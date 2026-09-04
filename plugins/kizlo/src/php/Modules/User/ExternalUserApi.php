@@ -90,7 +90,7 @@ class ExternalUserApi
                 'user_pass'  => wp_generate_password(32, true, true),
                 'first_name' => (string) $request->get_param('first_name'),
                 'last_name'  => (string) $request->get_param('last_name'),
-                'role'       => (string) get_option('default_role', 'subscriber'),
+                'role'       => 'subscriber',
             ]);
 
             if (is_wp_error($userId)) {

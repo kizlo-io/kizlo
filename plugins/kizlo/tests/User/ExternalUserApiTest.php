@@ -33,18 +33,41 @@ class ExternalUserApiTest extends WP_UnitTestCase
         $this->assertSame('user_clerk_1', get_user_meta($users[0]->ID, '_kizlo_external_id_clerk', true));
         $this->assertSame($this->profile(), get_user_meta($users[0]->ID, '_kizlo_external_profile_clerk', true));
         $this->assertSame('Updated', get_userdata($users[0]->ID)->first_name);
-        $this->assertSame(get_option('default_role'), $users[0]->roles[0]);
+        $this->assertSame('subscriber', $users[0]->roles[0]);
+    }
+
+    public function test_create_uses_subscriber_when_the_site_default_is_privileged(): void
+    {
+        $defaultRole = get_option('default_role');
+        update_option('default_role', 'administrator');
+
+        try {
+            $response = $this->api->create($this->writeRequest());
+        } finally {
+            update_option('default_role', $defaultRole);
+        }
+
+        $this->assertInstanceOf(WP_REST_Response::class, $response);
+        $user = get_userdata($response->get_data()['id']);
+        $this->assertSame(['subscriber'], $user->roles);
     }
 
     public function test_create_links_an_existing_non_privileged_email(): void
     {
-        $userId = self::factory()->user->create(['role' => 'subscriber', 'user_email' => 'clerk@example.com']);
+        add_role('external_member', 'External Member', ['read' => true]);
 
-        $response = $this->api->create($this->writeRequest());
+        try {
+            $userId = self::factory()->user->create(['role' => 'external_member', 'user_email' => 'clerk@example.com']);
+            $response = $this->api->create($this->writeRequest());
+            $roles = get_userdata($userId)->roles;
+        } finally {
+            remove_role('external_member');
+        }
 
         $this->assertInstanceOf(WP_REST_Response::class, $response);
         $this->assertSame($userId, $response->get_data()['id']);
         $this->assertSame('user_clerk_1', get_user_meta($userId, '_kizlo_external_id_clerk', true));
+        $this->assertSame(['external_member'], $roles);
     }
 
     public function test_duplicate_insert_recovery_converges_on_the_competing_account(): void
