@@ -1,5 +1,21 @@
 # kizlo
 
+## 0.19.0
+
+### Minor Changes
+
+- [#192](https://github.com/kizlo-io/kizlo/pull/192) [`94bf2dc`](https://github.com/kizlo-io/kizlo/commit/94bf2dc77836c967a1ae42c38eb151647caf11d9) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Redesign the auth adapter around email: replace `getUser` returning a WordPress id with `getSession` returning a third-party identity keyed by email
+
+- [#193](https://github.com/kizlo-io/kizlo/pull/193) [`554d619`](https://github.com/kizlo-io/kizlo/commit/554d61945b6e01e412f9fbb6b29d5e63d241836d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Send `user_email` from the session so the comment endpoint attributes a signed-in commenter to their WordPress user
+
+- [#191](https://github.com/kizlo-io/kizlo/pull/191) [`89e9e44`](https://github.com/kizlo-io/kizlo/commit/89e9e444932c7f29284365b6498b1d893812072f) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Redesign `kizlo.config`: local WordPress moves under `local`, and the generated file is named `introspection.ts`
+
+  Migrate: `dev`/`test` → `local.dev`/`local.test`, `name`/`worktrees` → `local.name`/`local.worktrees`, `wordpressClientDir: "."` → `dir: { introspection: "." }`. The test stack now inherits the dev stack's `version` and `fixtures`. Rename the generated `wordpress.ts` to `introspection.ts`. Removed keys fail config validation with the replacement to use.
+
+- [#187](https://github.com/kizlo-io/kizlo/pull/187) [`9df22f9`](https://github.com/kizlo-io/kizlo/commit/9df22f939800799ed437670efe2fccefcdbf3671) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Redesign WooCommerce Checkout resources and support non-success data responses
+
+- [#184](https://github.com/kizlo-io/kizlo/pull/184) [`0e84140`](https://github.com/kizlo-io/kizlo/commit/0e84140f41e7dc5cc9389c36bfc6637da1ba68f0) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Allow local WordPress fixtures to pin wp.org plugin versions
+
 ## 0.18.0
 
 ### Minor Changes

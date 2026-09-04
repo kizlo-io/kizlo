@@ -1,5 +1,21 @@
 # @kizlo/woocommerce
 
+## 0.5.0
+
+### Minor Changes
+
+- [#189](https://github.com/kizlo-io/kizlo/pull/189) [`a472ea6`](https://github.com/kizlo-io/kizlo/commit/a472ea6ce54223c4f28669702b1297feeb601a13) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a public customer-facing Order resource backed by the WooCommerce Store API
+
+- [#186](https://github.com/kizlo-io/kizlo/pull/186) [`c805c74`](https://github.com/kizlo-io/kizlo/commit/c805c743beceb9ba68c66e7c2dd59b11ccbe8b60) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Redesign the public Cart resource around complete Store API data
+
+- [#187](https://github.com/kizlo-io/kizlo/pull/187) [`9df22f9`](https://github.com/kizlo-io/kizlo/commit/9df22f939800799ed437670efe2fccefcdbf3671) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Redesign WooCommerce Checkout resources and support non-success data responses
+
+### Patch Changes
+
+- [#188](https://github.com/kizlo-io/kizlo/pull/188) [`2b1f484`](https://github.com/kizlo-io/kizlo/commit/2b1f484624b5cf38d7d6d7fa1220c3f5a8f25b25) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Authorize Store API order retries as the resolved customer
+
+- [#190](https://github.com/kizlo-io/kizlo/pull/190) [`a9466fa`](https://github.com/kizlo-io/kizlo/commit/a9466fadbc042142478a3d3f613a429bdc6bc2cc) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Merge guest carts safely in the original authenticated cart or checkout request
+
 ## 0.4.0
 
 ### Minor Changes
