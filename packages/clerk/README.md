@@ -124,7 +124,12 @@ clerk({
 	webhooks: {
 		signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET!,
 		async handler(event, context) {
-			context.logger.info("Clerk webhook", event.type)
+			if (event.type === "user.created") {
+				context.logger.info("New Clerk user", event.data.id)
+			}
+			if (event.type === "session.created") {
+				context.logger.info("New Clerk session", event.data.id)
+			}
 		},
 	},
 })
