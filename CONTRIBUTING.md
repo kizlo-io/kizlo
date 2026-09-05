@@ -240,9 +240,12 @@ Never commit directly to `main`.
 - The PR title must match the commit subject.
   `.github/workflows/lint-pr.yml` validates it and fails the PR otherwise.
 - Keep PRs focused; describe what changed and why.
-- Write the PR body as plain prose, two or three short paragraphs: what was
-  wrong and what happens instead, or for a feature, what it does and the shape
-  of the approach. No headings, no checklists, no filler sections.
+- Write the PR body under these headings, in order: **Why** (the problem or
+  motivation), **What changed** (the resulting behaviour and the shape of the
+  approach), **Notes** (deliberate scope calls, trade-offs, or risks), and
+  **Verified** (the checks you ran and their result, including anything skipped
+  or not applicable). Keep each section to a few lines and drop any that would
+  be empty.
 - Reference an issue with `Closes #123` only when a GitHub issue actually
   exists. Otherwise leave the issue line out.
 - Make sure the following pass locally before opening a PR — they're the same
@@ -254,6 +257,28 @@ Never commit directly to `main`.
   pnpm build
   pnpm test
   ```
+
+## Keeping one commit per PR
+
+We squash-merge, and the repo is set so the squash commit message is built
+from the branch's commit messages (GitHub's `COMMIT_MESSAGES` mode). To make
+that box deterministic, **keep every PR as a single commit**:
+
+- The branch carries exactly one commit. As the change evolves, amend it
+  (`git commit --amend`) and re-push with `git push --force-with-lease`.
+  Never stack incremental commits on a PR branch.
+- That commit's **body is the PR's overall-change summary** — what the code
+  does as a result, in a few short lines, not a log of steps taken. Keep it
+  current so it always describes what the PR ends up doing.
+- With one commit, GitHub prefills the squash modal from it: the *Commit
+  message* (subject) is the Conventional Commit subject (which equals the PR
+  title), and the *Extended description* is that commit body. At merge the
+  reviewer just checks the diff and clicks "Squash and merge" — both fields are
+  already right, with no editing.
+
+Do not put the PR description into the commit body — it's written for reviewers
+and is too long for history. Do not leave more than one commit — the squash box
+then collapses to a bulleted list of commit subjects and loses the summary.
 
 ## Reporting bugs
 
