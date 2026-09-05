@@ -66,21 +66,19 @@ export const { procedures, client, handler } = createKizlo({
 })
 ```
 
-With explicit values and console logging:
+With the generated introspection and console logging:
 
 ```ts title="src/lib/kizlo/server/index.ts"
 import { createKizlo } from "kizlo"
+import { nextjs } from "kizlo/nextjs/server"
+import { introspection } from "./generated"
 
 export const { procedures, client, handler } = createKizlo({
-  baseUrl: "https://example.com/api/kizlo",
-  siteSecret: "shared-secret",
-  wordpress: {
-    credentials: {
-      url: "https://wordpress.example.com",
-      username: "kizlo",
-      password: "application-password",
-    },
-  },
+  integrations: [nextjs()],
+  introspection,
   logging: "debug",
 })
 ```
+
+`introspection` is the tree that types the WordPress client. Pass the `introspection` export of your
+generated barrel; WordPress credentials resolve from the values your integrations contribute.

@@ -30,7 +30,7 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export interface WordPressClientRegistry {}
 	export interface WordPressEndpointRegistry {}
 	export interface WordPressCustomFieldsRegistry {}
-	export type ActiveWordPressClient = WordPressClientRegistry extends { endpoints: infer O } ? (O extends object ? WP_Client<O> & WordPressTransport : WordPressTransport) : WordPressTransport
+	export type ActiveWordPressClient = WordPressClientRegistry extends { introspection: infer O } ? (O extends object ? WP_Client<O> & WordPressTransport : WordPressTransport) : WordPressTransport
 	export type WP_EndpointPath = Extract<keyof WordPressEndpointRegistry, string>
 	type RegisteredEndpoint<P extends WP_EndpointPath> = WordPressEndpointRegistry[P]
 	export type WP_EndpointInput<P extends WP_EndpointPath> = RegisteredEndpoint<P> extends WP_Endpoint<infer I, any> ? I : never
@@ -101,7 +101,7 @@ describe("generateWordPressClient", () => {
 		expect(first).toContain("export interface WP_PostTypesBookCreateInput")
 		expect(first).toContain("export type WP_PostTypesBookCreateEndpointInput = WP_PostTypesBookCreateInput")
 		expect(first).not.toContain("A shared entity.\nexport type WP_AcmeEntity")
-		expect(first).toContain("export const endpoints = {")
+		expect(first).toContain("export const introspection = {")
 		expect(first).toContain("\tpostTypes: {")
 		expect(first).toContain("book: {")
 		expect(first).toContain('"postTypes.book.retrieve": WP_Endpoint<WP_PostTypesBookRetrieveEndpointInput,')
@@ -112,11 +112,11 @@ describe("generateWordPressClient", () => {
 	test("emits one shape for every target: the endpoint tree, registered and bindable", () => {
 		const client = generateWordPressClient(INTROSPECTION_FIXTURE)
 
-		expect(client).toContain("export const endpoints = {")
-		expect(client).toContain("export type WordPressClient = WP_Client<typeof endpoints>")
+		expect(client).toContain("export const introspection = {")
+		expect(client).toContain("export type WordPressClient = WP_Client<typeof introspection>")
 		expect(client).not.toContain("export class WordPressClient")
 		expect(client).toContain(`declare module "kizlo"`)
-		expect(client).toContain("endpoints: typeof endpoints")
+		expect(client).toContain("introspection: typeof introspection")
 		expect(client).toContain("export interface WP_AcmeBook extends WP_AcmeEntity")
 		expect(client).toContain(`import { type WP_Client, type WP_Endpoint, type WP_Failure, type WP_Success, wpEndpoint } from "kizlo"`)
 	})
@@ -290,9 +290,9 @@ describe("generateWordPressClient", () => {
 				"wordpress.ts": client,
 				// The tree an app runs on is the whole description, so calls are checked against it once bound.
 				"usage.ts": `import { createProcedure, createWordPressClient, WordPressTransport } from "kizlo"
-				import { endpoints } from "./wordpress"
+				import { introspection } from "./wordpress"
 				const transport = new WordPressTransport({ credentials: { url: "", username: "", password: "" } })
-				const wordpress = createWordPressClient(transport, endpoints)
+				const wordpress = createWordPressClient(transport, introspection)
 				${CLIENT_CALLS}`,
 			}),
 		).toEqual([])

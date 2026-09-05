@@ -10,7 +10,7 @@ function server(endpoints: object) {
 			siteSecret: "site-secret",
 			credentials: { url: "https://wp.example", username: "admin", password: "secret" },
 			integrations: [contactFormSeven("contact", { id: 42, fields: z.object({ email: z.string() }) })],
-			wordpressEndpoints: endpoints,
+			introspection: endpoints,
 		})
 }
 

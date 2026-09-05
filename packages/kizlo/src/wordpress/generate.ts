@@ -507,7 +507,7 @@ function renderRegistries(tree: WordPressEndpointNode, document: IntrospectionDo
 	return [
 		`declare module "kizlo" {`,
 		`\tinterface WordPressClientRegistry {`,
-		`\t\tendpoints: typeof endpoints`,
+		`\t\tintrospection: typeof introspection`,
 		`\t}`,
 		`\tinterface WordPressEndpointRegistry {`,
 		...endpoints,
@@ -575,8 +575,8 @@ export function generateWordPressModule(document: IntrospectionDocument): Genera
 
 	const moduleBody = [
 		body,
-		`export const endpoints = ${endpointBody}`,
-		`export type WordPressClient = WP_Client<typeof endpoints>`,
+		`export const introspection = ${endpointBody}`,
+		`export type WordPressClient = WP_Client<typeof introspection>`,
 		renderRegistries(tree, document),
 	].join(DECLARATION_SEPARATOR)
 

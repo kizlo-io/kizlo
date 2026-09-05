@@ -33,7 +33,7 @@ export interface KizloConfig<TIntegrations extends readonly AnyIntegration[]> {
 	integrations?: TIntegrations
 	logging?: false | LogLevel
 	credentials: WordPressCredentials
-	wordpressEndpoints?: object
+	introspection?: object
 }
 
 export type RootProcedures<TIntegrations extends readonly AnyIntegration[]> = InferIntegrationProcedures<TIntegrations> & CoreProcedures
@@ -56,7 +56,7 @@ export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
 			adapters: integrations.adapters,
 			siteSecret: config.siteSecret,
 			credentials: config.credentials,
-			wordpressEndpoints: config.wordpressEndpoints,
+			introspection: config.introspection,
 			integrationPlugins: integrations.plugins,
 		})
 
@@ -165,7 +165,7 @@ export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
 			}
 			integrationIds.add(integration.id)
 
-			if (!generating) assertIntegrationEndpoints(integration, this.config.wordpressEndpoints ?? {})
+			if (!generating) assertIntegrationEndpoints(integration, this.config.introspection ?? {})
 			plugins.push(...(integration.requires?.plugins ?? []))
 			if (integration.procedures && Object.keys(integration.procedures).length > 0) procedures[integration.id] = integration.procedures
 			for (const handler of integration.events ?? []) events.push(handler)
@@ -191,11 +191,11 @@ export interface CreateKizloOptions<TIntegrations extends readonly AnyIntegratio
 	/** Enable Kizlo's built-in console logger at this level. */
 	logging?: false | LogLevel
 	/**
-	 * The generated endpoints to run against WordPress, plus optional explicit credentials. Pass the
-	 * `endpoints` export of your generated barrel. Missing credentials fall back to the `wordpressUrl`,
-	 * `wordpressUsername`, and `wordpressPassword` values contributed by integrations.
+	 * The generated WordPress introspection tree to run the typed client against. Pass the
+	 * `introspection` export of your generated barrel. WordPress credentials resolve from the
+	 * `wordpressUrl`, `wordpressUsername`, and `wordpressPassword` values contributed by integrations.
 	 */
-	wordpress?: { endpoints?: object; credentials?: Partial<WordPressCredentials> }
+	introspection?: object
 }
 
 const WORDPRESS_ENV_VALUES = new Set(["siteSecret", "wordpressUrl", "wordpressUsername", "wordpressPassword"])
@@ -244,16 +244,12 @@ function requireEnvValue(name: string, env: EnvReader): string {
 	})
 }
 
-export function resolveWordPressConnection(
-	options: Pick<CreateKizloOptions, "wordpress"> | undefined,
-	env: EnvReader,
-): { credentials: WordPressCredentials } {
-	const credentials = options?.wordpress?.credentials
+export function resolveWordPressConnection(env: EnvReader): { credentials: WordPressCredentials } {
 	return {
 		credentials: {
-			url: credentials?.url ?? requireEnvValue("wordpressUrl", env),
-			username: credentials?.username ?? requireEnvValue("wordpressUsername", env),
-			password: credentials?.password ?? requireEnvValue("wordpressPassword", env),
+			url: requireEnvValue("wordpressUrl", env),
+			username: requireEnvValue("wordpressUsername", env),
+			password: requireEnvValue("wordpressPassword", env),
 		},
 	}
 }
@@ -269,14 +265,14 @@ export function resolveKizloConfig<TIntegrations extends readonly AnyIntegration
 	if (!isContractGeneration()) {
 		for (const integration of integrations) assertIntegrationEnv(integration, env)
 	}
-	const { credentials } = resolveWordPressConnection(options, env)
+	const { credentials } = resolveWordPressConnection(env)
 	return {
 		baseUrl: options?.baseUrl ?? requireEnvValue("baseUrl", env),
 		siteSecret: options?.siteSecret ?? requireEnvValue("siteSecret", env),
 		integrations,
 		logging: options?.logging,
 		credentials,
-		wordpressEndpoints: options?.wordpress?.endpoints,
+		introspection: options?.introspection,
 	}
 }
 

@@ -1,10 +1,10 @@
 import { createEventHandler, createIntegration, createKizlo, createMiddleware, createProcedure } from "kizlo"
 import { nextjs } from "kizlo/nextjs/server"
 import z from "zod"
-import { endpoints } from "./generated"
+import { introspection } from "./generated"
 
 export const { procedures, client, context, handler } = createKizlo({
-	wordpress: { endpoints },
+	introspection,
 	logging: "debug",
 	integrations: [
 		nextjs(),

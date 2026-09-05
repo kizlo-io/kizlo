@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest"
 import z from "zod/v4"
 import { createKizloClient } from "./client"
-import type { Kizlo, RootProcedures, S2SClient } from "./kizlo"
+import type { CreateKizloOptions, Kizlo, RootProcedures, S2SClient } from "./kizlo"
 import type { CommonErrorCode } from "./shared/error"
 import { createIntegration } from "./shared/integration"
 import { createProcedure } from "./shared/procedure"
@@ -100,5 +100,20 @@ describe("createKizloClient browser client", () => {
 	it("omits internal-only namespaces from the browser surface", () => {
 		// @ts-expect-error seo is not present on the browser client
 		browser.client.seo
+	})
+})
+
+// ====================================================
+// createKizlo OPTIONS SURFACE
+// ====================================================
+
+describe("createKizlo options", () => {
+	it("exposes an optional introspection tree", () => {
+		expectTypeOf<CreateKizloOptions>().toHaveProperty("introspection")
+		expectTypeOf<CreateKizloOptions["introspection"]>().toEqualTypeOf<object | undefined>()
+	})
+
+	it("no longer exposes the removed wordpress option", () => {
+		expectTypeOf<CreateKizloOptions>().not.toHaveProperty("wordpress")
 	})
 })

@@ -1,5 +1,5 @@
 import { createKizlo } from "kizlo"
 import { nextjs } from "kizlo/nextjs/server"
-import { endpoints } from "./generated"
+import { introspection } from "./generated"
 
-export const { procedures, client, context, handler } = createKizlo({ integrations: [nextjs()], wordpress: { endpoints } })
+export const { procedures, client, context, handler } = createKizlo({ integrations: [nextjs()], introspection })

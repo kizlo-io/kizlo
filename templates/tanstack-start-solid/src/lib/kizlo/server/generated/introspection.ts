@@ -6,13 +6,13 @@
  */
 import type { WP_Client } from "kizlo"
 
-export const endpoints = {} as any
+export const introspection = {} as any
 
-export type WordPressClient = WP_Client<typeof endpoints>
+export type WordPressClient = WP_Client<typeof introspection>
 
 declare module "kizlo" {
 	interface WordPressClientRegistry {
-		endpoints: typeof endpoints
+		introspection: typeof introspection
 	}
 	interface WordPressEndpointRegistry {
 		[path: string]: any

@@ -67,7 +67,7 @@ export interface ContextConfig {
 	siteSecret: string
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
-	wordpressEndpoints?: object
+	introspection?: object
 	/** WordPress plugins the registered integrations need, checked against what each response reports. */
 	integrationPlugins?: IntegrationPluginRequirement[]
 }
@@ -124,7 +124,7 @@ export class Context {
 		const transport = new WordPressTransport(options)
 		// The generated endpoints are inert data, so the client is the pair: the tree overlaid on the
 		// transport it runs against. The cast hands back whatever shape that project's `introspection.ts` declares.
-		this.wordpress = createWordPressClient(transport, config.wordpressEndpoints ?? {}) as ActiveWordPressClient
+		this.wordpress = createWordPressClient(transport, config.introspection ?? {}) as ActiveWordPressClient
 		this.settings = new SettingsService(this.wordpress)
 		this.email = new EmailService(this.wordpress)
 		this.logger = this.createLogger()
