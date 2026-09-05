@@ -80,26 +80,52 @@ class WooCommerceModuleTest extends TestCase
                 ]),
             ]);
         }
+
+        register_rest_route('wc-admin', '/kizlo-admin-test', [
+            'methods'             => WP_REST_Server::READABLE,
+            'permission_callback' => function (): bool {
+                $this->permissionUser = get_current_user_id();
+                return true;
+            },
+            'callback'            => static fn(): WP_REST_Response => new WP_REST_Response([
+                'user_id' => get_current_user_id(),
+            ]),
+        ]);
     }
 
-    public function test_route_policy_protects_only_identity_sensitive_woocommerce_families(): void
+    public function test_route_policy_guards_the_store_api_and_defers_other_woocommerce_routes(): void
     {
         foreach ([
             '/wc/store/v1/cart',
             '/wc/store/v1/cart/items',
             '/wc/store/v1/checkout',
             '/wc/store/v1/order/12',
-            '/wc/v3/customers',
-            '/wc/v3/orders/12',
+            '/wc/store/v1/products',
+            '/wc/store/v1/product-collection-data',
         ] as $route) {
             $this->assertTrue($this->module->requiresKizloAdmin(true, new WP_REST_Request('GET', $route)), $route);
         }
 
-        foreach (['/wc/store/v1/products', '/wc/store/v1/product-collection-data', '/wc/v3/products'] as $route) {
+        foreach ([
+            '/wc/v3/products',
+            '/wc/v3/customers',
+            '/wc/v3/orders/12',
+            '/wc-admin/options',
+            '/wc-analytics/reports',
+        ] as $route) {
             $this->assertFalse($this->module->requiresKizloAdmin(true, new WP_REST_Request('GET', $route)), $route);
         }
 
-        $this->assertTrue($this->module->requiresKizloAdmin(true, new WP_REST_Request('GET', '/kizlo/v1/introspect')));
+        $this->assertTrue($this->module->requiresKizloAdmin(true, new WP_REST_Request('GET', '/wp/v2/posts')));
+        $this->assertFalse($this->module->requiresKizloAdmin(false, new WP_REST_Request('GET', '/wp/v2/posts')));
+    }
+
+    public function test_cookie_authenticated_administrator_reaches_wc_admin_routes(): void
+    {
+        $response = $this->dispatch('/wc-admin/kizlo-admin-test', $this->adminId, false);
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame($this->adminId, $this->permissionUser);
     }
 
     public function test_store_api_permissions_and_callback_see_the_resolved_customer_once(): void
@@ -169,15 +195,26 @@ class WooCommerceModuleTest extends TestCase
         )));
     }
 
-    public function test_public_catalog_routes_ignore_identity_headers_and_do_not_initialize_a_session(): void
+    public function test_catalog_routes_ignore_identity_headers_and_do_not_initialize_a_session(): void
+    {
+        $response = $this->dispatch('/wc/store/v1/kizlo-public-test', $this->adminId, true, [
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
+        ]);
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame($this->adminId, $this->permissionUser);
+        $this->assertSame($this->adminId, $response->get_data()['user_id']);
+        $this->assertNull(WC()->session);
+    }
+
+    public function test_catalog_routes_reject_callers_without_an_application_password(): void
     {
         $response = $this->dispatch('/wc/store/v1/kizlo-public-test', 0, false, [
             SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
         ]);
 
-        $this->assertSame(200, $response->get_status());
-        $this->assertSame(0, $this->permissionUser);
-        $this->assertSame(0, $response->get_data()['user_id']);
+        $this->assertSame(401, $response->get_status());
+        $this->assertNull($this->permissionUser);
         $this->assertNull(WC()->session);
     }
 

@@ -27,15 +27,18 @@ class WooCommerceModule
         add_filter('rest_request_before_callbacks', [$this, 'maybeSwitchStoreApiUser'], 10, 3);
     }
 
-    /** Keep only identity-sensitive WooCommerce routes behind Kizlo's guard. */
+    /**
+     * Guard Kizlo's headless surface (the whole Store API) and defer every
+     * other WooCommerce route to WooCommerce's own capability checks, so the
+     * admin dashboard's cookie-authenticated REST calls are not blocked.
+     */
     public function requiresKizloAdmin(bool $required, WP_REST_Request $request): bool
     {
         $route = $request->get_route();
-        if (! str_starts_with($route, '/wc/store/') && ! str_starts_with($route, '/wc/v3/')) {
-            return $required;
-        }
+        if (str_starts_with($route, '/wc/store/')) return true;
+        if ($this->isWooCommerceRoute($route)) return false;
 
-        return $this->isProtectedWooCommerceRoute($route);
+        return $required;
     }
 
     public function maybeUseHeadlessSession(string $default): string
@@ -214,10 +217,9 @@ class WooCommerceModule
             || (string) $customer->get_billing_first_name() !== '';
     }
 
-    private function isProtectedWooCommerceRoute(string $route): bool
+    private function isWooCommerceRoute(string $route): bool
     {
-        return preg_match('#^/wc/store/v1/(?:cart|checkout|order)(?:/|$)#', $route) === 1
-            || preg_match('#^/wc/v3/(?:customers|orders)(?:/|$)#', $route) === 1;
+        return preg_match('#^/wc[-/]#', $route) === 1;
     }
 
     private function isHeadlessStoreRoute(string $route): bool
