@@ -14,6 +14,21 @@ describe("Cart resource schemas", () => {
 		expect(CartShippingPackage.shape.rates.element).toBe(CartShippingRate)
 	})
 
+	test("models payment methods as presentation objects, not bare IDs", () => {
+		const method = { id: "bacs", title: "Direct bank transfer", description: "Pay into our bank account.", order: 0, enabled: true }
+
+		expect(schemas.CartPaymentMethod.safeParse(method).success).toBe(true)
+		expect(Cart.shape.paymentMethods.element).toBe(schemas.CartPaymentMethod)
+
+		// The legacy string-array representation is rejected.
+		expect(Cart.shape.paymentMethods.safeParse(["bacs", "cod"]).success).toBe(false)
+
+		// Every field is required; incomplete metadata is rejected.
+		const { description: _description, ...withoutDescription } = method
+		expect(schemas.CartPaymentMethod.safeParse(withoutDescription).success).toBe(false)
+		expect(schemas.CartPaymentMethod.safeParse({ ...method, order: "1" }).success).toBe(false)
+	})
+
 	test("exports only the redesigned field names", () => {
 		for (const name of ["CartLineItemStatus", "CartPackageLine", "CartPackageRate", "CartCouponLine", "CartShippingLine"]) {
 			expect(schemas).not.toHaveProperty(name)

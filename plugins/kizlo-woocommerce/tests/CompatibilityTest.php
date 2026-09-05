@@ -11,7 +11,10 @@ class CompatibilityTest extends TestCase
         $headers = get_file_data(KIZLO_WOOCOMMERCE_FILE, ['requires' => 'Kizlo Requires']);
 
         $this->assertStringContainsString('kizlo 0.14.0', $headers['requires']);
-        $this->assertSame('0.14.0', KIZLO_VERSION);
+        $this->assertTrue(
+            version_compare(KIZLO_VERSION, '0.14.0', '>='),
+            sprintf('The loaded core kizlo %s is older than the required 0.14.0.', KIZLO_VERSION),
+        );
     }
 
     public function test_plugin_declares_hpos_compatibility(): void

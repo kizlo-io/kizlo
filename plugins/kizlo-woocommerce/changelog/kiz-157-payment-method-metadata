@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add payment gateway presentation metadata (id, title, description, order) to the cart Store API extension

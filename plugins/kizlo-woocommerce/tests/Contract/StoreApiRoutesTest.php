@@ -131,8 +131,24 @@ class StoreApiRoutesTest extends TestCase
         $fee = $cart['fees']['items']['properties'];
         $this->assertArrayHasKey('key', $fee);
         $this->assertArrayNotHasKey('id', $fee);
+
+        // WooCommerce's native list stays an array of gateway IDs.
         $this->assertSame('string', $cart['payment_methods']['items']['type']);
         $this->assertSame('string', $cart['payment_requirements']['items']['type']);
+
+        // The presentation metadata is a complete object on the kizlo cart
+        // extension, registered from this schema half.
+        $payment_methods = KizloBlocks::storeCart()['payment_methods'];
+        $this->assertSame('array', $payment_methods['type']);
+        $this->assertSame(
+            ['id', 'title', 'description', 'order', 'enabled'],
+            array_keys($payment_methods['items']['properties']),
+        );
+        $this->assertSame('string', $payment_methods['items']['properties']['id']['type']);
+        $this->assertSame('integer', $payment_methods['items']['properties']['order']['type']);
+        $this->assertSame('boolean', $payment_methods['items']['properties']['enabled']['type']);
+        $this->assertTrue($payment_methods['items']['properties']['id']['required']);
+
         $this->assertTrue($cart['extensions']['additionalProperties']);
         $this->assertTrue($cart['items']['items']['properties']['item_data']['items']['properties']['display']['nullable']);
 

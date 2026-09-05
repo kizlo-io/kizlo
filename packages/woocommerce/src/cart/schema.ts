@@ -149,6 +149,15 @@ export type CartTotals = z.infer<typeof CartTotals>
 export const CartError = z.object({ code: z.string(), message: z.string() })
 export type CartError = z.infer<typeof CartError>
 
+export const CartPaymentMethod = z.object({
+	id: z.string(),
+	title: z.string(),
+	description: z.string(),
+	order: z.number(),
+	enabled: z.boolean(),
+})
+export type CartPaymentMethod = z.infer<typeof CartPaymentMethod>
+
 export const Cart = z.object({
 	items: z.array(CartItem),
 	itemCount: z.number(),
@@ -162,7 +171,7 @@ export const Cart = z.object({
 	needsPayment: z.boolean(),
 	needsShipping: z.boolean(),
 	hasCalculatedShipping: z.boolean(),
-	paymentMethods: z.array(z.string()),
+	paymentMethods: z.array(CartPaymentMethod),
 	paymentRequirements: z.array(z.string()),
 	errors: z.array(CartError),
 	totals: CartTotals,

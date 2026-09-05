@@ -42,7 +42,44 @@ class CartModule
     /** @return array<string, mixed> */
     public function cartExtensionData(): array
     {
-        return [];
+        return [
+            'payment_methods' => $this->availablePaymentMethods(),
+        ];
+    }
+
+    /**
+     * The payment gateways WooCommerce considers available for the current cart
+     * and customer session, in checkout display order.
+     *
+     * WooCommerce's native `payment_methods` gives only the IDs. This pairs each
+     * with the store's configured frontend title and description so a storefront
+     * does not have to know a gateway to label it. `get_available_payment_gateways()`
+     * has already applied enablement, cart eligibility, customer, and extension
+     * filters and returns what remains in checkout order, so `enabled` is always
+     * true and `order` is the position in that list.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function availablePaymentMethods(): array
+    {
+        $gateways = WC()->payment_gateways()->get_available_payment_gateways();
+
+        $methods = [];
+        $order   = 0;
+
+        foreach ($gateways as $gateway) {
+            $methods[] = [
+                'id'          => $gateway->id,
+                'title'       => $gateway->get_title(),
+                'description' => $gateway->get_description(),
+                'order'       => $order,
+                'enabled'     => true,
+            ];
+
+            $order++;
+        }
+
+        return $methods;
     }
 
     /**

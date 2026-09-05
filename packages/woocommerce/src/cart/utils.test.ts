@@ -179,7 +179,15 @@ function rawCart(): WCK_Cart {
 			total_tax: "85",
 			tax_lines: [{ name: "Sales tax", price: "85", rate: "20%" }],
 		},
-		extensions: { kizlo: { internal: true }, acme: { opaque: "cart" } },
+		extensions: {
+			kizlo: {
+				payment_methods: [
+					{ id: "bacs", title: "Direct bank transfer", description: "Pay into our bank account.", order: 0, enabled: true },
+					{ id: "cod", title: "Cash on delivery", description: "Pay with cash upon delivery.", order: 1, enabled: true },
+				],
+			},
+			acme: { opaque: "cart" },
+		},
 	}
 }
 
@@ -194,8 +202,13 @@ test("deserializes complete cart data without legacy derivations", () => {
 		shippingAddress: { address1: "", additionalFields: { leave_at_door: true } },
 		fees: [{ id: "handling", totals: { total: 25, tax: 5 } }],
 		totals: { shippingTotal: null, shippingTaxTotal: null },
+		paymentMethods: [
+			{ id: "bacs", title: "Direct bank transfer", description: "Pay into our bank account.", order: 0, enabled: true },
+			{ id: "cod", title: "Cash on delivery", description: "Pay with cash upon delivery.", order: 1, enabled: true },
+		],
 		extensions: { acme: { opaque: "cart" } },
 	})
+	expect(result.extensions).not.toHaveProperty("kizlo")
 	expect(result.items[0]).toMatchObject({
 		productId: 42,
 		variationId: null,
@@ -218,6 +231,39 @@ test("deserializes complete cart data without legacy derivations", () => {
 	expect(result.items[0]).not.toHaveProperty("status")
 	expect(result.errors).toHaveLength(2)
 	expect(result.shippingPackages[0]?.id).toBe("vendor:alpha")
+})
+
+test("reads payment methods from the kizlo extension, preserving order and metadata", () => {
+	const cart = rawCart()
+	cart.payment_methods = ["bacs", "cod", "stripe"]
+	cart.extensions = {
+		kizlo: {
+			payment_methods: [
+				{ id: "stripe", title: "Credit card", description: "Pay by card.", order: 0, enabled: true },
+				{ id: "acme_pay", title: "Acme Pay", description: "<strong>Third-party</strong> gateway.", order: 1, enabled: true },
+			],
+		},
+	}
+
+	const result = deserializeCart(cart)
+
+	expect(result.paymentMethods).toEqual([
+		{ id: "stripe", title: "Credit card", description: "Pay by card.", order: 0, enabled: true },
+		{ id: "acme_pay", title: "Acme Pay", description: "<strong>Third-party</strong> gateway.", order: 1, enabled: true },
+	])
+	expect(Cart.safeParse(result).success).toBe(true)
+})
+
+test("tolerates a kizlo extension whose runtime payload omits payment methods", () => {
+	const cart = rawCart()
+	// The current contract type always carries payment_methods; this simulates a
+	// non-conforming runtime payload the defensive deserializer must still survive.
+	cart.extensions = { kizlo: {} } as unknown as WCK_Cart["extensions"]
+
+	const result = deserializeCart(cart)
+
+	expect(result.paymentMethods).toEqual([])
+	expect(Cart.safeParse(result).success).toBe(true)
 })
 
 test("deserializes empty carts as non-null resources", () => {

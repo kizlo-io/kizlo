@@ -9,6 +9,7 @@ import { woocommerce } from "./index"
 import { Order } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
+import { BANK_TRANSFER_DESCRIPTION, BANK_TRANSFER_TITLE } from "./test"
 
 /**
  * The WooCommerce integration against a real WooCommerce, calling every route through the endpoints
@@ -198,6 +199,20 @@ test("cart.get returns a cart conforming to Cart", async () => {
 
 	expect(Cart.safeParse(result).success).toBe(true)
 	expect(result.items).toHaveLength(0)
+})
+
+test("cart payment methods carry the store's configured gateway title and description", async () => {
+	await emptyCart()
+	const result = await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+
+	const bankTransfer = result.paymentMethods.find((method) => method.id === "bacs")
+	expect(bankTransfer).toEqual({
+		id: "bacs",
+		title: BANK_TRANSFER_TITLE,
+		description: BANK_TRANSFER_DESCRIPTION,
+		order: expect.any(Number),
+		enabled: true,
+	})
 })
 
 test("cart.items.add puts the product in the cart and answers with the whole cart", async () => {

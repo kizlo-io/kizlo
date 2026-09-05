@@ -2,6 +2,7 @@
 
 namespace Kizlo\WooCommerce\Tests\Cart;
 
+use WC_Payment_Gateway;
 use WC_Product_Variable;
 use WC_Product_Variation;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
@@ -10,6 +11,28 @@ use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\WooCommerce\Modules\Cart\CartModule;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
 use Kizlo\WooCommerce\Tests\TestCase;
+
+/**
+ * A payment gateway with controllable availability and frontend strings, so a
+ * test can hand WooCommerce a known available-gateway set.
+ */
+class FakePaymentGateway extends WC_Payment_Gateway
+{
+    private bool $available;
+
+    public function __construct(string $id, string $title, string $description, bool $available)
+    {
+        $this->id          = $id;
+        $this->title       = $title;
+        $this->description = $description;
+        $this->available   = $available;
+    }
+
+    public function is_available(): bool
+    {
+        return $this->available;
+    }
+}
 
 class CartModuleTest extends TestCase
 {
@@ -61,7 +84,23 @@ class CartModuleTest extends TestCase
         $this->assertSame('integer', $properties['variation_id']['type']);
         $this->assertSame(['string', 'null'], $properties['url']['type']);
         $this->assertArrayNotHasKey('additionalProperties', $properties['custom']);
-        $this->assertSame([], KizloBlocks::storeCart());
+    }
+
+    public function test_cart_extension_lists_available_payment_gateways_in_display_order(): void
+    {
+        $alpha   = new FakePaymentGateway('alpha', 'Alpha Pay', 'Pay with Alpha.', true);
+        $bravo   = new FakePaymentGateway('bravo', 'Bravo Bank', 'Direct bank transfer.', true);
+        $charlie = new FakePaymentGateway('charlie', 'Charlie Cash', 'Unavailable gateway.', false);
+
+        add_filter('woocommerce_payment_gateways', static fn(): array => [$alpha, $bravo, $charlie]);
+        WC()->payment_gateways()->init();
+
+        $data = (new CartModule())->cartExtensionData();
+
+        $this->assertSame([
+            ['id' => 'alpha', 'title' => 'Alpha Pay', 'description' => 'Pay with Alpha.', 'order' => 0, 'enabled' => true],
+            ['id' => 'bravo', 'title' => 'Bravo Bank', 'description' => 'Direct bank transfer.', 'order' => 1, 'enabled' => true],
+        ], $data['payment_methods']);
     }
 
     public function test_order_item_extension_schema_separates_product_availability(): void
