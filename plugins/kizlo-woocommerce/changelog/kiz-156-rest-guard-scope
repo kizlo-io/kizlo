@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Stop blocking WooCommerce admin and analytics REST routes; only the Store API stays behind Kizlo's guard

@@ -4,7 +4,7 @@
  * Plugin Name: Kizlo WooCommerce
  * Plugin URI: https://kizlo.io/plugins/kizlo-woocommerce
  * Description: Connects WooCommerce with the @kizlo/woocommerce integration.
- * Version: 0.4.0
+ * Version: 0.4.1
  * Author: Kizlo Developers
  * Author URI: https://kizlo.io
  * License: GPL v2 or later
@@ -20,7 +20,7 @@
 
 defined('ABSPATH') || exit;
 
-define('KIZLO_WOOCOMMERCE_VERSION', '0.4.0');
+define('KIZLO_WOOCOMMERCE_VERSION', '0.4.1');
 define('KIZLO_WOOCOMMERCE_FILE', __FILE__);
 define('KIZLO_WOOCOMMERCE_PATH', plugin_dir_path(__FILE__));
 define('KIZLO_WOOCOMMERCE_URL', plugin_dir_url(__FILE__));

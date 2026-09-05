@@ -5,5 +5,5 @@
 		"typecheck": "composer phpstan",
 		"clean": "git clean -xdf .cache .turbo vendor build node_modules"
 	},
-	"version": "0.4.0"
+	"version": "0.4.1"
 }

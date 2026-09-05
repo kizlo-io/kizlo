@@ -4,6 +4,10 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-09-05
+### Fixed
+- Stop blocking WooCommerce admin and analytics REST routes; only the Store API stays behind Kizlo's guard
+
 ## [0.4.0] - 2026-09-04
 ### Added
 - Add a public customer-facing Order resource backed by the WooCommerce Store API
@@ -50,6 +54,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.4.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.4.0...kizlo-woocommerce-v0.4.1
 [0.4.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.3.1...kizlo-woocommerce-v0.4.0
 [0.3.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.3.0...kizlo-woocommerce-v0.3.1
 [0.3.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.2.0...kizlo-woocommerce-v0.3.0
