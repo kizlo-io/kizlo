@@ -43,13 +43,13 @@ templates, when you build or run one.
 They all read **the root `.env`, and only that one**. Each app has a `withEnv`
 script that loads it through `dotenv-cli`, and its `build`, dev and `start`
 scripts run through that, so the WordPress connection is written once and
-`pnpm kizlo dev up` keeps it current. Don't add a `.env` under `web/` or a
+`pnpm kizlo dev` keeps it current. Don't add a `.env` under `web/` or a
 template — nothing reads it, and a stale copy is how the connection silently
 drifts. The per-framework API URLs (`NEXT_PUBLIC_`, `PUBLIC_`, `VITE_`) live in
 that same file; the names differ, so they don't collide.
 
 ```bash
-cp web/.env.example .env   # then fill in the values, or let `kizlo dev up` write them
+cp web/.env.example .env   # then fill in the values, or let `kizlo dev` write them
 ```
 
 Each template keeps its own complete `.env.example`, because that file is what a
@@ -83,10 +83,11 @@ pnpm test:only    # run tests for one package, e.g. pnpm test:only @kizlo/woocom
 pnpm test:watch   # run Vitest in watch mode
 ```
 
-`pnpm test` needs the WP test stack seeded first (`pnpm kizlo test up`). Seeding
-is an explicit lifecycle now, not part of the test run — `pnpm test` only reads
-the credentials artifact (~1s). `pnpm lint:ws` also runs automatically on
-`postinstall`.
+Run `pnpm kizlo test` for the complete test workflow. It starts and seeds the
+WordPress test stack when needed, runs the JavaScript and plugin PHPUnit suites,
+and leaves the stack running. After that, `pnpm test` provides a fast JavaScript
+test rerun using the credentials in `.kizlo/test-credentials.json`. `pnpm lint:ws`
+also runs automatically on `postinstall`.
 
 ## Local WordPress stacks
 
@@ -101,18 +102,19 @@ run against.
 git-ignored) — bind-mounted into the container so you can browse and edit every
 file live. Its `dev.plugins` `{ path }` entries also bind-mount this repo's plugins
 into `wp-content/plugins`, and the bare slugs install the wp.org dependencies.
-Build the plugin assets first, then bring it up:
+Build the plugin assets first, then start it:
 
 ```bash
 pnpm install
 pnpm build            # build the workspace incl. the CLI + plugin assets
-pnpm kizlo dev up     # boot + provision (idempotent, never wipes); prints .env lines
+pnpm kizlo dev        # start + provision WordPress, update .env, run the contract watcher (foreground)
 pnpm kizlo dev stop   # pause (DB + plugins kept)
-pnpm kizlo dev reset  # full wipe (down -v) + rebuild
+pnpm kizlo dev reset  # wipe DB + install; the next `kizlo dev` rebuilds fresh
 ```
 
-`kizlo dev up` prints the URL, admin login, and the `.env` lines to paste
-(`KIZLO_LOCAL_WP_URL`/`USERNAME`/`APP_PASSWORD`).
+`kizlo dev` prints the URL, admin login, and the `.env` lines to paste
+(`KIZLO_LOCAL_WP_URL`/`USERNAME`/`APP_PASSWORD`), then stays in the foreground
+running the contract watcher. Run `stop` or `reset` from another terminal.
 
 ### Test stack — `kizlo test`
 
@@ -123,30 +125,30 @@ extension's seed from its built `dist`, so build once first (`pnpm build`); a
 real consumer installs built packages and skips that step.
 
 ```bash
-pnpm build            # build the workspace incl. the CLI + extensions (monorepo only)
-pnpm kizlo test up    # boot the stack, then seed only if not already seeded (no-op when warm)
-pnpm test             # run tests — just reads the credentials artifact
-pnpm kizlo test stop  # pause the stack (non-destructive; DB + plugins kept)
-pnpm kizlo test reset # full wipe (down -v) + reseed — the only command that re-downloads plugins
+pnpm build                  # build the workspace, CLI, plugins, and extensions
+pnpm kizlo test             # boot and seed WordPress, run JS and PHPUnit tests, leave the stack running
+pnpm test                   # fast JS test rerun against the already-seeded stack
+pnpm kizlo test --teardown  # run the full suite, then stop the stack
+pnpm kizlo test --reset     # wipe and reseed before running the full suite
+pnpm kizlo test stop        # stop the stack while preserving its database
+pnpm kizlo test reset       # wipe the database and bring up a freshly seeded stack
 ```
 
-For a one-shot CI-style run, `pnpm kizlo test run` boots the stack, seeds it,
-runs your `test` script, and leaves it up (`--teardown` to stop it after,
-`--reset` for a fresh DB first). Bare `pnpm kizlo test` is shorthand for `run`.
+Bare `pnpm kizlo test` is the full test workflow: it starts WordPress when
+needed, seeds it when needed, runs the project's test script followed by plugin
+PHPUnit tests, and leaves the stack running for fast reruns. Once the stack is
+seeded, `pnpm test` can rerun the JavaScript test suite using
+`.kizlo/test-credentials.json` without managing the stack.
 
-The CLI writes a credentials artifact to `.kizlo/test-credentials.json`, anchored
-to the directory containing `kizlo.config.ts`, so tests find it from any
-sub-directory with no configuration.
+The credentials artifact is anchored to the directory containing `kizlo.config.ts`,
+so tests find it from any sub-directory with no configuration.
 
-`pnpm kizlo test` runs both test layers against the seeded stack: the workspace
-Vitest suites, then PHPUnit inside the container for every bind-mounted plugin
-that ships a `phpunit.xml`/`.dist` (today `kizlo` and `kizlo-woocommerce`),
-against an isolated `wordpress_test` database that never touches the served
-site's data. Docker has to be running, and each plugin's Composer dev
-dependencies have to be installed so `vendor/bin/phpunit` exists (`pnpm install`
-does this when Composer is on your `PATH`; a plugin missing it is skipped with a
-warning). The run leaves WordPress up for fast reruns, so stop it with
-`pnpm kizlo test stop` when you're done.
+The PHPUnit layer runs inside the container for every bind-mounted plugin that
+ships a `phpunit.xml`/`.dist` (today `kizlo` and `kizlo-woocommerce`), against an
+isolated `wordpress_test` database that never touches the served WordPress data.
+Docker has to be running, and each plugin's Composer dev dependencies have to be
+installed so `vendor/bin/phpunit` exists (`pnpm install` does this when Composer
+is on your `PATH`; a plugin missing it is skipped with a warning).
 
 ## Regenerating the WordPress contract
 
@@ -320,6 +322,12 @@ reuse one issue's worktree for a different issue.
   **Verified** (the checks you ran and their result, including anything skipped
   or not applicable). Keep each section to a few lines and drop any that would
   be empty.
+- When a change alters a public API or user-visible behavior, update the
+  relevant documentation or examples in the same PR. If neither applies, say so
+  in **Notes** and why.
+- Keep the description current as the diff and checks evolve. **Verified** must
+  match the checks that actually ran and their latest result, and the other
+  sections must still describe the PR as it now stands.
 - Reference an issue with `Closes #123` only when a GitHub issue actually
   exists. Otherwise leave the issue line out.
 - Make sure the following pass locally before opening a PR — they're the same
