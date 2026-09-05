@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.20.0
+
+### Minor Changes
+
+- [#201](https://github.com/kizlo-io/kizlo/pull/201) [`1ad4b80`](https://github.com/kizlo-io/kizlo/commit/1ad4b80daef47ca55bc0c631d74b7970bae52ec0) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Replace the `wordpress` option on `createKizlo` with `introspection`; pass the `introspection` export of your generated barrel and let integrations supply WordPress credentials.
+
 ## 0.19.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.6.0
+
+### Minor Changes
+
+- [#200](https://github.com/kizlo-io/kizlo/pull/200) [`b11014e`](https://github.com/kizlo-io/kizlo/commit/b11014e1b2e83be8faf227f46eff5c83e5159a69) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose cart payment methods as objects with id, title, description, order, and enabled instead of bare gateway IDs.
+
 ## 0.5.0
 
 ### Minor Changes
