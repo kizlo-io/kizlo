@@ -12,7 +12,7 @@ function kizlo() {
 		baseUrl: "https://app.example",
 		siteSecret: "site-secret",
 		credentials: { url: "https://wp.example", username: "admin", password: "secret" },
-		wordpressEndpoints: ENDPOINTS,
+		introspection: ENDPOINTS,
 	})
 }
 

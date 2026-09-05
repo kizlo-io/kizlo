@@ -13,6 +13,7 @@ import {
 	generateIntrospectionOnce,
 	generateIntrospectionSource,
 	generateOnce,
+	INTROSPECTION_STUB,
 	LegacyRouterExportError,
 	PartialContractError,
 	reportGenerationError,
@@ -138,6 +139,13 @@ describe("generateOnce", () => {
 		expect(CONTRACT_BARREL).toContain("typeof procedures")
 		// The barrel re-exports from the introspection artifact, not the old wordpress.ts.
 		expect(CONTRACT_BARREL).toContain('from "./introspection"')
+		expect(CONTRACT_BARREL).toContain('export { introspection, type WordPressClient } from "./introspection"')
+	})
+
+	test("writes an introspection stub that exports the named tree", () => {
+		expect(INTROSPECTION_STUB).toContain("export const introspection = {} as any")
+		expect(INTROSPECTION_STUB).toContain("export type WordPressClient = WP_Client<typeof introspection>")
+		expect(INTROSPECTION_STUB).toContain("introspection: typeof introspection")
 	})
 
 	test("generates the introspection alone when no server is configured", async () => {

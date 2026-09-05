@@ -8,4 +8,4 @@
  * The other templates keep the plain stub on purpose. Compiling the framework's own source against
  * an empty tree is what proves it still typechecks in a project that has not generated yet.
  */
-export { endpoints, type WordPressClient } from "../../../../../../../introspection"
+export { introspection, type WordPressClient } from "../../../../../../../introspection"

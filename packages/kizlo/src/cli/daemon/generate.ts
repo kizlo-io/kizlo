@@ -16,16 +16,16 @@ import { importIgnoringVirtualModules } from "./jiti"
 import { log } from "./logger"
 
 /**
- * The generated barrel is also written as a stub by `kizlo init`. It re-exports `endpoints` rather
- * than pre-wrapping it: a server entry passes `wordpress: { endpoints }` itself, so the rest of the
- * WordPress options stay visible at the call site instead of hiding inside a generated object.
+ * The generated barrel is also written as a stub by `kizlo init`. It re-exports `introspection`
+ * rather than pre-wrapping it: a server entry passes `createKizlo({ introspection })` itself, so the
+ * rest of the options stay visible at the call site instead of hiding inside a generated object.
  */
 export const CONTRACT_BARREL = [
 	`import type { procedures } from ".."`,
 	`import contractJson from "./contract.json"`,
 	``,
 	`export const contract = contractJson as unknown as typeof procedures`,
-	`export { endpoints, type WordPressClient } from "./introspection"`,
+	`export { introspection, type WordPressClient } from "./introspection"`,
 	``,
 ].join("\n")
 
@@ -50,13 +50,13 @@ export const INTROSPECTION_STUB = [
 	// The import is load-bearing: without one, `declare module "kizlo"` has no module to augment.
 	`import type { WP_Client } from "kizlo"`,
 	``,
-	`export const endpoints = {} as any`,
+	`export const introspection = {} as any`,
 	``,
-	`export type WordPressClient = WP_Client<typeof endpoints>`,
+	`export type WordPressClient = WP_Client<typeof introspection>`,
 	``,
 	`declare module "kizlo" {`,
 	`\tinterface WordPressClientRegistry {`,
-	`\t\tendpoints: typeof endpoints`,
+	`\t\tintrospection: typeof introspection`,
 	`\t}`,
 	`\tinterface WordPressEndpointRegistry {`,
 	`\t\t[path: string]: any`,
@@ -219,7 +219,7 @@ async function fetchDocument(
 	etag?: string,
 ): Promise<Awaited<ReturnType<typeof fetchIntrospection>> | undefined> {
 	loadEnvFiles(cwd)
-	const credentials = options.credentials ?? resolveWordPressConnection(undefined, integrationEnv([node()])).credentials
+	const credentials = options.credentials ?? resolveWordPressConnection(integrationEnv([node()])).credentials
 	// Strict generation never revalidates: a 304 carries no diagnostics, so a warm meta file left over
 	// from a partial generation would answer "unchanged" and pass a run whose whole job is to fail.
 	const result = await fetchIntrospection(credentials, { etag: options.strict ? undefined : etag, fetch: options.fetch })

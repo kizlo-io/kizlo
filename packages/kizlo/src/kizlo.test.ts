@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { authMock } from "./adapters/auth"
 import type { ProcedureContext } from "./context"
-import { Kizlo, resolveKizloConfig } from "./kizlo"
+import { createKizlo, Kizlo, resolveKizloConfig } from "./kizlo"
 import { CORE_PROCEDURES } from "./procedures"
 import { createIntegration } from "./shared/integration"
 
@@ -80,13 +80,20 @@ describe("resolveKizloConfig environment boundary", () => {
 	})
 
 	test("does not read runtime environment variables itself", () => {
+		// Credentials come from the integration, so a missing baseUrl is the only value left to throw on.
+		const wordpressOnly = createIntegration({
+			id: "runtime",
+			env: {
+				remote: { wordpressUrl: credentials.url, wordpressUsername: credentials.username, wordpressPassword: credentials.password },
+			},
+		})
 		const previous = process.env.KIZLO_BASE_URL
 		process.env.KIZLO_BASE_URL = "https://ignored.example/api/kizlo"
 		try {
 			expect(() =>
 				resolveKizloConfig({
 					siteSecret: "explicit-secret",
-					wordpress: { credentials },
+					integrations: [wordpressOnly],
 				}),
 			).toThrow(/"baseUrl" environment value/)
 		} finally {
@@ -95,32 +102,27 @@ describe("resolveKizloConfig environment boundary", () => {
 		}
 	})
 
-	test("lets explicit options configure Kizlo without an integration", () => {
+	test("preserves the supplied introspection tree on the resolved config", () => {
+		const introspection = { postTypes: { book: {} } }
 		const config = resolveKizloConfig({
-			baseUrl: "https://explicit.example/api/kizlo",
-			siteSecret: "explicit-secret",
-			wordpress: { credentials },
+			introspection,
+			integrations: [createIntegration({ id: "runtime", env: runtimeValues })],
 		})
 
-		expect(config).toMatchObject({
-			baseUrl: "https://explicit.example/api/kizlo",
-			siteSecret: "explicit-secret",
-			credentials,
-		})
+		expect(config.introspection).toBe(introspection)
 	})
 
-	test("lets explicit options override integration values", () => {
+	test("lets explicit baseUrl and siteSecret override integration values", () => {
 		const config = resolveKizloConfig({
 			baseUrl: "https://explicit.example/api/kizlo",
 			siteSecret: "explicit-secret",
-			wordpress: { credentials: { username: "explicit-user" } },
 			integrations: [createIntegration({ id: "runtime", env: runtimeValues })],
 		})
 
 		expect(config).toMatchObject({
 			baseUrl: "https://explicit.example/api/kizlo",
 			siteSecret: "explicit-secret",
-			credentials: { ...credentials, username: "explicit-user" },
+			credentials,
 		})
 	})
 })
@@ -155,8 +157,7 @@ describe("integration composition", () => {
 			baseUrl: "https://app.example",
 			siteSecret: "site-secret",
 			logging: "debug",
-			wordpress: { credentials },
-			integrations,
+			integrations: [createIntegration({ id: "runtime", env: runtimeValues }), ...integrations],
 		})
 		const adapters = new Kizlo(resolved).context.createServerContext().config.adapters
 
@@ -203,6 +204,14 @@ describe("integration composition", () => {
 				],
 			}),
 		).toThrow(/"provider" integration.*providerSecret/)
+	})
+
+	test("checks integration endpoint requirements against the supplied introspection", () => {
+		const runtime = createIntegration({ id: "runtime", env: runtimeValues })
+		const needsRoute = createIntegration({ id: "shop", requires: { endpoints: ["store.cart"] } })
+
+		expect(() => createKizlo({ integrations: [runtime, needsRoute] })).toThrow(/store\.cart/)
+		expect(() => createKizlo({ introspection: { store: { cart: {} } }, integrations: [runtime, needsRoute] })).not.toThrow()
 	})
 
 	test("keeps adapter-only and empty-procedure integrations out of the procedure tree", () => {

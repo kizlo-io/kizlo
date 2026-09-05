@@ -1,4 +1,4 @@
-import { endpoints } from "../../../../introspection"
+import { introspection } from "../../../../introspection"
 import { geoMock } from "../adapters/geo"
 import { consoleLog } from "../adapters/logger"
 import type { ServiceAdapters } from "../adapters/types"
@@ -39,7 +39,7 @@ export function getKizloTestInstance<TIntegrations extends readonly AnyIntegrati
 			username: creds.users.admin.username,
 			password: creds.users.admin.applicationPassword,
 		},
-		wordpressEndpoints: endpoints,
+		introspection,
 		integrations: [testRuntime, ...(options?.integrations ?? [])] as unknown as TIntegrations,
 	})
 }

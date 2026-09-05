@@ -9,9 +9,9 @@ export const base: Fallback = {
 				relPath: ctx.serverEntryPath,
 				contents: `import { createKizlo } from "kizlo"
 import { node } from "kizlo/node"
-import { endpoints } from "./generated"
+import { introspection } from "./generated"
 
-export const { procedures, client, context, handler } = createKizlo({ integrations: [node()], wordpress: { endpoints } })
+export const { procedures, client, context, handler } = createKizlo({ integrations: [node()], introspection })
 `,
 			},
 			{ label: "Browser client", relPath: ctx.clientPath, contents: clientEntry(ctx) },

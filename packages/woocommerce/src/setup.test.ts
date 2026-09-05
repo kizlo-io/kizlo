@@ -15,7 +15,7 @@ function server(endpoints: object) {
 			siteSecret: "site-secret",
 			credentials: { url: "https://wp.example", username: "admin", password: "secret" },
 			integrations: [woocommerce()],
-			wordpressEndpoints: endpoints,
+			introspection: endpoints,
 		})
 }
 

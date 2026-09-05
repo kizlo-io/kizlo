@@ -200,7 +200,7 @@ export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: S
 		// Credentials come from the environment and cannot change while the dev server runs, so they are
 		// resolved once here rather than on every regeneration.
 		loadEnvFiles(cwd)
-		const { credentials } = resolveWordPressConnection(undefined, integrationEnv([node()]))
+		const { credentials } = resolveWordPressConnection(integrationEnv([node()]))
 
 		try {
 			const result = await generateOnce(cfg, { credentials })

@@ -60,7 +60,7 @@ export interface WordPressCustomFieldsRegistry {}
  * transport, or the bare transport. The stub written before the first generation registers `any`,
  * so a freshly scaffolded project compiles against endpoints it has not described yet.
  */
-export type ActiveWordPressClient = WordPressClientRegistry extends { endpoints: infer TEndpoints extends object }
+export type ActiveWordPressClient = WordPressClientRegistry extends { introspection: infer TEndpoints extends object }
 	? WP_Client<TEndpoints> & WordPressTransport
 	: WordPressTransport
 

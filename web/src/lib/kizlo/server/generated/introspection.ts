@@ -14519,7 +14519,7 @@ export type WP_WoocommerceStoreProductsCollectionDataEndpointResult =
 	| WP_Success<WP_WoocommerceStoreProductCollectionData, 200, Record<string, never>>
 	| WP_Failure<"kizlo_rest_forbidden" | "kizlo_rest_unauthorized" | "rest_forbidden" | "rest_invalid_param" | "rest_missing_callback_param" | "woocommerce_rest_unknown_server_error", number, Record<string, never>>
 
-export const endpoints = {
+export const introspection = {
 	cf7: {
 		forms: {
 			/**
@@ -15108,11 +15108,11 @@ export const endpoints = {
 	},
 }
 
-export type WordPressClient = WP_Client<typeof endpoints>
+export type WordPressClient = WP_Client<typeof introspection>
 
 declare module "kizlo" {
 	interface WordPressClientRegistry {
-		endpoints: typeof endpoints
+		introspection: typeof introspection
 	}
 	interface WordPressEndpointRegistry {
 		"cf7.forms.submit": WP_Endpoint<WP_Cf7FormsSubmitEndpointInput, WP_Cf7FormsSubmitEndpointResult>
