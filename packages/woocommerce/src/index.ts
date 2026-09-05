@@ -14,7 +14,7 @@ export function woocommerce() {
 	return createIntegration({
 		id: "woocommerce",
 		requires: {
-			plugins: [{ name: "kizlo-woocommerce", version: "0.4.0" }],
+			plugins: [{ name: "kizlo-woocommerce", version: "0.5.0" }],
 			// The `wc/v3` and `wc/store/v1` operations this integration calls. WooCommerce serves them, but
 			// only the Kizlo WooCommerce plugin describes them, so an absent subtree means that plugin is
 			// missing or predates the contract rather than anything being wrong with WooCommerce.

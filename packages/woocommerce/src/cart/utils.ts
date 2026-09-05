@@ -238,7 +238,7 @@ assertNoMissing<Exclude<keyof WCK_CartShippingRate["meta_data"][number], (typeof
 assertNoMissing<Exclude<keyof WCK_CartTotals["tax_lines"][number], (typeof CART_TAX_LINE_KEYS)[number]>>()
 
 export function deserializeCart(data: WCK_Cart): Cart {
-	const { extensions } = deserializeExtensions(data.extensions)
+	const { extensions, kizlo } = deserializeExtensions(data.extensions)
 
 	return {
 		items: data.items.map(deserializeCartItem),
@@ -285,7 +285,7 @@ export function deserializeCart(data: WCK_Cart): Cart {
 		needsPayment: data.needs_payment,
 		needsShipping: data.needs_shipping,
 		hasCalculatedShipping: data.has_calculated_shipping,
-		paymentMethods: data.payment_methods,
+		paymentMethods: deserializePaymentMethods(kizlo.payment_methods),
 		paymentRequirements: data.payment_requirements,
 		errors: data.errors,
 		totals: {
@@ -365,6 +365,35 @@ function deserializeCartItem(item: WCK_CartItem): Cart["items"][number] {
 		custom: productCustomFields(kizlo.custom),
 		extensions,
 	}
+}
+
+/**
+ * Read the available payment gateways from the Kizlo cart extension.
+ *
+ * WooCommerce's native `payment_methods` is a list of IDs; the presentation
+ * metadata lives on `extensions.kizlo.payment_methods`, which the WooCommerce
+ * plugin populates. Entries missing a required field are dropped rather than
+ * passed through half-formed.
+ */
+function deserializePaymentMethods(value: unknown): Cart["paymentMethods"] {
+	if (!Array.isArray(value)) return []
+
+	return value.flatMap((entry) => {
+		if (typeof entry !== "object" || entry === null) return []
+
+		const { id, title, description, order, enabled } = entry as Record<string, unknown>
+		if (
+			typeof id !== "string" ||
+			typeof title !== "string" ||
+			typeof description !== "string" ||
+			typeof order !== "number" ||
+			typeof enabled !== "boolean"
+		) {
+			return []
+		}
+
+		return [{ id, title, description, order, enabled }]
+	})
 }
 
 export function deserializeCartShippingAddress(address: WCK_Cart["shipping_address"]): CartShippingAddress {

@@ -114,9 +114,17 @@ async function linkRecommendations(service: SeedContext["service"], productIds: 
  * WooCommerce ships every gateway disabled, and paying an order needs an available one, so the
  * checkout tests have nothing to reach without this. Bank transfer is the gateway with no shipping
  * method or country conditions attached to it, so enabling it says the least about the rest.
+ *
+ * The title and description are set to distinctive values so the cart's payment-method metadata
+ * test can prove the store's configured strings flow through rather than a hardcoded default.
  */
+export const BANK_TRANSFER_TITLE = "Bank transfer (Kizlo test)"
+export const BANK_TRANSFER_DESCRIPTION = "Pay by transferring to our test bank account."
+
 async function enableBankTransfer(service: SeedContext["service"]): Promise<void> {
-	const updated = await service.put(`${WC_CORE_BASE}/payment_gateways/bacs`, { body: { enabled: true } })
+	const updated = await service.put(`${WC_CORE_BASE}/payment_gateways/bacs`, {
+		body: { enabled: true, title: BANK_TRANSFER_TITLE, description: BANK_TRANSFER_DESCRIPTION },
+	})
 	if (updated.error) throw updated.error
 }
 

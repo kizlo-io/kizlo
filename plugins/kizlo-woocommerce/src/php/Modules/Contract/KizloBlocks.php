@@ -38,15 +38,33 @@ final class KizloBlocks
     /**
      * `extensions.kizlo` on a Store API cart.
      *
-     * The namespace is registered so its response shape is explicit. Kizlo does
-     * not currently add cart-level fields; cart item fields live on the item
-     * extension below.
+     * WooCommerce's native `payment_methods` is a list of gateway IDs. This adds
+     * the presentation metadata a storefront needs to render a payment step
+     * without hardcoding labels: each available gateway's frontend title and
+     * description, in checkout display order.
      *
      * @return array<string, mixed>
      */
     public static function storeCart(): array
     {
-        return [];
+        return [
+            'payment_methods' => [
+                'description' => 'Payment gateways available for the current cart and customer, in checkout display order.',
+                'type'        => 'array',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+                'items'       => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'id'          => ['type' => 'string', 'required' => true, 'description' => 'The gateway ID, matching an entry in the native `payment_methods` list.'],
+                        'title'       => ['type' => 'string', 'required' => true, 'description' => 'The gateway\'s configured frontend title.'],
+                        'description' => ['type' => 'string', 'required' => true, 'description' => 'The gateway\'s configured frontend description, which may contain sanitized HTML.'],
+                        'order'       => ['type' => 'integer', 'required' => true, 'description' => 'Zero-based position in WooCommerce\'s checkout display order.'],
+                        'enabled'     => ['type' => 'boolean', 'required' => true, 'description' => 'Always true; unavailable gateways are omitted.'],
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**
