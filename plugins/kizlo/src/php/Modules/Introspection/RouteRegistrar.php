@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\Introspection;
 
 use InvalidArgumentException;
+use Kizlo\Modules\RestApi\RestGuard;
 use WP_Error;
 use WP_REST_Request;
 
@@ -125,10 +126,11 @@ class RouteRegistrar
      * request is made, and nothing verifies that the described route exists —
      * the contract is a statement about someone else's API, taken on trust.
      *
-     * Described routes are protected by default through
-     * {@see \Kizlo\Modules\RestApi\RestGuard}, so they inherit
-     * {@see OperationErrors::GUARD}. An active integration may deliberately
-     * leave a narrow public route family on its native permission callback.
+     * A described route defers to its own permission callbacks by default, so it
+     * inherits {@see OperationErrors::NATIVE}. It inherits the guard's own errors
+     * through {@see OperationErrors::GUARD} only when {@see RestGuard} actually
+     * protects it — a Kizlo-owned route, or a family an active integration opts
+     * in with `kizlo_rest_route_requires_admin`.
      *
      * @param array<string, mixed> $args
      */
@@ -181,10 +183,31 @@ class RouteRegistrar
             );
         }
 
-        SpecStore::addRoute(
-            OperationErrors::withGuard(self::declaration($args, (string) $args['namespace'])),
-            $core,
-        );
+        $declaration = self::declaration($args, (string) $args['namespace']);
+        $declaration = self::guardProtects($declaration)
+            ? OperationErrors::withGuard($declaration)
+            : OperationErrors::withNative($declaration);
+
+        SpecStore::addRoute($declaration, $core);
+    }
+
+    /**
+     * Whether {@see RestGuard} stands in front of the described route, asked the
+     * same way and at the same time a real request would ask it.
+     *
+     * Specs are materialized when `/introspect` builds its document, by which
+     * point every integration has registered its `kizlo_rest_route_requires_admin`
+     * filter, so the contract matches the runtime policy for that route.
+     *
+     * @param array<string, mixed> $declaration
+     */
+    private static function guardProtects(array $declaration): bool
+    {
+        $namespace = is_string($declaration['namespace'] ?? null) ? trim($declaration['namespace'], '/') : '';
+        $route     = is_string($declaration['route'] ?? null) ? '/' . ltrim($declaration['route'], '/') : '';
+        $method    = is_string($declaration['method'] ?? null) ? $declaration['method'] : 'GET';
+
+        return RestGuard::protectsRoute(new WP_REST_Request($method, '/' . $namespace . $route));
     }
 
     /**

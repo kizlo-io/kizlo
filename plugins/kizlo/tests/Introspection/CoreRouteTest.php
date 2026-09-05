@@ -156,15 +156,43 @@ class CoreRouteTest extends IntrospectionTestCase
     // ============================================================
 
     /**
-     * `RestGuard` protects routes by default before their callbacks, so the
-     * lockdown is in front of `wp/v2` as much as `kizlo/v1`.
+     * `RestGuard` leaves `wp/v2` on WordPress's own authentication, so a native
+     * route inherits only what WordPress can return before dispatch and never
+     * advertises the guard's own `kizlo_rest_*` codes it can no longer produce.
      */
-    public function test_a_described_route_inherits_the_guard_errors(): void
+    public function test_a_native_route_inherits_only_the_pre_dispatch_errors(): void
     {
         $errors = $this->document()['apis']['comments']['paths']['/comments']['list']['errors'];
 
-        foreach (OperationErrors::GUARD as $code) {
+        foreach (OperationErrors::NATIVE as $code) {
             $this->assertContains($code, $errors);
+        }
+
+        $this->assertNotContains('kizlo_rest_unauthorized', $errors);
+        $this->assertNotContains('kizlo_rest_forbidden', $errors);
+    }
+
+    /**
+     * A described route an integration opts into the guard with
+     * `kizlo_rest_route_requires_admin` does advertise the guard's codes, because
+     * the guard now stands in front of it exactly as it does a Kizlo route.
+     */
+    public function test_a_described_route_opted_into_the_guard_inherits_its_errors(): void
+    {
+        $filter = static fn(bool $required, \WP_REST_Request $request): bool =>
+            $request->get_route() === '/acme/v1/widgets' ? true : $required;
+        add_filter('kizlo_rest_route_requires_admin', $filter, 10, 2);
+
+        try {
+            $this->registerRouteSpec($this->operation());
+
+            $errors = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list']['errors'];
+
+            foreach (OperationErrors::GUARD as $code) {
+                $this->assertContains($code, $errors);
+            }
+        } finally {
+            remove_filter('kizlo_rest_route_requires_admin', $filter, 10);
         }
     }
 
