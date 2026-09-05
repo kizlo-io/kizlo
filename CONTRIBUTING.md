@@ -3,6 +3,14 @@
 Thanks for your interest in contributing! This guide covers how to set up the
 project, the day-to-day workflow, and what we expect in a pull request.
 
+## Scope
+
+This guide governs the whole monorepo. Unless a command says otherwise, run it
+from the repository root, where the Turborepo scripts fan out across every
+package. If a subdirectory ever gains its own `CONTRIBUTING.md` or `AGENTS.md`,
+that nested guide wins inside its own subtree, and this one still covers whatever
+the nested guide leaves unsaid.
+
 ## Code of Conduct
 
 This project is governed by the Kizlo
@@ -14,6 +22,10 @@ By participating, you are expected to uphold it.
 - **Node** — `.nvmrc` pins Node 24 (`nvm use`); the minimum is 22.14
 - **pnpm** — `corepack enable` provides the pinned version; the minimum is 9.6
 - **Docker** — required to run the WordPress test stack
+- **PHP and Composer** are needed only for plugin work (`plugins/*`). With
+  Composer on your `PATH`, `pnpm install` installs each plugin's dev
+  dependencies (including `vendor/bin/phpunit`); without it, the plugin PHP
+  suites are skipped
 
 ## Getting started
 
@@ -126,6 +138,52 @@ The CLI writes a credentials artifact to `.kizlo/test-credentials.json`, anchore
 to the directory containing `kizlo.config.ts`, so tests find it from any
 sub-directory with no configuration.
 
+`pnpm kizlo test` runs both test layers against the seeded stack: the workspace
+Vitest suites, then PHPUnit inside the container for every bind-mounted plugin
+that ships a `phpunit.xml`/`.dist` (today `kizlo` and `kizlo-woocommerce`),
+against an isolated `wordpress_test` database that never touches the served
+site's data. Docker has to be running, and each plugin's Composer dev
+dependencies have to be installed so `vendor/bin/phpunit` exists (`pnpm install`
+does this when Composer is on your `PATH`; a plugin missing it is skipped with a
+warning). The run leaves WordPress up for fast reruns, so stop it with
+`pnpm kizlo test stop` when you're done.
+
+## Regenerating the WordPress contract
+
+Two generated files are committed, one at the repository root and one under
+`web/`:
+
+```
+introspection.ts
+web/src/lib/kizlo/server/generated/introspection.ts
+```
+
+Both are **derived artifacts**: the typed WordPress contract produced from
+whatever the seeded test stack serves. Never hand-edit them. Regenerate them
+whenever you change what the contract exposes, such as a plugin's Store API or
+REST schema, the introspection fixtures in `kizlo.config.ts`, or the pinned
+plugin versions those fixtures install. The `templates/*` copies are intentional
+empty stubs and stay out of this; leave them as they are.
+
+Regenerate and verify both copies against the seeded stack:
+
+```bash
+pnpm build                                          # rebuild packages incl. the CLI + plugin assets
+pnpm kizlo test                                     # boot, seed, run the suite; leaves WordPress running
+pnpm kizlo generate --test                          # rewrite the root introspection.ts
+pnpm kizlo generate --test --dir web/src/lib/kizlo  # rewrite the web copy
+pnpm kizlo check --test                             # confirm the root copy is current
+pnpm kizlo check --test --dir web/src/lib/kizlo     # confirm the web copy is current
+pnpm kizlo test stop                                # stop the stack
+```
+
+`--test` points the generator at the WordPress that `pnpm kizlo test` left
+running. `kizlo check` never writes: it regenerates in memory, diffs against the
+committed file, and exits non-zero when a copy is stale, printing the exact
+`kizlo generate` command to run. CI runs that check on the web copy, so a stale
+file fails the build. Commit the regenerated files alongside the change that
+moved the contract.
+
 ## Code style
 
 We use [Biome](https://biomejs.org/) for linting and formatting (config in
@@ -228,6 +286,22 @@ uncommitted work or a stale `main` is what produces avoidable conflicts later.
 
 Never commit directly to `main`.
 
+### Worktrees for tracked-issue automation
+
+Working by hand in a clean primary checkout is fine. Automation running a tracked
+issue instead cuts an isolated worktree at `.worktrees/<issue-key>` from current
+`origin/main`, so the primary checkout and any unrelated local changes stay
+untouched:
+
+```bash
+git fetch origin main
+git worktree add -b <type>/<issue-key>-<slug> .worktrees/<issue-key> origin/main
+```
+
+`pnpm worktree:sweep` prunes merged or stale worktrees under `.worktrees/`
+(pass `--dry-run` to preview). Never nest one worktree inside another, and never
+reuse one issue's worktree for a different issue.
+
 ## Commit messages & pull requests
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for commit
@@ -257,6 +331,13 @@ Never commit directly to `main`.
   pnpm build
   pnpm test
   ```
+- Open every pull request as a **draft**, and keep it not review-ready until the
+  checks above pass and the maintainer explicitly says to mark it ready. Feedback
+  on a draft is not that sign-off.
+- Resolve a review thread only once its concern is actually addressed or
+  answered, not to clear the list.
+- Maintainers merge. After review approval a maintainer squash-merges the pull
+  request; the single-commit rule below is what keeps that squash message clean.
 
 ## Keeping one commit per PR
 
@@ -279,6 +360,11 @@ that box deterministic, **keep every PR as a single commit**:
 Do not put the PR description into the commit body — it's written for reviewers
 and is too long for history. Do not leave more than one commit — the squash box
 then collapses to a bulleted list of commit subjects and loses the summary.
+
+Publish branches to `origin`. Rewriting history is limited to your own
+single-commit PR branch, and always with `--force-with-lease`. When a branch is
+shared, meaning someone else has commits on it or is reviewing from it, do not
+rewrite its history without coordinating first.
 
 ## Reporting bugs
 
