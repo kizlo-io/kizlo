@@ -6,22 +6,21 @@ use WP_Error;
 use WP_REST_Request;
 
 /**
- * Request-aware REST API lockdown.
+ * Request-aware REST API lockdown for Kizlo's own surface.
  *
  * Kizlo runs as a server-to-server headless adapter: the SDK on the
- * application server is the only client that should ever reach this site's
- * REST API. End-user browsers, public crawlers, exploratory tools, and any
- * other unauthenticated caller have no legitimate reason to hit /wp-json/*.
+ * application server is the only client that should reach a Kizlo route. Those
+ * routes are locked to an administrator authenticated with a WordPress
+ * Application Password, because some of them (the WooCommerce cart routes) act
+ * on an X-Kizlo-User-Email header trusted without cryptographic verification —
+ * opening them to anonymous callers would let anyone act as any user.
  *
- * The lockdown is unconditional and intentional: cart routes accept a
- * X-Kizlo-User-Email header that is trusted without cryptographic verification,
- * so opening the API to anonymous callers would let anyone act as any user.
- * The trust boundary is HTTP Basic auth with an admin Application Password —
- * everything past it is treated as a legitimate request from the SDK.
- *
- * Routes are protected by default. Integrations may make a narrow route family
- * public with `kizlo_rest_route_requires_admin`; Kizlo-owned routes stay behind
- * this guard.
+ * The guard is scoped to that surface. Kizlo-owned routes (`/kizlo/*`) are
+ * always protected; every other route — WordPress's own `/wp/v2/*` block-editor
+ * endpoints, the admin dashboard, third-party plugins — keeps its native
+ * authentication and capability callbacks. An integration opts a sensitive
+ * route family back in with `kizlo_rest_route_requires_admin`; see
+ * {@see self::protectsRoute()}.
  */
 class RestGuard
 {
@@ -34,17 +33,8 @@ class RestGuard
     {
         if (is_wp_error($result)) return $result;
 
-        if ($request instanceof WP_REST_Request) {
-            /**
-             * Whether this REST route requires an administrator authenticated
-             * with a WordPress Application Password.
-             *
-             * @param bool            $required Protected by default.
-             * @param WP_REST_Request $request  The current REST request.
-             */
-            $required = str_starts_with($request->get_route(), '/kizlo/')
-                || (bool) apply_filters('kizlo_rest_route_requires_admin', true, $request);
-            if (! $required) return $result;
+        if ($request instanceof WP_REST_Request && ! self::protectsRoute($request)) {
+            return $result;
         }
 
         if (! self::isApplicationPasswordAuthenticated() || ! is_user_logged_in()) {
@@ -64,6 +54,39 @@ class RestGuard
         }
 
         return $result;
+    }
+
+    /**
+     * Whether the Kizlo guard protects this route.
+     *
+     * Kizlo-owned routes (`/kizlo/*`) are always behind the administrator
+     * Application Password. Every other route defers to its own permission
+     * callbacks by default, so the block editor, the admin dashboard, and
+     * third-party plugins keep authenticating their REST requests the way they
+     * always have. An integration may opt a narrow route family back into this
+     * guard — the WooCommerce Store API does, so its unverified
+     * X-Kizlo-User-Email header stays behind the admin boundary.
+     *
+     * This is the single source of truth for the guard's route policy: the
+     * introspection contract reads it too, so a described route advertises the
+     * guard's `kizlo_rest_unauthorized`/`kizlo_rest_forbidden` errors exactly
+     * when the guard would return them.
+     */
+    public static function protectsRoute(WP_REST_Request $request): bool
+    {
+        if (str_starts_with($request->get_route(), '/kizlo/')) {
+            return true;
+        }
+
+        /**
+         * Whether a non-Kizlo REST route requires an administrator authenticated
+         * with a WordPress Application Password. False by default: native and
+         * third-party routes use their own authentication and capability checks.
+         *
+         * @param bool            $required Defer to native permissions by default.
+         * @param WP_REST_Request $request  The current REST request.
+         */
+        return (bool) apply_filters('kizlo_rest_route_requires_admin', false, $request);
     }
 
     /**

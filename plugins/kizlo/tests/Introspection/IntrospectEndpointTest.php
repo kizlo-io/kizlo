@@ -91,14 +91,33 @@ class IntrospectEndpointTest extends IntrospectionTestCase
         $this->assertSame(401, $response->get_status());
     }
 
-    public function test_a_route_policy_can_leave_an_integration_route_public(): void
+    public function test_a_non_kizlo_route_is_public_by_default(): void
     {
-        $request = new WP_REST_Request('GET', '/acme/v1/public');
-        $filter  = static fn(bool $required, WP_REST_Request $found): bool => $found === $request ? false : $required;
+        // The block editor's own request. No integration opts this family in, so
+        // the guard defers to WordPress's cookie-and-nonce authentication and
+        // never touches it.
+        $request = new WP_REST_Request('GET', '/wp/v2/posts/1');
+
+        $this->assertNull((new RestGuard())->requireAdmin(null, null, $request));
+    }
+
+    public function test_an_integration_can_opt_a_route_family_into_the_guard(): void
+    {
+        $request = new WP_REST_Request('GET', '/acme/v1/private');
+        $filter  = static fn(bool $required, WP_REST_Request $found): bool => $found === $request ? true : $required;
         add_filter('kizlo_rest_route_requires_admin', $filter, 10, 2);
 
         try {
-            $this->assertNull((new RestGuard())->requireAdmin(null, null, $request));
+            wp_set_current_user(0);
+            $unauthenticated = (new RestGuard())->requireAdmin(null, null, $request);
+            $this->assertInstanceOf(WP_Error::class, $unauthenticated);
+            $this->assertSame(401, $unauthenticated->get_error_data()['status']);
+
+            wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+            $GLOBALS['wp_rest_application_password_uuid'] = 'test-application-password';
+            $forbidden = (new RestGuard())->requireAdmin(null, null, $request);
+            $this->assertInstanceOf(WP_Error::class, $forbidden);
+            $this->assertSame(403, $forbidden->get_error_data()['status']);
         } finally {
             remove_filter('kizlo_rest_route_requires_admin', $filter, 10);
         }

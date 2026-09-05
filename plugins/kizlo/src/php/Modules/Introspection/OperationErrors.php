@@ -17,13 +17,29 @@ namespace Kizlo\Modules\Introspection;
 final class OperationErrors
 {
     /**
-     * What can fail before any route callback runs, whoever owns the route.
+     * What WordPress itself can fail with before any route callback runs.
      *
-     * {@see \Kizlo\Modules\RestApi\RestGuard} runs before route callbacks and
-     * protects routes by default, so a described route can answer
-     * `kizlo_rest_unauthorized` and `kizlo_rest_forbidden`. Integrations may
-     * explicitly leave public routes on native permissions. The three `rest_*`
-     * codes come from WordPress dispatching and validating arguments.
+     * The three `rest_*` codes come from WordPress dispatching and validating
+     * arguments, so every described route inherits them whoever owns the route
+     * and whether or not the Kizlo guard protects it.
+     *
+     * @var array<int, string>
+     */
+    public const NATIVE = [
+        'rest_forbidden',
+        'rest_invalid_param',
+        'rest_missing_callback_param',
+    ];
+
+    /**
+     * The native set plus the two codes {@see \Kizlo\Modules\RestApi\RestGuard}
+     * returns when it protects a route.
+     *
+     * A described route inherits these only when the guard actually stands in
+     * front of it — a Kizlo-owned route, or a family an integration opts in with
+     * `kizlo_rest_route_requires_admin` such as the WooCommerce Store API. A
+     * native route the guard leaves on its own permissions gets {@see NATIVE}
+     * instead, so it never advertises a Kizlo error it can no longer return.
      *
      * @var array<int, string>
      */
@@ -66,7 +82,7 @@ final class OperationErrors
     }
 
     /**
-     * Add the pre-dispatch error set to a route this plugin only describes.
+     * Add the pre-dispatch set for a described route the Kizlo guard protects.
      *
      * @param array<string, mixed> $declaration
      * @return array<string, mixed>
@@ -74,6 +90,18 @@ final class OperationErrors
     public static function withGuard(array $declaration): array
     {
         return self::merge($declaration, self::GUARD);
+    }
+
+    /**
+     * Add the pre-dispatch set for a described route the Kizlo guard leaves on
+     * its own permissions, so it carries only what WordPress can return.
+     *
+     * @param array<string, mixed> $declaration
+     * @return array<string, mixed>
+     */
+    public static function withNative(array $declaration): array
+    {
+        return self::merge($declaration, self::NATIVE);
     }
 
     /**

@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Stop the REST guard from blocking the WordPress block editor and other native routes; only Kizlo-owned and explicitly opted-in routes require an administrator Application Password

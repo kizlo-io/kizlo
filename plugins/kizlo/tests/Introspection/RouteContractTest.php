@@ -401,9 +401,9 @@ class RouteContractTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
 
-        // Sorted as one list with the inherited guard codes, not the declared ones first.
+        // Sorted as one list with the inherited pre-dispatch codes, not the declared ones first.
         $this->assertSame(
-            ['invalid_widget', ...OperationErrors::GUARD, 'widget_unavailable'],
+            ['invalid_widget', ...OperationErrors::NATIVE, 'widget_unavailable'],
             $operation['errors'],
         );
     }
@@ -453,8 +453,8 @@ class RouteContractTest extends IntrospectionTestCase
 
     /**
      * Registering through the public helper can no longer trip this rule, because
-     * {@see OperationErrors} supplies the envelope for the guard errors it adds and
-     * that envelope satisfies it. The filter is the path that still can: a plugin
+     * {@see OperationErrors} supplies the envelope for the pre-dispatch errors it
+     * adds and that envelope satisfies it. The filter is the path that still can: a plugin
      * contributing to `kizlo_introspection_routes` directly builds its own
      * declaration and inherits nothing.
      */

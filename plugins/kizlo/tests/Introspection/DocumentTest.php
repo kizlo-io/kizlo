@@ -113,11 +113,12 @@ class DocumentTest extends IntrospectionTestCase
 
         $operation = $document['apis']['alpha.api']['paths']['/beta']['retrieve'];
         $this->assertSame('POST', $operation['method']);
-        // The guard codes every described route inherits sort in with the declared ones.
-        $this->assertSame(['alpha_error', ...OperationErrors::GUARD, 'zeta_error'], $operation['errors']);
+        // A described route the guard leaves alone inherits only WordPress's own
+        // pre-dispatch codes; they sort in with the declared ones.
+        $this->assertSame(['alpha_error', ...OperationErrors::NATIVE, 'zeta_error'], $operation['errors']);
         // PHP coerces numeric array keys to integers; JSON encoding turns them back
         // into the string object keys the contract specifies. 400, 401 and 403 are
-        // the envelopes that ride along with the inherited guard errors.
+        // the envelopes that ride along with the inherited pre-dispatch errors.
         $this->assertSame(['200', '400', '401', '403', '500'], array_map('strval', array_keys($operation['responses'])));
     }
 
@@ -205,7 +206,7 @@ class DocumentTest extends IntrospectionTestCase
         // `summary`, `description` and `deprecated` stay out; `errors` is never empty,
         // because what sits in front of the route applies whether or not it says so.
         $this->assertSame(['method', 'errors', 'input', 'responses'], array_keys($operation));
-        $this->assertSame(OperationErrors::GUARD, $operation['errors']);
+        $this->assertSame(OperationErrors::NATIVE, $operation['errors']);
     }
 
     /**
