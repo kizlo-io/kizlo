@@ -46,6 +46,10 @@ export const CONFIRM_CHECKOUT_ERROR_MAP = defineErrorMap({
 		status: 400,
 		message: "A payment method is required.",
 	},
+	CHECKOUT_SHIPPING_OPTION_INVALID: {
+		status: 400,
+		message: "The selected shipping option is missing or unavailable.",
+	},
 	CHECKOUT_VALIDATION_FAILED: {
 		status: 400,
 		message: "Checkout validation failed.",

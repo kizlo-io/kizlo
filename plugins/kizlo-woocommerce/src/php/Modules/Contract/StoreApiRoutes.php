@@ -684,6 +684,7 @@ final class StoreApiRoutes
                     'woocommerce_rest_checkout_missing_payment_method',
                     'woocommerce_rest_checkout_payment_method_disabled',
                     'woocommerce_rest_checkout_process_payment_error',
+                    'woocommerce_rest_invalid_shipping_option',
                     'woocommerce_rest_coupon_reserve_failed',
                     'woocommerce_rest_guest_checkout_disabled',
                     'woocommerce_rest_invalid_address',

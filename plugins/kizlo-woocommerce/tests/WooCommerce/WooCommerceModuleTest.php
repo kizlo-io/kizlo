@@ -310,6 +310,66 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame('kizlo_conflicting_identity', $identity->get_error_code());
     }
 
+    public function test_checkout_get_fills_a_missing_draft_cart_from_the_live_session(): void
+    {
+        $product = new \WC_Product_Simple();
+        $product->set_name('Checkout draft cart');
+        $product->set_regular_price('10');
+        $product->set_status('publish');
+        $product->save();
+
+        $request = $this->request('/wc/store/v1/checkout');
+        $this->authenticateAs($this->adminId, true);
+        $this->module->maybeSwitchStoreApiUser(null, null, $request);
+        WC()->cart->add_to_cart($product->get_id());
+
+        $response = new WP_REST_Response([
+            'status'             => 'checkout-draft',
+            '__experimentalCart' => null,
+        ]);
+
+        $result = $this->module->addCheckoutDraftCart($response, $this->server, $request);
+        $cart   = (array) $result->get_data()['__experimentalCart'];
+
+        $this->assertSame($response, $result);
+        $this->assertSame(1, $cart['items_count']);
+        $this->assertCount(1, $cart['items']);
+        $this->assertSame($product->get_id(), $cart['items'][0]['id']);
+    }
+
+    public function test_checkout_get_keeps_an_existing_cart_untouched(): void
+    {
+        $cart     = (object) ['marker' => true];
+        $request  = $this->request('/wc/store/v1/checkout');
+        $response = new WP_REST_Response([
+            'status'             => 'checkout-draft',
+            '__experimentalCart' => $cart,
+        ]);
+
+        $result = $this->module->addCheckoutDraftCart($response, $this->server, $request);
+
+        $this->assertSame($cart, $result->get_data()['__experimentalCart']);
+    }
+
+    public function test_checkout_draft_cart_normalization_is_scoped_to_successful_gets(): void
+    {
+        foreach ([
+            ['POST', 'checkout-draft', 200],
+            ['GET', 'pending', 200],
+            ['GET', 'checkout-draft', 400],
+        ] as [$method, $status, $httpStatus]) {
+            $request  = new WP_REST_Request($method, '/wc/store/v1/checkout');
+            $response = new WP_REST_Response([
+                'status'             => $status,
+                '__experimentalCart' => null,
+            ], $httpStatus);
+
+            $result = $this->module->addCheckoutDraftCart($response, $this->server, $request);
+
+            $this->assertNull($result->get_data()['__experimentalCart'], "$method $status $httpStatus");
+        }
+    }
+
     /** @param array<string, string> $headers */
     private function dispatch(string $route, int $userId, bool $applicationPassword, array $headers = []): WP_REST_Response
     {
