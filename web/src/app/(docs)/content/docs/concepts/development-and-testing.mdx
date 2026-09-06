@@ -110,6 +110,13 @@ failure lands on whichever change you make next. A pinned version turns a core r
   `kizlo dev reset` or `kizlo test reset`. Kizlo warns you when a running stack and its config disagree.
 </Callout>
 
+### Large uploads
+
+Both stacks raise PHP's upload limit to **2 GB**, well above WordPress's stock 2 MB, so a large media file
+or a full-site migration archive uploads without PHP rejecting the request first. It is a real server limit,
+not a WordPress display setting, and applies to dev and test alike whatever port a stack lands on. Production
+WordPress is unaffected; this only shapes the local Docker stacks.
+
 ## Fixtures
 
 A **fixture** is the unit of that shared content: a `seed` function that creates known records over the typed

@@ -35,6 +35,10 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 export const COMPOSE_FILE = resolve(HERE, "compose/docker-compose.yml")
 /** PHP OPcache config, shipped alongside this module and bind-mounted into the local WordPress. */
 export const OPCACHE_INI = resolve(HERE, "compose/opcache.ini")
+/** PHP upload-limit config, shipped alongside this module and bind-mounted into the local WordPress. */
+export const UPLOADS_INI = resolve(HERE, "compose/uploads.ini")
+/** Apache extra-listener config, shipped alongside this module and bind-mounted into the local WordPress. */
+export const APACHE_LISTEN_CONF = resolve(HERE, "compose/apache-listen.conf")
 /** Linux-only entrypoint that retags www-data to the host user (see the script for why). */
 export const REMAP_ENTRYPOINT = resolve(HERE, "compose/remap-entrypoint.sh")
 export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config.mjs"]
