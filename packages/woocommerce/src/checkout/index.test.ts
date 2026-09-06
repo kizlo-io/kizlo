@@ -118,3 +118,25 @@ test("createAccount defaults to false even when a password is provided", async (
 		expect.anything(),
 	)
 })
+
+test("confirm maps an invalid WooCommerce shipping option", async () => {
+	const { context, promise } = await confirm(
+		{
+			status: 400,
+			data: null,
+			error: {
+				code: "woocommerce_rest_invalid_shipping_option",
+				message: "The selected shipping rate is unavailable.",
+				data: { status: 400 },
+			},
+		},
+		{ billingAddress, paymentMethod: "bacs" },
+	)
+
+	await expect(promise).rejects.toMatchObject({
+		code: "CHECKOUT_SHIPPING_OPTION_INVALID",
+		status: 400,
+		message: "The selected shipping rate is unavailable.",
+	})
+	expect(context.logger.error).not.toHaveBeenCalled()
+})

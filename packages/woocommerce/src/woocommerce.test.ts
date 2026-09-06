@@ -569,6 +569,60 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 	})
 })
 
+test("a failed shipping selection keeps the checkout cart available", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+	const addressed = await client().cart.update.call({
+		body: { shippingAddress: { city: "Los Angeles", state: "CA", postcode: "90210", country: "US" } },
+	})
+	const shippingPackage = addressed.shippingPackages[0]
+	const rate = shippingPackage?.rates[0]
+	if (!shippingPackage || !rate) throw new Error("The checkout fixture exposed no shipping rate.")
+	await client().cart.selectShippingRate.call({ body: { packageId: shippingPackage.id, rateId: rate.id } })
+
+	const failed = await client().checkout.confirm({
+		body: {
+			billingAddress: {
+				firstName: "Ada",
+				lastName: "Lovelace",
+				company: "",
+				address1: "1 Store Street",
+				address2: "",
+				city: "London",
+				state: "",
+				postcode: "SW1A 1AA",
+				country: "GB",
+				phone: "0123456789",
+				email: "ada@example.com",
+				additionalFields: {},
+			},
+			shippingAddress: {
+				firstName: "Ada",
+				lastName: "Lovelace",
+				company: "",
+				address1: "1 Store Street",
+				address2: "",
+				city: "London",
+				state: "",
+				postcode: "SW1A 1AA",
+				country: "GB",
+				phone: "0123456789",
+				additionalFields: {},
+			},
+			paymentMethod: "bacs",
+		},
+	})
+
+	expect(failed.success).toBe(false)
+	if (failed.success) throw new Error("Checkout unexpectedly succeeded with a stale shipping rate.")
+	expect(failed.error).toMatchObject({ code: "CHECKOUT_SHIPPING_OPTION_INVALID", status: 400 })
+
+	const cart = await client().cart.get.call()
+	const checkout = await client().checkout.get.call()
+	expect(checkout.status).toBe("checkout-draft")
+	expect(checkout.cart?.items).toEqual(cart.items)
+})
+
 /**
  * Retrying payment on an order that already exists, which is the one checkout call whose addresses
  * come from the caller rather than from the cart session.

@@ -2,6 +2,9 @@
 
 namespace Kizlo\WooCommerce\Modules\WooCommerce;
 
+use Automattic\WooCommerce\StoreApi\Schemas\V1\CartSchema;
+use Automattic\WooCommerce\StoreApi\SchemaController;
+use Automattic\WooCommerce\StoreApi\StoreApi;
 use Kizlo\WooCommerce\Modules\Cart\CartMerger;
 use WP_Error;
 use WP_HTTP_Response;
@@ -23,6 +26,7 @@ class WooCommerceModule
         add_filter('woocommerce_session_handler', [$this, 'maybeUseHeadlessSession']);
         add_filter('woocommerce_persistent_cart_enabled', [$this, 'maybeDisablePersistentCart']);
         add_filter('woocommerce_store_api_disable_nonce_check', [$this, 'maybeDisableNonceCheck']);
+        add_filter('rest_post_dispatch', [$this, 'addCheckoutDraftCart'], 10, 3);
         add_filter('rest_post_dispatch', [$this, 'addCartTokenHeader'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this, 'maybeSwitchStoreApiUser'], 10, 3);
     }
@@ -55,6 +59,31 @@ class WooCommerceModule
     {
         if ($disabled) return true;
         return $this->headlessRequestId !== null && $this->trustedAdminAuth;
+    }
+
+    /**
+     * WooCommerce 10.9+ defers draft creation until checkout POST. If that POST
+     * fails after materialising the draft, the next GET serializes the saved
+     * order without passing its still-live cart to CheckoutSchema. Keep Kizlo's
+     * checkout resource whole without making a second Store API request.
+     */
+    public function addCheckoutDraftCart(mixed $response, mixed $server, mixed $request): mixed
+    {
+        if (! $response instanceof WP_HTTP_Response) return $response;
+        if (! $request instanceof WP_REST_Request) return $response;
+        if ($request->get_method() !== 'GET' || $request->get_route() !== '/wc/store/v1/checkout') return $response;
+        if ($response->get_status() >= 400) return $response;
+
+        $data = $response->get_data();
+        if (! is_array($data) || ($data['status'] ?? null) !== 'checkout-draft') return $response;
+        if (($data['__experimentalCart'] ?? null) !== null) return $response;
+        $schema = StoreApi::container()->get(SchemaController::class)->get(CartSchema::IDENTIFIER);
+        if (! $schema instanceof CartSchema) return $response;
+
+        $data['__experimentalCart'] = (object) $schema->get_item_response(WC()->cart);
+        $response->set_data($data);
+
+        return $response;
     }
 
     /**

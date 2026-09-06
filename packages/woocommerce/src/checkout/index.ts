@@ -135,6 +135,8 @@ export const CHECKOUT_PROCEDURES = {
 						throw errors.CHECKOUT_PAYMENT_METHOD_DISABLED({ message: response.error.message })
 					case "woocommerce_rest_checkout_missing_payment_method":
 						throw errors.CHECKOUT_PAYMENT_METHOD_MISSING({ message: response.error.message })
+					case "woocommerce_rest_invalid_shipping_option":
+						throw errors.CHECKOUT_SHIPPING_OPTION_INVALID({ message: response.error.message })
 					case "woocommerce_rest_checkout_custom_validation_error":
 						throw errors.CHECKOUT_VALIDATION_FAILED({ message: response.error.message, data: { fields: {} } })
 					case "woocommerce_rest_checkout_invalid_payment_result":

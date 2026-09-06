@@ -250,6 +250,7 @@ class StoreApiRoutesTest extends TestCase
 
         $this->assertTrue($operations['process_order']['input']['properties']['key']['required']);
         $this->assertArrayHasKey('create_account', $operations['process']['input']['properties']);
+        $this->assertContains('woocommerce_rest_invalid_shipping_option', $operations['process']['errors']);
     }
 
     public function test_every_required_overlay_argument_still_exists_upstream(): void
