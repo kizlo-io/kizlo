@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.6.1
+
+### Patch Changes
+
+- [#203](https://github.com/kizlo-io/kizlo/pull/203) [`f7b2086`](https://github.com/kizlo-io/kizlo/commit/f7b2086ef5073e5cccbdc13f5bd4f7bb1072e323) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Keep active checkout carts available after shipping validation errors.
+
 ## 0.6.0
 
 ### Minor Changes
