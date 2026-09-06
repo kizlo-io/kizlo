@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.20.1
+
+### Patch Changes
+
+- [#205](https://github.com/kizlo-io/kizlo/pull/205) [`cfe5367`](https://github.com/kizlo-io/kizlo/commit/cfe53675d6ff7b82bf27e819c96432a14ab17db8) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Support large uploads and full-site imports on local WordPress stacks by raising the PHP upload limit to 2 GB and making same-site server requests reachable inside the container.
+
 ## 0.20.0
 
 ### Minor Changes
