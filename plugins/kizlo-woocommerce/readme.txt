@@ -4,7 +4,7 @@ Tags: kizlo, woocommerce, headless, javascript, ai
 Requires at least: 6.5
 Tested up to: 6.7
 Requires PHP: 8.2
-Stable tag: 0.5.0
+Stable tag: 0.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,7 +18,7 @@ Requires the Kizlo core plugin and WooCommerce to be active.
 
 == Changelog ==
 
-= 0.5.0 =
-* Added: Add payment gateway presentation metadata (id, title, description, order) to the cart Store API extension
+= 0.5.1 =
+* Fixed: Keep active checkout carts available after shipping validation errors.
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo-woocommerce/CHANGELOG.md).

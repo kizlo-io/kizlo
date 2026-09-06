@@ -4,6 +4,10 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-09-06
+### Fixed
+- Keep active checkout carts available after shipping validation errors.
+
 ## [0.5.0] - 2026-09-05
 ### Added
 - Add payment gateway presentation metadata (id, title, description, order) to the cart Store API extension
@@ -58,6 +62,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.5.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.5.0...kizlo-woocommerce-v0.5.1
 [0.5.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.4.1...kizlo-woocommerce-v0.5.0
 [0.4.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.4.0...kizlo-woocommerce-v0.4.1
 [0.4.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.3.1...kizlo-woocommerce-v0.4.0
