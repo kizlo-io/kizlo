@@ -28,5 +28,7 @@ require_once KIZLO_PATH . 'src/php/Support/constants.php';
 require_once KIZLO_PATH . 'src/php/Support/functions.php';
 
 register_activation_hook(KIZLO_FILE, [Kizlo\Modules\Headless\Onboarding::class, 'activate']);
+register_activation_hook(KIZLO_FILE, [Kizlo\Modules\Headless\HeadlessTheme::class, 'onActivate']);
+register_deactivation_hook(KIZLO_FILE, [Kizlo\Modules\Headless\HeadlessTheme::class, 'onDeactivate']);
 
 Kizlo\Kernel\Plugin::instance()->boot();

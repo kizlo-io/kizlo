@@ -108,6 +108,7 @@ class SettingsNav
                 $this->section('headless-mode', 'Headless Mode', 'Shut down or redirect the WordPress surfaces that only exist to display or advertise your WordPress origin. This is the master switch. When it is off, every option below is inert and WordPress behaves natively.', 'power'),
                 $this->section('editor-experience', 'Editor experience', 'Redirect the two editor affordances that assume a rendered WordPress site to your headless frontend instead.', 'note-pencil'),
                 $this->section('display-routing', 'Display & routing', 'Close down public theme output that a headless setup does not use.', 'signpost'),
+                $this->section('headless-theme', 'Headless theme', 'Switch to the bundled layout-free Kizlo Headless theme, which renders no public front end and restores the classic Appearance → Menus screen that block themes hide.', 'paint-brush'),
                 $this->section('search-engine-control', 'Search-engine control', 'Index your headless frontend, not the WordPress backend.', 'magnifying-glass'),
                 $this->section('security-hardening', 'Security hardening', 'Shrink the attack and information-leak surface of the WordPress origin.', 'shield-check'),
             ]),

@@ -435,6 +435,7 @@ final class SettingsSchemas
             'enabled'                   => 'Master switch. The rest apply only while this is on.',
             'preview'                   => 'Route the admin preview to the headless frontend.',
             'view_links'                => 'Point admin view links at the headless frontend.',
+            'theme'                     => 'Switch the active theme to the bundled layout-free Kizlo Headless theme.',
             'block_indexing'            => 'Ask search engines not to index the WordPress origin.',
             'frontend_lockout'          => 'Refuse frontend requests to WordPress.',
             'frontend_lockout_redirect' => 'Redirect locked-out frontend requests to the headless frontend.',

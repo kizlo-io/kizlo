@@ -59,6 +59,9 @@ class Onboarding
             'disable_pingbacks'   => true,
             // Login rename needs a user-chosen slug, so it is not auto-enabled.
             'rename_login'        => false,
+            // `theme` is deliberately omitted: switching a live site's active theme
+            // is too invasive for the recommendation banner and stays opt-in from
+            // the settings screen. Omitting it leaves the stored default (false).
         ];
     }
 

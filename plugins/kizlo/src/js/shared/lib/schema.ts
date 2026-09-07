@@ -620,6 +620,7 @@ export const HeadlessSettingsSchema = z.object({
 	enabled: z.boolean(),
 	preview: z.boolean(),
 	view_links: z.boolean(),
+	theme: z.boolean(),
 	block_indexing: z.boolean(),
 	frontend_lockout: z.boolean(),
 	frontend_lockout_redirect: z.boolean(),

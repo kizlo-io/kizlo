@@ -26,6 +26,7 @@ class HeadlessSettings extends SettingsAbstract
         'enabled'             => false,
         'preview'             => true,
         'view_links'          => true,
+        'theme'               => false,
         'block_indexing'      => true,
         'frontend_lockout'    => false,
         'frontend_lockout_redirect' => false,

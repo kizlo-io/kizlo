@@ -1,0 +1,13 @@
+/*
+Theme Name: Kizlo Headless
+Theme URI: https://kizlo.io/plugins/kizlo
+Author: Kizlo Developers
+Author URI: https://kizlo.io
+Description: A layout-free companion theme for headless WordPress running behind Kizlo. It renders no public front end and exists only to keep the classic Appearance → Menus screen available for the menus Kizlo serves over REST.
+Version: 1.0.0
+Requires at least: 5.0
+Requires PHP: 8.2
+License: GPL v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: kizlo-headless
+*/

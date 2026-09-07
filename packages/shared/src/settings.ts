@@ -389,6 +389,7 @@ export interface HeadlessSettings {
 	enabled: boolean
 	preview: boolean
 	view_links: boolean
+	theme: boolean
 	block_indexing: boolean
 	frontend_lockout: boolean
 	frontend_lockout_redirect: boolean

@@ -46,9 +46,10 @@ class OnboardingTest extends TestCase
         $this->assertIsArray($seeded);
 
         // These need an explicit choice, so they stay off/empty even on full opt-in:
-        // the redirect mode (hiding with a 404 is the secure default) and login
-        // renaming (which needs a user-chosen slug).
-        $optional = ['frontend_lockout_redirect' => false, 'rename_login' => false, 'login_slug' => null];
+        // the redirect mode (hiding with a 404 is the secure default), login
+        // renaming (which needs a user-chosen slug), and the theme switch (too
+        // invasive to trigger from the recommendation banner).
+        $optional = ['frontend_lockout_redirect' => false, 'rename_login' => false, 'login_slug' => null, 'theme' => false];
 
         foreach ($seeded as $key => $value) {
             $expected = array_key_exists($key, $optional) ? $optional[$key] : true;
