@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Settings\Headless;
 
+use Kizlo\Modules\Headless\HeadlessTheme;
 use Kizlo\Modules\Introspection\CoreSchemas;
 use Kizlo\Modules\Settings\SettingsSchemas;
 use Kizlo\Modules\Webhook\Webhook;
@@ -42,6 +43,8 @@ class HeadlessSettingsService
                 $settings->setData($request->get_json_params())->save();
 
                 update_option('blog_public', $settings->isEnabled('block_indexing') ? '0' : '1');
+
+                HeadlessTheme::reconcile($settings->isEnabled('theme'));
 
                 Webhook::sendEvent(Webhook::SETTINGS_HEADLESS_UPDATED_EVENT);
 

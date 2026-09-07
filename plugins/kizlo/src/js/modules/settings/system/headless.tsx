@@ -17,6 +17,7 @@ export function HeadlessSettingsPage() {
 			enabled: settings?.headless.enabled ?? false,
 			preview: settings?.headless.preview ?? true,
 			view_links: settings?.headless.view_links ?? true,
+			theme: settings?.headless.theme ?? false,
 			block_indexing: settings?.headless.block_indexing ?? true,
 			frontend_lockout: settings?.headless.frontend_lockout ?? false,
 			frontend_lockout_redirect: settings?.headless.frontend_lockout_redirect ?? false,
@@ -93,6 +94,16 @@ export function HeadlessSettingsPage() {
 					disabled={!enabled}
 					label="Disable oEmbed & embeds"
 					description="Remove the /embed frontend and oEmbed discovery links."
+				/>
+			</SettingsSection>
+
+			<SettingsSection {...S("headless-theme")}>
+				<SwitchField
+					control={form.control}
+					name="theme"
+					disabled={!enabled}
+					label="Use the Kizlo Headless theme"
+					description="Switch the active theme to the bundled, layout-free Kizlo Headless theme. It renders no public front end and, being a classic theme, restores the Appearance &rarr; Menus screen that block themes hide. Turning this off switches back to another installed theme."
 				/>
 			</SettingsSection>
 

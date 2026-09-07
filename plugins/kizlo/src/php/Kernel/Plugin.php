@@ -9,6 +9,7 @@ use Kizlo\Modules\CustomFields\CustomFieldsModule;
 use Kizlo\Modules\Email\EmailModule;
 use Kizlo\Modules\Extension\ExtensionModule;
 use Kizlo\Modules\Headless\HeadlessModule;
+use Kizlo\Modules\Headless\HeadlessTheme;
 use Kizlo\Modules\Introspection\IntrospectionModule;
 use Kizlo\Modules\Post\PostModule;
 use Kizlo\Modules\PostType\PostTypeModule;
@@ -40,6 +41,7 @@ class Plugin
         AdminModule::class,
         SettingsModule::class,
         HeadlessModule::class,
+        HeadlessTheme::class,
         PreviewModule::class,
         PostModule::class,
         PostTypeModule::class,

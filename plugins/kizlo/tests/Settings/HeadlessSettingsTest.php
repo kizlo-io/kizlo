@@ -29,6 +29,18 @@ class HeadlessSettingsTest extends TestCase
         }
     }
 
+    public function test_theme_defaults_off_and_is_gated_by_the_master(): void
+    {
+        $settings = new HeadlessSettings([]);
+        $this->assertFalse($settings->getData()['theme'], 'theme should default off');
+
+        $settings->setData(['enabled' => false, 'theme' => true]);
+        $this->assertFalse($settings->isEnabled('theme'), 'Master off keeps the theme toggle inert.');
+
+        $settings->setData(['enabled' => true, 'theme' => true]);
+        $this->assertTrue($settings->isEnabled('theme'), 'Master and child on activates the theme toggle.');
+    }
+
     public function test_every_field_sanitizes_to_bool(): void
     {
         $settings = new HeadlessSettings([]);
@@ -69,6 +81,7 @@ class HeadlessSettingsTest extends TestCase
         $response = (new HeadlessSettingsService())->toResponse($settings);
 
         $this->assertTrue($response['enabled']);
+        $this->assertArrayHasKey('theme', $response);
         $this->assertArrayHasKey('disable_pingbacks', $response);
         $this->assertArrayHasKey('login_slug', $response);
     }
