@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Add a WooCommerce Kizlo settings tab that redirects the post-checkout order-received URL to the headless frontend.
