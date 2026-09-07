@@ -62,10 +62,17 @@ class WooCommerceModule
     }
 
     /**
-     * WooCommerce 10.9+ defers draft creation until checkout POST. If that POST
-     * fails after materialising the draft, the next GET serializes the saved
-     * order without passing its still-live cart to CheckoutSchema. Keep Kizlo's
-     * checkout resource whole without making a second Store API request.
+     * A GET /checkout serializes its order through CheckoutSchema without ever
+     * passing the still-live cart, so `__experimentalCart` comes back null. This
+     * happens for the checkout-draft the route rebuilds (WooCommerce 10.9+ defers
+     * draft creation until checkout POST, so a POST that fails after materialising
+     * the draft leaves the next GET reading the saved order), and equally for a
+     * pending or failed order the route keeps returning while its payment is
+     * still outstanding — the exact case of returning to checkout after starting
+     * an online payment. The route only ever hands back one of those orders while
+     * its cart hash still matches the live cart, so WC()->cart is the cart behind
+     * whichever it is. Fill it in so Kizlo's checkout resource stays whole without
+     * a second Store API request.
      */
     public function addCheckoutDraftCart(mixed $response, mixed $server, mixed $request): mixed
     {
@@ -75,7 +82,8 @@ class WooCommerceModule
         if ($response->get_status() >= 400) return $response;
 
         $data = $response->get_data();
-        if (! is_array($data) || ($data['status'] ?? null) !== 'checkout-draft') return $response;
+        if (! is_array($data)) return $response;
+        if (! in_array($data['status'] ?? null, ['checkout-draft', 'pending', 'failed'], true)) return $response;
         if (($data['__experimentalCart'] ?? null) !== null) return $response;
         $schema = StoreApi::container()->get(SchemaController::class)->get(CartSchema::IDENTIFIER);
         if (! $schema instanceof CartSchema) return $response;
