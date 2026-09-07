@@ -28,6 +28,20 @@ abstract class TestCase extends WP_UnitTestCase
         return $admin;
     }
 
+    /**
+     * Authenticate the next REST dispatch as a cookie-and-nonce administrator —
+     * a logged-in admin with no Application Password, the way the wp-admin UI
+     * reaches a Kizlo route.
+     */
+    protected function actingAsCookieAdmin(): int
+    {
+        $admin = self::factory()->user->create(['role' => 'administrator']);
+        wp_set_current_user($admin);
+        unset($GLOBALS['wp_rest_application_password_uuid']);
+
+        return $admin;
+    }
+
     protected function tearDown(): void
     {
         unset($GLOBALS['wp_rest_application_password_uuid']);
