@@ -310,7 +310,15 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame('kizlo_conflicting_identity', $identity->get_error_code());
     }
 
-    public function test_checkout_get_fills_a_missing_draft_cart_from_the_live_session(): void
+    /**
+     * A checkout-draft is the route rebuilding its draft; a pending order is the
+     * route still returning an unpaid order (returning to checkout after starting
+     * an online payment). Both serialize without their live cart and both must be
+     * filled from the session.
+     *
+     * @dataProvider provide_missing_draft_cart_statuses
+     */
+    public function test_checkout_get_fills_a_missing_draft_cart_from_the_live_session(string $status): void
     {
         $product = new \WC_Product_Simple();
         $product->set_name('Checkout draft cart');
@@ -324,7 +332,7 @@ class WooCommerceModuleTest extends TestCase
         WC()->cart->add_to_cart($product->get_id());
 
         $response = new WP_REST_Response([
-            'status'             => 'checkout-draft',
+            'status'             => $status,
             '__experimentalCart' => null,
         ]);
 
@@ -335,6 +343,16 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame(1, $cart['items_count']);
         $this->assertCount(1, $cart['items']);
         $this->assertSame($product->get_id(), $cart['items'][0]['id']);
+    }
+
+    /** @return array<string, array{string}> */
+    public function provide_missing_draft_cart_statuses(): array
+    {
+        return [
+            'checkout-draft' => ['checkout-draft'],
+            'pending'        => ['pending'],
+            'failed'         => ['failed'],
+        ];
     }
 
     public function test_checkout_get_keeps_an_existing_cart_untouched(): void
@@ -355,7 +373,7 @@ class WooCommerceModuleTest extends TestCase
     {
         foreach ([
             ['POST', 'checkout-draft', 200],
-            ['GET', 'pending', 200],
+            ['GET', 'completed', 200],
             ['GET', 'checkout-draft', 400],
         ] as [$method, $status, $httpStatus]) {
             $request  = new WP_REST_Request($method, '/wc/store/v1/checkout');
