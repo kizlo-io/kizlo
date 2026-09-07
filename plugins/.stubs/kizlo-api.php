@@ -102,8 +102,13 @@ namespace Kizlo\Support {
 namespace Kizlo\Modules\Settings {
     class Settings
     {
+        public \Kizlo\Modules\Settings\Site\SiteSettings $site;
         public \Kizlo\Modules\Settings\PostType\PostTypeSettingsCollection $postTypes;
         public \Kizlo\Modules\Settings\Taxonomy\TaxonomySettingsCollection $taxonomies;
+
+        public function getBaseUrl(): string {}
+
+        public function resolveUrl(string $base, string ...$parts): string {}
 
         public function resolvePostUrl(
             \WP_Post $post,
@@ -114,6 +119,13 @@ namespace Kizlo\Modules\Settings {
             \WP_Term $term,
             \Kizlo\Modules\Settings\Taxonomy\TaxonomySettings $taxonomy_settings
         ): string {}
+    }
+}
+
+namespace Kizlo\Modules\Settings\Site {
+    class SiteSettings
+    {
+        public function getUrl(): ?string {}
     }
 }
 

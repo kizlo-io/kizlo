@@ -29,7 +29,7 @@
 		}
 	},
 	"scripts": {
-		"phpstan": "phpstan analyse --memory-limit=1G",
+		"phpstan": "phpstan analyse --memory-limit=2G",
 		"changelog": "changelogger"
 	},
 	"extra": {
