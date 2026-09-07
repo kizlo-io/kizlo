@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Clear the WooCommerce cart once an order is paid through an online payment gateway.

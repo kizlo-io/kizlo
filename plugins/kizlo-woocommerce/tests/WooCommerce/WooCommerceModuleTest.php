@@ -388,6 +388,121 @@ class WooCommerceModuleTest extends TestCase
         }
     }
 
+    public function test_checkout_order_processed_stamps_the_owning_session_key(): void
+    {
+        $request = $this->request('/wc/store/v1/checkout', [
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
+        ]);
+        $this->authenticateAs($this->adminId, true);
+        $this->module->maybeSwitchStoreApiUser(null, null, $request);
+
+        $order = new \WC_Order();
+        $order->save();
+
+        $this->module->captureOrderSessionKey($order);
+
+        $stored = wc_get_order($order->get_id());
+        $this->assertSame((string) $this->customerId, $stored->get_meta('_kizlo_session_key'));
+    }
+
+    public function test_checkout_order_processed_ignores_non_headless_sessions(): void
+    {
+        $order = new \WC_Order();
+        $order->save();
+
+        $this->module->captureOrderSessionKey($order);
+
+        $this->assertSame('', wc_get_order($order->get_id())->get_meta('_kizlo_session_key'));
+    }
+
+    /**
+     * A guest keeps only a "t_" token and a logged-in customer a numeric key;
+     * both are stamped on the order at checkout, so a paid transition reaching
+     * the order off-session (a gateway webhook, no request session) empties the
+     * owning session row directly.
+     *
+     * @dataProvider provide_owning_session_keys
+     */
+    public function test_paid_transition_empties_the_owning_session_off_session(string $key): void
+    {
+        $this->seedSessionCart($key);
+
+        $order = new \WC_Order();
+        $order->update_meta_data('_kizlo_session_key', $key);
+        $order->save();
+
+        $this->module->clearCartForPaidOrder($order->get_id(), 'pending', 'processing', $order);
+
+        $data = $this->readSession($key);
+        $this->assertArrayNotHasKey('cart', $data);
+        $this->assertArrayNotHasKey('store_api_draft_order', $data);
+    }
+
+    /** @return array<string, array{string}> */
+    public function provide_owning_session_keys(): array
+    {
+        return [
+            'guest'     => [self::GUEST_TOKEN],
+            'logged in' => ['42'],
+        ];
+    }
+
+    public function test_non_paid_transition_keeps_the_owning_cart(): void
+    {
+        $this->seedSessionCart(self::GUEST_TOKEN);
+
+        $order = new \WC_Order();
+        $order->update_meta_data('_kizlo_session_key', self::GUEST_TOKEN);
+        $order->save();
+
+        $this->module->clearCartForPaidOrder($order->get_id(), 'pending', 'on-hold', $order);
+
+        $this->assertArrayHasKey('cart', $this->readSession(self::GUEST_TOKEN));
+    }
+
+    public function test_paid_transition_ignores_an_order_without_a_session_key(): void
+    {
+        $this->seedSessionCart(self::GUEST_TOKEN);
+
+        $order = new \WC_Order();
+        $order->save();
+
+        $this->module->clearCartForPaidOrder($order->get_id(), 'pending', 'processing', $order);
+
+        $this->assertArrayHasKey('cart', $this->readSession(self::GUEST_TOKEN));
+    }
+
+    private function seedSessionCart(string $key): void
+    {
+        global $wpdb;
+        $wpdb->replace(
+            $wpdb->prefix . 'woocommerce_sessions',
+            [
+                'session_key'    => $key,
+                'session_value'  => maybe_serialize([
+                    'cart'                  => maybe_serialize(['abc' => ['product_id' => 1, 'quantity' => 1]]),
+                    'store_api_draft_order' => 123,
+                ]),
+                'session_expiry' => time() + SessionHandler::SESSION_LIFETIME,
+            ],
+            ['%s', '%s', '%d']
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function readSession(string $key): array
+    {
+        global $wpdb;
+        $value = $wpdb->get_var($wpdb->prepare(
+            'SELECT session_value FROM %i WHERE session_key = %s',
+            $wpdb->prefix . 'woocommerce_sessions',
+            $key
+        ));
+        $data = maybe_unserialize((string) $value);
+
+        return is_array($data) ? $data : [];
+    }
+
     /** @param array<string, string> $headers */
     private function dispatch(string $route, int $userId, bool $applicationPassword, array $headers = []): WP_REST_Response
     {

@@ -29,6 +29,11 @@ class WooCommerceModule
         add_filter('rest_post_dispatch', [$this, 'addCheckoutDraftCart'], 10, 3);
         add_filter('rest_post_dispatch', [$this, 'addCartTokenHeader'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this, 'maybeSwitchStoreApiUser'], 10, 3);
+
+        // Global (not headless-request-scoped) so an off-session gateway
+        // webhook/IPN that completes payment can still reach the owning cart.
+        add_action('woocommerce_store_api_checkout_order_processed', [$this, 'captureOrderSessionKey']);
+        add_action('woocommerce_order_status_changed', [$this, 'clearCartForPaidOrder'], 10, 4);
     }
 
     /**
@@ -92,6 +97,80 @@ class WooCommerceModule
         $response->set_data($data);
 
         return $response;
+    }
+
+    /**
+     * Record which headless session owns a checkout order. A logged-in order
+     * could be found again from its customer id, but a guest order keeps only a
+     * "t_" session token that is never written to the order, so stamp the key on
+     * every headless order and read it back when payment later completes —
+     * possibly off-session, from a gateway webhook with no request headers.
+     */
+    public function captureOrderSessionKey(mixed $order): void
+    {
+        if (! $order instanceof \WC_Order) return;
+
+        $session = WC()->session;
+        if (! $session instanceof SessionHandler) return;
+
+        $key = $session->get_customer_id();
+        if ($key === '') return;
+
+        $order->update_meta_data('_kizlo_session_key', $key);
+        $order->save();
+    }
+
+    /**
+     * Empty the owning cart once an order reaches a paid status. Online gateways
+     * leave the order pending with the cart live so an abandoned payment returns
+     * to a populated cart; nothing in a headless flow runs the storefront's
+     * post-payment step that clears it. Keyed only off the session stamped at
+     * checkout, so a non-headless order transitioning never touches a cart.
+     */
+    public function clearCartForPaidOrder(int $orderId, string $from, string $to, mixed $order): void
+    {
+        if (! in_array($to, wc_get_is_paid_statuses(), true)) return;
+        if (! $order instanceof \WC_Order) return;
+
+        $key = (string) $order->get_meta('_kizlo_session_key');
+        if ($key === '') return;
+
+        $this->clearSessionCart($key);
+    }
+
+    /**
+     * Clear a session's cart and its Store API draft-order reference. When the
+     * owning session is the live one (the in-session retry route), empty it
+     * through WooCommerce so the shutdown save persists the change; otherwise
+     * (an off-session webhook) rewrite the session row directly.
+     */
+    private function clearSessionCart(string $key): void
+    {
+        $session = WC()->session;
+        // @phpstan-ignore instanceof.alwaysTrue
+        if ($session instanceof \WC_Session && $session->get_customer_id() === $key) {
+            $cart = WC()->cart;
+            // @phpstan-ignore instanceof.alwaysTrue
+            if ($cart instanceof \WC_Cart) $cart->empty_cart();
+            $session->set('store_api_draft_order', null);
+            return;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'woocommerce_sessions';
+
+        $value = $wpdb->get_var(
+            $wpdb->prepare('SELECT session_value FROM %i WHERE session_key = %s', $table, $key)
+        );
+        if ($value === null) return;
+
+        $data = maybe_unserialize($value);
+        if (! is_array($data)) return;
+
+        unset($data['cart'], $data['store_api_draft_order']);
+
+        $wpdb->update($table, ['session_value' => maybe_serialize($data)], ['session_key' => $key]);
+        wp_cache_delete($key, 'wc_session_id');
     }
 
     /**
