@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Allow administrators to read and save Kizlo settings from wp-admin without an application password
