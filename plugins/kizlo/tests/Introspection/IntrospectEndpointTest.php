@@ -123,6 +123,12 @@ class IntrospectEndpointTest extends IntrospectionTestCase
         }
     }
 
+    /**
+     * The `kizlo_rest_route_requires_admin` policy governs only the opt-in guard,
+     * which no longer stands in front of a Kizlo route. A policy that returns
+     * false cannot make one public: the route's own permission callback still
+     * rejects an anonymous caller with 401.
+     */
     public function test_a_route_policy_cannot_make_a_kizlo_route_public(): void
     {
         $request = new WP_REST_Request('GET', '/kizlo/v1/introspect');
@@ -130,9 +136,14 @@ class IntrospectEndpointTest extends IntrospectionTestCase
         add_filter('kizlo_rest_route_requires_admin', $filter);
 
         try {
-            $result = (new RestGuard())->requireAdmin(null, null, $request);
-            $this->assertInstanceOf(WP_Error::class, $result);
-            $this->assertSame(401, $result->get_error_data()['status']);
+            // The guard defers the route outright.
+            $this->assertNull((new RestGuard())->requireAdmin(null, null, $request));
+
+            // The permission callback keeps it administrator-only regardless.
+            wp_set_current_user(0);
+            $response = $this->get();
+            $this->assertSame(401, $response->get_status());
+            $this->assertSame('kizlo_rest_unauthorized', $response->get_data()['code']);
         } finally {
             remove_filter('kizlo_rest_route_requires_admin', $filter);
         }

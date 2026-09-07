@@ -280,10 +280,17 @@ class RouteRegistrar
         $routeArgs['methods'] = $args['method'] ?? '';
 
         $routeArgs['permission_callback'] = static function () {
+            if (! is_user_logged_in()) {
+                return new WP_Error(
+                    'kizlo_rest_unauthorized',
+                    'Administrator authentication required.',
+                    ['status' => 401]
+                );
+            }
             if (! current_user_can('manage_options')) {
                 return new WP_Error(
-                    'rest_forbidden',
-                    'You do not have permission to access this endpoint.',
+                    'kizlo_rest_forbidden',
+                    'Administrator privileges required.',
                     ['status' => 403]
                 );
             }
