@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-09-07
+### Added
+- Add an optional layout-free Kizlo Headless theme, switchable from Headless settings, that restores the classic Menus screen block themes hide.
+
 ## [0.14.2] - 2026-09-07
 ### Fixed
 - Allow administrators to read and save Kizlo settings from wp-admin without an application password
@@ -173,6 +177,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.15.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.2...kizlo-v0.15.0
 [0.14.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.1...kizlo-v0.14.2
 [0.14.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.0...kizlo-v0.14.1
 [0.14.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.13.2...kizlo-v0.14.0
