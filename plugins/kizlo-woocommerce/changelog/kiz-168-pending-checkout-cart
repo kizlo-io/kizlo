@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Return the live cart on a checkout GET for a pending or failed order after starting an online payment
