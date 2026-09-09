@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'kizlo-v*'
+      - 'kizlo-acf-v*'
       - 'kizlo-cf7-v*'
       - 'kizlo-woocommerce-v*'
 
