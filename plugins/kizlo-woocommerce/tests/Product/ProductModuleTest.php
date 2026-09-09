@@ -2,6 +2,7 @@
 
 namespace Kizlo\WooCommerce\Tests\Product;
 
+use WP_Post;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
@@ -14,6 +15,13 @@ use WC_Product_Simple;
 
 class ProductModuleTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        remove_all_filters('kizlo_post_type_custom_values');
+
+        parent::tearDown();
+    }
+
     public function test_store_sale_dates_are_qualified_utc_values(): void
     {
         $product = new WC_Product_Simple();
@@ -63,8 +71,100 @@ class ProductModuleTest extends TestCase
         $this->assertArrayNotHasKey('additionalProperties', $schema);
     }
 
+    public function test_rest_products_apply_the_post_type_custom_values_filter(): void
+    {
+        $definitions = FieldDefinitions::normalize([[
+            'type'    => 'text',
+            'name'    => 'product_note',
+            'default' => 'Default note',
+        ]]);
+        $settings = PostTypeSettings::load('product');
+        $settings->setData(['custom_fields' => $definitions]);
+        $settings->save('product');
+
+        $product = new WC_Product_Simple();
+        $product->set_name('Filtered product');
+        $product->set_regular_price('10');
+        $product->save();
+
+        CustomFieldsStore::write(CustomFieldsStore::META_POST, $product->get_id(), $definitions, [
+            'product_note' => 'Stored note',
+        ]);
+
+        $received = [];
+        add_filter('kizlo_post_type_custom_values', function (array $custom, WP_Post $post) use (&$received): array {
+            $received[]    = ['custom' => $custom, 'post' => $post];
+            $custom['integration'] = ['label' => 'Integration value'];
+
+            return $custom;
+        }, 10, 2);
+
+        $result = (new ProductModule())->extendProduct([], $product);
+        $custom = (array) $result['kizlo']['custom'];
+
+        $this->assertSame('Stored note', $custom['product_note']);
+        $this->assertSame(['label' => 'Integration value'], $custom['integration']);
+        $this->assertNotEmpty($received);
+        foreach ($received as $call) {
+            $this->assertSame(['product_note' => 'Stored note'], $call['custom']);
+            $this->assertSame($product->get_id(), $call['post']->ID);
+        }
+    }
+
+    public function test_store_product_contexts_apply_the_post_type_custom_values_filter(): void
+    {
+        $definitions = FieldDefinitions::normalize([[
+            'type'    => 'text',
+            'name'    => 'product_note',
+            'default' => 'Default note',
+        ]]);
+        $settings = PostTypeSettings::load('product');
+        $settings->setData(['custom_fields' => $definitions]);
+        $settings->save('product');
+
+        $product = new WC_Product_Simple();
+        $product->set_name('Store product');
+        $product->set_regular_price('10');
+        $product->save();
+
+        CustomFieldsStore::write(CustomFieldsStore::META_POST, $product->get_id(), $definitions, [
+            'product_note' => 'Stored note',
+        ]);
+
+        $received = [];
+        add_filter('kizlo_post_type_custom_values', function (array $custom, WP_Post $post) use (&$received): array {
+            $received[]    = ['custom' => $custom, 'post' => $post];
+            $custom['integration'] = ['label' => 'Integration value'];
+
+            return $custom;
+        }, 10, 2);
+
+        $module    = new ProductModule();
+        $extension = $module->storeProductExtensionData($product);
+        $detail    = $module->extendStoreProductDetail([], $product);
+
+        foreach ([$extension['custom'], $detail['extensions']['kizlo']['custom']] as $value) {
+            $custom = (array) $value;
+            $this->assertSame('Stored note', $custom['product_note']);
+            $this->assertSame(['label' => 'Integration value'], $custom['integration']);
+        }
+
+        $this->assertCount(2, $received);
+        foreach ($received as $call) {
+            $this->assertSame(['product_note' => 'Stored note'], $call['custom']);
+            $this->assertSame($product->get_id(), $call['post']->ID);
+        }
+    }
+
     public function test_detail_enrichment_preserves_third_party_extensions_without_store_url_fallbacks(): void
     {
+        $filter_calls = 0;
+        add_filter('kizlo_post_type_custom_values', function (array $custom) use (&$filter_calls): array {
+            $filter_calls++;
+
+            return $custom;
+        });
+
         $module = new ProductModule();
         $result = $module->extendStoreProductDetail(
             [
@@ -80,6 +180,7 @@ class ProductModuleTest extends TestCase
         $this->assertSame([], (array) $result['extensions']['kizlo']['custom']);
         $this->assertArrayNotHasKey('hs_code', $result['extensions']['kizlo']);
         $this->assertArrayNotHasKey('extend', $result['extensions']['kizlo']);
+        $this->assertSame(0, $filter_calls);
     }
 
     public function test_store_extension_resolves_headless_relationship_urls(): void

@@ -292,8 +292,12 @@ class ProductModule
     private function customFields(WC_Product $product): array
     {
         $definitions = PostTypeSettings::load('product')->getCustomFields();
+        $custom      = CustomFieldsStore::read(CustomFieldsStore::META_POST, $product->get_id(), $definitions);
+        $post        = get_post($product->get_id());
 
-        return CustomFieldsStore::read(CustomFieldsStore::META_POST, $product->get_id(), $definitions);
+        return $post instanceof WP_Post
+            ? apply_filters('kizlo_post_type_custom_values', $custom, $post)
+            : $custom;
     }
 
     private function qualifiedDate(?\WC_DateTime $date): ?string
@@ -339,6 +343,7 @@ class ProductModule
             $post->ID,
             $post_type_settings->getCustomFields(),
         );
+        $custom             = apply_filters('kizlo_post_type_custom_values', $custom, $post);
 
         $seo = null;
         if ($include_seo && $post_type_settings->getSeoEnabled() && ! post_password_required($post)) {
