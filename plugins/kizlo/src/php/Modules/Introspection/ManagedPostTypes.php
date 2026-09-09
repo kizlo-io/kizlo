@@ -423,7 +423,14 @@ class ManagedPostTypes
             $block['seo'] = ['$ref' => CoreSchemas::SEO, 'required' => true];
         }
 
-        $block['custom'] = CustomFieldSchema::responseGroup($fields);
+        // `custom` is the shared extension bag: an integration contributes a
+        // namespaced sub-object (`custom.acf`, later others) through this filter,
+        // so core never names an integration. Paired with `kizlo_post_type_custom_values`
+        // in PostExtension so a contributed namespace is described where it is
+        // emitted. No listener leaves the properties untouched.
+        $custom               = CustomFieldSchema::responseGroup($fields);
+        $custom['properties'] = apply_filters('kizlo_post_type_custom_schema', $custom['properties'], $slug);
+        $block['custom']      = $custom;
 
         $block['extend'] = [
             'type'                 => 'object',

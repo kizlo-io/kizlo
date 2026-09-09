@@ -1,0 +1,59 @@
+{
+	"name": "kizlo/acf",
+	"description": "Kizlo ACF",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"autoload": {
+		"psr-4": {
+			"Kizlo\\Acf\\": "src/php/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"Kizlo\\Acf\\Tests\\": "tests/"
+		}
+	},
+	"authors": [
+		{
+			"name": "IDJGILL",
+			"email": "inderjeetgill.me@gmail.com"
+		}
+	],
+	"require": {
+		"php": ">=8.2",
+		"yahnis-elsts/plugin-update-checker": "^5.7"
+	},
+	"require-dev": {
+		"phpstan/phpstan": "^2.2",
+		"szepeviktor/phpstan-wordpress": "^2.0",
+		"automattic/jetpack-changelogger": "^6.0",
+		"phpunit/phpunit": "^9.6",
+		"wp-phpunit/wp-phpunit": "^6.4",
+		"yoast/phpunit-polyfills": "^3.0"
+	},
+	"config": {
+		"platform": {
+			"php": "8.2"
+		}
+	},
+	"scripts": {
+		"phpstan": "phpstan analyse --memory-limit=2G",
+		"changelog": "changelogger"
+	},
+	"extra": {
+		"changelogger": {
+			"changelog": "CHANGELOG.md",
+			"changes-dir": "changelog",
+			"versioning": "semver",
+			"link-template": "https://github.com/kizlo-io/kizlo/compare/kizlo-acf-v${old}...kizlo-acf-v${new}",
+			"types": {
+				"added": "Added",
+				"changed": "Changed",
+				"deprecated": "Deprecated",
+				"removed": "Removed",
+				"fixed": "Fixed",
+				"security": "Security"
+			}
+		}
+	}
+}

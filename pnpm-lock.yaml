@@ -444,6 +444,8 @@ importers:
         specifier: 'catalog:'
         version: 3.2.6(@types/debug@4.1.13)(@types/node@25.9.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.101.0)(terser@5.48.0)(yaml@2.9.0)
 
+  plugins/kizlo-acf: {}
+
   plugins/kizlo-cf7: {}
 
   plugins/kizlo-woocommerce: {}

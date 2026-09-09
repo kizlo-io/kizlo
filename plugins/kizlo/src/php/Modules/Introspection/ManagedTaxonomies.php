@@ -281,7 +281,7 @@ class ManagedTaxonomies
     {
         $properties = CoreItemSchema::responseForTaxonomy($slug);
 
-        $properties['kizlo'] = self::envelope($fields, $single);
+        $properties['kizlo'] = self::envelope($slug, $fields, $single);
 
         return [
             'type'        => 'object',
@@ -300,7 +300,7 @@ class ManagedTaxonomies
      * @param array<int, array<string, mixed>> $fields Configured custom fields.
      * @return array<string, mixed>
      */
-    private static function envelope(array $fields, bool $single): array
+    private static function envelope(string $slug, array $fields, bool $single): array
     {
         $properties = [];
 
@@ -308,7 +308,12 @@ class ManagedTaxonomies
             $properties['seo'] = ['$ref' => CoreSchemas::SEO, 'required' => true];
         }
 
-        $properties['custom'] = CustomFieldSchema::responseGroup($fields);
+        // The taxonomy counterpart of the post-type `custom` bag. See
+        // {@see ManagedPostTypes::envelope()}; paired with `kizlo_taxonomy_custom_values`
+        // in TermExtension. No listener leaves the properties untouched.
+        $custom               = CustomFieldSchema::responseGroup($fields);
+        $custom['properties'] = apply_filters('kizlo_taxonomy_custom_schema', $custom['properties'], $slug);
+        $properties['custom'] = $custom;
 
         return [
             'type'       => 'object',
