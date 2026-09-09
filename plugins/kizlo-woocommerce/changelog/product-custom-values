@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Ensure WooCommerce product responses include values from post type custom value filters.
