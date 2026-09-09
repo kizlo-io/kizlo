@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add custom-block schema and value hooks so integrations can contribute typed namespaces under kizlo.custom

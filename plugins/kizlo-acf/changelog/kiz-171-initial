@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Publish Advanced Custom Fields values under kizlo.custom.acf for managed post types and taxonomies

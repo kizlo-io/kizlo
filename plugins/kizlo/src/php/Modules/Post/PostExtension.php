@@ -24,6 +24,11 @@ class PostExtension
         $definitions = Utils::getSettings()->postTypes->get($post->post_type)->getCustomFields();
         $custom      = CustomFieldsStore::read(CustomFieldsStore::META_POST, $post->ID, $definitions);
 
+        // Let an integration merge its namespaced sub-object (e.g. `custom.acf`).
+        // Paired with `kizlo_post_type_custom_schema` so the emitted namespace is
+        // the one the schema declares. No listener leaves the values untouched.
+        $custom = apply_filters('kizlo_post_type_custom_values', $custom, $post);
+
         $data['kizlo']['custom'] = (object) $custom;
 
         $response->set_data($data);

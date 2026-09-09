@@ -176,6 +176,12 @@ namespace Kizlo\Modules\Introspection {
          */
         public static function responseGroup(array $definitions): array {}
     }
+
+    class CoreSchemas
+    {
+        public const MEDIA       = 'kizlo.media';
+        public const MEDIA_IMAGE = 'kizlo.media-image';
+    }
 }
 
 namespace Kizlo\Modules\Post {

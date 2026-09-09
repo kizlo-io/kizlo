@@ -60,6 +60,10 @@ class PostTypeExtension
         $definitions = Utils::getSettings()->postTypes->get($post->post_type)->getCustomFields();
         $custom      = CustomFieldsStore::read(CustomFieldsStore::META_POST, $post->ID, $definitions);
 
+        // Same integration hook as PostExtension: a `/post-types/<type>` response
+        // carries the same namespaced sub-objects a `/posts` response does.
+        $custom = apply_filters('kizlo_post_type_custom_values', $custom, $post);
+
         $data['kizlo']['custom'] = (object) $custom;
 
         return $data;

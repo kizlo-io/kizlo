@@ -39,6 +39,10 @@ class TermExtension
         $definitions = Utils::getSettings()->taxonomies->get($term->taxonomy)->getCustomFields();
         $custom      = CustomFieldsStore::read(CustomFieldsStore::META_TERM, $term->term_id, $definitions);
 
+        // Taxonomy counterpart of `kizlo_post_type_custom_values`; paired with
+        // `kizlo_taxonomy_custom_schema`. No listener leaves the values untouched.
+        $custom = apply_filters('kizlo_taxonomy_custom_values', $custom, $term);
+
         $data['kizlo']['custom'] = (object) $custom;
 
         $response->set_data($data);
