@@ -19,6 +19,6 @@ Requires the Kizlo core plugin and Advanced Custom Fields to be active.
 == Changelog ==
 
 = 0.1.0 =
-* Initial release. Publishes ACF fields under kizlo.custom.acf for managed post types and taxonomies.
+* Added: Publish Advanced Custom Fields values under kizlo.custom.acf for managed post types and taxonomies
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo-acf/CHANGELOG.md).
