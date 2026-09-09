@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-09-09
+### Added
+- Add custom-block schema and value hooks so integrations can contribute typed namespaces under kizlo.custom
+
 ## [0.15.0] - 2026-09-07
 ### Added
 - Add an optional layout-free Kizlo Headless theme, switchable from Headless settings, that restores the classic Menus screen block themes hide.
@@ -177,6 +181,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.16.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.15.0...kizlo-v0.16.0
 [0.15.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.2...kizlo-v0.15.0
 [0.14.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.1...kizlo-v0.14.2
 [0.14.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.0...kizlo-v0.14.1
