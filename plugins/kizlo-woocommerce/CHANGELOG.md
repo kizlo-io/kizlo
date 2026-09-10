@@ -4,6 +4,10 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-10
+### Added
+- Allow a trusted Kizlo storefront origin to embed WooCommerce order-pay pages in an iframe.
+
 ## [0.6.2] - 2026-09-10
 ### Fixed
 - Render the WooCommerce order-pay page under the Kizlo Headless theme so shoppers can complete payment.
@@ -79,6 +83,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.7.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.6.2...kizlo-woocommerce-v0.7.0
 [0.6.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.6.1...kizlo-woocommerce-v0.6.2
 [0.6.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.6.0...kizlo-woocommerce-v0.6.1
 [0.6.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.5.2...kizlo-woocommerce-v0.6.0
