@@ -182,10 +182,19 @@ class HeadlessModule
      * frontend can still reference them. The WordPress core sitemap is not exempt:
      * it only lists origin URLs the lockout blocks, so it is locked out too and the
      * headless frontend serves its own sitemap instead.
+     *
+     * A request an extension claims through `kizlo_headless_render_frontend` is also
+     * exempt: it is a genuine WordPress-rendered surface (WooCommerce claims the
+     * order-pay page, for example) that the theme still renders. The filter is
+     * neutral so core stays unaware of what claims it.
      */
     public function isLockedRequest(): bool
     {
         if (is_feed() || is_robots() || (function_exists('is_favicon') && is_favicon())) {
+            return false;
+        }
+
+        if (apply_filters('kizlo_headless_render_frontend', false)) {
             return false;
         }
 

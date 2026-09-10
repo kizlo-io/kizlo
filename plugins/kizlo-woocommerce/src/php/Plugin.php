@@ -5,6 +5,7 @@ namespace Kizlo\WooCommerce;
 use Kizlo\WooCommerce\Modules\Admin\AttributeSwatch;
 use Kizlo\WooCommerce\Modules\Cart\CartModule;
 use Kizlo\WooCommerce\Modules\Checkout\CheckoutRedirectModule;
+use Kizlo\WooCommerce\Modules\Checkout\PayPageModule;
 use Kizlo\WooCommerce\Modules\Contract\ContractModule;
 use Kizlo\WooCommerce\Modules\Customer\CustomerModule;
 use Kizlo\WooCommerce\Modules\Integration\CoreIntegration;
@@ -32,6 +33,7 @@ class Plugin
         AttributeSwatch::class,
         VariationListener::class,
         CheckoutRedirectModule::class,
+        PayPageModule::class,
     ];
 
     private function __construct() {}
