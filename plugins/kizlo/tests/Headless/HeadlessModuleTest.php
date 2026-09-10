@@ -154,6 +154,17 @@ class HeadlessModuleTest extends HeadlessTestCase
         $this->assertFalse($module->isLockedRequest());
     }
 
+    public function test_frontend_lockout_exempts_a_claimed_render_request(): void
+    {
+        $module = $this->bootHeadless(['enabled' => true, 'frontend_lockout' => true]);
+
+        // An extension (e.g. kizlo-woocommerce for the order-pay page) claims the
+        // request for WordPress-side rendering through the neutral filter.
+        add_filter('kizlo_headless_render_frontend', '__return_true');
+
+        $this->assertFalse($module->isLockedRequest());
+    }
+
     public function test_frontend_lockout_locks_the_wordpress_sitemap(): void
     {
         $module = $this->bootHeadless(['enabled' => true, 'frontend_lockout' => true]);
