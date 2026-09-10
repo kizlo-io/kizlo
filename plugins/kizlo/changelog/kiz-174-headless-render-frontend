@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Add a kizlo_headless_render_frontend filter that lets an extension render a specific front-end request under Headless Mode instead of it being blanked or locked out.

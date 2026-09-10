@@ -4,6 +4,10 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-09-10
+### Added
+- Add a kizlo_headless_render_frontend filter that lets an extension render a specific front-end request under Headless Mode instead of it being blanked or locked out.
+
 ## [0.16.0] - 2026-09-09
 ### Added
 - Add custom-block schema and value hooks so integrations can contribute typed namespaces under kizlo.custom
@@ -181,6 +185,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.17.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.16.0...kizlo-v0.17.0
 [0.16.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.15.0...kizlo-v0.16.0
 [0.15.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.2...kizlo-v0.15.0
 [0.14.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.1...kizlo-v0.14.2
