@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Allow a trusted Kizlo storefront origin to embed WooCommerce order-pay pages in an iframe.
