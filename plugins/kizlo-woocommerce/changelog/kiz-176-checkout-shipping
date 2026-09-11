@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Calculate the checkout cart on reload so shipping rates and the selected method reappear

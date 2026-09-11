@@ -355,18 +355,87 @@ class WooCommerceModuleTest extends TestCase
         ];
     }
 
-    public function test_checkout_get_keeps_an_existing_cart_untouched(): void
+    /**
+     * WooCommerce's own no-order draft path embeds a non-null but shipping-less
+     * cart (it never runs the per-request calculation `/cart` performs). The
+     * fill must replace that cart with the calculated one rather than trust it,
+     * so a reload sees priced shipping.
+     */
+    public function test_checkout_get_replaces_a_shipping_less_draft_cart(): void
     {
-        $cart     = (object) ['marker' => true];
-        $request  = $this->request('/wc/store/v1/checkout');
+        $chosen  = $this->registerFlatRate();
+        $product = $this->createShippableProduct('Replaced draft cart');
+
+        $request = $this->request('/wc/store/v1/checkout');
+        $this->authenticateAs($this->adminId, true);
+        $this->module->maybeSwitchStoreApiUser(null, null, $request);
+        WC()->customer->set_shipping_country('US');
+        WC()->cart->add_to_cart($product->get_id());
+        WC()->session->set('chosen_shipping_methods', [$chosen]);
+        WC()->cart->calculate_totals();
+
         $response = new WP_REST_Response([
             'status'             => 'checkout-draft',
-            '__experimentalCart' => $cart,
+            '__experimentalCart' => (object) ['shipping_rates' => []],
         ]);
 
         $result = $this->module->addCheckoutDraftCart($response, $this->server, $request);
+        $cart   = (array) $result->get_data()['__experimentalCart'];
 
-        $this->assertSame($cart, $result->get_data()['__experimentalCart']);
+        $this->assertTrue($cart['has_calculated_shipping']);
+        $this->assertSame($chosen, $this->selectedRate($cart));
+    }
+
+    /**
+     * The reload case: a session already carries a calculated cart with a chosen
+     * method, but the fresh checkout GET request never recalculates, so its cart
+     * starts with `has_calculated_shipping()` false and empty packages. The fill
+     * must run the same calculation `/cart` does so the chosen rate reappears.
+     */
+    public function test_checkout_get_calculates_shipping_for_a_reloaded_session(): void
+    {
+        $chosen  = $this->registerFlatRate();
+        $product = $this->createShippableProduct('Reloaded session cart');
+
+        // First request: build and persist a calculated cart with a chosen rate.
+        $first = $this->request('/wc/store/v1/checkout', [
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
+        ]);
+        $this->authenticateAs($this->adminId, true);
+        $this->module->maybeSwitchStoreApiUser(null, null, $first);
+        WC()->customer->set_shipping_country('US');
+        WC()->cart->add_to_cart($product->get_id());
+        WC()->session->set('chosen_shipping_methods', [$chosen]);
+        WC()->cart->calculate_totals();
+        $this->assertTrue(WC()->session->persist());
+
+        // Model a fresh request: drop the live objects and the process-global
+        // action counts a new PHP process would start at zero. Their in-process
+        // accumulation is what makes the reloaded cart skip the lazy
+        // session-load and the per-request calculation a real request performs.
+        $this->resetWooCommerce();
+        unset(
+            $GLOBALS['wp_actions']['woocommerce_load_cart_from_session'],
+            $GLOBALS['wp_actions']['woocommerce_after_calculate_totals'],
+        );
+
+        $second = $this->request('/wc/store/v1/checkout', [
+            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
+        ]);
+        $this->authenticateAs($this->adminId, true);
+        $this->module->maybeSwitchStoreApiUser(null, null, $second);
+        $this->assertFalse(WC()->cart->has_calculated_shipping());
+
+        $response = new WP_REST_Response([
+            'status'             => 'checkout-draft',
+            '__experimentalCart' => null,
+        ]);
+
+        $result = $this->module->addCheckoutDraftCart($response, $this->server, $second);
+        $cart   = (array) $result->get_data()['__experimentalCart'];
+
+        $this->assertTrue($cart['has_calculated_shipping']);
+        $this->assertSame($chosen, $this->selectedRate($cart));
     }
 
     public function test_checkout_draft_cart_normalization_is_scoped_to_successful_gets(): void
@@ -470,6 +539,50 @@ class WooCommerceModuleTest extends TestCase
         $this->module->clearCartForPaidOrder($order->get_id(), 'pending', 'processing', $order);
 
         $this->assertArrayHasKey('cart', $this->readSession(self::GUEST_TOKEN));
+    }
+
+    /** Add a flat-rate method to the "Rest of the World" zone; return its rate id. */
+    private function registerFlatRate(): string
+    {
+        $zone       = new \WC_Shipping_Zone(0);
+        $instanceId = $zone->add_shipping_method('flat_rate');
+        update_option('woocommerce_flat_rate_' . $instanceId . '_settings', [
+            'title'      => 'Flat rate',
+            'tax_status' => 'none',
+            'cost'       => '5',
+        ]);
+        \WC_Cache_Helper::get_transient_version('shipping', true);
+
+        return 'flat_rate:' . $instanceId;
+    }
+
+    private function createShippableProduct(string $name): \WC_Product_Simple
+    {
+        $product = new \WC_Product_Simple();
+        $product->set_name($name);
+        $product->set_regular_price('10');
+        $product->set_status('publish');
+        $product->save();
+
+        return $product;
+    }
+
+    /**
+     * The rate id selected across a serialized cart's shipping packages, or null
+     * when none is marked selected.
+     *
+     * @param array<string, mixed> $cart
+     */
+    private function selectedRate(array $cart): ?string
+    {
+        foreach ((array) ($cart['shipping_rates'] ?? []) as $package) {
+            foreach ((array) ((array) $package)['shipping_rates'] as $rate) {
+                $rate = (array) $rate;
+                if (! empty($rate['selected'])) return (string) $rate['rate_id'];
+            }
+        }
+
+        return null;
     }
 
     private function seedSessionCart(string $key): void
