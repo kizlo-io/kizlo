@@ -11,6 +11,11 @@ export type CheckoutExtensions = z.infer<typeof CheckoutExtensions>
 export const CheckoutPaymentData = z.array(z.object({ key: z.string(), value: z.union([z.string(), z.boolean()]) }))
 export type CheckoutPaymentData = z.infer<typeof CheckoutPaymentData>
 
+// A frontend path the store redirects to after checkout. Relative-only: it must
+// start with a single "/" so a scheme (`https:`) or a protocol-relative `//host`
+// cannot smuggle an off-site origin past WooCommerce's redirect allow-list.
+const RelativePath = z.string().refine((value) => /^\/(?![/\\])/.test(value), "must be a relative path starting with a single '/'")
+
 export const CheckoutPaymentResult = z.object({
 	status: z.string(),
 	details: z.array(z.object({ key: z.string(), value: z.string() })),
@@ -54,6 +59,8 @@ export const ConfirmCheckoutInput = z.object({
 	paymentData: CheckoutPaymentData.optional(),
 	additionalFields: CheckoutAdditionalFields.optional(),
 	extensions: CheckoutExtensions.optional(),
+	successPath: RelativePath.optional(),
+	cancelPath: RelativePath.optional(),
 })
 export type ConfirmCheckoutInput = z.input<typeof ConfirmCheckoutInput>
 
@@ -68,5 +75,7 @@ export const RetryCheckoutInput = z.object({
 	customerNote: z.string().optional(),
 	additionalFields: CheckoutAdditionalFields.optional(),
 	extensions: CheckoutExtensions.optional(),
+	successPath: RelativePath.optional(),
+	cancelPath: RelativePath.optional(),
 })
 export type RetryCheckoutInput = z.input<typeof RetryCheckoutInput>

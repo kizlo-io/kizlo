@@ -49,6 +49,15 @@ Cart and checkout requests carry identity headers (`X-Kizlo-User-Email` as the s
 
 Guest tokens, the signed Kizlo cookie, and WooCommerce's server session all expire after 48 hours. The cookie uses `Path=/`, `HttpOnly`, and `SameSite=Lax`. Cookie deletion is optional cleanup after a successful writable cart or checkout response; repeated requests remain safe when a Server Component cannot emit `Set-Cookie`.
 
+## Redirecting after checkout
+
+When a Kizlo Site URL is configured, the plugin sends the shopper back to the headless storefront once checkout finishes. There is no admin setting: the storefront chooses each destination per checkout by sending relative `successPath` and `cancelPath` when it confirms or retries checkout, and the plugin stamps them on the order.
+
+- **Success.** After payment completes, the order-received redirect resolves `successPath` against the Site URL and appends `order_id` and `key`. Without a `successPath` it falls back to `/checkout/order-received`.
+- **Cancel.** Aborting an off-site payment still runs WooCommerce's cancel-order endpoint, so the order is cancelled and stock is freed, then lands the shopper on `cancelPath`. Without a `cancelPath` it falls back to `/cart`.
+
+Both paths are relative only. A value carrying a scheme or a `//` prefix is rejected and the default is used, so a checkout request cannot redirect the shopper off-site. The Site URL host is already trusted for these redirects; nothing happens when no Site URL is set.
+
 ## Embedding the order-pay page
 
 Starting a payment returns a `redirectUrl` to WooCommerce's order-pay page, where the gateway loads. WooCommerce protects checkout responses with `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, so a headless storefront on a different origin cannot present that page inside a modal iframe.

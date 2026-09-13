@@ -1,6 +1,6 @@
 import { createThrowableErrorMap, type KizloError } from "kizlo"
 import { expect, test, vi } from "vitest"
-import { CONFIRM_CHECKOUT_ERROR_MAP } from "./error"
+import { CONFIRM_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERROR_MAP } from "./error"
 import { CHECKOUT_PROCEDURES } from "./index"
 
 const billingAddress = {
@@ -115,6 +115,49 @@ test("createAccount defaults to false even when a password is provided", async (
 	await expect(promise).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" })
 	expect(context.wordpress.woocommerce.store.checkout.process).toHaveBeenCalledWith(
 		expect.objectContaining({ create_account: false, customer_password: "secret" }),
+		expect.anything(),
+	)
+})
+
+test("confirm forwards the per-checkout redirect paths as extensions.kizlo", async () => {
+	const { context, promise } = await confirm(
+		{ status: 500, data: null, error: { code: "woocommerce_rest_unknown_server_error", message: "Unexpected", data: null } },
+		{ billingAddress, paymentMethod: "bacs", successPath: "/thanks", cancelPath: "/cart" },
+	)
+
+	await expect(promise).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" })
+	expect(context.wordpress.woocommerce.store.checkout.process).toHaveBeenCalledWith(
+		expect.objectContaining({ extensions: { kizlo: { success_path: "/thanks", cancel_path: "/cart" } } }),
+		expect.anything(),
+	)
+})
+
+function retryContext(response: unknown) {
+	return {
+		wordpress: { woocommerce: { store: { checkout: { processOrder: vi.fn().mockResolvedValue(response) } } } },
+		sessionHeaders: { "X-Kizlo-Guest-Token": "guest" },
+		logger: { error: vi.fn() },
+	}
+}
+
+test("retry forwards the per-checkout redirect paths as extensions.kizlo", async () => {
+	const context = retryContext({
+		status: 500,
+		data: null,
+		error: { code: "woocommerce_rest_unknown_server_error", message: "Unexpected", data: null },
+	})
+	const promise = CHECKOUT_PROCEDURES.retry["~kizlo"].handler({
+		context: context as never,
+		input: {
+			params: { orderId: 42 },
+			body: { key: "wc_order_key", paymentMethod: "bacs", billingAddress, successPath: "/thanks", cancelPath: "/cart" },
+		} as never,
+		errors: createThrowableErrorMap(RETRY_CHECKOUT_ERROR_MAP),
+	})
+
+	await expect(promise).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" })
+	expect(context.wordpress.woocommerce.store.checkout.processOrder).toHaveBeenCalledWith(
+		expect.objectContaining({ extensions: { kizlo: { success_path: "/thanks", cancel_path: "/cart" } } }),
 		expect.anything(),
 	)
 })
