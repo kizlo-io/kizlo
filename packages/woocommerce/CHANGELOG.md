@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.7.0
+
+### Minor Changes
+
+- [#218](https://github.com/kizlo-io/kizlo/pull/218) [`3be40d1`](https://github.com/kizlo-io/kizlo/commit/3be40d15ba4f7e4ba212e8aa6e1417321b3ab467) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Accept optional relative successPath and cancelPath on confirm and retry checkout to redirect the storefront per checkout.
+
 ## 0.6.1
 
 ### Patch Changes
