@@ -1,16 +1,16 @@
 import type { Metadata } from "next"
-import { appDescription, appName, siteUrl } from "./shared"
+import { appDescription, appName, appTitle, siteUrl } from "./shared"
 
 type CreateMetadata = Omit<Metadata, "title"> & {
 	title?: string
 }
 
 export function createMetadata({ title, description, openGraph, twitter, ...rest }: CreateMetadata = {}): Metadata {
-	const resolvedTitle = title ? `${title} | ${appName}` : `${appName} — The framework for headless WordPress`
+	const resolvedTitle = title ? `${title} | ${appName}` : appTitle
 	const resolvedDescription = description ?? appDescription
 
 	return {
-		title,
+		title: title ?? appTitle,
 		description: resolvedDescription,
 		openGraph: {
 			title: resolvedTitle,

@@ -1,32 +1,43 @@
 "use client"
 
-import { Check, Copy } from "lucide-react"
-import { useState } from "react"
+import { CheckIcon, CopyIcon } from "@phosphor-icons/react"
+import { useEffect, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
 
 export function Command({ command }: { command: string }) {
-	const [copied, setCopied] = useState(false)
+	const [status, setStatus] = useState<"idle" | "copied" | "error">("idle")
+	const timeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-	function copy() {
-		navigator.clipboard.writeText(command).then(() => {
-			setCopied(true)
-			setTimeout(() => setCopied(false), 2000)
-		})
+	useEffect(
+		() => () => {
+			if (timeout.current) clearTimeout(timeout.current)
+		},
+		[],
+	)
+
+	async function copy() {
+		if (timeout.current) clearTimeout(timeout.current)
+		try {
+			await navigator.clipboard.writeText(command)
+			setStatus("copied")
+		} catch {
+			setStatus("error")
+		}
+		timeout.current = setTimeout(() => setStatus("idle"), 2000)
 	}
 
 	return (
-		<div className="flex items-center gap-3 rounded-lg border border-fd-border bg-fd-card py-2 pr-2 pl-4 font-mono text-sm">
-			<span aria-hidden className="select-none text-fd-muted-foreground">
+		<div className="relative flex max-w-full items-center gap-3 border border-border bg-card py-2 pr-2 pl-4 font-mono text-sm">
+			<span aria-hidden="true" className="select-none text-muted-foreground">
 				$
 			</span>
-			<code className="text-fd-foreground">{command}</code>
-			<button
-				type="button"
-				onClick={copy}
-				aria-label={copied ? "Copied" : "Copy command"}
-				className="ml-1 rounded-md p-1.5 text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
-			>
-				{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-			</button>
+			<code className="min-w-0 break-all text-foreground">{command}</code>
+			<Button type="button" onClick={copy} variant="ghost" size="icon" aria-label={status === "copied" ? "Copied" : "Copy command"}>
+				{status === "copied" ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
+			</Button>
+			<span role="status" className={status === "error" ? "absolute top-full left-0 mt-1 text-xs" : "sr-only"}>
+				{status === "copied" ? "Command copied" : status === "error" ? "Could not copy. Select the command to copy it." : ""}
+			</span>
 		</div>
 	)
 }

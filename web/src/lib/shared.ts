@@ -1,6 +1,7 @@
 export const appName = "Kizlo"
+export const appTitle = "Kizlo | TypeScript Framework for Headless WordPress"
 export const appDescription =
-	"Kizlo is the framework for headless WordPress — build websites, mobile apps, and agentic applications on a stack you host and own from top to bottom."
+	"Build TypeScript apps with WordPress as your CMS. Kizlo provides generated API types, preview support, SEO tools, and local development and testing."
 export const siteUrl = "https://kizlo.io"
 export const docsRoute = "/docs"
 export const docsImageRoute = "/og/docs"

@@ -1,0 +1,74 @@
+.kizlo-home {
+	--background: #0b0b0b;
+	--foreground: #f5f5f5;
+	--card: #111111;
+	--card-foreground: var(--foreground);
+	--primary: #f5f5f5;
+	--primary-foreground: #0b0b0b;
+	--muted: #202020;
+	--muted-foreground: #a3a3a3;
+	--border: #303030;
+	--input: var(--border);
+	--ring: #d4d4d4;
+	color-scheme: dark;
+	background: var(--background);
+	color: var(--foreground);
+}
+
+.kizlo-home .home-highlight {
+	--background: #f5f5f5;
+	--foreground: #111111;
+	--card: #eeeeee;
+	--primary: #111111;
+	--primary-foreground: #f5f5f5;
+	--muted: #e5e5e5;
+	--muted-foreground: #525252;
+	--border: #d4d4d4;
+	--ring: #404040;
+	color-scheme: light;
+	background: var(--background);
+	color: var(--foreground);
+}
+
+.kizlo-home :is(a, button):focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 5px;
+}
+
+.kizlo-home .home-heading {
+	font-size: clamp(2.25rem, 4vw, 3.5rem);
+	font-weight: 500;
+	line-height: 1.1;
+	letter-spacing: -0.035em;
+	text-wrap: balance;
+}
+
+.kizlo-home .home-subheading {
+	font-size: clamp(1.5rem, 2.5vw, 2rem);
+	font-weight: 500;
+	line-height: 1.2;
+	letter-spacing: -0.025em;
+	text-wrap: balance;
+}
+
+.kizlo-home .home-copy {
+	color: var(--muted-foreground);
+	font-size: 1rem;
+	line-height: 1.7;
+}
+
+@media (min-width: 640px) {
+	.kizlo-home .home-copy {
+		font-size: 1.125rem;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.kizlo-home *,
+	.kizlo-home *::before,
+	.kizlo-home *::after {
+		animation: none;
+		transition: none;
+		scroll-behavior: auto;
+	}
+}
