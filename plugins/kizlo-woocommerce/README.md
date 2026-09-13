@@ -58,6 +58,8 @@ When a Kizlo Site URL is configured, the plugin sends the shopper back to the he
 
 Both paths are relative only. A value carrying a scheme or a `//` prefix is rejected and the default is used, so a checkout request cannot redirect the shopper off-site. The Site URL host is already trusted for these redirects; nothing happens when no Site URL is set.
 
+Some order-pay exits return the browser to the WordPress `/checkout` page rather than the cancel-order endpoint. With an empty native cart, WooCommerce redirects that request to `/cart` before any order filter runs, and it carries no order id or key. To keep `cancelPath` across that gap, the order-pay page stamps a short-lived, one-time context in the WooCommerce session, and only that empty-checkout redirect reads it back to reach `cancelPath`. This changes nothing else: it never alters the order's status, stock, or any provider-owned cancellation behaviour, and ordinary cart links and checkout navigation are untouched. When two order-pay pages are open in one session, the final request cannot say which order it belongs to, so the redirect keeps WooCommerce's `/cart`.
+
 ## Embedding the order-pay page
 
 Starting a payment returns a `redirectUrl` to WooCommerce's order-pay page, where the gateway loads. WooCommerce protects checkout responses with `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, so a headless storefront on a different origin cannot present that page inside a modal iframe.

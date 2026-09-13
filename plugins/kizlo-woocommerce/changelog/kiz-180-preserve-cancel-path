@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Preserve a checkout's cancel path when WooCommerce redirects an emptied cart to /cart after an order-pay exit

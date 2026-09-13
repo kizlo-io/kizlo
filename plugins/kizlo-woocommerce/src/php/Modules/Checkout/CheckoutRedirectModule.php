@@ -16,6 +16,13 @@ use WP_REST_Request;
  * `extensions.kizlo` when confirming or retrying checkout; they are stamped on
  * the order and read back when WooCommerce builds each redirect. Everything is
  * gated on a configured Kizlo Site URL.
+ *
+ * One exit is order-pay: when a gateway sends the browser back to the WordPress
+ * `/checkout` page with an empty native cart, `wc_template_redirect()` redirects
+ * to `/cart` before any Kizlo order filter can run, and that request carries no
+ * order id or key. To keep the order's `cancelPath` through that gap, the
+ * order-pay page stamps a short-lived, one-time context in the WooCommerce
+ * session, and the empty-cart redirect reads it back to reach the cancel path.
  */
 class CheckoutRedirectModule
 {
@@ -27,6 +34,12 @@ class CheckoutRedirectModule
 
     private const DEFAULT_CANCEL_PATH = '/cart';
 
+    /** WooCommerce session key holding the pending order-pay redirect context. */
+    private const SESSION_CONTEXT = '_kizlo_orderpay_redirect';
+
+    /** How long a stamped order-pay context stays usable, in seconds. */
+    private const CONTEXT_TTL = 1800;
+
     public function register(): void
     {
         add_action('woocommerce_blocks_loaded', [$this, 'extendCheckoutSchema'], PHP_INT_MAX);
@@ -35,6 +48,8 @@ class CheckoutRedirectModule
         add_filter('woocommerce_get_cancel_order_url_raw', [$this, 'redirectCancelOrderUrl'], 10, 3);
         add_filter('woocommerce_get_cancel_order_url', [$this, 'redirectCancelOrderUrl'], 10, 3);
         add_filter('allowed_redirect_hosts', [$this, 'allowFrontendRedirectHost']);
+        add_action('template_redirect', [$this, 'captureOrderPayContext']);
+        add_filter('woocommerce_checkout_redirect_empty_cart', [$this, 'redirectEmptyCheckoutToCancelPath']);
     }
 
     /**
@@ -170,6 +185,85 @@ class CheckoutRedirectModule
     }
 
     /**
+     * Stamp a one-time redirect context in the WooCommerce session while the
+     * shopper is on a valid order-pay page. The order id comes from the endpoint
+     * query var and the key from the request; both must match a real order, so a
+     * forged or stale link stamps nothing. Two different order-pay pages in one
+     * session cannot be told apart by the later path-less redirect, so the second
+     * marks the context ambiguous and the redirect keeps WooCommerce's fallback.
+     */
+    public function captureOrderPayContext(): void
+    {
+        if (! function_exists('is_checkout_pay_page') || ! is_checkout_pay_page()) {
+            return;
+        }
+
+        $wp      = $GLOBALS['wp'] ?? null;
+        $orderId = $wp instanceof \WP && isset($wp->query_vars['order-pay']) ? absint($wp->query_vars['order-pay']) : 0;
+        if ($orderId === 0) {
+            return;
+        }
+
+        $key = isset($_GET['key']) ? sanitize_text_field(wp_unslash($_GET['key'])) : '';
+        if ($key === '') {
+            return;
+        }
+
+        $order = wc_get_order($orderId);
+        if (! $order instanceof WC_Order || ! hash_equals($order->get_order_key(), $key)) {
+            return;
+        }
+
+        $existing  = $this->readOrderPayContext();
+        $ambiguous = $existing !== null && ($existing['order_id'] ?? null) !== $orderId;
+
+        WC()->session->set(self::SESSION_CONTEXT, $ambiguous
+            ? ['ambiguous' => true, 'expires' => time() + self::CONTEXT_TTL]
+            : ['order_id' => $orderId, 'expires' => time() + self::CONTEXT_TTL]);
+    }
+
+    /**
+     * Bridge the order's `cancelPath` across WooCommerce's empty-cart redirect.
+     * Runs only when `wc_template_redirect()` is about to send an empty `/checkout`
+     * to the cart URL, so it never touches order-pay, order-received, or ordinary
+     * cart links. The stored context is consumed here whatever the outcome; a
+     * valid one with a `cancelPath` swaps that single cart destination for the
+     * frontend cancel path, and everything else keeps WooCommerce's `/cart`.
+     *
+     * @param  bool $doRedirect Whether WooCommerce will redirect the empty checkout.
+     * @return bool
+     */
+    public function redirectEmptyCheckoutToCancelPath(bool $doRedirect): bool
+    {
+        if (! $doRedirect) {
+            return $doRedirect;
+        }
+
+        $context  = $this->consumeOrderPayContext();
+        $settings = $this->frontendSettings();
+
+        if ($settings === null || $context === null || ($context['ambiguous'] ?? false) === true) {
+            return $doRedirect;
+        }
+
+        $orderId = isset($context['order_id']) ? (int) $context['order_id'] : 0;
+        $order   = $orderId > 0 ? wc_get_order($orderId) : null;
+        if (! $order instanceof WC_Order) {
+            return $doRedirect;
+        }
+
+        $meta       = $order->get_meta(self::META_CANCEL);
+        $cancelPath = is_string($meta) ? self::sanitizePath($meta) : null;
+        if ($cancelPath === null) {
+            return $doRedirect;
+        }
+
+        $this->filterCartUrlOnce($settings->resolveUrl($settings->getBaseUrl(), $cancelPath));
+
+        return $doRedirect;
+    }
+
+    /**
      * The stored path for an order, sanitized, or the default when it is missing
      * or not a valid relative path.
      */
@@ -211,5 +305,54 @@ class CheckoutRedirectModule
         $settings = Utils::getSettings();
 
         return $settings->site->getUrl() === null ? null : $settings;
+    }
+
+    /**
+     * The stored order-pay context when it is present and unexpired, else null.
+     * The WooCommerce session is always loaded on the frontend requests these
+     * hooks run in, so it is read directly.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function readOrderPayContext(): ?array
+    {
+        $context = WC()->session->get(self::SESSION_CONTEXT);
+        if (! is_array($context)) {
+            return null;
+        }
+
+        $expires = isset($context['expires']) ? (int) $context['expires'] : 0;
+
+        return $expires >= time() ? $context : null;
+    }
+
+    /**
+     * Read the order-pay context and clear it in the same pass, so a single
+     * empty-cart redirect can act on it and no later request reuses it.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function consumeOrderPayContext(): ?array
+    {
+        $context = $this->readOrderPayContext();
+        WC()->session->set(self::SESSION_CONTEXT, null);
+
+        return $context;
+    }
+
+    /**
+     * Rewrite the next `wc_get_cart_url()` to the given URL, once. The empty-cart
+     * redirect calls that helper exactly once, so a self-removing filter reaches
+     * only that destination and leaves every other cart URL untouched.
+     */
+    private function filterCartUrlOnce(string $url): void
+    {
+        $filter = static function () use (&$filter, $url): string {
+            remove_filter('woocommerce_get_cart_url', $filter, PHP_INT_MAX);
+
+            return $url;
+        };
+
+        add_filter('woocommerce_get_cart_url', $filter, PHP_INT_MAX);
     }
 }
