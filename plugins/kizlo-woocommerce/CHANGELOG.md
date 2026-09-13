@@ -4,6 +4,10 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-13
+### Changed
+- Redirect after checkout to a per-checkout success or cancel path sent by the storefront, replacing the global redirect settings.
+
 ## [0.7.1] - 2026-09-11
 ### Fixed
 - Calculate the checkout cart on reload so shipping rates and the selected method reappear
@@ -87,6 +91,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.8.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.7.1...kizlo-woocommerce-v0.8.0
 [0.7.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.7.0...kizlo-woocommerce-v0.7.1
 [0.7.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.6.2...kizlo-woocommerce-v0.7.0
 [0.6.2]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.6.1...kizlo-woocommerce-v0.6.2

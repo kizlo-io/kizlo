@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Redirect after checkout to a per-checkout success or cancel path sent by the storefront, replacing the global redirect settings.
