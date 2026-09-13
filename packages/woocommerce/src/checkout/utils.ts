@@ -9,7 +9,7 @@ import {
 	serializeCartShippingAddress,
 } from "../cart/utils"
 import { deserializeExtensions } from "../product/utils"
-import type { Checkout, CheckoutAdditionalFields } from "./schema"
+import type { Checkout, CheckoutAdditionalFields, CheckoutExtensions } from "./schema"
 import type { WCK_Checkout, WCK_CheckoutOrder } from "./types"
 
 type Gateway = NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["payment_method"]>
@@ -108,6 +108,28 @@ export function deserializeCheckout(data: WCK_Checkout | WCK_CheckoutOrder): Che
 		cart: data.__experimentalCart ? deserializeCart(data.__experimentalCart) : null,
 		extensions,
 	}
+}
+
+/**
+ * Fold the per-checkout redirect paths into `extensions.kizlo` so WooCommerce can
+ * stamp them on the order and redirect there after checkout. Only defined paths
+ * are added, and any existing `extensions.kizlo` block a caller passed is kept.
+ * Returns the extensions unchanged when neither path is set.
+ */
+export function withKizloRedirectPaths(
+	extensions: CheckoutExtensions | undefined,
+	paths: { successPath?: string; cancelPath?: string },
+): CheckoutExtensions | undefined {
+	const kizlo: Record<string, unknown> = {}
+	if (paths.successPath !== undefined) kizlo.success_path = paths.successPath
+	if (paths.cancelPath !== undefined) kizlo.cancel_path = paths.cancelPath
+
+	if (Object.keys(kizlo).length === 0) return extensions
+
+	const existing = extensions?.kizlo
+	const existingKizlo = typeof existing === "object" && existing !== null && !Array.isArray(existing) ? existing : {}
+
+	return { ...extensions, kizlo: { ...existingKizlo, ...kizlo } }
 }
 
 export function serializeCheckoutShippingAddress(address: CartShippingAddress) {

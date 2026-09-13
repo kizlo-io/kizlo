@@ -5,14 +5,17 @@ namespace Kizlo\WooCommerce\Tests\Checkout;
 use Kizlo\Modules\Settings\Site\SiteSettings;
 use Kizlo\WooCommerce\Modules\Checkout\CheckoutRedirectModule;
 use Kizlo\WooCommerce\Tests\TestCase;
+use WP_REST_Request;
 
 class CheckoutRedirectModuleTest extends TestCase
 {
-    private const OPTION_ENABLED = 'kizlo_wc_checkout_redirect_enabled';
+    private const META_SUCCESS = '_kizlo_success_path';
 
-    private const OPTION_PATH = 'kizlo_wc_checkout_order_received_path';
+    private const META_CANCEL = '_kizlo_cancel_path';
 
-    private const DEFAULT_URL = 'https://shop.example/checkout/order-received/42/?key=wc_order_abc';
+    private const RECEIVED_URL = 'https://shop.example/checkout/order-received/42/?key=wc_order_abc';
+
+    private const CANCEL_URL = 'https://shop.example/cart/?cancel_order=true&order=wc_order_abc&order_id=42&redirect=&_wpnonce=abc';
 
     private CheckoutRedirectModule $module;
 
@@ -23,78 +26,122 @@ class CheckoutRedirectModuleTest extends TestCase
         $this->module = new CheckoutRedirectModule();
     }
 
-    public function test_leaves_url_unchanged_when_toggle_is_off(): void
+    public function test_captures_relative_paths_from_the_request_extension(): void
     {
-        SiteSettings::load()->setUrl('https://frontend.example')->save();
-
         $order = wc_create_order();
 
-        $this->assertSame(
-            self::DEFAULT_URL,
-            $this->module->redirectOrderReceivedUrl(self::DEFAULT_URL, $order),
-        );
+        $this->module->captureRedirectPaths($order, $this->requestWithKizlo([
+            'success_path' => '/thanks',
+            'cancel_path'  => '/basket',
+        ]));
+
+        $saved = wc_get_order($order->get_id());
+        $this->assertSame('/thanks', $saved->get_meta(self::META_SUCCESS));
+        $this->assertSame('/basket', $saved->get_meta(self::META_CANCEL));
     }
 
-    public function test_redirects_to_frontend_when_toggle_on_and_site_url_set(): void
+    public function test_success_redirect_uses_the_stored_path(): void
     {
-        update_option(self::OPTION_ENABLED, 'yes');
         SiteSettings::load()->setUrl('https://frontend.example')->save();
 
         $order = wc_create_order();
+        $order->update_meta_data(self::META_SUCCESS, '/thanks');
+        $order->save();
 
-        $result = $this->module->redirectOrderReceivedUrl(self::DEFAULT_URL, $order);
+        $result = $this->module->redirectOrderReceivedUrl(self::RECEIVED_URL, $order);
         $parts  = wp_parse_url($result);
         parse_str($parts['query'] ?? '', $query);
 
         $this->assertSame('frontend.example', $parts['host']);
-        $this->assertSame('/checkout/order-received/', $parts['path']);
+        $this->assertSame('/thanks/', $parts['path']);
         $this->assertSame((string) $order->get_id(), $query['order_id']);
         $this->assertSame($order->get_order_key(), $query['key']);
     }
 
-    public function test_leaves_url_unchanged_when_toggle_on_but_no_site_url(): void
+    public function test_success_redirect_falls_back_to_the_default_path(): void
     {
-        update_option(self::OPTION_ENABLED, 'yes');
-
-        $this->assertNull(SiteSettings::load()->getUrl());
-
-        $order = wc_create_order();
-
-        $this->assertSame(
-            self::DEFAULT_URL,
-            $this->module->redirectOrderReceivedUrl(self::DEFAULT_URL, $order),
-        );
-    }
-
-    public function test_honours_custom_path_and_normalises_slashes(): void
-    {
-        update_option(self::OPTION_ENABLED, 'yes');
-        update_option(self::OPTION_PATH, '/custom/thank-you/');
         SiteSettings::load()->setUrl('https://frontend.example')->save();
 
         $order = wc_create_order();
 
-        $result = $this->module->redirectOrderReceivedUrl(self::DEFAULT_URL, $order);
-
-        $this->assertStringStartsWith('https://frontend.example/custom/thank-you/?', $result);
-    }
-
-    public function test_empty_path_falls_back_to_default(): void
-    {
-        update_option(self::OPTION_ENABLED, 'yes');
-        update_option(self::OPTION_PATH, '');
-        SiteSettings::load()->setUrl('https://frontend.example')->save();
-
-        $order = wc_create_order();
-
-        $result = $this->module->redirectOrderReceivedUrl(self::DEFAULT_URL, $order);
+        $result = $this->module->redirectOrderReceivedUrl(self::RECEIVED_URL, $order);
 
         $this->assertStringStartsWith('https://frontend.example/checkout/order-received/?', $result);
     }
 
-    public function test_allows_frontend_host_when_enabled_and_site_url_set(): void
+    public function test_cancel_redirect_points_at_the_stored_path(): void
     {
-        update_option(self::OPTION_ENABLED, 'yes');
+        SiteSettings::load()->setUrl('https://frontend.example')->save();
+
+        $order = wc_create_order();
+        $order->update_meta_data(self::META_CANCEL, '/basket');
+        $order->save();
+
+        $result = $this->module->redirectCancelOrderUrl(self::CANCEL_URL, $order, '');
+        parse_str(wp_parse_url($result, PHP_URL_QUERY) ?? '', $query);
+
+        $this->assertSame('https://frontend.example/basket/', $query['redirect']);
+        $this->assertSame('true', $query['cancel_order']);
+    }
+
+    public function test_cancel_redirect_falls_back_to_the_default_path(): void
+    {
+        SiteSettings::load()->setUrl('https://frontend.example')->save();
+
+        $order = wc_create_order();
+
+        $result = $this->module->redirectCancelOrderUrl(self::CANCEL_URL, $order, '');
+        parse_str(wp_parse_url($result, PHP_URL_QUERY) ?? '', $query);
+
+        $this->assertSame('https://frontend.example/cart/', $query['redirect']);
+    }
+
+    /**
+     * @dataProvider offSitePaths
+     */
+    public function test_capture_rejects_a_non_relative_path(string $path): void
+    {
+        $order = wc_create_order();
+
+        $this->module->captureRedirectPaths($order, $this->requestWithKizlo([
+            'success_path' => $path,
+            'cancel_path'  => $path,
+        ]));
+
+        $saved = wc_get_order($order->get_id());
+        $this->assertSame('', $saved->get_meta(self::META_SUCCESS));
+        $this->assertSame('', $saved->get_meta(self::META_CANCEL));
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function offSitePaths(): array
+    {
+        return [
+            'absolute scheme'         => ['https://evil.example/steal'],
+            'protocol relative'       => ['//evil.example/steal'],
+            'backslash protocol'      => ['/\\evil.example/steal'],
+            'no leading slash'        => ['checkout/order-received'],
+        ];
+    }
+
+    public function test_no_redirect_when_site_url_is_unset(): void
+    {
+        $this->assertNull(SiteSettings::load()->getUrl());
+
+        $order = wc_create_order();
+        $order->update_meta_data(self::META_SUCCESS, '/thanks');
+        $order->update_meta_data(self::META_CANCEL, '/basket');
+        $order->save();
+
+        $this->assertSame(self::RECEIVED_URL, $this->module->redirectOrderReceivedUrl(self::RECEIVED_URL, $order));
+        $this->assertSame(self::CANCEL_URL, $this->module->redirectCancelOrderUrl(self::CANCEL_URL, $order, ''));
+        $this->assertSame(['example.org'], $this->module->allowFrontendRedirectHost(['example.org']));
+    }
+
+    public function test_allows_the_frontend_host_when_site_url_is_set(): void
+    {
         SiteSettings::load()->setUrl('https://frontend.example')->save();
 
         $hosts = $this->module->allowFrontendRedirectHost(['example.org']);
@@ -103,26 +150,14 @@ class CheckoutRedirectModuleTest extends TestCase
         $this->assertContains('example.org', $hosts);
     }
 
-    public function test_leaves_allowed_hosts_unchanged_when_toggle_off(): void
+    /**
+     * @param array<string, mixed> $kizlo
+     */
+    private function requestWithKizlo(array $kizlo): WP_REST_Request
     {
-        SiteSettings::load()->setUrl('https://frontend.example')->save();
+        $request = new WP_REST_Request('POST', '/wc/store/v1/checkout');
+        $request->set_param('extensions', ['kizlo' => $kizlo]);
 
-        $this->assertSame(
-            ['example.org'],
-            $this->module->allowFrontendRedirectHost(['example.org']),
-        );
-    }
-
-    public function test_save_persists_both_options(): void
-    {
-        $_POST[self::OPTION_ENABLED] = '1';
-        $_POST[self::OPTION_PATH]    = '/custom/thank-you';
-
-        $this->module->saveSettings();
-
-        unset($_POST[self::OPTION_ENABLED], $_POST[self::OPTION_PATH]);
-
-        $this->assertSame('yes', get_option(self::OPTION_ENABLED));
-        $this->assertSame('/custom/thank-you', get_option(self::OPTION_PATH));
+        return $request;
     }
 }

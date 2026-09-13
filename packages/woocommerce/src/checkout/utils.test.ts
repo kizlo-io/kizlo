@@ -1,7 +1,7 @@
 import { expect, test } from "vitest"
 import { Checkout } from "./schema"
 import type { WCK_Checkout } from "./types"
-import { deserializeCheckout, serializeCheckoutBillingAddress, serializeCheckoutShippingAddress } from "./utils"
+import { deserializeCheckout, serializeCheckoutBillingAddress, serializeCheckoutShippingAddress, withKizloRedirectPaths } from "./utils"
 
 const shippingAddress = {
 	first_name: "Ada",
@@ -89,6 +89,29 @@ test("preserves custom payment statuses and normalizes empty redirects", () => {
 			details: [{ key: "transaction", value: "tx_42" }],
 			redirectUrl: null,
 		},
+	})
+})
+
+test("folds only the defined redirect paths into extensions.kizlo", () => {
+	expect(withKizloRedirectPaths(undefined, { successPath: "/thanks", cancelPath: "/cart" })).toEqual({
+		kizlo: { success_path: "/thanks", cancel_path: "/cart" },
+	})
+	expect(withKizloRedirectPaths(undefined, { successPath: "/thanks" })).toEqual({
+		kizlo: { success_path: "/thanks" },
+	})
+})
+
+test("returns the extensions unchanged when neither path is set", () => {
+	expect(withKizloRedirectPaths(undefined, {})).toBeUndefined()
+
+	const extensions = { acme: { source: "test" } }
+	expect(withKizloRedirectPaths(extensions, {})).toBe(extensions)
+})
+
+test("preserves an existing extensions.kizlo block", () => {
+	expect(withKizloRedirectPaths({ acme: { source: "test" }, kizlo: { private: true } }, { cancelPath: "/cart" })).toEqual({
+		acme: { source: "test" },
+		kizlo: { private: true, cancel_path: "/cart" },
 	})
 })
 

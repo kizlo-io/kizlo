@@ -4,7 +4,13 @@ import { deserializeCart } from "../cart/utils"
 import { sessionMiddleware } from "../session"
 import { CONFIRM_CHECKOUT_ERROR_MAP, GET_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERROR_MAP, UPDATE_CHECKOUT_ERROR_MAP } from "./error"
 import { Checkout, ConfirmCheckoutInput, RetryCheckoutInput, UpdateCheckoutInput } from "./schema"
-import { deserializeCheckout, gateway, serializeCheckoutBillingAddress, serializeCheckoutShippingAddress } from "./utils"
+import {
+	deserializeCheckout,
+	gateway,
+	serializeCheckoutBillingAddress,
+	serializeCheckoutShippingAddress,
+	withKizloRedirectPaths,
+} from "./utils"
 
 export const CHECKOUT_PROCEDURES = {
 	get: createProcedure(
@@ -107,7 +113,10 @@ export const CHECKOUT_PROCEDURES = {
 					customer_password: input.body.customerPassword,
 					payment_data: input.body.paymentData,
 					additional_fields: input.body.additionalFields,
-					extensions: input.body.extensions,
+					extensions: withKizloRedirectPaths(input.body.extensions, {
+						successPath: input.body.successPath,
+						cancelPath: input.body.cancelPath,
+					}),
 				},
 				{ headers: context.sessionHeaders },
 			)
@@ -196,7 +205,10 @@ export const CHECKOUT_PROCEDURES = {
 					shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
 					customer_note: input.body.customerNote,
 					additional_fields: input.body.additionalFields,
-					extensions: input.body.extensions,
+					extensions: withKizloRedirectPaths(input.body.extensions, {
+						successPath: input.body.successPath,
+						cancelPath: input.body.cancelPath,
+					}),
 				},
 				{ headers: context.sessionHeaders },
 			)

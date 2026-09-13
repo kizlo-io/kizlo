@@ -107,6 +107,32 @@ final class KizloBlocks
     }
 
     /**
+     * `extensions.kizlo` on the Store API checkout.
+     *
+     * These are write-only transport for the headless storefront: the frontend
+     * sends where to send the shopper after checkout, and the plugin stamps them
+     * on the order to build the success and cancel redirects. They are relative
+     * paths on the configured Site URL, validated server-side before storage.
+     *
+     * @return array<string, mixed>
+     */
+    public static function storeCheckout(): array
+    {
+        return [
+            'success_path' => [
+                'description' => 'Relative path on the Kizlo Site URL to send the shopper to after a successful checkout.',
+                'type'        => 'string',
+                'context'     => ['view', 'edit'],
+            ],
+            'cancel_path' => [
+                'description' => 'Relative path on the Kizlo Site URL to send the shopper to after cancelling an off-site payment.',
+                'type'        => 'string',
+                'context'     => ['view', 'edit'],
+            ],
+        ];
+    }
+
+    /**
      * `extensions.kizlo` on a Store API order item.
      *
      * The order line itself is a transaction snapshot. These fields describe
