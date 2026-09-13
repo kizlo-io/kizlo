@@ -4,6 +4,10 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-09-13
+### Fixed
+- Preserve a checkout's cancel path when WooCommerce redirects an emptied cart to /cart after an order-pay exit
+
 ## [0.8.0] - 2026-09-13
 ### Changed
 - Redirect after checkout to a per-checkout success or cancel path sent by the storefront, replacing the global redirect settings.
@@ -91,6 +95,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.8.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.8.0...kizlo-woocommerce-v0.8.1
 [0.8.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.7.1...kizlo-woocommerce-v0.8.0
 [0.7.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.7.0...kizlo-woocommerce-v0.7.1
 [0.7.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.6.2...kizlo-woocommerce-v0.7.0

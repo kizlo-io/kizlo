@@ -4,7 +4,7 @@ Tags: kizlo, woocommerce, headless, javascript, ai
 Requires at least: 6.5
 Tested up to: 6.7
 Requires PHP: 8.2
-Stable tag: 0.8.0
+Stable tag: 0.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,7 +18,7 @@ Requires the Kizlo core plugin and WooCommerce to be active.
 
 == Changelog ==
 
-= 0.8.0 =
-* Changed: Redirect after checkout to a per-checkout success or cancel path sent by the storefront, replacing the global redirect settings.
+= 0.8.1 =
+* Fixed: Preserve a checkout's cancel path when WooCommerce redirects an emptied cart to /cart after an order-pay exit
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo-woocommerce/CHANGELOG.md).
