@@ -76,11 +76,16 @@ describe("assertIntegrationEndpoints", () => {
 
 	it("names the missing subtree and the plugin that would serve it", () => {
 		expect(() => assertIntegrationEndpoints(integration, endpoints)).toThrow(/woocommerce\.store\.checkout/)
-		expect(() => assertIntegrationEndpoints(integration, endpoints)).toThrow(/kizlo-woocommerce 0\.2\.0\+/)
+		expect(() => assertIntegrationEndpoints(integration, endpoints)).toThrow(/kizlo-woocommerce to 0\.2\.0 or newer/)
+	})
+
+	it("lists the missing routes and links to the integration", () => {
+		expect(() => assertIntegrationEndpoints(integration, endpoints)).toThrow(/Missing routes:/)
+		expect(() => assertIntegrationEndpoints(integration, endpoints)).toThrow(/https:\/\/kizlo\.io\/integrations\/woocommerce/)
 	})
 
 	it("names only what is missing, not everything it declared", () => {
-		expect(() => assertIntegrationEndpoints(integration, endpoints)).not.toThrow(/woocommerce\.store\.cart,/)
+		expect(() => assertIntegrationEndpoints(integration, endpoints)).not.toThrow(/- woocommerce\.store\.cart/)
 	})
 
 	it("falls back to generate guidance when no plugin is named", () => {

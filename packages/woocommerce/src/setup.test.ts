@@ -21,7 +21,7 @@ function server(endpoints: object) {
 
 test("refuses to start against a WordPress that does not serve the integration routes", () => {
 	expect(server({})).toThrow(/woocommerce\.store\.cart/)
-	expect(server({})).toThrow(/kizlo-woocommerce 0\.5\.0\+/)
+	expect(server({})).toThrow(/kizlo-woocommerce to 0\.5\.0 or newer/)
 })
 
 test("names only the subtrees that are missing", () => {
@@ -36,5 +36,5 @@ test("names only the subtrees that are missing", () => {
 
 	// A plugin old enough to predate the checkout routes reaches here as a tree missing one subtree.
 	expect(server(partial)).toThrow(/woocommerce\.store\.checkout/)
-	expect(server(partial)).not.toThrow(/woocommerce\.store\.cart,/)
+	expect(server(partial)).not.toThrow(/- woocommerce\.store\.cart/)
 })
