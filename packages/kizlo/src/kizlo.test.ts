@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { authMock } from "./adapters/auth"
 import type { ProcedureContext } from "./context"
-import { createKizlo, Kizlo, resolveKizloConfig } from "./kizlo"
+import { createKizlo, integrationEnv, Kizlo, resolveKizloConfig, wordPressConnectionComplete } from "./kizlo"
 import { CORE_PROCEDURES } from "./procedures"
 import { createIntegration } from "./shared/integration"
 
@@ -124,6 +124,30 @@ describe("resolveKizloConfig environment boundary", () => {
 			siteSecret: "explicit-secret",
 			credentials,
 		})
+	})
+})
+
+describe("wordPressConnectionComplete", () => {
+	test("is true when the active profile has every connection value", () => {
+		const env = integrationEnv([createIntegration({ id: "runtime", env: runtimeValues })])
+		expect(wordPressConnectionComplete(env)).toBe(true)
+	})
+
+	test("selects the active profile, so a complete remote does not cover an incomplete local", () => {
+		const env = integrationEnv([
+			createIntegration({
+				id: "runtime",
+				env: { ...runtimeValues, mode: "local", local: { wordpressUrl: "http://localhost:8080" } },
+			}),
+		])
+		expect(wordPressConnectionComplete(env)).toBe(false)
+	})
+
+	test("is false when a profile value is missing", () => {
+		const env = integrationEnv([
+			createIntegration({ id: "runtime", env: { ...runtimeValues, remote: { ...runtimeValues.remote, wordpressPassword: undefined } } }),
+		])
+		expect(wordPressConnectionComplete(env)).toBe(false)
 	})
 })
 

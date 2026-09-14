@@ -170,6 +170,12 @@ export interface GenerateWordPressOptions {
 	fetch?: typeof globalThis.fetch
 	/** Refuse a document WordPress had to exclude anything from, leaving the introspection on disk untouched. */
 	strict?: boolean
+	/**
+	 * Build the contract from the server sources without fetching introspection, leaving the file on disk
+	 * as it is. Set when there is no reachable WordPress (no enabled local stack, or incomplete connection
+	 * envs), so `kizlo dev` / `kizlo generate` still refresh the contract instead of failing to connect.
+	 */
+	skipIntrospection?: boolean
 }
 
 /**
@@ -255,7 +261,8 @@ export async function generateIntrospectionSource(cwd: string, options: Generate
 export async function generateIntrospectionOnce(
 	cfg: ResolvedConfig,
 	options: GenerateWordPressOptions = {},
-): Promise<"generated" | "unchanged"> {
+): Promise<"generated" | "unchanged" | "skipped"> {
+	if (options.skipIntrospection) return "skipped"
 	const file = path.resolve(cfg.cwd, cfg.introspectionPath)
 	const metaPath = path.resolve(cfg.cwd, cfg.introspectionMetaPath)
 	const result = await fetchDocument(cfg.cwd, options, readWordPressMeta(metaPath, file)?.etag)
@@ -275,8 +282,11 @@ export async function generateIntrospectionOnce(
 
 /** What a run of {@link generateOnce} did. */
 export interface GenerateResult {
-	/** The introspection artifact: freshly written, or already current (an unchanged 304). */
-	introspection: "generated" | "unchanged"
+	/**
+	 * The introspection artifact: freshly written, already current (an unchanged 304), or `skipped` when
+	 * `skipIntrospection` left it untouched because there was no reachable WordPress.
+	 */
+	introspection: "generated" | "unchanged" | "skipped"
 	/**
 	 * The contract:
 	 * - `built`: a server was present and its `contract.json` + barrel were written;

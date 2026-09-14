@@ -244,10 +244,18 @@ describe("createWordPressRefresh", () => {
 
 /**
  * A workspace the watcher can start in but never finish starting in. The config carries it past the
- * "nothing to generate" exit, and the blank credentials make `resolveWordPressConnection` throw on
- * the next line, which is the first thing to run after the lock is taken.
+ * "nothing to generate" exit, and an invalid `KIZLO_MODE` makes `resolveWatchCredentials` throw on the
+ * next line, which is the first thing to run after the lock is taken.
  */
 function unstartable(): string {
+	const cwd = workspace()
+	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: { introspection: "." } }\n`)
+	vi.stubEnv("KIZLO_MODE", "preview")
+	return cwd
+}
+
+/** A workspace with a config to generate but no reachable WordPress: the watcher runs alone, introspection skipped. */
+function unconnected(): string {
 	const cwd = workspace()
 	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: { introspection: "." } }\n`)
 	for (const key of ["KIZLO_MODE", "KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD"]) {
@@ -261,7 +269,23 @@ describe("startWatcher", () => {
 		watchLog()
 		const cwd = unstartable()
 
-		await expect(startWatcher(cwd)).rejects.toThrow("wordpressUrl")
+		await expect(startWatcher(cwd)).rejects.toThrow(/"local" or "remote"/)
+		expect(fs.existsSync(lockPath(cwd))).toBe(false)
+	})
+
+	test("runs the contract watcher alone, skipping introspection, without a WordPress connection", async () => {
+		watchLog()
+		const cwd = unconnected()
+
+		const stop = await startWatcher(cwd)
+		try {
+			expect(stop).toBeDefined()
+			expect(lines("info").join("\n")).toContain("introspection skipped")
+			// Nothing was fetched, so the introspection file was never written.
+			expect(fs.existsSync(path.join(cwd, "introspection.ts"))).toBe(false)
+		} finally {
+			stop?.()
+		}
 		expect(fs.existsSync(lockPath(cwd))).toBe(false)
 	})
 
