@@ -20,8 +20,9 @@ export type KizloDir =
 
 export interface KizloDevConfig {
 	/**
-	 * Run the dev stack. On by default when local WordPress is enabled; set `false` to keep local
-	 * WordPress on for `kizlo test` while `kizlo dev` runs the contract watcher alone.
+	 * Run the dev stack under `kizlo dev`. Off unless set to `true`; `local: true` is the shorthand that
+	 * turns both stacks on. Leave it off to keep the stack configured while `kizlo dev` runs the contract
+	 * watcher alone (for example when only `kizlo test` boots local WordPress).
 	 */
 	enable?: boolean
 
@@ -64,8 +65,9 @@ export interface KizloDevConfig {
 
 export interface KizloTestConfig {
 	/**
-	 * Run the test stack. On by default when local WordPress is enabled; set `false` to keep local
-	 * WordPress on for `kizlo dev` while `kizlo test` just runs the project's own test script.
+	 * Run the test stack under `kizlo test`. Off unless set to `true`; `local: true` is the shorthand that
+	 * turns both stacks on. Leave it off and `kizlo test` just runs the project's own test script without
+	 * booting local WordPress.
 	 */
 	enable?: boolean
 
@@ -103,8 +105,9 @@ export interface KizloTestConfig {
 
 export interface KizloLocalConfig {
 	/**
-	 * Enable local Docker WordPress (default `true` in this object form). Set `false` to keep the
-	 * stacks configured but off, the same as omitting `local` entirely.
+	 * Master switch for local Docker WordPress (default `true` in this object form). Set `false` to keep
+	 * the stacks configured but off, the same as omitting `local` entirely. Each stack is still off until
+	 * its own `enable: true` — see {@link KizloDevConfig.enable} and {@link KizloTestConfig.enable}.
 	 */
 	enable?: boolean
 
@@ -150,9 +153,9 @@ export interface KizloGlobalConfig {
 	alias?: string
 
 	/**
-	 * Local Docker WordPress, off unless set. `true` enables both the dev and test stacks with
-	 * defaults; the object form enables and configures them, and is where the stack name, the
-	 * per-branch `worktrees` toggle, and the two stacks live.
+	 * Local Docker WordPress, off unless set. `true` enables both the dev and test stacks with defaults;
+	 * the object form configures them, with each stack off until its own `enable: true`, and is where the
+	 * stack name, the per-branch `worktrees` toggle, and the two stacks live.
 	 */
 	local?: boolean | KizloLocalConfig
 }

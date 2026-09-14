@@ -3,7 +3,15 @@ import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { DEFAULT_WORDPRESS_TAG } from "../wp/constants"
-import { resolveConfig, resolveDevConfig, resolveStackName, resolveTestConfig, stackProject, usesLocalWordPress } from "./config"
+import {
+	resolveConfig,
+	resolveDevConfig,
+	resolveStackName,
+	resolveTestConfig,
+	resolveWatchCredentials,
+	stackProject,
+	usesLocalWordPress,
+} from "./config"
 import { log } from "./logger"
 
 describe("resolveStackName", () => {
@@ -274,11 +282,13 @@ describe("resolveDevConfig / resolveTestConfig", () => {
 	})
 
 	test.each([
-		["both stacks on", "{ dev: {}, test: {} }", true, true],
-		["dev off", "{ dev: { enable: false }, test: {} }", false, true],
-		["test off", "{ dev: {}, test: { enable: false } }", true, false],
+		["both stacks off by default", "{ dev: {}, test: {} }", false, false],
+		["dev enabled", "{ dev: { enable: true }, test: {} }", true, false],
+		["test enabled", "{ dev: {}, test: { enable: true } }", false, true],
+		["both enabled", "{ dev: { enable: true }, test: { enable: true } }", true, true],
+		["local true enables both", "true", true, true],
 		["local off", "false", false, false],
-		["local disabled by enable", "{ enable: false, dev: {}, test: {} }", false, false],
+		["master enable false overrides a stack enable", "{ enable: false, dev: { enable: true }, test: { enable: true } }", false, false],
 	])("resolves local booleans: %s", async (_label, local, dev, test) => {
 		writeConfig(`{ local: ${local} }`)
 		expect(await usesLocalWordPress(dir)).toBe(dev)
@@ -308,5 +318,66 @@ describe("resolveDevConfig / resolveTestConfig", () => {
 	test("takes a full tag, for a caller pinning a specific PHP", async () => {
 		writeConfig('{ local: { test: { version: "6.8.2-php8.3-apache" } } }')
 		expect((await resolveTestConfig(dir)).wordpressTag).toBe("6.8.2-php8.3-apache")
+	})
+})
+
+describe("resolveWatchCredentials", () => {
+	let dir: string
+	const ENV_KEYS = [
+		"KIZLO_MODE",
+		"KIZLO_WP_URL",
+		"KIZLO_WP_USERNAME",
+		"KIZLO_WP_APP_PASSWORD",
+		"KIZLO_LOCAL_WP_URL",
+		"KIZLO_LOCAL_WP_USERNAME",
+		"KIZLO_LOCAL_WP_APP_PASSWORD",
+	]
+
+	beforeEach(() => {
+		dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-creds-")))
+	})
+
+	afterEach(() => {
+		fs.rmSync(dir, { recursive: true, force: true })
+		for (const key of ENV_KEYS) delete process.env[key]
+	})
+
+	function writeConfig(body: string): void {
+		fs.writeFileSync(path.join(dir, "kizlo.config.ts"), `export default ${body}\n`)
+	}
+
+	test("returns undefined in local mode when no local dev stack is enabled", async () => {
+		writeConfig("{ local: { dev: {} } }")
+		process.env.KIZLO_MODE = "local"
+		process.env.KIZLO_LOCAL_WP_URL = "http://localhost:8080"
+		process.env.KIZLO_LOCAL_WP_USERNAME = "admin"
+		process.env.KIZLO_LOCAL_WP_APP_PASSWORD = "pass"
+		expect(await resolveWatchCredentials(dir)).toBeUndefined()
+	})
+
+	test("returns undefined when the active profile's envs are incomplete", async () => {
+		writeConfig("{ local: true }")
+		process.env.KIZLO_MODE = "remote"
+		process.env.KIZLO_WP_URL = "https://wp.example"
+		// username and password are missing, so the remote profile is not usable.
+		expect(await resolveWatchCredentials(dir)).toBeUndefined()
+	})
+
+	test("returns the resolved credentials for a complete remote profile", async () => {
+		writeConfig("{ local: true }")
+		process.env.KIZLO_MODE = "remote"
+		process.env.KIZLO_WP_URL = "https://wp.example"
+		process.env.KIZLO_WP_USERNAME = "admin"
+		process.env.KIZLO_WP_APP_PASSWORD = "secret"
+		expect(await resolveWatchCredentials(dir)).toEqual({ url: "https://wp.example", username: "admin", password: "secret" })
+	})
+
+	test("returns the local credentials once the local dev stack is enabled", async () => {
+		writeConfig("{ local: { dev: { enable: true } } }")
+		process.env.KIZLO_MODE = "local"
+		process.env.KIZLO_LOCAL_WP_URL = "http://localhost:8080"
+		process.env.KIZLO_LOCAL_WP_USERNAME = "admin"
+		process.env.KIZLO_LOCAL_WP_APP_PASSWORD = "pass"
+		expect(await resolveWatchCredentials(dir)).toEqual({ url: "http://localhost:8080", username: "admin", password: "pass" })
 	})
 })

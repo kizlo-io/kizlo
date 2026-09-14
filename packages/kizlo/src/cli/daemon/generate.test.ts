@@ -164,6 +164,22 @@ describe("generateOnce", () => {
 		await expect(generateOnce(cfg)).rejects.toThrow(LegacyRouterExportError)
 		await expect(generateOnce(cfg)).rejects.toThrow(/exports `router`.*Rename that export to `procedures`/)
 	})
+
+	test("skips introspection but still builds the contract when told to", async () => {
+		const cfg = project()
+		const kizloModule = path.resolve(here, "../../kizlo.ts")
+		writeServer(cfg, `import { createKizlo } from ${JSON.stringify(kizloModule)}\nexport const { procedures } = createKizlo()\n`)
+		const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+
+		const result = await generateOnce(cfg, { skipIntrospection: true, fetch: fetch as unknown as typeof globalThis.fetch })
+
+		expect(result).toEqual({ introspection: "skipped", contract: "built" })
+		expect(fetch).not.toHaveBeenCalled()
+		const server = cfg.server as NonNullable<ResolvedConfig["server"]>
+		expect(fs.existsSync(path.join(cfg.cwd, server.contractPath))).toBe(true)
+		// The introspection file is left as it was — skipping never writes it.
+		expect(fs.existsSync(path.join(cfg.cwd, cfg.introspectionPath))).toBe(false)
+	})
 })
 
 describe("generateIntrospectionOnce", () => {

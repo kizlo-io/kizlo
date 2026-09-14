@@ -2,7 +2,10 @@ import fs from "node:fs"
 import path from "node:path"
 import z from "zod/v4"
 import type { KizloGlobalConfig } from "../../config"
-import { detectPackageManager, type PackageManager } from "../utils"
+import { node } from "../../integrations/node/integration"
+import { integrationEnv, resolveWordPressConnection, wordPressConnectionComplete } from "../../kizlo"
+import type { WordPressCredentials } from "../../wordpress/types"
+import { detectPackageManager, loadEnvFiles, type PackageManager } from "../utils"
 import { DEFAULT_WORDPRESS_TAG, INTROSPECTION_META_REL, LOCAL_DIR_REL } from "../wp/constants"
 import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
@@ -91,21 +94,31 @@ type DevStack = NonNullable<LocalObject["dev"]>
 type TestStack = NonNullable<LocalObject["test"]>
 
 interface ResolvedLocal {
-	/** Whether local WordPress is on at all (`local === true` or the object with `enable !== false`). */
+	/** Whether the `local` block is on at all (`local === true`, or the object with `enable !== false`). */
 	enabled: boolean
+	/** Whether the dev stack runs: the block is enabled and `local.dev.enable === true` (or `local === true`). */
+	devEnabled: boolean
+	/** Whether the test stack runs: the block is enabled and `local.test.enable === true` (or `local === true`). */
+	testEnabled: boolean
 	name?: string
 	worktrees?: boolean
 	dev: DevStack
 	test: TestStack
 }
 
-/** Normalize `local` (absent, `true`, `false`, or the object form) into one shape the resolvers read. */
+/**
+ * Normalize `local` (absent, `true`, `false`, or the object form) into one shape the resolvers read.
+ * A stack is off unless its own `enable: true` is set; `local: true` is the shorthand that turns both on.
+ */
 function resolveLocal(fileConfig?: LoadedConfig): ResolvedLocal {
 	const local = fileConfig?.local
-	if (local === true) return { enabled: true, dev: {}, test: {} }
-	if (!local) return { enabled: false, dev: {}, test: {} }
+	if (local === true) return { enabled: true, devEnabled: true, testEnabled: true, dev: {}, test: {} }
+	if (!local) return { enabled: false, devEnabled: false, testEnabled: false, dev: {}, test: {} }
+	const enabled = local.enable !== false
 	return {
-		enabled: local.enable !== false,
+		enabled,
+		devEnabled: enabled && local.dev?.enable === true,
+		testEnabled: enabled && local.test?.enable === true,
 		name: local.name,
 		worktrees: local.worktrees,
 		dev: local.dev ?? {},
@@ -349,7 +362,7 @@ export async function resolveTestConfig(cwd: string): Promise<ResolvedTestConfig
 
 	return {
 		configDir,
-		local: local.enabled && test.enable !== false,
+		local: local.testEnabled,
 		project: stackProject(resolveStackName(configDir, { name: local.name, worktrees: local.worktrees }), "test"),
 		command: test.command,
 		port: test.port ?? DEFAULT_TEST_PORT,
@@ -393,14 +406,28 @@ export interface ResolvedDevConfig {
 }
 
 /**
- * Whether this project runs local WordPress under `kizlo dev`: local is enabled and the dev stack is
- * on (`local.dev.enable !== false`) in `kizlo.config.*`. When false, `kizlo dev` has nothing to boot and
- * runs the contract watcher alone, the path a project pointing at its own WordPress takes. Written by
- * `create`/`init` when local WordPress is chosen, so it's committed and survives `kizlo dev reset`.
+ * Whether this project runs local WordPress under `kizlo dev`: the `local` block is enabled and the dev
+ * stack is turned on with `local.dev.enable: true` (or `local: true`) in `kizlo.config.*`. When false,
+ * `kizlo dev` has nothing to boot and runs the contract watcher alone, the path a project pointing at its
+ * own WordPress takes. Written by `create`/`init` when local WordPress is chosen, so it's committed and
+ * survives `kizlo dev reset`.
  */
 export async function usesLocalWordPress(cwd: string): Promise<boolean> {
-	const local = resolveLocal(await loadConfigFile(findConfigDir(cwd)))
-	return local.enabled && local.dev.enable !== false
+	return resolveLocal(await loadConfigFile(findConfigDir(cwd))).devEnabled
+}
+
+/**
+ * WordPress credentials for the dev/generate watcher, or `undefined` when there is nothing to introspect:
+ * the active profile is `local` but no local dev stack is enabled, or the active profile's connection
+ * envs are incomplete. Callers then generate the contract with introspection skipped rather than fetching
+ * from a WordPress that is not there. Unlike {@link resolveWordPressConnection}, this never throws.
+ */
+export async function resolveWatchCredentials(cwd: string): Promise<WordPressCredentials | undefined> {
+	loadEnvFiles(cwd)
+	const env = integrationEnv([node()])
+	if (env("mode")?.trim() === "local" && !(await usesLocalWordPress(cwd))) return undefined
+	if (!wordPressConnectionComplete(env)) return undefined
+	return resolveWordPressConnection(env).credentials
 }
 
 /**

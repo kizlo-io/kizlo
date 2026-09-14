@@ -1,8 +1,7 @@
 import path from "node:path"
 import { defineCommand } from "citty"
-import type { WordPressCredentials } from "../../wordpress/types"
-import { resolveConfig } from "../daemon/config"
-import { generateOnce, PartialContractError, reportGenerationError } from "../daemon/generate"
+import { resolveConfig, resolveWatchCredentials } from "../daemon/config"
+import { type GenerateWordPressOptions, generateOnce, PartialContractError, reportGenerationError } from "../daemon/generate"
 import { log } from "../daemon/logger"
 import { testWordPressCredentials } from "./_test-wordpress"
 
@@ -39,17 +38,26 @@ export const generate = defineCommand({
 	async run({ args }) {
 		const cwd = process.cwd()
 		const strict = args.strict === true
-		let credentials: WordPressCredentials | undefined
+		let options: GenerateWordPressOptions
 		if (args.test) {
 			try {
-				credentials = await testWordPressCredentials(cwd)
+				options = { credentials: await testWordPressCredentials(cwd), strict }
 			} catch (error) {
 				log.error(error instanceof Error ? error.message : String(error))
 				process.exitCode = 1
 				return
 			}
+		} else {
+			// Without a reachable WordPress — no enabled local stack, or incomplete connection envs — build
+			// the contract with introspection skipped rather than failing to fetch from a WordPress that
+			// is not there. `--test` always has the seeded stack to fetch from.
+			const credentials = await resolveWatchCredentials(cwd)
+			if (credentials) options = { credentials, strict }
+			else {
+				log.info("No WordPress connection configured; generating the contract only, introspection skipped.")
+				options = { skipIntrospection: true, strict }
+			}
 		}
-		const options = { credentials, strict }
 
 		const cfg = await resolveConfig(cwd, { dir: args.dir })
 		if (!cfg) {
@@ -70,8 +78,10 @@ export const generate = defineCommand({
 		}
 
 		// Introspection-only: a package that ships procedures but no server. Name the file, since there is
-		// no contract line to imply the generation happened.
+		// no contract line to imply the generation happened. Nothing to report when it was skipped — the
+		// note above already said so, and no file was touched.
 		if (result.contract === "none") {
+			if (result.introspection === "skipped") return
 			const file = path.resolve(cwd, cfg.introspectionPath)
 			log.success(`WordPress introspection ${result.introspection === "generated" ? "written to" : "already current at"} ${file}`)
 			return

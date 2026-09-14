@@ -67,6 +67,7 @@ export default defineConfig({
 	dir: { introspection: "." },
 	local: {
 		worktrees: true,
-		dev: { version: WORDPRESS_VERSION, fixtures: introspectionFixtures },
+		dev: { enable: true, version: WORDPRESS_VERSION, fixtures: introspectionFixtures },
+		test: { enable: true },
 	},
 })

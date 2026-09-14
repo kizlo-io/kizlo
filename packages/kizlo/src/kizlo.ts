@@ -16,6 +16,7 @@ import {
 	assertIntegrationEnv,
 	type EnvReader,
 	type InferIntegrationProcedures,
+	missingEnv,
 	readEnv,
 } from "./shared/integration"
 import type { InvocationScope } from "./shared/procedure"
@@ -242,6 +243,18 @@ function requireEnvValue(name: string, env: EnvReader): string {
 	throw new KizloError("MISSING_ENV_VALUE", {
 		message: `Kizlo requires the "${name}" environment value. Provide it through an integration or an explicit createKizlo option.`,
 	})
+}
+
+/** The three connection values a WordPress request needs, scoped to the active profile by {@link integrationEnv}. */
+const WORDPRESS_CONNECTION_VALUES = ["wordpressUrl", "wordpressUsername", "wordpressPassword"] as const
+
+/**
+ * Whether the active profile carries a full WordPress connection, without throwing. The dev/generate
+ * flow uses this to decide whether introspection can be fetched at all; {@link resolveWordPressConnection}
+ * throws for the request path that must have a connection.
+ */
+export function wordPressConnectionComplete(env: EnvReader): boolean {
+	return missingEnv(env, WORDPRESS_CONNECTION_VALUES).length === 0
 }
 
 export function resolveWordPressConnection(env: EnvReader): { credentials: WordPressCredentials } {

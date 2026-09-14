@@ -1,11 +1,8 @@
 import path from "node:path"
 import { FSWatcher } from "chokidar"
-import { node } from "../../integrations/node/integration"
-import { integrationEnv, resolveWordPressConnection } from "../../kizlo"
 import { IntrospectionFetchError } from "../../wordpress/fetch-introspection"
 import type { WordPressCredentials } from "../../wordpress/types"
-import { loadEnvFiles } from "../utils"
-import { type ResolvedConfig, resolveConfig } from "./config"
+import { type ResolvedConfig, resolveConfig, resolveWatchCredentials } from "./config"
 import { type GenerateWordPressOptions, generateIntrospectionOnce, generateOnce, reportGenerationError } from "./generate"
 import { acquire, lockPath, release } from "./lock"
 import { log } from "./logger"
@@ -18,9 +15,9 @@ function debounce<T extends (...args: never[]) => Promise<void>>(fn: T, delay: n
 	}) as T
 }
 
-async function regenerate(cfg: ResolvedConfig, credentials: WordPressCredentials): Promise<void> {
+async function regenerate(cfg: ResolvedConfig, options: GenerateWordPressOptions): Promise<void> {
 	try {
-		const result = await generateOnce(cfg, { credentials })
+		const result = await generateOnce(cfg, options)
 		if (result.contract === "built") log.success("Contract updated")
 		else if (result.contract === "empty" && cfg.server) log.warn(`No Kizlo server found in ${cfg.server.entry}`)
 	} catch (error) {
@@ -32,7 +29,7 @@ async function regenerate(cfg: ResolvedConfig, credentials: WordPressCredentials
 async function watch(
 	cfg: ResolvedConfig,
 	server: NonNullable<ResolvedConfig["server"]>,
-	credentials: WordPressCredentials,
+	options: GenerateWordPressOptions,
 ): Promise<FSWatcher> {
 	const watcher = new FSWatcher({
 		persistent: true,
@@ -40,7 +37,7 @@ async function watch(
 		ignored: path.resolve(cfg.cwd, server.contractDir),
 	})
 
-	const onChange = debounce(() => regenerate(cfg, credentials), 300)
+	const onChange = debounce(() => regenerate(cfg, options), 300)
 
 	watcher.add(path.resolve(cfg.cwd, server.dir))
 	watcher.on("all", () => void onChange())
@@ -56,7 +53,7 @@ async function watch(
  * different answer and is reported. The state is per reporter rather than per process, so restarting the
  * watcher reports afresh.
  */
-function reportGeneration(stack?: StackGuard): (run: () => Promise<"generated" | "unchanged">) => Promise<void> {
+function reportGeneration(stack?: StackGuard): (run: () => Promise<"generated" | "unchanged" | "skipped">) => Promise<void> {
 	let reported: string | undefined
 	return async (run) => {
 		try {
@@ -198,12 +195,15 @@ export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: S
 		}
 
 		// Credentials come from the environment and cannot change while the dev server runs, so they are
-		// resolved once here rather than on every regeneration.
-		loadEnvFiles(cwd)
-		const { credentials } = resolveWordPressConnection(integrationEnv([node()]))
+		// resolved once here rather than on every regeneration. Without a reachable WordPress — no enabled
+		// local stack, or incomplete connection envs — introspection is skipped and the contract watcher
+		// runs alone, rather than failing to fetch from a WordPress that is not there.
+		const credentials = await resolveWatchCredentials(cwd)
+		const options: GenerateWordPressOptions = credentials ? { credentials } : { skipIntrospection: true }
+		if (!credentials) log.info("No WordPress connection configured; running the contract watcher only, introspection skipped.")
 
 		try {
-			const result = await generateOnce(cfg, { credentials })
+			const result = await generateOnce(cfg, options)
 			if (result.contract === "built") log.success("Contract generated")
 			else if (result.contract === "empty" && cfg.server) log.warn(`No Kizlo server found in ${cfg.server.entry}`)
 			else if (result.introspection === "generated") log.success("WordPress introspection generated")
@@ -212,15 +212,16 @@ export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: S
 		}
 
 		// Only a server has sources worth watching; a package with just the introspection rides the poll below.
-		const watcher = cfg.server ? await watch(cfg, cfg.server, credentials) : undefined
-		const wordpressRefresh = refreshWordPress(cfg, credentials, opts?.stack)
+		const watcher = cfg.server ? await watch(cfg, cfg.server, options) : undefined
+		// The introspection poll needs a live connection; with none, there is nothing to refresh.
+		const wordpressRefresh = credentials ? refreshWordPress(cfg, credentials, opts?.stack) : undefined
 		let stopped = false
 		handedOver = true
 		return () => {
 			if (stopped) return
 			stopped = true
 			release(lock)
-			clearInterval(wordpressRefresh)
+			if (wordpressRefresh) clearInterval(wordpressRefresh)
 			void watcher?.close()
 		}
 	} finally {
