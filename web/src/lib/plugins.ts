@@ -12,6 +12,13 @@ export const PLUGINS = {
 		tested: "6.7",
 		requires_php: "8.2",
 	},
+	"kizlo-acf": {
+		name: "Kizlo ACF",
+		description: "Brings your Advanced Custom Fields into any JavaScript runtime.",
+		requires: "6.5",
+		tested: "6.7",
+		requires_php: "8.2",
+	},
 	"kizlo-cf7": {
 		name: "Kizlo Contact Form 7",
 		description: "Connects contact form 7 plugin with @kizlo/cf7 integration.",

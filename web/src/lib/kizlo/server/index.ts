@@ -1,6 +1,7 @@
 import { createEventHandler, createIntegration, createKizlo, createMiddleware, createProcedure } from "kizlo"
 import { nextjs } from "kizlo/nextjs/server"
 import z from "zod"
+import { integrations } from "../integrations"
 import { introspection } from "./generated"
 
 export const { procedures, client, context, handler } = createKizlo({
@@ -8,6 +9,7 @@ export const { procedures, client, context, handler } = createKizlo({
 	logging: "debug",
 	integrations: [
 		nextjs(),
+		integrations,
 		createIntegration({
 			id: "test",
 			events: [
