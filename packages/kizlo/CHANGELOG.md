@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.20.2
+
+### Patch Changes
+
+- [#222](https://github.com/kizlo-io/kizlo/pull/222) [`558555f`](https://github.com/kizlo-io/kizlo/commit/558555f65faee36b13e5820101b953e3b0ff4a29) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Require an explicit `enable: true` to turn on each local dev or test stack, and run `kizlo dev` and `kizlo generate` with introspection skipped instead of failing when no WordPress connection is reachable.
+
 ## 0.20.1
 
 ### Patch Changes
