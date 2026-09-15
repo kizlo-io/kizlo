@@ -20,7 +20,7 @@ class RegistrationArgsTest extends TestCase
             'singular_label'  => 'Book',
             'plural_label'    => 'Books',
             'hierarchical'    => true,
-            'supports'        => ['title', 'editor', 'custom-fields'],
+            'supports'        => ['title', 'editor', 'custom-fields', 'post-formats'],
             'capability_type' => 'custom',
         ]);
 
@@ -31,8 +31,10 @@ class RegistrationArgsTest extends TestCase
         $this->assertSame(['book', 'books'], $args['capability_type']);
         $this->assertTrue($args['map_meta_cap']);
 
-        // The legacy custom-fields metabox is never registered.
+        // The legacy custom-fields metabox and post formats are never registered,
+        // including when an older definition still has them stored.
         $this->assertNotContains('custom-fields', $args['supports']);
+        $this->assertNotContains('post-formats', $args['supports']);
         $this->assertContains('title', $args['supports']);
 
         // WordPress-frontend URL machinery is never emitted; Kizlo is headless.

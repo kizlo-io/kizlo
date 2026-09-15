@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Show the Featured image panel for post types with that support enabled, and drop the post formats support option that WordPress cannot honour per post type.

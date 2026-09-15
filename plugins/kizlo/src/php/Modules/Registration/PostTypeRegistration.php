@@ -19,8 +19,13 @@ class PostTypeRegistration extends RegistrationAbstract
     public const KEY_MAX_LENGTH = 20;
 
     /**
-     * Supports offered to users. The legacy `custom-fields` metabox is
-     * intentionally excluded: Kizlo provides its own custom-field system.
+     * Supports offered to users.
+     *
+     * Two WordPress supports are intentionally excluded. The legacy
+     * `custom-fields` metabox is: Kizlo provides its own custom-field system.
+     * `post-formats` is: its theme support has no per-post-type form, so
+     * honouring it would turn post formats on site-wide, and a format only ever
+     * tells a theme how to render a post, which means nothing headless.
      */
     public const SUPPORTS = [
         'title',
@@ -31,7 +36,6 @@ class PostTypeRegistration extends RegistrationAbstract
         'comments',
         'revisions',
         'page-attributes',
-        'post-formats',
     ];
 
     protected array $data = [
