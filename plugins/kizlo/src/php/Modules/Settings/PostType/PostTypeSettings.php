@@ -8,6 +8,7 @@ use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\CustomFields\CustomFieldsValidator;
 use Kizlo\Modules\Registration\PostTypeRegistration;
+use Kizlo\Support\Pathname;
 
 class PostTypeSettings extends SettingsIndexedAbstract
 {
@@ -89,10 +90,11 @@ class PostTypeSettings extends SettingsIndexedAbstract
             'rest_api_enabled',
             'search_engine_visibility' => (bool) $value,
 
+            'pathname_structure'       => Pathname::normalize(sanitize_text_field((string) $value)),
+
             'article_type',
             'webpage_type',
             'title_structure',
-            'pathname_structure',
             'description_structure',
             'comment_action_structure' => !empty($value) ? sanitize_text_field($value) : null,
 

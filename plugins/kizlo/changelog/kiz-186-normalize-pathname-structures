@@ -1,0 +1,4 @@
+Significance: patch
+Type: changed
+
+Normalize a saved pathname structure to lowercase with a single leading slash, no repeated separators, and no trailing slash

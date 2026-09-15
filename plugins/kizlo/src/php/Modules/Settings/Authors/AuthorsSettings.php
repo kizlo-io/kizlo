@@ -4,6 +4,7 @@ namespace Kizlo\Modules\Settings\Authors;
 
 use Kizlo\Modules\Settings\SettingsAbstract;
 use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
+use Kizlo\Support\Pathname;
 
 class AuthorsSettings extends SettingsAbstract
 {
@@ -23,7 +24,7 @@ class AuthorsSettings extends SettingsAbstract
     protected function sanitize(string $key, mixed $value): mixed
     {
         return match ($key) {
-            'pathname_structure',
+            'pathname_structure'       => Pathname::normalize(sanitize_text_field((string) $value)),
             'title_structure',
             'description_structure'    => !empty($value) ? sanitize_text_field($value) : null,
             'enabled',
