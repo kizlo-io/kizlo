@@ -139,8 +139,6 @@ class ManagedContentTest extends IntrospectionTestCase
         $this->seedSettings(['post_types' => ['movie' => ['rest_api_enabled' => true]]]);
 
         $this->assertArrayHasKey('post-types.movie', $this->document()['apis']);
-
-        unregister_post_type('movie');
     }
 
     public function test_a_kizlo_created_taxonomy_is_described(): void
@@ -162,8 +160,6 @@ class ManagedContentTest extends IntrospectionTestCase
         $this->seedSettings(['taxonomies' => ['genre' => ['rest_api_enabled' => true]]]);
 
         $this->assertArrayHasKey('taxonomies.genre', $this->document()['apis']);
-
-        unregister_taxonomy('genre');
     }
 
     public function test_a_post_type_that_was_never_included_is_not_described(): void

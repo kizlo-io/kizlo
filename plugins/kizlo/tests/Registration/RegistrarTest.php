@@ -13,21 +13,6 @@ use Kizlo\Tests\TestCase;
  */
 class RegistrarTest extends TestCase
 {
-    protected function tearDown(): void
-    {
-        foreach (['book', 'movie'] as $post_type) {
-            if (post_type_exists($post_type)) {
-                unregister_post_type($post_type);
-            }
-        }
-
-        if (taxonomy_exists('genre')) {
-            unregister_taxonomy('genre');
-        }
-
-        parent::tearDown();
-    }
-
     private function savePostType(string $key, bool $active): void
     {
         $definition = new PostTypeRegistration();
