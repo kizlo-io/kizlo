@@ -11,19 +11,6 @@ use Kizlo\Tests\TestCase;
  */
 class ItemDeleterTest extends TestCase
 {
-    protected function tearDown(): void
-    {
-        if (post_type_exists('book')) {
-            unregister_post_type('book');
-        }
-
-        if (taxonomy_exists('genre')) {
-            unregister_taxonomy('genre');
-        }
-
-        parent::tearDown();
-    }
-
     public function test_posts_are_deleted_in_resumable_batches(): void
     {
         register_post_type('book', ['public' => true]);

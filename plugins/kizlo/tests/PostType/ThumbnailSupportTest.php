@@ -26,11 +26,6 @@ class ThumbnailSupportTest extends TestCase
         global $_wp_theme_features;
         $this->previous_feature = $_wp_theme_features['post-thumbnails'] ?? null;
         unset($_wp_theme_features['post-thumbnails']);
-
-        // Registered post types survive the database rollback, so an earlier
-        // suite's leftover would make Registrar skip these keys and leave the
-        // definition's supports unregistered.
-        $this->unregisterFixtures();
     }
 
     protected function tearDown(): void
@@ -42,18 +37,7 @@ class ThumbnailSupportTest extends TestCase
             $_wp_theme_features['post-thumbnails'] = $this->previous_feature;
         }
 
-        $this->unregisterFixtures();
-
         parent::tearDown();
-    }
-
-    private function unregisterFixtures(): void
-    {
-        foreach (['book', 'movie', 'unmanaged'] as $post_type) {
-            if (post_type_exists($post_type)) {
-                unregister_post_type($post_type);
-            }
-        }
     }
 
     /** @param string[] $supports */

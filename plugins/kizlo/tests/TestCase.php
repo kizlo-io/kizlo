@@ -18,6 +18,20 @@ use WP_UnitTestCase;
  */
 abstract class TestCase extends WP_UnitTestCase
 {
+    /** @var array<string, string> */
+    private array $bootPostTypes = [];
+
+    /** @var array<string, string> */
+    private array $bootTaxonomies = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->bootPostTypes  = get_post_types();
+        $this->bootTaxonomies = get_taxonomies();
+    }
+
     /** Authenticate the next REST dispatch as an administrator Application Password. */
     protected function actingAsAdmin(): int
     {
@@ -45,6 +59,35 @@ abstract class TestCase extends WP_UnitTestCase
     protected function tearDown(): void
     {
         unset($GLOBALS['wp_rest_application_password_uuid']);
+
+        $this->unregisterFixtures();
+
         parent::tearDown();
+    }
+
+    /**
+     * Unregisters the post types and taxonomies this test registered.
+     *
+     * Registered objects live in `$wp_post_types` and `$wp_taxonomies`, which the
+     * database rollback does not touch. `WP_UnitTestCase` resets them only when
+     * `WP_RUN_CORE_TESTS` is defined, and a plugin suite never defines it: core's
+     * reset unregisters everything and re-registers only the built-ins, which would
+     * drop what a plugin registers at `init`. So a fixture left behind stays
+     * registered for the rest of the process, and `Registrar` skips a key that
+     * already exists, so a later test's definition never reaches WordPress at all.
+     *
+     * Removing only what appeared during the test keeps the boot-time set intact,
+     * and taxonomies go first so none is left pointing at an object type that has
+     * already gone.
+     */
+    private function unregisterFixtures(): void
+    {
+        foreach (array_diff_key(get_taxonomies(), $this->bootTaxonomies) as $taxonomy) {
+            unregister_taxonomy($taxonomy);
+        }
+
+        foreach (array_diff_key(get_post_types(), $this->bootPostTypes) as $post_type) {
+            unregister_post_type($post_type);
+        }
     }
 }
