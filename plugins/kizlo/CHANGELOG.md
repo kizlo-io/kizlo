@@ -4,6 +4,13 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.1] - 2026-09-15
+### Changed
+- Normalize a saved pathname structure to lowercase with a single leading slash, no repeated separators, and no trailing slash
+
+### Fixed
+- Show the Featured image panel for post types with that support enabled, and drop the post formats support option that WordPress cannot honour per post type.
+
 ## [0.17.0] - 2026-09-10
 ### Added
 - Add a kizlo_headless_render_frontend filter that lets an extension render a specific front-end request under Headless Mode instead of it being blanked or locked out.
@@ -185,6 +192,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.17.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.17.0...kizlo-v0.17.1
 [0.17.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.16.0...kizlo-v0.17.0
 [0.16.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.15.0...kizlo-v0.16.0
 [0.15.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.14.2...kizlo-v0.15.0
