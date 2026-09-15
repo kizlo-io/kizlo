@@ -16,7 +16,7 @@ function server(endpoints: object) {
 
 test("refuses to start against a WordPress that does not serve the CF7 route", () => {
 	expect(server({})).toThrow(/cf7\.forms\.submit/)
-	expect(server({})).toThrow(/kizlo-cf7 0\.2\.0\+/)
+	expect(server({})).toThrow(/kizlo-cf7 to 0\.2\.0 or newer/)
 })
 
 test("starts when the generated client contains the CF7 route", () => {

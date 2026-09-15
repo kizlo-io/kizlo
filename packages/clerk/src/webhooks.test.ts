@@ -139,7 +139,7 @@ describe("Clerk webhook integration", () => {
 		const integration = clerk({ client: clerkClientFixture(), webhooks: { signingSecret: SIGNING_SECRET } })
 
 		expect(() => assertIntegrationEndpoints(integration, {})).toThrow(
-			/The "clerk" integration needs WordPress endpoints.*users\.external.*kizlo generate/,
+			/The "clerk" integration is missing routes.*kizlo generate.*users\.external/s,
 		)
 	})
 })

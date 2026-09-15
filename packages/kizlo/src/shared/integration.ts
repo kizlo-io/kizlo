@@ -142,12 +142,17 @@ export function assertIntegrationEndpoints(integration: AnyIntegration, endpoint
 	if (missing.length === 0) return
 
 	const plugins = integration.requires?.plugins
-	const remedy = plugins?.length
-		? `Install or update the required WordPress plugins (${plugins.map((plugin) => `${plugin.name} ${plugin.version}+`).join(", ")}), then run \`kizlo generate\`.`
-		: "Run `kizlo generate` against a WordPress that serves them."
+	const cause = plugins?.length
+		? `The "${integration.id}" integration plugin is outdated. Update ${plugins
+				.map((plugin) => `${plugin.name} to ${plugin.version} or newer`)
+				.join(" and ")}, then run \`kizlo generate\` to refresh introspection.ts.`
+		: `The "${integration.id}" integration is missing routes in your introspection. Run \`kizlo generate\` against a WordPress that serves them to refresh introspection.ts.`
+
+	const routes = missing.map((route) => `  - ${route}`).join("\n")
+	const link = `Download the latest version: https://kizlo.io/integrations/${integration.id}`
 
 	throw new KizloError("MISSING_WORDPRESS_ENDPOINTS", {
-		message: `The "${integration.id}" integration needs WordPress endpoints your generated client does not have: ${missing.join(", ")}. ${remedy}`,
+		message: `${cause}\n\nMissing routes:\n${routes}\n\n${link}`,
 	})
 }
 
