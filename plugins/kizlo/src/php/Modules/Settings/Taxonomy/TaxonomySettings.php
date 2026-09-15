@@ -8,6 +8,7 @@ use Kizlo\Modules\Settings\HasBreadcrumbsSetting;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\CustomFields\CustomFieldsValidator;
 use Kizlo\Modules\Registration\TaxonomyRegistration;
+use Kizlo\Support\Pathname;
 
 class TaxonomySettings extends SettingsIndexedAbstract
 {
@@ -58,7 +59,8 @@ class TaxonomySettings extends SettingsIndexedAbstract
             'rest_api_enabled',
             'search_engine_visibility' => (bool) $value,
 
-            'pathname_structure',
+            'pathname_structure'       => Pathname::normalize(sanitize_text_field((string) $value)),
+
             'title_structure',
             'description_structure'    => !empty($value) ? sanitize_text_field($value) : null,
 
