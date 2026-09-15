@@ -22,7 +22,6 @@ const SUPPORTS_OPTIONS: SelectOption[] = [
 	{ value: "comments", label: "Comments" },
 	{ value: "revisions", label: "Revisions" },
 	{ value: "page-attributes", label: "Page attributes" },
-	{ value: "post-formats", label: "Post formats" },
 ]
 
 const CAPABILITY_OPTIONS: SelectOption[] = [
