@@ -1,4 +1,4 @@
-import { createIntegration, createProcedure } from "kizlo"
+import { createIntegration, createProcedure, deserializeSeo, Seo } from "kizlo"
 import z from "zod"
 import type { WP_PostTypesIntegrationItem, WP_PostTypesIntegrationListItem } from "./server/generated/introspection"
 
@@ -30,6 +30,8 @@ export const Integration = z.object({
 	npmPackage: z.string().nullable(),
 	pluginSlug: z.string().nullable(),
 	docsUrl: z.string().nullable(),
+	/** Null on list entries; WordPress only resolves the SEO block on a single fetch. */
+	seo: Seo.nullable(),
 })
 export type Integration = z.infer<typeof Integration>
 
@@ -73,6 +75,7 @@ function mapIntegration(entry: WP_PostTypesIntegrationListItem | WP_PostTypesInt
 		npmPackage: nullifyEmpty(custom.npm_package),
 		pluginSlug: nullifyEmpty(custom.plugin_slug),
 		docsUrl: nullifyEmpty(custom.docs_url),
+		seo: "seo" in entry.kizlo ? deserializeSeo(entry.kizlo.seo) : null,
 	}
 }
 
