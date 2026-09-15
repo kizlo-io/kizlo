@@ -1,7 +1,11 @@
+import { createPageMetadata } from "kizlo/nextjs/server"
+import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { cache } from "react"
 import { Command } from "@/components/command"
 import { DownloadButton } from "@/components/download-button"
+import { JsonLd } from "@/components/json-ld"
 import type { Integration } from "@/lib/kizlo/integrations"
 import { client } from "@/lib/kizlo/server"
 import { createMetadata } from "@/lib/metadata"
@@ -19,21 +23,17 @@ export async function generateStaticParams() {
 	return (data ?? []).map((integration) => ({ slug: integration.slug }))
 }
 
-async function getIntegration(slug: string): Promise<Integration | null> {
+const getIntegration = cache(async (slug: string): Promise<Integration | null> => {
 	const { data, error } = await client.integrations.get({ params: { identifier: slug } })
 	if (error) return null
 	return data
-}
+})
 
-export async function generateMetadata(props: PageProps<"/integrations/[slug]">) {
+export async function generateMetadata(props: PageProps<"/integrations/[slug]">): Promise<Metadata> {
 	const { slug } = await props.params
 	const integration = await getIntegration(slug)
-	if (!integration) return createMetadata({ alternates: { canonical: "/integrations" } })
-	return createMetadata({
-		title: integration.name,
-		description: integration.description || `Connect ${integration.name} with Kizlo.`,
-		alternates: { canonical: `/integrations/${integration.slug}` },
-	})
+	if (!integration?.seo) return createMetadata({ alternates: { canonical: "/integrations" } })
+	return createPageMetadata(integration.seo.head)
 }
 
 /** A prefilled GitHub new-issue form scoped to this integration. */
@@ -58,6 +58,8 @@ export default async function IntegrationPage(props: PageProps<"/integrations/[s
 
 	return (
 		<main className="mx-auto w-full max-w-6xl flex-1 px-6 py-12">
+			<JsonLd schema={integration.seo?.schema} />
+
 			<Link href="/integrations" className="text-fd-muted-foreground text-sm transition-colors hover:text-fd-foreground">
 				← All integrations
 			</Link>
