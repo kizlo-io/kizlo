@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.20.3
+
+### Patch Changes
+
+- [#224](https://github.com/kizlo-io/kizlo/pull/224) [`bd2e73a`](https://github.com/kizlo-io/kizlo/commit/bd2e73af246bbb733370ad34a22150558388c477) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Rewrite the missing-endpoints startup error to lead with the outdated-plugin cause and fix, list the missing routes, and link to the integration's download page.
+
 ## 0.20.2
 
 ### Patch Changes
