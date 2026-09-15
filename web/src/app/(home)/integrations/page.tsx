@@ -1,35 +1,33 @@
-import Link from "next/link"
-import { ShaderBackdrop } from "@/components/shader-backdrop"
+import { Suspense } from "react"
+import { IntegrationsCatalog } from "@/components/integrations-catalog"
+import { client } from "@/lib/kizlo/server"
 import { createMetadata } from "@/lib/metadata"
-import { docsRoute } from "@/lib/shared"
 
 export const metadata = createMetadata({
 	title: "Integrations",
+	description: "Browse the integrations that connect Kizlo with the tools in your stack.",
 	alternates: { canonical: "/integrations" },
 })
 
 export default async function IntegrationsPage() {
+	const { data } = await client.integrations.list()
+	const integrations = data ?? []
+
 	return (
-		<main className="relative flex max-h-dvh flex-1 flex-col items-center justify-center overflow-hidden px-6 py-24 text-center">
-			<ShaderBackdrop />
+		<main className="flex flex-1 flex-col">
+			<section className="border-fd-border border-b">
+				<div className="mx-auto w-full max-w-6xl px-6 py-16">
+					<h1 className="font-semibold text-4xl text-fd-foreground tracking-tight sm:text-5xl">Integrations</h1>
+					<p className="mt-4 max-w-2xl text-fd-muted-foreground leading-relaxed sm:text-lg">
+						Connect Kizlo with the tools in your stack. Each integration ships as an npm package, a WordPress plugin, or both.
+					</p>
+				</div>
+			</section>
 
-			<span className="relative mb-6 rounded-full border border-fd-border px-3 py-1 font-medium text-fd-muted-foreground text-xs uppercase tracking-wide">
-				Coming soon
-			</span>
-
-			<h1 className="max-w-2xl text-balance font-semibold text-4xl text-fd-foreground tracking-tight sm:text-5xl">Integrations</h1>
-
-			<p className="mt-5 max-w-xl text-balance text-fd-muted-foreground leading-relaxed sm:text-lg">
-				We're building first-class integrations to connect Kizlo with the tools in your stack. Check back soon.
-			</p>
-
-			<div className="mt-6">
-				<Link
-					href={docsRoute}
-					className="rounded-lg bg-fd-foreground px-5 py-2.5 font-medium text-fd-background text-sm transition-opacity hover:opacity-90"
-				>
-					Documentation
-				</Link>
+			<div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
+				<Suspense>
+					<IntegrationsCatalog integrations={integrations} />
+				</Suspense>
 			</div>
 		</main>
 	)

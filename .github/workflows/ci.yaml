@@ -63,8 +63,8 @@ jobs:
       - name: Boot + seed WordPress stack + run tests
         run: pnpm kizlo test
 
-      - name: Check generated WordPress clients
-        run: pnpm kizlo check --test --dir web/src/lib/kizlo
+      - name: Check generated WordPress client
+        run: pnpm kizlo check --test
 
       - name: Print docker logs on failure
         if: failure()

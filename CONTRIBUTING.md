@@ -160,31 +160,48 @@ introspection.ts
 web/src/lib/kizlo/server/generated/introspection.ts
 ```
 
-Both are **derived artifacts**: the typed WordPress contract produced from
-whatever the seeded test stack serves. Never hand-edit them. Regenerate them
-whenever you change what the contract exposes, such as a plugin's Store API or
-REST schema, the introspection fixtures in `kizlo.config.ts`, or the pinned
-plugin versions those fixtures install. The `templates/*` copies are intentional
-empty stubs and stay out of this; leave them as they are.
+Both are **derived artifacts** (the typed WordPress contract produced from a
+WordPress), but they track **different** WordPress instances, because they serve
+different consumers:
 
-Regenerate and verify both copies against the seeded stack:
+- **Root `introspection.ts`** is derived from the seeded test stack and is the
+  CI-verified copy. Regenerate it whenever you change what the shared contract
+  exposes: a plugin's Store API or REST schema, the introspection fixtures in
+  `kizlo.config.ts`, or the pinned plugin versions those fixtures install.
+- **`web/src/lib/kizlo/server/generated/introspection.ts`** is derived from the
+  remote WordPress the site is built against (`cms.kizlo.io`). It therefore
+  includes remote-only content the test stack never serves (for example the
+  `integration` custom post type behind the `/integrations` catalog). Regenerate
+  it from remote whenever the site's contract moves — including after a
+  shared-schema change above, since CI does not check this copy.
+
+Never hand-edit either file. The `templates/*` copies are intentional empty
+stubs and stay out of this; leave them as they are.
+
+Regenerate the root copy against the seeded stack:
 
 ```bash
-pnpm build                                          # rebuild packages incl. the CLI + plugin assets
-pnpm kizlo test                                     # boot, seed, run the suite; leaves WordPress running
-pnpm kizlo generate --test                          # rewrite the root introspection.ts
-pnpm kizlo generate --test --dir web/src/lib/kizlo  # rewrite the web copy
-pnpm kizlo check --test                             # confirm the root copy is current
-pnpm kizlo check --test --dir web/src/lib/kizlo     # confirm the web copy is current
-pnpm kizlo test stop                                # stop the stack
+pnpm build                     # rebuild packages incl. the CLI + plugin assets
+pnpm kizlo test                # boot, seed, run the suite; leaves WordPress running
+pnpm kizlo generate --test     # rewrite the root introspection.ts
+pnpm kizlo check --test        # confirm the root copy is current
+pnpm kizlo test stop           # stop the stack
+```
+
+Regenerate the web copy against remote (reads the `.env` connection, so
+`KIZLO_MODE=remote` points it at `cms.kizlo.io`):
+
+```bash
+pnpm kizlo generate --dir web/src/lib/kizlo
 ```
 
 `--test` points the generator at the WordPress that `pnpm kizlo test` left
 running. `kizlo check` never writes: it regenerates in memory, diffs against the
 committed file, and exits non-zero when a copy is stale, printing the exact
-`kizlo generate` command to run. CI runs that check on the web copy, so a stale
-file fails the build. Commit the regenerated files alongside the change that
-moved the contract.
+`kizlo generate` command to run. CI runs `kizlo check --test` on the **root**
+copy, so a stale root file fails the build; the web copy is regenerated from
+remote by hand and is not CI-checked. Commit the regenerated file alongside the
+change that moved the contract.
 
 ## Code style
 
