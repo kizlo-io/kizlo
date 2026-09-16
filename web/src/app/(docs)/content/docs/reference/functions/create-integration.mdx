@@ -33,13 +33,17 @@ Every contribution is optional, so an integration can be procedure-only, event-o
 - **`events`**: webhook handlers created with `createEventHandler`.
 - **`adapters`**: auth, captcha, geo, logger, or cookies implementations. See
   [Adapter precedence](/docs/concepts/adapter#which-adapter-wins).
-- **`env`**: a typed, runtime-neutral record or reader composed from left to right. `KizloEnv` exposes
+- **`env`**: a typed, runtime-neutral record or reader composed in mount order. `KizloEnv` exposes
   `baseUrl`, `mode`, `remote`, and `local`. Runtime integrations only map these values.
   Kizlo selects the active WordPress connection after composition. Custom provider keys are also accepted.
   Concrete leaf values replace earlier values; `undefined` is ignored.
 - **`requires`**: environment values and generated endpoint subtrees checked when the server starts, plus plugin
   versions checked from WordPress response headers. Nested environment values use dotted paths such as
   `remote.wordpressUrl`.
+- **`order`**: mount position, ascending, defaulting to `0`. Integrations sharing an `order` keep their declared
+  order. Mounting first means supplying the baseline a later integration overrides, so a framework integration
+  declares a negative `order` to land ahead of app integrations. See
+  [Adapter precedence](/docs/concepts/adapter#which-adapter-wins).
 
 ## Returns
 

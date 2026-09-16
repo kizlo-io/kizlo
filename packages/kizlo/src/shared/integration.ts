@@ -87,6 +87,12 @@ export interface Integration<TId extends string, TProcedures extends AnyProcedur
 	env?: EnvSource
 	/** Environment, endpoint, and WordPress plugin requirements checked at their documented lifecycle points. */
 	requires?: IntegrationRequirements
+	/**
+	 * Mount position, ascending, defaulting to `0`. Mounting first means supplying the baseline a later
+	 * integration overrides, so a framework integration declares a negative order to land ahead of app
+	 * integrations however the `integrations` array is written.
+	 */
+	order?: number
 }
 
 export type AnyIntegration = Integration<any, AnyProcedureTree>
@@ -112,6 +118,11 @@ export function createIntegration<TId extends string, TProcedures extends AnyPro
 	integration: Integration<TId, TProcedures>,
 ) {
 	return integration
+}
+
+/** Integrations in mount order. `sort` is stable, so integrations sharing an `order` keep their declared order. */
+export function sortIntegrations<TIntegration extends AnyIntegration>(integrations: readonly TIntegration[]): TIntegration[] {
+	return [...integrations].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 }
 
 /** The declared subtrees the generated tree does not have. */

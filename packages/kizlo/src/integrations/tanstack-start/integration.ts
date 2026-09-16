@@ -1,3 +1,4 @@
+import { FRAMEWORK_INTEGRATION_ORDER } from "../../shared/constants"
 import { createIntegration, type EnvSource } from "../../shared/integration"
 import { runtimeEnv } from "../runtime-env"
 
@@ -12,6 +13,7 @@ export function tanstackStart(options: TanstackStartOptions = {}) {
 
 	return createIntegration({
 		id: "tanstack-start",
+		order: FRAMEWORK_INTEGRATION_ORDER,
 		env: runtimeEnv(source, "VITE_KIZLO_BASE_URL"),
 	})
 }

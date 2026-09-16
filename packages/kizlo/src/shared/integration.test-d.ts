@@ -32,6 +32,14 @@ const loyalty = createIntegration({
 	},
 })
 
+const ordered = createIntegration({
+	id: "ordered",
+	order: -100,
+	procedures: {
+		ping: createProcedure({ scope: "api", output: z.string() }, async () => "pong"),
+	},
+})
+
 const adapterOnly = createIntegration({ id: "auth-provider", adapters: { auth: { getSession: () => null } } })
 const emptyProcedures = createIntegration({ id: "empty", procedures: {} })
 
@@ -51,6 +59,13 @@ describe("InferIntegrationProcedures", () => {
 		type Procedures = InferIntegrationProcedures<[typeof billing, typeof loyalty]>
 
 		expectTypeOf<keyof Procedures>().toEqualTypeOf<"billing" | "loyalty">()
+	})
+
+	it("keeps the literal id and procedure tree of an integration declaring an order", () => {
+		type Procedures = InferIntegrationProcedures<[typeof ordered]>
+
+		expectTypeOf<keyof Procedures>().toEqualTypeOf<"ordered">()
+		expectTypeOf<OutputOf<Procedures["ordered"]["ping"]>>().toEqualTypeOf<string>()
 	})
 
 	it("resolves an empty integration list to an empty record", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest"
+import { FRAMEWORK_INTEGRATION_ORDER } from "../shared/constants"
 import { readEnv } from "../shared/integration"
 import { astro } from "./astro/integration"
 import { nextjs } from "./nextjs/integration"
@@ -62,6 +63,14 @@ describe("framework integrations", () => {
 	test("runtime integrations only map the connection selector", () => {
 		expect(node({ env: { KIZLO_MODE: "preview", NODE_ENV: "test" } }).env).toMatchObject({ mode: "preview" })
 		expect(node({ env: { NODE_ENV: "test" } }).env).not.toHaveProperty("environment")
+	})
+
+	test("mounts ahead of app integrations", () => {
+		expect(nextjs({ env: {}, revalidate: false }).order).toBe(FRAMEWORK_INTEGRATION_ORDER)
+		expect(astro({ env: {} }).order).toBe(FRAMEWORK_INTEGRATION_ORDER)
+		expect(tanstackStart({ env: {} }).order).toBe(FRAMEWORK_INTEGRATION_ORDER)
+		expect(node({ env: {} }).order).toBe(FRAMEWORK_INTEGRATION_ORDER)
+		expect(FRAMEWORK_INTEGRATION_ORDER).toBeLessThan(0)
 	})
 
 	test("bundles Next.js revalidation unless disabled", () => {

@@ -66,8 +66,9 @@ The app does not import `providerAuth` or repeat its configuration.
 
 ## Which adapter wins?
 
-Kizlo starts with the console logger selected by `createKizlo({ logging })`, then applies integrations from
-left to right.
+Kizlo starts with the console logger selected by `createKizlo({ logging })`, then applies integrations in mount
+order: ascending `order`, with declaration order kept among integrations that share one. Framework integrations
+such as `nextjs()` declare a negative `order`, so they mount first however the `integrations` array is written.
 
 A later concrete value replaces the earlier value for that capability. An `undefined` contribution is ignored,
 so an optional provider setting cannot erase an adapter that is already configured. Composition is synchronous
