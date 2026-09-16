@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { assertIntegrationEndpoints, assertIntegrationEnv, createIntegration, missingEndpoints, missingEnv } from "./integration"
+import {
+	assertIntegrationEndpoints,
+	assertIntegrationEnv,
+	createIntegration,
+	missingEndpoints,
+	missingEnv,
+	sortIntegrations,
+} from "./integration"
 
 const endpoints = {
 	woocommerce: {
@@ -92,5 +99,33 @@ describe("assertIntegrationEndpoints", () => {
 		const anonymous = createIntegration({ id: "custom", requires: { endpoints: ["nope.gone"] } })
 
 		expect(() => assertIntegrationEndpoints(anonymous, {})).toThrow(/kizlo generate/)
+	})
+})
+
+describe("sortIntegrations", () => {
+	it("mounts lower orders first and treats an absent order as 0", () => {
+		const framework = createIntegration({ id: "framework", order: -100 })
+		const app = createIntegration({ id: "app" })
+		const last = createIntegration({ id: "last", order: 10 })
+
+		expect(sortIntegrations([last, app, framework]).map((mounted) => mounted.id)).toEqual(["framework", "app", "last"])
+	})
+
+	it("keeps declaration order for integrations sharing an order", () => {
+		const first = createIntegration({ id: "first", order: -100 })
+		const second = createIntegration({ id: "second", order: -100 })
+		const third = createIntegration({ id: "third" })
+		const fourth = createIntegration({ id: "fourth" })
+
+		expect(sortIntegrations([third, first, fourth, second]).map((mounted) => mounted.id)).toEqual(["first", "second", "third", "fourth"])
+	})
+
+	it("returns a new array without reordering the caller's", () => {
+		const integrations = [createIntegration({ id: "app" }), createIntegration({ id: "framework", order: -100 })]
+
+		const sorted = sortIntegrations(integrations)
+
+		expect(sorted).not.toBe(integrations)
+		expect(integrations.map((mounted) => mounted.id)).toEqual(["app", "framework"])
 	})
 })

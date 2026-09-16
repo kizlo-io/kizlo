@@ -1,3 +1,4 @@
+import { FRAMEWORK_INTEGRATION_ORDER } from "../../shared/constants"
 import { createIntegration, type EnvSource } from "../../shared/integration"
 import { runtimeEnv } from "../runtime-env"
 import { type NextRevalidateOptions, nextRevalidation } from "./revalidate"
@@ -16,6 +17,7 @@ export function nextjs(options: NextjsOptions = {}) {
 
 	return createIntegration({
 		id: "nextjs",
+		order: FRAMEWORK_INTEGRATION_ORDER,
 		env: runtimeEnv(source, "NEXT_PUBLIC_KIZLO_BASE_URL"),
 		events: revalidation === false ? undefined : nextRevalidation(typeof revalidation === "object" ? revalidation : undefined).events,
 	})

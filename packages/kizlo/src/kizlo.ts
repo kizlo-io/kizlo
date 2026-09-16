@@ -18,6 +18,7 @@ import {
 	type InferIntegrationProcedures,
 	missingEnv,
 	readEnv,
+	sortIntegrations,
 } from "./shared/integration"
 import type { InvocationScope } from "./shared/procedure"
 import { createResultClient, type ResultClient } from "./shared/result"
@@ -153,7 +154,7 @@ export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
 		// generated tree to check against and no request that could reach a missing endpoint.
 		const generating = isContractGeneration()
 
-		for (const integration of this.config.integrations ?? []) {
+		for (const integration of sortIntegrations(this.config.integrations ?? [])) {
 			if (reservedIds.has(integration.id)) {
 				throw new KizloError("INTEGRATION_ID_CONFLICT", {
 					message: `The integration id "${integration.id}" is reserved by Kizlo. Choose a different integration id.`,
@@ -206,9 +207,10 @@ const WORDPRESS_ENV_VALUES = new Set(["siteSecret", "wordpressUrl", "wordpressUs
  * Kizlo's active WordPress connection from the canonical `mode` value.
  */
 export function integrationEnv(integrations: readonly AnyIntegration[]): EnvReader {
+	const mounted = sortIntegrations(integrations)
 	const composed: EnvReader = (name) => {
 		let value: string | undefined
-		for (const integration of integrations) {
+		for (const integration of mounted) {
 			if (!integration.env) continue
 			const contribution = readEnv(integration.env, name)
 			if (contribution !== undefined) value = contribution

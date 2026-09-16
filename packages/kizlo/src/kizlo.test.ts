@@ -192,6 +192,23 @@ describe("integration composition", () => {
 		})
 	})
 
+	test("mounts a lower-order integration first even when it is declared last", () => {
+		const frameworkAuth = authMock({ id: "framework" })
+		const appAuth = authMock({ id: "app" })
+
+		const resolved = resolveKizloConfig({
+			baseUrl: "https://app.example",
+			siteSecret: "site-secret",
+			integrations: [
+				createIntegration({ id: "app", adapters: { auth: appAuth } }),
+				createIntegration({ id: "framework", order: -100, env: runtimeValues, adapters: { auth: frameworkAuth } }),
+			],
+		})
+		const adapters = new Kizlo(resolved).context.createServerContext().config.adapters
+
+		expect(adapters).toMatchObject({ auth: appAuth })
+	})
+
 	test("resolves integration env from left to right without erasing concrete values", () => {
 		const resolved = resolveKizloConfig({
 			integrations: [
@@ -207,6 +224,17 @@ describe("integration composition", () => {
 		expect(resolved.baseUrl).toBe("https://first.example")
 		expect(resolved.credentials.username).toBe("second-user")
 		expect(resolved.credentials.password).toBe(credentials.password)
+	})
+
+	test("composes integration env in mount order rather than array order", () => {
+		const resolved = resolveKizloConfig({
+			integrations: [
+				createIntegration({ id: "app", env: { baseUrl: "https://app.example" } }),
+				createIntegration({ id: "framework", order: -100, env: { ...runtimeValues, baseUrl: "https://framework.example" } }),
+			],
+		})
+
+		expect(resolved.baseUrl).toBe("https://app.example")
 	})
 
 	test("checks integration env requirements against the fully composed environment", () => {
@@ -260,6 +288,17 @@ describe("integration composition", () => {
 		const registered = (kizlo as unknown as { registerIntegrations(): { events: unknown[] } }).registerIntegrations()
 
 		expect(registered.events).toEqual([first, second, third])
+	})
+
+	test("collects events in mount order rather than array order", () => {
+		const app = { handler: vi.fn() }
+		const framework = { handler: vi.fn() }
+		const kizlo = new Kizlo(
+			config([createIntegration({ id: "app", events: [app] }), createIntegration({ id: "framework", order: -100, events: [framework] })]),
+		)
+		const registered = (kizlo as unknown as { registerIntegrations(): { events: unknown[] } }).registerIntegrations()
+
+		expect(registered.events).toEqual([framework, app])
 	})
 
 	test("rejects duplicate integration ids with the startup error code", () => {
