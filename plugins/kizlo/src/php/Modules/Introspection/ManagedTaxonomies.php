@@ -380,7 +380,10 @@ class ManagedTaxonomies
         }
 
         $envelope['description'] = 'Kizlo-owned fields on this term.';
-        $envelope['properties']  = ['custom' => $custom];
+        $envelope['properties']  = [
+            'custom' => $custom,
+            'seo'    => ['$ref' => CoreSchemas::TERM_SEO_INPUT],
+        ];
 
         return $envelope;
     }

@@ -43,6 +43,12 @@ class CoreSchemas
     public const MEDIA_FILE          = 'kizlo.media-file';
     public const SEO                 = 'kizlo.seo';
 
+    /** The SEO a post can be authored with. */
+    public const SEO_INPUT = 'kizlo.seo-input';
+
+    /** The SEO a term can be authored with. */
+    public const TERM_SEO_INPUT = 'kizlo.term-seo-input';
+
     /** A status a post can be read back as. */
     public const POST_STATUS = 'kizlo.post-status';
 
@@ -83,6 +89,8 @@ class CoreSchemas
             self::MEDIA_AUDIO          => self::mediaAudio(),
             self::MEDIA_FILE           => self::mediaFile(),
             self::SEO                  => self::seo(),
+            self::SEO_INPUT            => self::seoInput(true),
+            self::TERM_SEO_INPUT       => self::seoInput(false),
             self::POST_STATUS          => self::postStatus($status['filter']),
             self::POST_STATUS_WRITABLE => self::postStatusWritable($status['writable']),
             self::POST_STATUS_FILTER   => self::postStatusFilter($status['filter']),
@@ -406,6 +414,70 @@ class CoreSchemas
                         ],
                     ],
                 ],
+            ],
+        ];
+    }
+
+    /**
+     * The overrides a single post or term can be authored with.
+     *
+     * The counterpart of {@see self::seo()} rather than a subset of it: the read
+     * side carries what the settings and these overrides resolve to, and the write
+     * side carries only what a caller may set, grouped the way the editor already
+     * groups it. A field left out resolves from the post-type template, and an
+     * empty value clears the override so it resolves from the template again.
+     *
+     * Closed, so a misspelled field is a 400 rather than a silently ignored no-op.
+     * That is what makes `webpage_type` on a term an error: a term always resolves
+     * to a CollectionPage, so the two schema.org type fields are post-only, and an
+     * agent sending one to a term would otherwise get a 200 and no effect.
+     *
+     * @return array<string, mixed>
+     */
+    private static function seoInput(bool $typed): array
+    {
+        $properties = [
+            'title'       => ['type' => 'string'],
+            'description' => ['type' => 'string'],
+            'canonical'   => ['type' => 'string', 'format' => 'uri'],
+        ];
+
+        if ($typed) {
+            $properties['webpage_type'] = ['type' => 'string', 'description' => 'schema.org WebPage subtype.'];
+            $properties['article_type'] = ['type' => 'string', 'description' => 'schema.org Article subtype, or "none" to publish no Article node.'];
+        }
+
+        $properties += [
+            'noindex'  => ['type' => 'boolean'],
+            'nofollow' => ['type' => 'boolean'],
+            'og'       => self::seoInputSocial(),
+            'twitter'  => self::seoInputSocial(),
+        ];
+
+        return [
+            'type'                 => 'object',
+            'description'          => sprintf(
+                'SEO overrides for this %s. Every field is optional; an omitted field resolves from the %s, and an empty one clears the override.',
+                $typed ? 'entry' : 'term',
+                $typed ? 'post-type template' : 'taxonomy template'
+            ),
+            'additionalProperties' => false,
+            'properties'           => $properties,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function seoInputSocial(): array
+    {
+        return [
+            'type'                 => 'object',
+            'additionalProperties' => false,
+            'properties'           => [
+                'title'       => ['type' => 'string'],
+                'description' => ['type' => 'string'],
+                'image_id'    => ['type' => 'integer', 'description' => 'Image attachment ID. 0 clears the override.'],
             ],
         ];
     }

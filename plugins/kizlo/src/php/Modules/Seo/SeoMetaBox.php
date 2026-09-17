@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Seo;
 
+use Throwable;
 use WP_Post;
 use Kizlo\Support\Asset;
 use Kizlo\Support\Utils;
@@ -99,30 +100,14 @@ class SeoMetaBox
         $raw = isset($_POST['kizlo_seo']) ? json_decode(wp_unslash($_POST['kizlo_seo']), true) : null;
         $raw = is_array($raw) ? $raw : [];
 
-        $values = [
-            'title'               => sanitize_text_field($raw['title'] ?? ''),
-            'description'         => sanitize_textarea_field($raw['description'] ?? ''),
-            'canonical'           => esc_url_raw($raw['canonical'] ?? ''),
-            'webpage_type'        => sanitize_text_field($raw['webpage_type'] ?? ''),
-            'article_type'        => sanitize_text_field($raw['article_type'] ?? ''),
-            'og_title'            => sanitize_text_field($raw['og_title'] ?? ''),
-            'og_description'      => sanitize_textarea_field($raw['og_description'] ?? ''),
-            'og_image_id'         => isset($raw['og_image_id']) ? absint($raw['og_image_id']) : 0,
-            'twitter_title'       => sanitize_text_field($raw['twitter_title'] ?? ''),
-            'twitter_description' => sanitize_textarea_field($raw['twitter_description'] ?? ''),
-            'twitter_image_id'    => isset($raw['twitter_image_id']) ? absint($raw['twitter_image_id']) : 0,
-            'noindex'             => ! empty($raw['noindex']) ? '1' : '',
-            'nofollow'            => ! empty($raw['nofollow']) ? '1' : '',
-        ];
-
-        foreach ($values as $field => $value) {
-            $meta_key = SeoBase::OVERRIDE_KEYS[$field];
-
-            if (empty($value)) {
-                delete_post_meta($post_id, $meta_key);
-            } else {
-                update_post_meta($post_id, $meta_key, $value);
-            }
+        try {
+            SeoOverridesStore::write(
+                SeoOverridesStore::META_POST,
+                $post_id,
+                SeoOverridesStore::fromEditor(SeoOverridesStore::META_POST, $raw)
+            );
+        } catch (Throwable $e) {
+            kizlo_log('Post SEO overrides save failed: ' . $e->getMessage());
         }
     }
 
@@ -139,7 +124,8 @@ class SeoMetaBox
      */
     private function getMeta(WP_Post $post): array
     {
-        $get = fn(string $field) => (string) get_post_meta($post->ID, SeoBase::OVERRIDE_KEYS[$field], true);
+        $stored = SeoOverridesStore::read(SeoOverridesStore::META_POST, $post->ID);
+        $get    = fn(string $field) => $stored[$field];
 
         return [
             'title'        => $get('title'),
