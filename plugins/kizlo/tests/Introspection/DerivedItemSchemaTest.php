@@ -82,8 +82,8 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         foreach ([WP_REST_Server::CREATABLE => 'create', WP_REST_Server::EDITABLE => 'update'] as $method => $operation) {
             $described = $this->itemProperties(sprintf('post-types.%s.%s-input', $slug, $operation));
 
-            $this->assertArrayHasKey('custom', $described, $operation);
-            unset($described['custom']);
+            $this->assertArrayHasKey('kizlo', $described, $operation);
+            unset($described['kizlo']);
 
             $this->assertSame(
                 $this->sorted(array_keys($controller->get_endpoint_args_for_item_schema($method))),
@@ -142,8 +142,8 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         foreach ([WP_REST_Server::CREATABLE => 'create', WP_REST_Server::EDITABLE => 'update'] as $method => $operation) {
             $described = $this->itemProperties(sprintf('taxonomies.category.%s-input', $operation));
 
-            $this->assertArrayHasKey('custom', $described, $operation);
-            unset($described['custom']);
+            $this->assertArrayHasKey('kizlo', $described, $operation);
+            unset($described['kizlo']);
 
             $this->assertSame(
                 $this->sorted(array_keys($controller->get_endpoint_args_for_item_schema($method))),

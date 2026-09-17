@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Write custom-field values under `kizlo.custom` instead of a top-level `custom` property, matching where they are read from
