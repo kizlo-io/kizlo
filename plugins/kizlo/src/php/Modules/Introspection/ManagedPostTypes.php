@@ -468,9 +468,44 @@ class ManagedPostTypes
                 ? sprintf('A partial update to a "%s" entry. Custom fields are only re-validated when submitted.', $slug)
                 : sprintf('A new "%s" entry. Required custom fields must be present.', $slug),
             'properties'  => $properties + [
-                'custom' => CustomFieldSchema::inputGroup($fields, $partial),
+                'kizlo' => self::inputEnvelope($fields, $partial),
             ],
         ];
+    }
+
+    /**
+     * The write counterpart of {@see self::envelope()}. Kizlo-owned input sits at
+     * the same `kizlo` path the response emits it from, so a caller can send back
+     * what it read, and no Kizlo property competes for the top level with a core
+     * field or another plugin's registered args.
+     *
+     * {@see CustomFieldSchema::inputGroup()} marks the group required on create
+     * when a definition is required; the envelope has to carry that too, or an
+     * omitted `kizlo` would skip the check. {@see ArgTranslator} passes the nested
+     * boolean through untouched.
+     *
+     * The envelope is closed: a misspelled or unknown key under `kizlo` is a 400
+     * rather than a silently ignored no-op, so a caller that gets the path wrong
+     * finds out. Every Kizlo-owned write property is declared here, so there is
+     * nothing legitimate for an open envelope to admit.
+     *
+     * @param array<int, array<string, mixed>> $fields
+     * @return array<string, mixed>
+     */
+    private static function inputEnvelope(array $fields, bool $partial): array
+    {
+        $custom = CustomFieldSchema::inputGroup($fields, $partial);
+
+        $envelope = ['type' => 'object', 'additionalProperties' => false];
+
+        if (!empty($custom['required'])) {
+            $envelope['required'] = true;
+        }
+
+        $envelope['description'] = 'Kizlo-owned fields on this entry.';
+        $envelope['properties']  = ['custom' => $custom];
+
+        return $envelope;
     }
 
     /**

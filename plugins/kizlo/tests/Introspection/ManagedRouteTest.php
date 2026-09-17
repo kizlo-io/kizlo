@@ -4,6 +4,8 @@ namespace Kizlo\Tests\Introspection;
 
 use WP_REST_Request;
 use WP_REST_Server;
+use Kizlo\Modules\CustomFields\FieldDefinitions;
+use Kizlo\Modules\Introspection\ManagedContent;
 use Kizlo\Modules\Introspection\PathNormalizer;
 
 /**
@@ -196,6 +198,38 @@ class ManagedRouteTest extends IntrospectionTestCase
         $this->assertNotEmpty($response->get_data());
     }
 
+    public function test_a_create_omitting_the_required_kizlo_group_is_rejected(): void
+    {
+        // Kizlo-owned input is written under `kizlo`, so the `required` a required
+        // custom field earns has to reach the envelope: leaving the whole group out
+        // would otherwise skip the field without the request ever being invalid.
+        $this->seedRequiredCustomField();
+        $this->boot();
+
+        $request = new WP_REST_Request('POST', '/kizlo/v1/post-types/post');
+        $request->set_param('title', 'Hello');
+
+        $response = $this->server->dispatch($request);
+
+        $this->assertSame(400, $response->get_status());
+        $this->assertSame('rest_missing_callback_param', $response->get_data()['code']);
+    }
+
+    public function test_a_create_sending_an_envelope_without_its_custom_group_is_rejected(): void
+    {
+        $this->seedRequiredCustomField();
+        $this->boot();
+
+        $request = new WP_REST_Request('POST', '/kizlo/v1/post-types/post');
+        $request->set_param('title', 'Hello');
+        $request->set_param('kizlo', []);
+
+        $response = $this->server->dispatch($request);
+
+        $this->assertSame(400, $response->get_status());
+        $this->assertSame('rest_invalid_param', $response->get_data()['code']);
+    }
+
     public function test_a_valid_request_still_reaches_the_controller(): void
     {
         $this->boot();
@@ -282,6 +316,16 @@ class ManagedRouteTest extends IntrospectionTestCase
     // ============================================================
     // HELPERS
     // ============================================================
+
+    /** Configure `post` with one required custom field. */
+    private function seedRequiredCustomField(): void
+    {
+        $this->seedSettings(['post_types' => ['post' => [
+            'custom_fields' => FieldDefinitions::normalize([['type' => 'text', 'name' => 'company_name', 'required' => true]]),
+        ]]]);
+
+        ManagedContent::flush();
+    }
 
     /**
      * Managed paths as `/introspect` describes them, path => sorted methods.

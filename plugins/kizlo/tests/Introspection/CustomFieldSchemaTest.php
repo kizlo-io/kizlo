@@ -17,7 +17,7 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
      * Configure `post` with these definitions and return the generated schemas.
      *
      * @param array<int, array<string, mixed>> $raw
-     * @return array{item: array<string, mixed>, create: array<string, mixed>, update: array<string, mixed>, itemRoot: array<string, mixed>, createGroup: array<string, mixed>, updateGroup: array<string, mixed>}
+     * @return array{item: array<string, mixed>, create: array<string, mixed>, update: array<string, mixed>, itemRoot: array<string, mixed>, createRoot: array<string, mixed>, createGroup: array<string, mixed>, updateGroup: array<string, mixed>, createEnvelope: array<string, mixed>, updateEnvelope: array<string, mixed>}
      */
     private function generate(array $raw): array
     {
@@ -29,17 +29,23 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
         $create_root = $schemas['post-types.post.create-input']['properties'];
         $update_root = $schemas['post-types.post.update-input']['properties'];
 
+        $create_envelope = $create_root['kizlo'];
+        $update_envelope = $update_root['kizlo'];
+
         $item_group   = $item_root['kizlo']['properties']['custom'];
-        $create_group = $create_root['custom'];
-        $update_group = $update_root['custom'];
+        $create_group = $create_envelope['properties']['custom'];
+        $update_group = $update_envelope['properties']['custom'];
 
         return [
-            'item'        => $item_group['properties'],
-            'create'      => $create_group['properties'],
-            'update'      => $update_group['properties'],
-            'itemRoot'    => $item_root,
-            'createGroup' => $create_group,
-            'updateGroup' => $update_group,
+            'item'           => $item_group['properties'],
+            'create'         => $create_group['properties'],
+            'update'         => $update_group['properties'],
+            'itemRoot'       => $item_root,
+            'createRoot'     => $create_root,
+            'createGroup'    => $create_group,
+            'updateGroup'    => $update_group,
+            'createEnvelope' => $create_envelope,
+            'updateEnvelope' => $update_envelope,
         ];
     }
 
@@ -266,6 +272,56 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
         $this->assertArrayNotHasKey('required', $schemas['updateGroup']);
     }
 
+    public function test_custom_fields_are_written_inside_the_kizlo_envelope(): void
+    {
+        $schemas = $this->generate([['type' => 'text', 'name' => 'company_name']]);
+
+        $this->assertSame('object', $schemas['createEnvelope']['type']);
+        $this->assertSame('string', $schemas['create']['company_name']['type']);
+        $this->assertArrayNotHasKey('custom', $schemas['createRoot'], 'Writes moved off the top level.');
+        $this->assertArrayNotHasKey('company_name', $schemas['createRoot']);
+    }
+
+    public function test_the_write_envelope_is_required_on_create_only_when_a_field_is(): void
+    {
+        // The group's own `required` is useless if the envelope around it can be
+        // left out, so the condition has to reach the envelope as well.
+        $optional = $this->generate([['type' => 'text', 'name' => 'company_name']]);
+
+        $this->assertArrayNotHasKey('required', $optional['createEnvelope']);
+
+        $required = $this->generate([['type' => 'text', 'name' => 'company_name', 'required' => true]]);
+
+        $this->assertTrue($required['createEnvelope']['required']);
+        $this->assertTrue($required['createGroup']['required']);
+        $this->assertArrayNotHasKey('required', $required['updateEnvelope'], 'An update validates only what it carries.');
+    }
+
+    public function test_the_write_envelope_is_closed_to_unknown_keys(): void
+    {
+        // Everything Kizlo owns on a write is declared on the envelope, so a key
+        // that is not one of them is a misspelling. Left open, `kizlo.cusotm`
+        // would answer 200 and write nothing.
+        $schemas = $this->generate([['type' => 'text', 'name' => 'company_name']]);
+
+        $this->assertFalse($schemas['createEnvelope']['additionalProperties']);
+        $this->assertFalse($schemas['updateEnvelope']['additionalProperties']);
+    }
+
+    public function test_the_taxonomy_write_envelope_is_closed_too(): void
+    {
+        $this->seedSettings([
+            'taxonomies' => [
+                'category' => ['custom_fields' => FieldDefinitions::normalize([['type' => 'text', 'name' => 'blurb']])],
+            ],
+        ]);
+
+        $schemas = $this->document()['schemas'];
+
+        $this->assertFalse($schemas['taxonomies.category.create-input']['properties']['kizlo']['additionalProperties']);
+        $this->assertFalse($schemas['taxonomies.category.update-input']['properties']['kizlo']['additionalProperties']);
+    }
+
     public function test_a_nested_required_field_stays_required_on_a_partial_update(): void
     {
         // A partial update only validates the fields it carries, but once a group
@@ -302,7 +358,10 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         $schemas = $this->document()['schemas'];
 
-        $this->assertSame('integer', $schemas['taxonomies.category.create-input']['properties']['custom']['properties']['banner']['type']);
+        $this->assertSame(
+            'integer',
+            $schemas['taxonomies.category.create-input']['properties']['kizlo']['properties']['custom']['properties']['banner']['type'],
+        );
         $this->assertSame(
             'kizlo.media-image',
             $schemas['taxonomies.category.item']['properties']['kizlo']['properties']['custom']['properties']['banner']['$ref'],

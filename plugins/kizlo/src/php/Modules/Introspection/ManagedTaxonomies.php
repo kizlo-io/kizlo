@@ -357,9 +357,32 @@ class ManagedTaxonomies
                 ? sprintf('A partial update to a "%s" term. Custom fields are only re-validated when submitted.', $slug)
                 : sprintf('A new "%s" term. Required custom fields must be present.', $slug),
             'properties'  => $properties + [
-                'custom' => CustomFieldSchema::inputGroup($fields, $partial),
+                'kizlo' => self::inputEnvelope($fields, $partial),
             ],
         ];
+    }
+
+    /**
+     * The taxonomy counterpart of the post-type write envelope. See
+     * {@see ManagedPostTypes::inputEnvelope()}.
+     *
+     * @param array<int, array<string, mixed>> $fields
+     * @return array<string, mixed>
+     */
+    private static function inputEnvelope(array $fields, bool $partial): array
+    {
+        $custom = CustomFieldSchema::inputGroup($fields, $partial);
+
+        $envelope = ['type' => 'object', 'additionalProperties' => false];
+
+        if (!empty($custom['required'])) {
+            $envelope['required'] = true;
+        }
+
+        $envelope['description'] = 'Kizlo-owned fields on this term.';
+        $envelope['properties']  = ['custom' => $custom];
+
+        return $envelope;
     }
 
     // ============================================================

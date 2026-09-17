@@ -10,8 +10,8 @@ use WP_REST_Request;
 use Kizlo\Support\Utils;
 
 /**
- * Accepts custom-field writes under the Kizlo create/update endpoints' `custom`
- * object, matching the public response shape.
+ * Accepts custom-field writes under the Kizlo create/update endpoints'
+ * `kizlo.custom` object, the same path the values are read back from.
  *
  * The `/post-types/*` and `/taxonomies/*` routes delegate to the core WordPress
  * REST controllers, so the submitted values are:
@@ -106,20 +106,33 @@ class CustomFieldsModule
     }
 
     /**
-     * Collect submitted custom-field values from the grouped `custom` parameter.
-     * Returns null when the request carries no group, so a write that never
-     * touches custom fields leaves the stored values untouched.
+     * Collect submitted custom-field values from the grouped `kizlo.custom`
+     * parameter. Returns null when the request carries no group, so a write that
+     * never touches custom fields leaves the stored values untouched.
+     *
+     * An absent group is a no-op at this layer only. A create that has to carry
+     * one is rejected before this runs, by the `required` the derived schema puts
+     * on `kizlo` and on `custom` inside it.
      *
      * @return array<string, mixed>|null
      * @throws \InvalidArgumentException
      */
     private static function collectValues(WP_REST_Request $request): ?array
     {
-        if (!isset($request['custom'])) {
+        if (!isset($request['kizlo'])) {
             return null;
         }
 
-        $values = $request['custom'];
+        $kizlo = $request['kizlo'];
+        if (!is_array($kizlo)) {
+            throw new \InvalidArgumentException('The kizlo group must be an object.');
+        }
+
+        if (!isset($kizlo['custom'])) {
+            return null;
+        }
+
+        $values = $kizlo['custom'];
         if (!is_array($values)) {
             throw new \InvalidArgumentException('The custom field group must be an object.');
         }
