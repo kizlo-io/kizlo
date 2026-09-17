@@ -137,6 +137,17 @@ export interface KizloLocalConfig {
 	test?: KizloTestConfig
 }
 
+export interface KizloMcpConfig {
+	/**
+	 * Port the server binds on `127.0.0.1`. Unset, it starts at the Kizlo default and steps off a
+	 * collision, which is why nothing has to be configured to run two projects at once. Set it when a
+	 * harness config has to name the port: an explicitly set port is never auto-reassigned, and
+	 * `kizlo dev` stops rather than serving on one you did not choose.
+	 * @default 8300
+	 */
+	port?: number
+}
+
 export interface KizloGlobalConfig {
 	/**
 	 * Where Kizlo generates, and what it watches. A string names the home directory Kizlo owns the
@@ -158,6 +169,13 @@ export interface KizloGlobalConfig {
 	 * stack name, the per-branch `worktrees` toggle, and the two stacks live.
 	 */
 	local?: boolean | KizloLocalConfig
+
+	/**
+	 * The MCP server `kizlo dev` serves on loopback, exposing this project's WordPress routes to an AI
+	 * harness. It runs whenever `kizlo dev` can resolve a WordPress connection; this block only tunes it.
+	 * It is never part of a built app: the server lives in the CLI, so nothing about it can be deployed.
+	 */
+	mcp?: KizloMcpConfig
 }
 
 export function defineConfig(config: KizloGlobalConfig): KizloGlobalConfig {

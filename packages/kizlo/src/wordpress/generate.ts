@@ -21,7 +21,7 @@ function pascal(value: string): string {
 	return /^[0-9]/.test(result) ? `N${result}` : result || "Anonymous"
 }
 
-function camel(value: string): string {
+export function camel(value: string): string {
 	const result = pascal(value)
 	return `${result[0]?.toLowerCase() ?? ""}${result.slice(1)}`
 }
@@ -346,7 +346,12 @@ function sortedEndpoints(node: WordPressEndpointNode): WordPressEndpointEntry[] 
 	return [...node.endpoints].sort((left, right) => left.member.localeCompare(right.member))
 }
 
-function endpointDefinition(entry: WordPressEndpointEntry): WP_EndpointDefinition {
+/**
+ * The runtime descriptor for one operation: what the generated client emits, and what anything calling
+ * a route straight off the introspection document needs to build its request. Exported because the
+ * CLI's MCP server dispatches routes the client never generated a member for.
+ */
+export function endpointDefinition(entry: Pick<WordPressEndpointEntry, "namespace" | "path" | "operation">): WP_EndpointDefinition {
 	const pathParameters = sortedEntries(entry.operation.input.properties ?? {})
 		.filter(([, schema]) => schema.in === "path")
 		.map(([name]) => name)

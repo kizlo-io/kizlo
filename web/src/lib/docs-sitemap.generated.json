@@ -9,6 +9,7 @@
 		"/docs/concepts/development-and-testing",
 		"/docs/concepts/integration",
 		"/docs/concepts/introspection",
+		"/docs/concepts/mcp",
 		"/docs/concepts/plugin",
 		"/docs/installation",
 		"/docs/php/functions/emit-event",

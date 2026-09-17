@@ -176,6 +176,19 @@ export interface GenerateWordPressOptions {
 	 * envs), so `kizlo dev` / `kizlo generate` still refresh the contract instead of failing to connect.
 	 */
 	skipIntrospection?: boolean
+	/**
+	 * Fetch the whole document instead of revalidating, so one arrives even when the file on disk is
+	 * already current. The ETag cache outlives the session, so a `kizlo dev` started against unchanged
+	 * WordPress answers every poll with a 304: a consumer fed only by what generation produces would
+	 * never see a document at all. Set on the first pass of a session that has one, not on the poll.
+	 */
+	seed?: boolean
+	/**
+	 * Called with each document WordPress returns, before anything is written. This is how the document
+	 * leaves generation without being fetched twice — the MCP server reads what the watcher already has.
+	 * Fired for a seeding fetch too, including the one whose document matches what is already on disk.
+	 */
+	onDocument?: (document: IntrospectionDocument) => void
 }
 
 /**
@@ -228,7 +241,9 @@ async function fetchDocument(
 	const credentials = options.credentials ?? resolveWordPressConnection(integrationEnv([node()])).credentials
 	// Strict generation never revalidates: a 304 carries no diagnostics, so a warm meta file left over
 	// from a partial generation would answer "unchanged" and pass a run whose whole job is to fail.
-	const result = await fetchIntrospection(credentials, { etag: options.strict ? undefined : etag, fetch: options.fetch })
+	// A seeding fetch does not either, for the opposite reason: the document itself is what it is after.
+	const revalidate = !options.strict && !options.seed
+	const result = await fetchIntrospection(credentials, { etag: revalidate ? etag : undefined, fetch: options.fetch })
 	// Before the 304, which carries the header too: a project generating nothing new still has a plugin
 	// its introspection may have outgrown.
 	reportPluginVersion(result.pluginVersion)
@@ -265,8 +280,23 @@ export async function generateIntrospectionOnce(
 	if (options.skipIntrospection) return "skipped"
 	const file = path.resolve(cfg.cwd, cfg.introspectionPath)
 	const metaPath = path.resolve(cfg.cwd, cfg.introspectionMetaPath)
-	const result = await fetchDocument(cfg.cwd, options, readWordPressMeta(metaPath, file)?.etag)
+	const meta = readWordPressMeta(metaPath, file)
+	const result = await fetchDocument(cfg.cwd, options, meta?.etag)
 	if (!result?.document) return "unchanged"
+	// Ahead of the generator, so a document still reaches its consumer on a run the generator refuses.
+	options.onDocument?.(result.document)
+
+	// A seeding fetch skipped the ETag to get the document, not because the file was stale. Rewriting
+	// one the document it was generated from already matches would touch it on every session start.
+	// Only a seeding fetch: strict skips the ETag as well, and its whole job is to regenerate the
+	// contract and recheck that it compiles, which returning here would quietly skip.
+	if (options.seed && meta && result.document.hash === meta.hash) {
+		// The cache still has to be refreshed. This fetch bypassed it, so WordPress may have answered
+		// with a new ETag for a document that has not changed, and leaving the old one behind makes
+		// every poll for the rest of the session download the whole contract again.
+		if (result.etag !== meta.etag) atomicWrite(metaPath, wordPressMeta(result.etag, result.document.hash))
+		return "unchanged"
+	}
 
 	// Before the ETag cache, not only before the file: a refused generation that had already
 	// stamped the cache would answer its own next poll with a 304 and never retry.

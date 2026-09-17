@@ -115,6 +115,7 @@
 	"dependencies": {
 		"@clack/prompts": "^1.5.1",
 		"@kizlo/shared": "workspace:*",
+		"@modelcontextprotocol/sdk": "^1.29.0",
 		"@orpc/client": "^1.14.3",
 		"@orpc/contract": "^1.14.3",
 		"@orpc/openapi": "^1.14.3",

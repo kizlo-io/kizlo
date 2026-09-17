@@ -5,7 +5,14 @@ import * as p from "@clack/prompts"
 import { isPluginVersionSupported, pluginUpdateMessage } from "@kizlo/shared"
 import getPort, { portNumbers } from "get-port"
 import z from "zod/v4"
-import { DEFAULT_DEV_DB_PORT, DEFAULT_DEV_PORT, type ResolvedDevConfig, resolveStackName, stackProject } from "../daemon/config"
+import {
+	DEFAULT_DEV_DB_PORT,
+	DEFAULT_DEV_PORT,
+	DEFAULT_MCP_PORT,
+	type ResolvedDevConfig,
+	resolveStackName,
+	stackProject,
+} from "../daemon/config"
 import { promptFragment, resolvePromptDefault, type TemplateManifest, type TemplatePrompt } from "../presets/template"
 import {
 	availablePackageManagers,
@@ -341,6 +348,7 @@ function devConfigFor(cwd: string): ResolvedDevConfig {
 	return {
 		configDir: cwd,
 		project: stackProject(resolveStackName(cwd), "dev"),
+		mcp: { port: DEFAULT_MCP_PORT, portExplicit: false },
 		port: DEFAULT_DEV_PORT,
 		portExplicit: false,
 		dbPort: DEFAULT_DEV_DB_PORT,

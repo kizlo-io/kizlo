@@ -20,6 +20,7 @@ describe("stack", () => {
 		return {
 			configDir: dir,
 			project: "kizlo-app-dev",
+			mcp: { port: 8300, portExplicit: false },
 			port: 8080,
 			portExplicit: false,
 			dbPort: 3307,

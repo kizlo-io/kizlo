@@ -61,6 +61,10 @@ const testStackSchema = z.object({
 	command: z.string().optional(),
 })
 
+const mcpSchema = z.object({
+	port: z.number().int().positive().optional(),
+})
+
 const localSchema = z.union([
 	z.boolean(),
 	z.object({
@@ -77,6 +81,7 @@ const configSchema = z.object({
 	dir: dirSchema.optional(),
 	alias: z.string().optional(),
 	local: localSchema.optional(),
+	mcp: mcpSchema.optional(),
 	// Keys removed in the config redesign, each failing with the replacement to move to.
 	wordpressClientDir: removedKey("`wordpressClientDir` has been removed. Use `dir: { introspection }` instead."),
 	name: removedKey("`name` is no longer a config root key. Move it under `local.name`."),
@@ -156,6 +161,17 @@ export const CONFIG_FILES = ["kizlo.config.ts", "kizlo.config.js", "kizlo.config
 
 export const DEFAULT_DEV_PORT = 8080
 export const DEFAULT_DEV_DB_PORT = 3307
+
+/**
+ * Port the MCP server binds on `127.0.0.1` when `mcp.port` is unset. It steps off a collision like the
+ * stack ports do, so two projects need no configuration to run side by side. A harness config names a
+ * port and cannot follow one that moves, which is what setting `mcp.port` is for.
+ *
+ * Deliberately clear of the stack ports' own scan ranges. Each default steps up to `PORT_SCAN_RANGE`
+ * ports looking for a free one, so a default inside 8080-8179 could be handed to the dev stack and
+ * then claimed again here, since the MCP probe runs before compose has published anything.
+ */
+export const DEFAULT_MCP_PORT = 8300
 const DEFAULT_TEST_PORT = 8889
 
 /** The generated introspection artifact's filename, written under its resolved directory. */
@@ -403,6 +419,14 @@ export interface ResolvedDevConfig {
 	wordpressPath: string
 	/** Absolute path the whole install is bind-mounted to; wiped by `reset`. */
 	wordpressDir: string
+	/** The MCP server's settings, so the session can resolve its port before it prints the summary. */
+	mcp: ResolvedMcpConfig
+	/**
+	 * The port the MCP server bound, once the session has resolved it. Absent until then, because the
+	 * port is probed alongside the stack's rather than when the config is read: `kizlo dev stop` and
+	 * `reset` resolve the same config and have no listener to place.
+	 */
+	mcpPort?: number
 }
 
 /**
@@ -430,6 +454,28 @@ export async function resolveWatchCredentials(cwd: string): Promise<WordPressCre
 	return resolveWordPressConnection(env).credentials
 }
 
+/** The MCP server's settings, resolved from `mcp` in `kizlo.config.*`. */
+export interface ResolvedMcpConfig {
+	port: number
+	/**
+	 * True when `mcp.port` was set in config, so the user owns collisions and we don't auto-step. A
+	 * harness config names one port, and a port that moved under it connects to nothing.
+	 */
+	portExplicit: boolean
+}
+
+function resolveMcp(fileConfig: LoadedConfig | undefined): ResolvedMcpConfig {
+	return {
+		port: fileConfig?.mcp?.port ?? DEFAULT_MCP_PORT,
+		portExplicit: fileConfig?.mcp?.port !== undefined,
+	}
+}
+
+/** Resolve `mcp` from `kizlo.config.*`, applying the defaults for a project that says nothing about it. */
+export async function resolveMcpConfig(cwd: string): Promise<ResolvedMcpConfig> {
+	return resolveMcp(await loadConfigFile(findConfigDir(cwd)))
+}
+
 /**
  * Resolve the dev stack (`local.dev`) into concrete values for the `dev` command, applying defaults
  * (port 8080). The install folder is fixed at `.kizlo/local` (no longer a config choice), so there's
@@ -453,5 +499,6 @@ export async function resolveDevConfig(cwd: string): Promise<ResolvedDevConfig> 
 		fixtures: dev.fixtures ?? [],
 		wordpressPath: LOCAL_DIR_REL,
 		wordpressDir: path.resolve(configDir, LOCAL_DIR_REL),
+		mcp: resolveMcp(fileConfig),
 	}
 }
