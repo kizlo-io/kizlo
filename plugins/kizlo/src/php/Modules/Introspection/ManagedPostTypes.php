@@ -503,7 +503,10 @@ class ManagedPostTypes
         }
 
         $envelope['description'] = 'Kizlo-owned fields on this entry.';
-        $envelope['properties']  = ['custom' => $custom];
+        $envelope['properties']  = [
+            'custom' => $custom,
+            'seo'    => ['$ref' => CoreSchemas::SEO_INPUT],
+        ];
 
         return $envelope;
     }
