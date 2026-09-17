@@ -1,0 +1,104 @@
+---
+title: MCP
+icon: Robot
+description: Give an AI coding agent typed access to your project's WordPress REST API while kizlo dev runs.
+---
+
+An AI agent working on your project can read your code, but it can't ask your WordPress anything. It doesn't
+know which routes exist, what arguments they take, or what a real response looks like. So it guesses.
+
+`kizlo dev` serves an [MCP](https://modelcontextprotocol.io) endpoint that closes that gap. Point your agent at
+it and it can list every route your WordPress serves, read the JSON Schema for any of them, and call them.
+
+```package-install
+npx kizlo dev
+```
+
+The address appears in the startup summary:
+
+```
+   - WP Local:              http://localhost:8080/wp-admin
+   - Database Connection:   127.0.0.1:3306
+   - MCP:                   http://127.0.0.1:8300/mcp
+```
+
+It runs only while `kizlo dev` runs, and only on `127.0.0.1`. There is nothing to deploy and no token to leak,
+because the server lives in the CLI rather than in your app.
+
+<Callout type="warn">
+  Tool calls reach WordPress as the user in your `.env`, which in a dev session is usually an administrator.
+  An agent that can call `kizlo_call` can change and delete content, so point this at a WordPress you are
+  willing to lose.
+</Callout>
+
+## The tools
+
+Three tools reach every route, instead of one tool per route. A seeded WordPress serves well over a hundred
+routes, and their schemas would fill an agent's context before it did any work.
+
+| Tool | What it does |
+| --- | --- |
+| `kizlo_list_routes` | Lists every route, with its method and summary. Takes an optional `namespace` filter |
+| `kizlo_describe_route` | Returns the JSON Schema for one route's arguments |
+| `kizlo_call` | Runs a route against your WordPress and returns the response |
+
+Route names match the [client](/docs/concepts/client) you write against, so `postTypes.book.list` is the same
+route in a tool result and in your code.
+
+Routes come from the same [introspection](/docs/concepts/introspection) document the contract watcher already
+polls, refreshed every few seconds. Register a post type in WordPress while `kizlo dev` is running and its
+routes show up in the next listing, with no restart.
+
+## Connecting your agent
+
+The MCP specification covers the protocol, not where a client keeps its configuration, so every harness has its
+own file. Kizlo doesn't write any of them. Add the URL from the summary to whichever your agent reads:
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "kizlo": { "type": "http", "url": "http://127.0.0.1:8300/mcp" }
+  }
+}
+```
+
+That file is Claude Code's. Cursor uses `.cursor/mcp.json` and VS Code uses `.vscode/mcp.json`, both with the
+same shape. Codex keeps its servers in `~/.codex/config.toml`:
+
+```toml title="~/.codex/config.toml"
+[mcp_servers.kizlo]
+url = "http://127.0.0.1:8300/mcp"
+```
+
+<Callout>
+  Set [`mcp.port`](/docs/reference/functions/define-config) before you write the URL down. Without it the port
+  steps to whatever is free, so it can move between sessions and leave your config pointing at nothing.
+</Callout>
+
+## Configuration
+
+One optional field:
+
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({
+  mcp: {
+    port: 8300,
+  },
+})
+```
+
+**`port`** fixes the port so a harness config keeps working. Left unset, the server starts at `8300` and steps
+past anything already listening, which is what lets two projects run `kizlo dev` at once. Set it and the port
+never moves: if something else holds it, `kizlo dev` stops and says so rather than serving somewhere you didn't
+choose.
+
+## What it doesn't expose
+
+Only WordPress routes. Your Kizlo [procedures](/docs/concepts/integration) aren't reachable: they need a
+running app and in-process access, which is a different thing from a REST call.
+
+The server also stays off in two cases, and says which in the output. A second `kizlo dev` on the same project
+leaves MCP to the first. A project with no resolvable WordPress connection has no contract to serve, so the
+contract watcher runs alone.

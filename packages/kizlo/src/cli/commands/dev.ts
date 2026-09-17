@@ -3,10 +3,11 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { defineCommand } from "citty"
 import { palette } from "../banner"
-import { type ResolvedDevConfig, resolveDevConfig, usesLocalWordPress } from "../daemon/config"
+import { type ResolvedDevConfig, resolveDevConfig, resolveMcpConfig, usesLocalWordPress } from "../daemon/config"
 import { log } from "../daemon/logger"
 import { watchReload } from "../daemon/reload"
 import { type StackWatch, startWatcher } from "../daemon/watch"
+import { createMcpState, resolveMcpPort, startMcp } from "../mcp"
 import { DEFAULT_ENV_KEYS, ensureGitignored, envGroups, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
 import { createStack, type DockerStack, dockerHint, dockerStatus, stackStatus } from "../wp/docker"
@@ -41,15 +42,17 @@ function note(text: string): void {
  * Print the connection summary as an aligned, Next.js-style block. Shows the wp-admin URL on
  * the loopback ("Local") and — when local WordPress is installed on a LAN address rather than
  * localhost — on the network, so it can be opened from other devices. On a fresh install, also
- * show the default wp-admin login.
+ * show the default wp-admin login. The MCP row is the address to paste into a harness's own
+ * configuration: nothing writes one, because each harness reads a different file.
  */
-function printSummary(info: DevStackInfo): void {
+function printSummary(info: DevStackInfo, mcpUrl?: string): void {
 	const { cyan, dim, reset } = palette()
 	const { port, hostname } = new URL(info.url)
 
 	const rows: [string, string][] = [["WP Local", `http://localhost:${port}/wp-admin`]]
 	if (hostname !== "localhost") rows.push(["WP Network", `${info.url}/wp-admin`])
 	rows.push(["Database Connection", `127.0.0.1:${info.dbPort}`])
+	if (mcpUrl) rows.push(["MCP", mcpUrl])
 
 	const width = Math.max(...rows.map(([label]) => label.length)) + 1
 	const lines = ["", ...rows.map(([label, value]) => `   ${dim}- ${`${label}:`.padEnd(width)}${reset} ${cyan}${value}${reset}`)]
@@ -189,12 +192,15 @@ function stopping(reason: string): string {
  * and the teardown work against. Shared by the first boot and every reload reboot, so a changed
  * `dev.port` in `kizlo.config.ts` is re-resolved the same way each time.
  */
-async function prepareStack(cfg: ResolvedDevConfig): Promise<ResolvedDevConfig> {
+async function prepareStack(cfg: ResolvedDevConfig, mcpPort?: number): Promise<ResolvedDevConfig> {
 	await removeProjectContainers(cfg.project)
 
 	const port = await pickStackPort(cfg.port, { fixed: cfg.portExplicit, configKey: "dev.port" })
 	const dbPort = await pickStackPort(cfg.dbPort, { fixed: cfg.dbPortExplicit, host: "127.0.0.1", configKey: "dev.dbPort" })
-	const ready: ResolvedDevConfig = { ...cfg, port, dbPort }
+	// Resolved on the first boot only, and carried through every reboot after it. The MCP server binds
+	// once per session and is still holding this port, so probing again would step off our own listener
+	// (printing an address nothing answers on) or, with `mcp.port` pinned, stop the session outright.
+	const ready: ResolvedDevConfig = { ...cfg, port, dbPort, mcpPort: mcpPort ?? (await resolveMcpPort(cfg.mcp)) }
 	createStack(devStack(ready))
 	if (port !== cfg.port) note(`Port ${cfg.port} is in use — serving on ${port} instead.`)
 	if (dbPort !== cfg.dbPort) note(`Database port ${cfg.dbPort} is in use — using ${dbPort} instead.`)
@@ -207,7 +213,7 @@ async function prepareStack(cfg: ResolvedDevConfig): Promise<ResolvedDevConfig> 
  * one-time Ctrl+C hint. `start` is when the boot began, so the timing spans the whole reboot including
  * the spinner. The `.env` writes here are why the caller pauses the reload watcher around a reboot.
  */
-async function report(cfg: ResolvedDevConfig, creds: DevStackInfo, reloaded: boolean, start: number): Promise<void> {
+async function syncEnv(cfg: ResolvedDevConfig, creds: DevStackInfo): Promise<void> {
 	if (creds.appPassword) {
 		const env = updateWpEnv(cfg, creds)
 		note("Updated .env with the new WordPress credentials")
@@ -224,7 +230,17 @@ async function report(cfg: ResolvedDevConfig, creds: DevStackInfo, reloaded: boo
 	} else if (syncLocalUrl(cfg.configDir, creds.url)) {
 		note("Updated .env WordPress URL to the current network address — restart your app to pick it up")
 	}
-	printSummary(creds)
+}
+
+/**
+ * Print the summary and the timed ready line, once everything it names is actually up. Split from
+ * {@link syncEnv} because the two have opposite ordering needs: the `.env` writes have to land before
+ * the watcher starts, since that is where it reads the connection from, while the summary has to wait
+ * until after, so the MCP address it prints belongs to a server that exists. `mcpUrl` is absent when
+ * MCP is not running, and the row is then left out rather than pointing at nothing.
+ */
+function printReady(creds: DevStackInfo, reloaded: boolean, start: number, mcpUrl?: string): void {
+	printSummary(creds, mcpUrl)
 
 	const { green, dim, bold, reset } = palette()
 	const ms = Date.now() - start
@@ -239,10 +255,11 @@ async function report(cfg: ResolvedDevConfig, creds: DevStackInfo, reloaded: boo
  * then report. The first-boot path only — reboots go through {@link rebootStack}, which also folds the
  * prepare step under the spinner.
  */
-async function bootAndReport(cfg: ResolvedDevConfig): Promise<void> {
+async function bootAndSync(cfg: ResolvedDevConfig): Promise<{ creds: DevStackInfo; start: number }> {
 	const start = Date.now()
 	const creds = await withSpinner("Starting local WordPress", () => bootstrapDev(cfg))
-	await report(cfg, creds, false, start)
+	await syncEnv(cfg, creds)
+	return { creds, start }
 }
 
 /**
@@ -252,14 +269,18 @@ async function bootAndReport(cfg: ResolvedDevConfig): Promise<void> {
  * the first boot, so this never re-arms. Returns the freshly resolved config (ports may have moved) so
  * the caller can re-target its watchers.
  */
-async function rebootStack(cwd: string, label: string): Promise<ResolvedDevConfig> {
+async function rebootStack(
+	cwd: string,
+	label: string,
+	mcpPort?: number,
+): Promise<{ ready: ResolvedDevConfig; creds: DevStackInfo; start: number }> {
 	const start = Date.now()
 	const { ready, creds } = await withSpinner(label, async () => {
-		const ready = await prepareStack(await resolveDevConfig(cwd))
+		const ready = await prepareStack(await resolveDevConfig(cwd), mcpPort)
 		return { ready, creds: await bootstrapDev(ready) }
 	})
-	await report(ready, creds, true, start)
-	return ready
+	await syncEnv(ready, creds)
+	return { ready, creds, start }
 }
 
 /**
@@ -276,7 +297,7 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	const cwd = process.cwd()
 	let ready = await prepareStack(cfg)
 	const shutdown = await armForegroundTeardown(ready)
-	await bootAndReport(ready)
+	const { creds, start } = await bootAndSync(ready)
 
 	// The poll is the only thing here that talks to WordPress, so it is where a stopped stack shows up
 	// first. It ends the session through the same teardown the signal handlers use, which drops the
@@ -286,7 +307,20 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 		status: () => stackStatus(ready.project),
 		onStopped: () => shutdown(),
 	}
-	let stopContract = await startWatcher(ready.configDir, { stack })
+	// One holder for the whole session. Every `startWatcher` below writes the current connection and
+	// contract into it, and MCP reads it per tool call, so a reload never rebinds the socket.
+	const mcp = createMcpState()
+	const mcpPort = ready.mcpPort
+	let stopContract = await startWatcher(ready.configDir, { stack, mcp })
+	// Only when the watcher is ours. A watcher that did not start means another `kizlo dev` holds the
+	// lock and is already serving MCP; binding here would fail on its port and report a misconfiguration.
+	const mcpServer = stopContract && mcpPort !== undefined ? await startMcp(mcp, mcpPort) : undefined
+	// The one case `startMcp` never hears about, so it cannot report it: no watcher means another
+	// `kizlo dev` owns this project and is already serving MCP for it.
+	if (!stopContract) log.info("Another `kizlo dev` is serving MCP for this project.")
+
+	// Everything the summary names is up by now, so the MCP row is an address that answers.
+	printReady(creds, false, start, mcpServer?.url)
 
 	let reloading = false
 	const reload = async (changed: string): Promise<void> => {
@@ -294,8 +328,11 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 		reloading = true
 		try {
 			stopContract?.()
-			ready = await rebootStack(cwd, `${changed} changed — restarting the session`)
-			stopContract = await startWatcher(ready.configDir, { stack })
+			const rebooted = await rebootStack(cwd, `${changed} changed — restarting the session`, mcpPort)
+			ready = rebooted.ready
+			stopContract = await startWatcher(ready.configDir, { stack, mcp })
+			// MCP was never restarted, so the address it was serving on is still the live one.
+			printReady(rebooted.creds, true, rebooted.start, mcpServer?.url)
 		} catch (error) {
 			log.error("Failed to reload the dev session:", error)
 		} finally {
@@ -309,6 +346,9 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	process.on("exit", () => {
 		stopContract?.()
 		stopReload()
+		// `exit` cannot await, and the listener dies with the process anyway. This is here so the socket
+		// is released on the ordinary path rather than left to the kernel.
+		void mcpServer?.stop()
 	})
 
 	setInterval(() => {}, 1 << 30)
@@ -324,8 +364,18 @@ async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
  * persistent watcher keeps the process alive on its own.
  */
 async function watchOnly(cwd: string): Promise<void> {
-	let stop = await startWatcher(cwd)
-	if (!stop) return
+	const mcp = createMcpState()
+	let stop = await startWatcher(cwd, { mcp })
+	if (!stop) {
+		// Same as the local path: no watcher means another `kizlo dev` owns this project and is serving
+		// MCP for it, so this one binds nothing and says why rather than leaving the reason to the lock.
+		log.info("Another `kizlo dev` is serving MCP for this project.")
+		return
+	}
+
+	// This path prints no summary, so the server's own line is where the address appears.
+	const mcpConfig = await resolveMcpConfig(cwd)
+	const mcpServer = await startMcp(mcp, await resolveMcpPort(mcpConfig))
 
 	let reloading = false
 	const reload = async (): Promise<void> => {
@@ -333,7 +383,7 @@ async function watchOnly(cwd: string): Promise<void> {
 		reloading = true
 		try {
 			stop?.()
-			stop = await startWatcher(cwd)
+			stop = await startWatcher(cwd, { mcp })
 		} finally {
 			setTimeout(() => {
 				reloading = false
@@ -345,6 +395,7 @@ async function watchOnly(cwd: string): Promise<void> {
 	const shutdown = (): void => {
 		stop?.()
 		stopReload()
+		void mcpServer?.stop()
 	}
 	process.on("exit", shutdown)
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {

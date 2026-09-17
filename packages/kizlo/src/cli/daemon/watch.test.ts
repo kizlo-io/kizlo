@@ -4,6 +4,7 @@ import path from "node:path"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import type { WordPressCredentials } from "../../wordpress/types"
+import { createMcpState } from "../mcp/state"
 import type { ResolvedConfig } from "./config"
 import { lockPath } from "./lock"
 import { log } from "./logger"
@@ -316,5 +317,135 @@ describe("startWatcher", () => {
 
 		await expect(startWatcher(cwd)).resolves.toBeUndefined()
 		expect(lines("info")).toContain(SKIPPED)
+	})
+})
+
+describe("the state the MCP server reads", () => {
+	// `loadEnvFiles` never overrides an env var that is already set, so a connection left behind by an
+	// earlier test would be the one every later test resolved.
+	afterEach(() => {
+		for (const key of ["KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD"]) delete process.env[key]
+	})
+
+	/** A workspace with a reachable WordPress, so the watcher resolves a connection and fetches. */
+	function connected(): string {
+		const cwd = workspace()
+		fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: { introspection: "." } }\n`)
+		fs.writeFileSync(path.join(cwd, ".env"), "KIZLO_WP_URL=https://wp.example\nKIZLO_WP_USERNAME=admin\nKIZLO_WP_APP_PASSWORD=secret\n")
+		vi.stubEnv("KIZLO_MODE", "remote")
+		vi.stubGlobal("fetch", serving())
+		return cwd
+	}
+
+	test("carries the connection and the contract once the watcher starts", async () => {
+		watchLog()
+		const cwd = connected()
+		const mcp = createMcpState()
+
+		const stop = await startWatcher(cwd, { mcp })
+		try {
+			expect(mcp.credentials).toMatchObject({ url: "https://wp.example", username: "admin" })
+			expect(mcp.document?.hash).toBe(INTROSPECTION_FIXTURE.hash)
+		} finally {
+			stop?.()
+		}
+	})
+
+	test("is populated on a session whose introspection is already current", async () => {
+		watchLog()
+		const cwd = connected()
+
+		// A first session leaves the ETag behind, which is what makes every later fetch a 304.
+		;(await startWatcher(cwd, { mcp: createMcpState() }))?.()
+
+		const mcp = createMcpState()
+		const stop = await startWatcher(cwd, { mcp })
+		try {
+			expect(mcp.document?.hash).toBe(INTROSPECTION_FIXTURE.hash)
+		} finally {
+			stop?.()
+		}
+	})
+
+	test("leaves the watcher running with MCP off when there is no connection", async () => {
+		watchLog()
+		const cwd = unconnected()
+		const mcp = createMcpState()
+
+		const stop = await startWatcher(cwd, { mcp })
+		try {
+			// The watcher is the session's job and still has one; MCP has nothing to serve.
+			expect(stop).toBeDefined()
+			expect(mcp.credentials).toBeUndefined()
+			expect(mcp.document).toBeUndefined()
+		} finally {
+			stop?.()
+		}
+	})
+
+	test("stays empty and reports no port problem when another watcher holds the lock", async () => {
+		watchLog()
+		const cwd = unstartable()
+		const lock = lockPath(cwd)
+		fs.mkdirSync(path.dirname(lock), { recursive: true })
+		fs.writeFileSync(lock, String(process.pid))
+		const mcp = createMcpState()
+
+		// Undefined is what tells the caller not to bind: the other `kizlo dev` is already serving MCP.
+		await expect(startWatcher(cwd, { mcp })).resolves.toBeUndefined()
+		expect(mcp.credentials).toBeUndefined()
+		expect(lines("error")).toHaveLength(0)
+	})
+
+	test("keeps seeding until a document arrives, so a failed first pass still recovers", async () => {
+		watchLog()
+		const cwd = connected()
+		// A first session leaves the ETag behind, so every later fetch can be answered with a 304.
+		;(await startWatcher(cwd, { mcp: createMcpState() }))?.()
+
+		// The next session's first pass fails. Without re-seeding, the poll behind it revalidates, gets
+		// a 304, and the server is left with no contract for the rest of the session.
+		let calls = 0
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+				calls += 1
+				if (calls === 1) throw new Error("WordPress is still starting")
+				// A seeding fetch sends no validator, so a 304 is not something WordPress could answer.
+				if (new Headers(init?.headers).get("If-None-Match")) return new Response(null, { status: 304 })
+				return Response.json(INTROSPECTION_FIXTURE, { headers: { etag: '"fixture"' } })
+			}),
+		)
+
+		const mcp = createMcpState()
+		const stop = await startWatcher(cwd, { mcp })
+		try {
+			expect(mcp.document).toBeUndefined()
+			// The poll runs the same options object, so it is still seeding and picks the contract up.
+			await createWordPressRefresh(standalone(cwd), { credentials: CREDENTIALS, seed: true, onDocument: (d) => (mcp.document = d) })()
+			expect(mcp.document?.hash).toBe(INTROSPECTION_FIXTURE.hash)
+		} finally {
+			stop?.()
+		}
+	})
+
+	test("rewrites the connection on every start, which is what a reload is", async () => {
+		watchLog()
+		const cwd = connected()
+		const mcp = createMcpState()
+
+		const first = await startWatcher(cwd, { mcp })
+		first?.()
+		expect(mcp.credentials?.url).toBe("https://wp.example")
+
+		// A reload restarts the watcher against the same holder. Standing in for the connection a
+		// previous session resolved, so the assertion is that a start replaces it rather than keeps it.
+		mcp.credentials = { url: "https://stale.example", username: "old", password: "old" }
+		const second = await startWatcher(cwd, { mcp })
+		try {
+			expect(mcp.credentials?.url).toBe("https://wp.example")
+		} finally {
+			second?.()
+		}
 	})
 })

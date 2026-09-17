@@ -1,7 +1,7 @@
 import path from "node:path"
 import { FSWatcher } from "chokidar"
 import { IntrospectionFetchError } from "../../wordpress/fetch-introspection"
-import type { WordPressCredentials } from "../../wordpress/types"
+import type { McpState } from "../mcp/state"
 import { type ResolvedConfig, resolveConfig, resolveWatchCredentials } from "./config"
 import { type GenerateWordPressOptions, generateIntrospectionOnce, generateOnce, reportGenerationError } from "./generate"
 import { acquire, lockPath, release } from "./lock"
@@ -153,8 +153,8 @@ export function createWordPressRefresh(cfg: ResolvedConfig, options: GenerateWor
 }
 
 /** Run {@link createWordPressRefresh} on a timer, skipping a tick while the previous one is still going. */
-function refreshWordPress(cfg: ResolvedConfig, credentials: WordPressCredentials, stack?: StackWatch): NodeJS.Timeout {
-	const refresh = createWordPressRefresh(cfg, { credentials }, stack)
+function refreshWordPress(cfg: ResolvedConfig, options: GenerateWordPressOptions, stack?: StackWatch): NodeJS.Timeout {
+	const refresh = createWordPressRefresh(cfg, options, stack)
 	let refreshing = false
 	const timer = setInterval(() => {
 		if (refreshing) return
@@ -174,7 +174,10 @@ function refreshWordPress(cfg: ResolvedConfig, credentials: WordPressCredentials
  * generate, in which case the caller carries on without watching. Used by `kizlo dev`, both when it
  * boots a local stack and when it runs the watcher alone, so a single terminal covers the whole dev loop.
  */
-export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: StackWatch }): Promise<(() => void) | undefined> {
+export async function startWatcher(
+	cwd: string,
+	opts?: { dir?: string; stack?: StackWatch; mcp?: McpState },
+): Promise<(() => void) | undefined> {
 	const lock = lockPath(cwd)
 	if (!(await acquire(lock))) {
 		log.info("Watcher already running — skipping the contract watcher.")
@@ -202,6 +205,22 @@ export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: S
 		const options: GenerateWordPressOptions = credentials ? { credentials } : { skipIntrospection: true }
 		if (!credentials) log.info("No WordPress connection configured; running the contract watcher only, introspection skipped.")
 
+		// The MCP server holds no copies, so this is where both of the things it serves are kept current.
+		// Credentials are written on every start, reload included, because a `.env` change is exactly when
+		// the connection may have moved.
+		if (opts?.mcp) {
+			opts.mcp.credentials = credentials
+			// Seed until a document actually arrives, not just on the first pass. That pass can fail for
+			// ordinary reasons (WordPress still starting, a transient error), and the poll behind it
+			// revalidates: with a warm ETag it would answer 304 for the rest of the session and MCP would
+			// never receive a contract at all. The flag clears itself the moment one lands.
+			options.seed = true
+			options.onDocument = (document) => {
+				if (opts.mcp) opts.mcp.document = document
+				options.seed = false
+			}
+		}
+
 		try {
 			const result = await generateOnce(cfg, options)
 			if (result.contract === "built") log.success("Contract generated")
@@ -214,7 +233,7 @@ export async function startWatcher(cwd: string, opts?: { dir?: string; stack?: S
 		// Only a server has sources worth watching; a package with just the introspection rides the poll below.
 		const watcher = cfg.server ? await watch(cfg, cfg.server, options) : undefined
 		// The introspection poll needs a live connection; with none, there is nothing to refresh.
-		const wordpressRefresh = credentials ? refreshWordPress(cfg, credentials, opts?.stack) : undefined
+		const wordpressRefresh = credentials ? refreshWordPress(cfg, options, opts?.stack) : undefined
 		let stopped = false
 		handedOver = true
 		return () => {

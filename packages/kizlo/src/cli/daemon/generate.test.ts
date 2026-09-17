@@ -269,6 +269,124 @@ describe("generateIntrospectionOnce", () => {
 	})
 })
 
+describe("a seeding fetch", () => {
+	/** A session whose `introspection.ts` is already current: the ETag on disk still describes it. */
+	async function warmed(): Promise<{ cfg: ResolvedConfig; fetch: ReturnType<typeof vi.fn> }> {
+		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
+		seedEnv(cwd)
+		const cfg = config(cwd)
+		const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => modified())
+		await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
+		return { cfg, fetch }
+	}
+
+	test("produces a document where revalidating would answer 304 and produce none", async () => {
+		const { cfg, fetch } = await warmed()
+		const documents: IntrospectionDocument[] = []
+		fetch.mockResolvedValue(new Response(null, { status: 304 }))
+
+		// What the poll does, and why a holder fed only from it stays empty for the whole session.
+		expect(
+			await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch, onDocument: (d) => documents.push(d) }),
+		).toBe("unchanged")
+		expect(documents).toHaveLength(0)
+
+		// What the first pass of an MCP session does instead.
+		fetch.mockResolvedValue(modified())
+		await generateIntrospectionOnce(cfg, {
+			fetch: fetch as unknown as typeof globalThis.fetch,
+			seed: true,
+			onDocument: (d) => documents.push(d),
+		})
+
+		expect(documents).toHaveLength(1)
+		expect(documents[0]?.hash).toBe(INTROSPECTION_FIXTURE.hash)
+	})
+
+	test("asks without If-None-Match, so WordPress cannot answer 304", async () => {
+		const { cfg, fetch } = await warmed()
+
+		await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch, seed: true })
+
+		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("If-None-Match")).toBe(null)
+		expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("If-None-Match")).toBe(null)
+	})
+
+	test("leaves a current introspection.ts untouched", async () => {
+		const { cfg, fetch } = await warmed()
+		const file = path.join(cfg.cwd, cfg.introspectionPath)
+		const before = fs.readFileSync(file, "utf8")
+		const mtime = fs.statSync(file).mtimeMs
+
+		expect(await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch, seed: true })).toBe("unchanged")
+
+		expect(fs.readFileSync(file, "utf8")).toBe(before)
+		expect(fs.statSync(file).mtimeMs).toBe(mtime)
+	})
+
+	test("leaves strict generation regenerating, since strict skips the ETag for its own reasons", async () => {
+		const { cfg, fetch } = await warmed()
+		const file = path.join(cfg.cwd, cfg.introspectionPath)
+		// A file whose header still names the current document but whose body no longer matches it: the
+		// exact case strict exists to catch, and the one the seeding short-circuit must not swallow.
+		const generated = fs.readFileSync(file, "utf8")
+		fs.writeFileSync(file, generated.replace("export const introspection", "export const tampered"))
+
+		expect(await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch, strict: true })).toBe("generated")
+		expect(fs.readFileSync(file, "utf8")).toBe(generated)
+	})
+
+	test("refreshes the ETag it skipped, so later polls can revalidate again", async () => {
+		const { cfg, fetch } = await warmed()
+		const metaPath = path.join(cfg.cwd, cfg.introspectionMetaPath)
+		// Same document, new ETag: a plugin reinstall or a cache flush is enough to produce this. Built
+		// per call, since a Response body can only be read once.
+		fetch.mockImplementation(async () => modified(INTROSPECTION_FIXTURE, '"rotated"'))
+
+		expect(await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch, seed: true })).toBe("unchanged")
+
+		expect(JSON.parse(fs.readFileSync(metaPath, "utf8")).etag).toBe('"rotated"')
+		// Which is what lets the next poll answer 304 instead of downloading the contract again.
+		await generateIntrospectionOnce(cfg, { fetch: fetch as unknown as typeof globalThis.fetch })
+		expect(new Headers(fetch.mock.calls.at(-1)?.[1]?.headers).get("If-None-Match")).toBe('"rotated"')
+	})
+
+	test("still writes when the document it fetched is a different one", async () => {
+		const { cfg, fetch } = await warmed()
+		const documents: IntrospectionDocument[] = []
+		fetch.mockResolvedValue(modified(altered(), '"altered"'))
+
+		expect(
+			await generateIntrospectionOnce(cfg, {
+				fetch: fetch as unknown as typeof globalThis.fetch,
+				seed: true,
+				onDocument: (d) => documents.push(d),
+			}),
+		).toBe("generated")
+		expect(documents[0]?.hash).toBe(altered().hash)
+	})
+
+	test("hands the document over even when the generator refuses it", async () => {
+		watchLog()
+		const { cfg, fetch } = await warmed()
+		const documents: IntrospectionDocument[] = []
+		fetch.mockResolvedValue(modified(altered(), '"altered"'))
+		// After the warm-up generation, which compiles the fixture like any other run.
+		vi.mocked(assertGeneratedClientCompiles).mockRejectedValueOnce(refused())
+
+		await expect(
+			generateIntrospectionOnce(cfg, {
+				fetch: fetch as unknown as typeof globalThis.fetch,
+				seed: true,
+				onDocument: (d) => documents.push(d),
+			}),
+		).rejects.toThrow(GeneratedClientTypeError)
+
+		// A contract that will not compile is still a contract the tools can read and call.
+		expect(documents).toHaveLength(1)
+	})
+})
+
 describe("generateIntrospectionSource", () => {
 	test("returns current output without writing the client or its cache", async () => {
 		const cfg = project()
