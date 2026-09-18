@@ -4,6 +4,17 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-09-18
+### Added
+- Author per-post and per-term SEO over the REST API through the kizlo.seo write property.
+
+### Changed
+- Write custom-field values under `kizlo.custom` instead of a top-level `custom` property, matching where they are read from
+
+### Fixed
+- Stop publishing `multipleOf` for a number field whose minimum offsets its step, which contradicted the editor and the stored rule
+- Validate submitted custom fields and SEO overrides on managed write routes, so an invalid value is rejected with a 400 instead of being silently dropped.
+
 ## [0.17.1] - 2026-09-15
 ### Changed
 - Normalize a saved pathname structure to lowercase with a single leading slash, no repeated separators, and no trailing slash
@@ -192,6 +203,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.18.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.17.1...kizlo-v0.18.0
 [0.17.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.17.0...kizlo-v0.17.1
 [0.17.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.16.0...kizlo-v0.17.0
 [0.16.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.15.0...kizlo-v0.16.0

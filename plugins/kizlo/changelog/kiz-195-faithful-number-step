@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Stop publishing `multipleOf` for a number field whose minimum offsets its step, which contradicted the editor and the stored rule
