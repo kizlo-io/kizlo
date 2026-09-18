@@ -1,5 +1,17 @@
 # kizlo
 
+## 0.21.0
+
+### Minor Changes
+
+- [#232](https://github.com/kizlo-io/kizlo/pull/232) [`b97b12e`](https://github.com/kizlo-io/kizlo/commit/b97b12e3e670a6770ab622ba9ce772cc1a494fb6) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Serve an MCP server from `kizlo dev` that exposes your WordPress routes to an AI harness as tools.
+
+- [#231](https://github.com/kizlo-io/kizlo/pull/231) [`48138b1`](https://github.com/kizlo-io/kizlo/commit/48138b14741026279e29a458d6e34dc781293c6b) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add an `order` option to integrations so a framework integration mounts before app integrations whatever order they are listed in.
+
+### Patch Changes
+
+- [#224](https://github.com/kizlo-io/kizlo/pull/224) [`bd2e73a`](https://github.com/kizlo-io/kizlo/commit/bd2e73af246bbb733370ad34a22150558388c477) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Rewrite the missing-endpoints startup error to lead with the outdated-plugin cause and fix, list the missing routes, and link to the integration's download page.
+
 ## 0.20.2
 
 ### Patch Changes
