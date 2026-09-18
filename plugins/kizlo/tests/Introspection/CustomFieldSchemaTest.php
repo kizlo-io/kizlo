@@ -112,6 +112,41 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
         $this->assertArrayNotHasKey('nullable', $schemas['create']['rank']);
     }
 
+    public function test_a_step_offset_from_zero_publishes_no_multiple_of(): void
+    {
+        $schemas = $this->generate([
+            ['type' => 'number', 'name' => 'rank', 'min' => 1, 'max' => 10, 'step' => 2],
+        ]);
+
+        // `multipleOf` counts from zero and would accept 2, 4, 6, where the store and
+        // the editor accept 1, 3, 5. The keyword is dropped rather than published wrong.
+        foreach (['item', 'create', 'update'] as $side) {
+            $this->assertSame(1, $schemas[$side]['rank']['minimum']);
+            $this->assertSame(10, $schemas[$side]['rank']['maximum']);
+            $this->assertArrayNotHasKey('multipleOf', $schemas[$side]['rank']);
+        }
+    }
+
+    public function test_a_step_without_a_minimum_still_publishes_multiple_of(): void
+    {
+        $schemas = $this->generate([['type' => 'number', 'name' => 'rank', 'step' => 2]]);
+
+        // An absent `min` leaves the store counting from zero too, so the keyword is exact.
+        $this->assertSame(2, $schemas['create']['rank']['multipleOf']);
+        $this->assertSame(2, $schemas['item']['rank']['multipleOf']);
+        $this->assertArrayNotHasKey('minimum', $schemas['create']['rank']);
+    }
+
+    public function test_a_float_minimum_on_step_is_measured_with_the_stores_tolerance(): void
+    {
+        $schemas = $this->generate([['type' => 'number', 'name' => 'rank', 'min' => 0.3, 'step' => 0.1]]);
+
+        // 0.3 / 0.1 is 2.9999999999999996 in binary floating point. The store treats that
+        // as an exact multiple, so the contract has to reach the same verdict.
+        $this->assertSame(0.1, $schemas['create']['rank']['multipleOf']);
+        $this->assertSame(0.3, $schemas['create']['rank']['minimum']);
+    }
+
     public function test_a_toggle_maps_to_a_boolean_and_keeps_its_default(): void
     {
         $schemas = $this->generate([['type' => 'toggle', 'name' => 'featured', 'default' => true]]);

@@ -194,10 +194,14 @@ class CustomFieldsWriteTest extends SeoTestCase
     public function invalidConstrainedValueProvider(): array
     {
         $number = ['type' => 'number', 'name' => 'score', 'min' => 0, 'max' => 10, 'step' => 2];
+        // A minimum of 0 is the one case where a step from zero and a step from the
+        // minimum agree, so an offset base is covered alongside it.
+        $offset = ['type' => 'number', 'name' => 'score', 'min' => 1, 'max' => 10, 'step' => 2];
         return [
             'below minimum' => [$number, -1],
             'above maximum' => [$number, 11],
             'off step' => [$number, 3],
+            'off step from an offset minimum' => [$offset, 4],
             'non leap day' => [['type' => 'date', 'name' => 'launch'], '2025-02-29'],
             'invalid month and day' => [['type' => 'date', 'name' => 'launch'], '2026-13-40'],
         ];
