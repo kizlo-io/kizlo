@@ -8,6 +8,7 @@ use WP_REST_Terms_Controller;
 use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\CoreItemSchema;
 use Kizlo\Modules\Introspection\ManagedTaxonomies;
+use Kizlo\Modules\Introspection\ManagedWrite;
 use Kizlo\Modules\Introspection\RouteRegistrar;
 
 /**
@@ -35,7 +36,7 @@ class TaxonomyApi
                         continue;
                     }
 
-                    RouteRegistrar::registerManaged($declaration, $handler);
+                    RouteRegistrar::registerManaged($declaration, $handler, self::validator($slug, $operation));
                 }
             }
         });
@@ -65,6 +66,30 @@ class TaxonomyApi
         );
 
         return null;
+    }
+
+    /**
+     * @see \Kizlo\Modules\PostType\PostTypeApi::validator()
+     *
+     * `replace` shares `update`'s declaration and handler here, and publishes
+     * the same partial input, so it is a partial write too. Leaving it out would
+     * not merely skip its validation: {@see ManagedWrite} is also what tells the
+     * insert hook that a request came from a managed route, so a `PUT` carrying
+     * `kizlo.custom` or `kizlo.seo` would stop persisting altogether.
+     */
+    private static function validator(string $slug, string $operation): ?callable
+    {
+        $partial = match ($operation) {
+            'create'            => false,
+            'update', 'replace' => true,
+            default             => null,
+        };
+
+        if ($partial === null) {
+            return null;
+        }
+
+        return (new ManagedWrite(ManagedWrite::TAXONOMY, $slug, $partial))->callback();
     }
 
     /** @see \Kizlo\Modules\PostType\PostTypeApi::pinContext() for why this is forced rather than declared. */

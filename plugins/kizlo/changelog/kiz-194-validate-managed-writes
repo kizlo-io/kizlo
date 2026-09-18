@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Validate submitted custom fields and SEO overrides on managed write routes, so an invalid value is rejected with a 400 instead of being silently dropped.
