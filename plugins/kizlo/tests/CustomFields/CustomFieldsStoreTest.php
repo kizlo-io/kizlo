@@ -222,4 +222,16 @@ class CustomFieldsStoreTest extends TestCase
 
         $this->assertSame('', get_post_meta($this->post, 'kcf_a_b', true));
     }
+
+    public function test_a_number_steps_from_its_minimum_rather_than_from_zero(): void
+    {
+        $defs = $this->defs([['type' => 'number', 'name' => 'rank', 'min' => 1, 'max' => 10, 'step' => 2]]);
+
+        // The editor renders `<input type="number" min="1" step="2">`, whose step base is
+        // the minimum. This is the rule the contract has to state, so it is pinned here.
+        CustomFieldsStore::assertWritable($defs, ['rank' => 3]);
+
+        $this->expectException(InvalidArgumentException::class);
+        CustomFieldsStore::assertWritable($defs, ['rank' => 4]);
+    }
 }

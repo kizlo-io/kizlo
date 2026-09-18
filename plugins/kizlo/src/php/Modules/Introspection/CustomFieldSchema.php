@@ -266,7 +266,7 @@ class CustomFieldSchema
     {
         $constraints = [];
 
-        foreach (['min' => 'minimum', 'max' => 'maximum', 'step' => 'multipleOf'] as $stored => $keyword) {
+        foreach (['min' => 'minimum', 'max' => 'maximum'] as $stored => $keyword) {
             $value = $definition[$stored] ?? null;
 
             if (is_int($value) || is_float($value)) {
@@ -274,7 +274,34 @@ class CustomFieldSchema
             }
         }
 
+        $step = $definition['step'] ?? null;
+
+        if ((is_int($step) || is_float($step)) && self::stepCountsFromZero($definition['min'] ?? null, $step)) {
+            $constraints['multipleOf'] = $step;
+        }
+
         return $constraints;
+    }
+
+    /**
+     * `multipleOf` is a modulo against zero, while
+     * {@see \Kizlo\Modules\CustomFields\CustomFieldsStore} and the editor's
+     * `<input type="number" min step>` both count the step from `min`. The keyword
+     * therefore states the real rule only when the two origins coincide. Publishing
+     * it otherwise would contradict every other enforcer, so it is left out and the
+     * store stays the sole enforcer of the step.
+     */
+    private static function stepCountsFromZero(mixed $min, int|float $step): bool
+    {
+        if (!is_int($min) && !is_float($min)) {
+            return true;
+        }
+
+        // Measured the way the store measures its own step, with the same tolerance,
+        // so a borderline float configuration cannot be judged differently by each side.
+        $quotient = (float) $min / (float) $step;
+
+        return abs($quotient - round($quotient)) <= 1.0E-9;
     }
 
     /**
