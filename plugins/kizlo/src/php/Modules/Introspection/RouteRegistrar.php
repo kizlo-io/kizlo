@@ -107,18 +107,25 @@ class RouteRegistrar
      * managed is only knowable once post types and taxonomies exist, which is to
      * say from inside that hook.
      *
+     * A write also supplies a validator, which rides along as the endpoint's
+     * route-level `validate_callback`. It is passed here rather than declared in
+     * `input`, so it stays out of `/introspect` and keeps its own error code on
+     * the wire. {@see ManagedWrite}
+     *
      * @param array<string, mixed> $declaration
      */
-    public static function registerManaged(array $declaration, callable $callback): void
+    public static function registerManaged(array $declaration, callable $callback, ?callable $validator = null): void
     {
         $route = is_string($declaration['route'] ?? null) ? $declaration['route'] : '';
         $input = is_array($declaration['input'] ?? null) ? $declaration['input'] : [];
 
-        self::registerEndpoint(
-            $route,
-            self::routeArgs(['method' => $declaration['method'] ?? null, 'callback' => $callback]),
-            $input,
-        );
+        $args = ['method' => $declaration['method'] ?? null, 'callback' => $callback];
+
+        if ($validator !== null) {
+            $args['validate_callback'] = $validator;
+        }
+
+        self::registerEndpoint($route, self::routeArgs($args), $input);
     }
 
     /**

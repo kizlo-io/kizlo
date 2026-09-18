@@ -7,6 +7,7 @@ use WP_REST_Request;
 use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\CoreItemSchema;
 use Kizlo\Modules\Introspection\ManagedPostTypes;
+use Kizlo\Modules\Introspection\ManagedWrite;
 use Kizlo\Modules\Introspection\RouteRegistrar;
 
 /**
@@ -43,7 +44,7 @@ class PostTypeApi
                         continue;
                     }
 
-                    RouteRegistrar::registerManaged($declaration, $handler);
+                    RouteRegistrar::registerManaged($declaration, $handler, self::validator($slug, $operation));
                 }
             }
         });
@@ -80,6 +81,29 @@ class PostTypeApi
         );
 
         return null;
+    }
+
+    /**
+     * The write validation mounted on this route, or null for a read or delete.
+     *
+     * Both facts the check needs are settled here rather than at request time:
+     * the slug, because the route carries it as a literal path segment, and
+     * whether the write is partial, because `create` and `update` are declared
+     * as separate operations. {@see ManagedWrite}
+     */
+    private static function validator(string $slug, string $operation): ?callable
+    {
+        $partial = match ($operation) {
+            'create' => false,
+            'update' => true,
+            default  => null,
+        };
+
+        if ($partial === null) {
+            return null;
+        }
+
+        return (new ManagedWrite(ManagedWrite::POST_TYPE, $slug, $partial))->callback();
     }
 
     /**

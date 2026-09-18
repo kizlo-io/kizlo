@@ -10,6 +10,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\Support\Utils;
 use Kizlo\Modules\Introspection\CoreSchemas;
+use Kizlo\Modules\Introspection\ManagedWrite;
 use Kizlo\Modules\Post\PostSchema;
 use Kizlo\Modules\Settings\Settings;
 
@@ -32,8 +33,8 @@ class SeoModule
      * WordPress REST controllers, so the payload is handled exactly the way
      * {@see \Kizlo\Modules\CustomFields\CustomFieldsModule} handles `kizlo.custom`:
      *
-     *  1. validated in `rest_request_before_callbacks` — a rejected payload blocks
-     *     the write with a clean 400 before anything is created, and
+     *  1. validated on the route's own `validate_callback` — a rejected payload
+     *     blocks the write with a clean 400 before anything is created, and
      *  2. written in `rest_after_insert_{type}` once the post/term exists.
      *
      * The override keys are never registered with `show_in_rest`, so the native
@@ -42,7 +43,7 @@ class SeoModule
      */
     private function registerWrites(): void
     {
-        add_filter('rest_request_before_callbacks', [$this, 'validateRequest'], 10, 3);
+        add_filter('kizlo_validate_managed_write', [$this, 'validateWrite'], 10, 3);
 
         foreach (array_keys(Utils::getSettings()->postTypes->all()) as $post_type) {
             add_action("rest_after_insert_{$post_type}", function (WP_Post $post, WP_REST_Request $request) {
@@ -61,76 +62,38 @@ class SeoModule
      * Validate submitted overrides before the route callback runs, so an invalid
      * payload is rejected before the post/term is created.
      *
-     * @param mixed $response Current short-circuit response (null to continue).
-     * @return mixed
+     * The capability deferral this check needs lives in {@see ManagedWrite}, so
+     * it applies to every consumer of the filter rather than to whichever ones
+     * remembered it.
+     *
+     * @param  bool|WP_Error $valid
+     * @return bool|WP_Error
      */
-    public function validateRequest($response, $handler, WP_REST_Request $request)
+    public function validateWrite($valid, ManagedWrite $write, WP_REST_Request $request)
     {
-        if (is_wp_error($response)) {
-            return $response;
-        }
-
-        if (!in_array($request->get_method(), ['POST', 'PUT', 'PATCH'], true)) {
-            return $response;
-        }
-
-        // `rest_request_before_callbacks` runs before the route's
-        // `permission_callback`, so without this every check below — including
-        // the attachment lookups in SeoOverridesStore::assertWritable — would run
-        // for anonymous callers. Answering 400 for an ID that is not an image and
-        // 401 for one that is would tell a logged-out caller which attachment IDs
-        // exist. Defer to the route's own 401/403 by leaving $response alone.
-        if (!current_user_can('manage_options')) {
-            return $response;
-        }
-
-        $meta_type = self::metaTypeForRequest($request);
-        if ($meta_type === null) {
-            return $response;
+        if (is_wp_error($valid)) {
+            return $valid;
         }
 
         try {
             $input = self::collectInput($request);
             if ($input === null) {
-                return $response;
+                return $valid;
             }
 
-            SeoOverridesStore::assertWritable(SeoOverridesStore::fromInput($meta_type, $input));
+            SeoOverridesStore::assertWritable(SeoOverridesStore::fromInput(self::metaType($write), $input));
         } catch (Throwable $e) {
             return new WP_Error('kizlo_seo_invalid', $e->getMessage(), ['status' => 400]);
         }
 
-        return $response;
+        return $valid;
     }
 
-    /**
-     * Which object type a Kizlo write route targets, or null when the request is
-     * not a managed post-type / taxonomy write.
-     *
-     * Read from the route rather than from a `post_type` parameter, because there
-     * is no such parameter to read: {@see \Kizlo\Modules\PostType\PostTypeApi}
-     * registers one route per managed slug, so the slug is a literal path segment
-     * and never reaches the request as an argument. A parameter lookup returns
-     * null on every real request, which would leave this validation running only
-     * in tests that set one by hand.
-     */
-    private static function metaTypeForRequest(WP_REST_Request $request): ?string
+    private static function metaType(ManagedWrite $write): string
     {
-        $base    = preg_quote('/' . trim(KIZLO_API_NAMESPACE, '/'), '#');
-        $pattern = '#^' . $base . '/(post-types|taxonomies)/([^/]+)#';
-
-        if (preg_match($pattern, $request->get_route(), $matches) !== 1) {
-            return null;
-        }
-
-        [, $family, $slug] = $matches;
-        $settings          = Utils::getSettings();
-
-        if ($family === 'post-types') {
-            return isset($settings->postTypes->all()[$slug]) ? SeoOverridesStore::META_POST : null;
-        }
-
-        return isset($settings->taxonomies->all()[$slug]) ? SeoOverridesStore::META_TERM : null;
+        return $write->family === ManagedWrite::POST_TYPE
+            ? SeoOverridesStore::META_POST
+            : SeoOverridesStore::META_TERM;
     }
 
     /**
@@ -170,17 +133,19 @@ class SeoModule
 
     private function save(string $meta_type, int $object_id, WP_REST_Request $request): void
     {
+        $write = ManagedWrite::forRequest($request);
+
         // The hooks are keyed on post type and taxonomy, so they also fire for
         // core's own `/wp/v2/*` routes. Those never declare `kizlo` as an
-        // argument, so neither the closed `kizlo.seo` schema nor validateRequest()
+        // argument, so neither the closed `kizlo.seo` schema nor validateWrite()
         // has seen the payload. Writing it here anyway would make core's routes a
         // second, undocumented authoring path where a misspelled field is a silent
-        // no-op rather than the 400 this contract promises.
-        if (self::metaTypeForRequest($request) !== $meta_type) {
+        // no-op rather than the 400 this contract promises. {@see ManagedWrite}
+        if ($write === null || self::metaType($write) !== $meta_type) {
             return;
         }
 
-        // Already validated in rest_request_before_callbacks; a throw here would
+        // Already validated on the route's validate_callback; a throw here would
         // only mean the two passes disagree, so log rather than 500 after the row
         // has been created.
         try {
