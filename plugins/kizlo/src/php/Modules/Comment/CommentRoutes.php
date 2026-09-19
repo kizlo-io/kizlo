@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Comment;
 
+use Kizlo\Modules\Introspection\CoreIdentifier;
 use Kizlo\Modules\Introspection\CoreResource;
 use WP_REST_Comments_Controller;
 
@@ -25,7 +26,7 @@ final class CommentRoutes
 
     public static function register(): void
     {
-        foreach (['list', 'retrieve', 'create', 'update', 'delete'] as $operation) {
+        foreach (self::resource()->operations() as $operation) {
             kizlo_register_route_spec(
                 static fn(): array => self::resource()->operation($operation),
             );
@@ -42,9 +43,10 @@ final class CommentRoutes
             base: '/comments',
             controller: new WP_REST_Comments_Controller(),
             item: CommentSchemas::COMMENT,
-            deleted: CommentSchemas::DELETED,
             noun: 'comment',
             plural: 'comments',
+            identifier: CoreIdentifier::numeric('comment'),
+            deleted: CommentSchemas::DELETED,
             force: 'Whether to bypass the trash and delete permanently. Without it a trashable comment is trashed and returned.',
             errors: self::errors(),
             extra: self::extra(),

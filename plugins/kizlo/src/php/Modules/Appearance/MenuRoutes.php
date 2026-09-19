@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\Appearance;
 
 use Kizlo\Modules\Introspection\CoreControllers;
+use Kizlo\Modules\Introspection\CoreIdentifier;
 use Kizlo\Modules\Introspection\CoreResource;
 
 /**
@@ -30,7 +31,7 @@ final class MenuRoutes
 
     private static function registerResource(callable $resource): void
     {
-        foreach (['list', 'retrieve', 'create', 'update', 'delete'] as $operation) {
+        foreach ($resource()->operations() as $operation) {
             kizlo_register_route_spec(
                 static fn(): array => $resource()->operation($operation),
             );
@@ -47,9 +48,10 @@ final class MenuRoutes
             base: '/menus',
             controller: CoreControllers::forTaxonomy(MenuSchemas::MENU_TAXONOMY),
             item: MenuSchemas::MENU,
-            deleted: MenuSchemas::MENU_DELETED,
             noun: 'menu',
             plural: 'menus',
+            identifier: CoreIdentifier::numeric('menu'),
+            deleted: MenuSchemas::MENU_DELETED,
             force: 'Required. A menu is a term, and terms do not support trashing, so a delete is always permanent.',
             errors: self::menuErrors(),
         );
@@ -65,9 +67,10 @@ final class MenuRoutes
             base: '/menu-items',
             controller: CoreControllers::forPostType(MenuSchemas::MENU_ITEM_TYPE),
             item: MenuSchemas::MENU_ITEM,
-            deleted: MenuSchemas::MENU_ITEM_DELETED,
             noun: 'menu item',
             plural: 'menu items',
+            identifier: CoreIdentifier::numeric('menu item'),
+            deleted: MenuSchemas::MENU_ITEM_DELETED,
             force: 'Required. Menu items do not support trashing, and a delete without it answers 501.',
             errors: self::menuItemErrors(),
         );
