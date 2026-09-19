@@ -32,6 +32,33 @@ final class CommentSchemas
     /** The context every comment response is prepared in. */
     private const CONTEXT = 'view';
 
+    /** The API ID RouteDiscovery derives for `wp/v2/comments`. */
+    private const CORE_API_ID = 'comments';
+
+    /**
+     * Put the `kizlo` block back on the described `wp/v2/comments` shape.
+     *
+     * {@see \Kizlo\Modules\CoreApi\RouteDiscovery} derives that shape from
+     * `WP_REST_Comments_Controller::get_item_schema()`, which is everything core
+     * declares and nothing Kizlo adds. The block reaches a response through
+     * `rest_prepare_comment` instead ({@see CommentModule::prepare()}), long after
+     * the schema was built, so no derivation can see it and the contract would
+     * describe a response missing a key every response carries.
+     *
+     * @param array<string, array<string, mixed>> $properties
+     * @return array<string, array<string, mixed>>
+     */
+    public static function contribute(array $properties, string $apiId): array
+    {
+        if ($apiId !== self::CORE_API_ID) {
+            return $properties;
+        }
+
+        $properties['kizlo'] = self::envelope();
+
+        return $properties;
+    }
+
     /**
      * @return array<string, array<string, mixed>>
      */

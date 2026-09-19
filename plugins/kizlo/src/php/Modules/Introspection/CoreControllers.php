@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\Introspection;
 
+use WP_REST_Controller;
 use WP_REST_Posts_Controller;
 use WP_REST_Terms_Controller;
 
@@ -50,6 +51,39 @@ final class CoreControllers
 
         /** @var WP_REST_Terms_Controller */
         return new $class($slug);
+    }
+
+    /**
+     * The controller instance already serving a route.
+     *
+     * Most described resources name their controller, because constructing one
+     * is a slug away. A few cannot: `WP_REST_Search_Controller` takes the list of
+     * search handlers as a constructor argument, and that list is assembled in
+     * `create_initial_rest_routes()` and then filtered through
+     * `wp_rest_search_handlers`. Rebuilding it here would be a second copy of
+     * core's assembly, free to drift from the one actually answering requests.
+     *
+     * So the object is taken from the registration instead. It is the controller
+     * serving the route by definition, which is the property every derivation
+     * here depends on and the only one that cannot be wrong.
+     */
+    public static function forRoute(string $namespace, string $route, string $method = 'GET'): ?WP_REST_Controller
+    {
+        $full = sprintf('/%s%s', trim($namespace, '/'), $route);
+
+        foreach (rest_get_server()->get_routes()[$full] ?? [] as $handler) {
+            if (!is_array($handler) || ($handler['methods'][$method] ?? false) !== true) {
+                continue;
+            }
+
+            $callback = $handler['callback'] ?? null;
+
+            if (is_array($callback) && ($callback[0] ?? null) instanceof WP_REST_Controller) {
+                return $callback[0];
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Comment;
 
+use Kizlo\Modules\CoreApi\RouteDiscovery;
+
 use WP_Comment;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -13,11 +15,11 @@ class CommentModule
         add_filter('rest_prepare_comment', [$this, 'prepare'], PHP_INT_MAX, 3);
         (new CommentSubmission())->register();
 
-        // Described on `rest_api_init` rather than at load, because the derivation
-        // reads a controller's item schema and core has not finished registering
-        // by then. Nothing is lost by waiting: `/introspect` is itself a REST
-        // route, so the store is always armed before the document is built.
-        add_action('rest_api_init', [CommentRoutes::class, 'register']);
+        // The `wp/v2/comments` routes are described by RouteDiscovery, which
+        // reads them off the route table. What it cannot see is the `kizlo` block
+        // prepare() adds on the way out, because that is not in core's item
+        // schema, so the shape is contributed here.
+        add_filter(RouteDiscovery::SCHEMA_FILTER, [CommentSchemas::class, 'contribute'], 10, 2);
     }
 
     public function prepare(WP_REST_Response $response, WP_Comment $comment, WP_REST_Request $request): WP_REST_Response

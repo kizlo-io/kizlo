@@ -171,8 +171,16 @@ class PluginRouteTest extends IntrospectionTestCase
     }
 
     /**
-     * Every operation the plugin describes, keyed by something readable enough
-     * to name in a failure.
+     * Every operation the plugin *serves*, keyed by something readable enough to
+     * name in a failure.
+     *
+     * Scoped to `kizlo/v1` because that is what these assertions are about. The
+     * document also carries the WordPress routes Kizlo only describes, and those
+     * are a different contract: nothing wraps their callbacks, so they cannot
+     * answer `invalid_param`, and the guard leaves them on WordPress's own
+     * authentication, so they cannot answer `kizlo_rest_*` either. Requiring the
+     * runtime error set of a route this plugin does not run would be requiring a
+     * promise it has no way to keep.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -181,6 +189,10 @@ class PluginRouteTest extends IntrospectionTestCase
         $operations = [];
 
         foreach ($this->document()['apis'] as $id => $api) {
+            if ($api['namespace'] !== KIZLO_API_NAMESPACE) {
+                continue;
+            }
+
             foreach ($api['paths'] as $path => $named) {
                 foreach ($named as $operation => $declaration) {
                     $operations[sprintf('%s %s (%s)', $id, $path, $operation)] = $declaration;

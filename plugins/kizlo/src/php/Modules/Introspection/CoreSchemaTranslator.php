@@ -109,6 +109,9 @@ final class CoreSchemaTranslator
             $schema[$keyword] = $children;
         }
 
+        $schema = self::distributeRequired($schema);
+        $schema = self::listEnum($schema);
+
         foreach (['anyOf', 'oneOf'] as $keyword) {
             if (!isset($schema[$keyword]) || !is_array($schema[$keyword])) {
                 continue;
@@ -215,13 +218,121 @@ final class CoreSchemaTranslator
             return $schema;
         }
 
-        $type = $schema['type'] ?? null;
+        $type = $schema['type'] ?? self::inferredType($schema);
 
         if (!is_string($type) || !in_array($type, Spec::TYPES, true)) {
             return null;
         }
 
+        $schema['type'] = $type;
+
         return $schema;
+    }
+
+    /**
+     * Spell an enum as the list it is.
+     *
+     * WordPress builds some enums from a helper that returns a map rather than a
+     * list. `get_post_format_slugs()` is the one that reaches the contract: it
+     * returns `['standard' => 'standard', 'aside' => 'aside', ...]`, keyed by the
+     * same slugs it holds. Handed on unchanged it serializes as a JSON object,
+     * which is not an enum, and the validator drops it with a warning — taking
+     * the whole vocabulary with it.
+     *
+     * The values are the enum either way, so they are what is kept. Nothing is
+     * guessed: a map whose values are not all scalars is left alone to be
+     * reported, because that is not an enum written awkwardly, it is something
+     * else.
+     *
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>
+     */
+    private static function listEnum(array $schema): array
+    {
+        $enum = $schema['enum'] ?? null;
+
+        if (!is_array($enum) || $enum === [] || array_is_list($enum)) {
+            return $schema;
+        }
+
+        foreach ($enum as $member) {
+            if (!is_scalar($member) && $member !== null) {
+                return $schema;
+            }
+        }
+
+        $schema['enum'] = array_values($enum);
+
+        return $schema;
+    }
+
+    /**
+     * Spell JSON Schema's `required` list the way this contract spells it.
+     *
+     * The two say the same thing differently. JSON Schema puts a list of names
+     * on the object — `'required' => ['type', 'args']` — while a Kizlo schema
+     * marks each property `'required' => true`, because that is what decides
+     * whether the generated field is optional and the generator reads it per
+     * property. Core writes the list form wherever it hand-authors a nested
+     * schema, the `modifiers` argument on `/media/{id}/edit` among them.
+     *
+     * Only the list form is touched. A boolean is already in this contract's
+     * spelling and is left exactly as it is, and a property the list does not
+     * name stays optional, which is what leaving it out means.
+     *
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>
+     */
+    private static function distributeRequired(array $schema): array
+    {
+        $names = $schema['required'] ?? null;
+
+        if (!is_array($names)) {
+            return $schema;
+        }
+
+        unset($schema['required']);
+
+        $properties = self::mapping($schema['properties'] ?? null);
+
+        if ($properties === null) {
+            return $schema;
+        }
+
+        foreach ($names as $name) {
+            if (is_string($name) && isset($properties[$name]) && is_array($properties[$name])) {
+                $properties[$name]['required'] = true;
+            }
+        }
+
+        $schema['properties'] = $properties;
+
+        return $schema;
+    }
+
+    /**
+     * The type a subschema means without saying it.
+     *
+     * JSON Schema lets a subschema leave `type` out when an enclosing one has
+     * already fixed it, and core does exactly that. Every `oneOf` branch of the
+     * `modifiers` argument on `/media/{id}/edit` carries `properties` and no
+     * `type`, because the `items.type` above it already says `object`. Reading
+     * the shape keyword back is not a guess about what core meant; an object is
+     * the only thing `properties` can describe.
+     *
+     * Nothing else is inferred. A subschema with neither a type nor a shape
+     * keyword is genuinely untyped and still fails, which is the case this
+     * translator exists to report rather than paper over.
+     *
+     * @param array<string, mixed> $schema
+     */
+    private static function inferredType(array $schema): ?string
+    {
+        if (isset($schema['properties']) || isset($schema['patternProperties'])) {
+            return 'object';
+        }
+
+        return isset($schema['items']) ? 'array' : null;
     }
 
     /**
@@ -251,7 +362,7 @@ final class CoreSchemaTranslator
             return $schema;
         }
 
-        if ($type === 'mixed' && !isset($schema['anyOf']) && !isset($schema['oneOf'])) {
+        if (self::acceptsAnything($schema)) {
             unset($schema['type']);
 
             $schema['anyOf'] = array_map(
@@ -261,6 +372,44 @@ final class CoreSchemaTranslator
         }
 
         return $schema;
+    }
+
+    /**
+     * Whether a schema declares that it accepts any value at all.
+     *
+     * Two spellings mean this, and they mean exactly the same thing. WordPress
+     * writes `'type' => 'mixed'`, which is not a JSON Schema type but is plain
+     * enough. JSON Schema itself writes the empty schema: core declares a view
+     * filter's `value` as `array()` on `/wp/v2/view-config`, because the value
+     * being filtered on can be a string, a number, a boolean or a list of them
+     * depending on the field.
+     *
+     * Reading an empty schema as "anything" is not a guess about what core meant.
+     * It is what the empty schema is defined to mean, and the alternative is
+     * dropping a field the route genuinely returns.
+     *
+     * @param array<string, mixed> $schema
+     */
+    private static function acceptsAnything(array $schema): bool
+    {
+        if (isset($schema['anyOf']) || isset($schema['oneOf']) || isset($schema['$ref'])) {
+            return false;
+        }
+
+        if (($schema['type'] ?? null) === 'mixed') {
+            return true;
+        }
+
+        // Only a schema with nothing in it at all, which is narrower than JSON
+        // Schema's own reading: `{"description": "..."}` constrains just as little
+        // and means the same thing. The line is drawn at intent rather than at
+        // semantics, because the two arrive from different places. Core writes
+        // `array()` deliberately for a value whose type depends on the field
+        // being filtered on, while a `register_rest_field()` carrying a
+        // description and no type is a contribution someone left unfinished — and
+        // reporting that is the whole difference between a derived contract and a
+        // hand-written one quietly falling behind.
+        return $schema === [];
     }
 
     /**

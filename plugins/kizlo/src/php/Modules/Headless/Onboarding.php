@@ -104,9 +104,13 @@ class Onboarding
 
     public function enable(): void
     {
-        if (! current_user_can('manage_options') || ! check_admin_referer(self::NONCE_ACTION)) {
+        if (! current_user_can('manage_options')) {
             wp_die('Forbidden', '', ['response' => 403]);
         }
+
+        // Halts on its own with a 403 when the nonce does not check out, so its
+        // return value is never falsy and testing it would be dead code.
+        check_admin_referer(self::NONCE_ACTION);
 
         $this->optIn();
 
@@ -130,9 +134,13 @@ class Onboarding
 
     public function dismiss(): void
     {
-        if (! current_user_can('manage_options') || ! check_admin_referer(self::NONCE_ACTION)) {
+        if (! current_user_can('manage_options')) {
             wp_die('Forbidden', '', ['response' => 403]);
         }
+
+        // Halts on its own with a 403 when the nonce does not check out, so its
+        // return value is never falsy and testing it would be dead code.
+        check_admin_referer(self::NONCE_ACTION);
 
         update_user_meta(get_current_user_id(), self::USER_DISMISS_META, '1');
 
