@@ -109,6 +109,8 @@ final class CoreSchemaTranslator
             $schema[$keyword] = $children;
         }
 
+        $schema = self::distributeRequired($schema);
+
         foreach (['anyOf', 'oneOf'] as $keyword) {
             if (!isset($schema[$keyword]) || !is_array($schema[$keyword])) {
                 continue;
@@ -215,13 +217,84 @@ final class CoreSchemaTranslator
             return $schema;
         }
 
-        $type = $schema['type'] ?? null;
+        $type = $schema['type'] ?? self::inferredType($schema);
 
         if (!is_string($type) || !in_array($type, Spec::TYPES, true)) {
             return null;
         }
 
+        $schema['type'] = $type;
+
         return $schema;
+    }
+
+    /**
+     * Spell JSON Schema's `required` list the way this contract spells it.
+     *
+     * The two say the same thing differently. JSON Schema puts a list of names
+     * on the object — `'required' => ['type', 'args']` — while a Kizlo schema
+     * marks each property `'required' => true`, because that is what decides
+     * whether the generated field is optional and the generator reads it per
+     * property. Core writes the list form wherever it hand-authors a nested
+     * schema, the `modifiers` argument on `/media/{id}/edit` among them.
+     *
+     * Only the list form is touched. A boolean is already in this contract's
+     * spelling and is left exactly as it is, and a property the list does not
+     * name stays optional, which is what leaving it out means.
+     *
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>
+     */
+    private static function distributeRequired(array $schema): array
+    {
+        $names = $schema['required'] ?? null;
+
+        if (!is_array($names)) {
+            return $schema;
+        }
+
+        unset($schema['required']);
+
+        $properties = self::mapping($schema['properties'] ?? null);
+
+        if ($properties === null) {
+            return $schema;
+        }
+
+        foreach ($names as $name) {
+            if (is_string($name) && isset($properties[$name]) && is_array($properties[$name])) {
+                $properties[$name]['required'] = true;
+            }
+        }
+
+        $schema['properties'] = $properties;
+
+        return $schema;
+    }
+
+    /**
+     * The type a subschema means without saying it.
+     *
+     * JSON Schema lets a subschema leave `type` out when an enclosing one has
+     * already fixed it, and core does exactly that. Every `oneOf` branch of the
+     * `modifiers` argument on `/media/{id}/edit` carries `properties` and no
+     * `type`, because the `items.type` above it already says `object`. Reading
+     * the shape keyword back is not a guess about what core meant; an object is
+     * the only thing `properties` can describe.
+     *
+     * Nothing else is inferred. A subschema with neither a type nor a shape
+     * keyword is genuinely untyped and still fails, which is the case this
+     * translator exists to report rather than paper over.
+     *
+     * @param array<string, mixed> $schema
+     */
+    private static function inferredType(array $schema): ?string
+    {
+        if (isset($schema['properties']) || isset($schema['patternProperties'])) {
+            return 'object';
+        }
+
+        return isset($schema['items']) ? 'array' : null;
     }
 
     /**

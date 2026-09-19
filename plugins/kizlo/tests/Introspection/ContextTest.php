@@ -246,7 +246,7 @@ class ContextTest extends IntrospectionTestCase
         $this->boot();
 
         foreach ($this->operations() as $where => $operation) {
-            if (isset($operation['input']['properties']['context']) || in_array($where, self::KEEPS_THE_ERROR, true)) {
+            if (isset($this->inputProperties($operation)['context']) || in_array($where, self::KEEPS_THE_ERROR, true)) {
                 continue;
             }
 
@@ -321,8 +321,18 @@ class ContextTest extends IntrospectionTestCase
     // HELPERS
     // ============================================================
 
-    /** The list route the term controller can still refuse without a `context`. */
-    private const KEEPS_THE_ERROR = ['menus /menus list'];
+    /**
+     * The list routes the term controller can still refuse without a `context`.
+     *
+     * Every taxonomy reaches the same `?post=` raise site, so this grows with the
+     * described taxonomies rather than staying the one menus needed.
+     */
+    private const KEEPS_THE_ERROR = [
+        'menus /menus list',
+        'categories /categories list',
+        'tags /tags list',
+        'patternCategories /wp_pattern_category list',
+    ];
 
     /**
      * Every operation in the document, keyed by where it is, so a failure names
