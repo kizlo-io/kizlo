@@ -64,15 +64,15 @@ class ContextTest extends IntrospectionTestCase
     public static function managedListProvider(): array
     {
         return [
-            'posts'      => ['post-types.post', '/post-types/post'],
-            'pages'      => ['post-types.page', '/post-types/page'],
-            'categories' => ['taxonomies.category', '/taxonomies/category'],
+            'posts'      => ['kizlo.post-types.post', '/post-types/post'],
+            'pages'      => ['kizlo.post-types.page', '/post-types/page'],
+            'categories' => ['kizlo.taxonomies.category', '/taxonomies/category'],
         ];
     }
 
     public function test_no_managed_retrieve_describes_a_context_parameter(): void
     {
-        foreach (['post-types.post' => '/post-types/post', 'taxonomies.category' => '/taxonomies/category'] as $apiId => $path) {
+        foreach (['kizlo.post-types.post' => '/post-types/post', 'kizlo.taxonomies.category' => '/taxonomies/category'] as $apiId => $path) {
             $input = $this->document()['apis'][$apiId]['paths'][$path . '/{identifier}']['retrieve']['input'];
 
             $this->assertArrayNotHasKey('context', $input['properties'], $apiId);
@@ -191,7 +191,7 @@ class ContextTest extends IntrospectionTestCase
 
         $id = self::factory()->post->create(['post_type' => 'post', 'post_status' => 'publish']);
 
-        $described = array_keys($this->document()['schemas']['post-types.post.item']['properties']);
+        $described = array_keys($this->document()['schemas']['kizlo.post-types.post.item']['properties']);
         $returned  = array_keys($this->dispatch('GET', '/kizlo/v1/post-types/post/' . $id)->get_data());
 
         $this->assertSame([], array_diff($returned, $described));
@@ -209,7 +209,7 @@ class ContextTest extends IntrospectionTestCase
 
         self::factory()->post->create(['post_type' => 'post', 'post_status' => 'publish']);
 
-        $described = array_keys($this->document()['schemas']['post-types.post.list-item']['properties']);
+        $described = array_keys($this->document()['schemas']['kizlo.post-types.post.list-item']['properties']);
         $returned  = array_keys($this->dispatch('GET', '/kizlo/v1/post-types/post')->get_data()[0]);
 
         $this->assertSame(['_links'], array_values(array_diff($returned, $described)));
@@ -221,7 +221,7 @@ class ContextTest extends IntrospectionTestCase
 
         $term = self::factory()->term->create(['taxonomy' => 'category']);
 
-        $described = array_keys($this->document()['schemas']['taxonomies.category.item']['properties']);
+        $described = array_keys($this->document()['schemas']['kizlo.taxonomies.category.item']['properties']);
         $returned  = array_keys($this->dispatch('GET', '/kizlo/v1/taxonomies/category/' . $term)->get_data());
 
         $this->assertSame([], array_diff($returned, $described));

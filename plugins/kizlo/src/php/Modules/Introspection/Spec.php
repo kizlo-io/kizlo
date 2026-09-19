@@ -53,7 +53,7 @@ final class Spec
      * Schema ID prefixes owned by core generation. Registering into them from
      * outside the Kizlo plugin fails introspection.
      */
-    public const RESERVED_ID_PREFIXES = ['kizlo.', 'post-types.', 'taxonomies.'];
+    public const RESERVED_ID_PREFIXES = ['kizlo.'];
 
     /** Keys whose value is a registered schema ID rather than an inline schema. */
     public const REFERENCE_KEYWORDS = ['$ref', '$extends'];
@@ -179,10 +179,15 @@ final class Spec
         return is_string($namespace) && preg_match('/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_.-]+)+$/', $namespace) === 1;
     }
 
+    /**
+     * The bare root counts too. `kizlo` on its own is a valid API ID, and every
+     * operation on it lands on a generated client member that core's own
+     * `kizlo.*` APIs own.
+     */
     public static function isReservedId(string $id): bool
     {
         foreach (self::RESERVED_ID_PREFIXES as $prefix) {
-            if (str_starts_with($id, $prefix)) {
+            if ($id === rtrim($prefix, '.') || str_starts_with($id, $prefix)) {
                 return true;
             }
         }

@@ -24,7 +24,7 @@ class SiteSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.site',
+            'id'        => 'kizlo.settings.site',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/site',

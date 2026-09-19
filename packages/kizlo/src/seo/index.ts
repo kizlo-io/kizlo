@@ -26,7 +26,7 @@ export const SEO_PROCEDURES = {
 			output: Seo,
 		},
 		async ({ context, errors }) => {
-			const response = await context.wordpress.seo.homepage.retrieve()
+			const response = await context.wordpress.kizlo.seo.homepage.retrieve()
 
 			if (response.error) {
 				context.logger.error("Get homepage seo unhandled error", response.error)
@@ -44,7 +44,7 @@ export const SEO_PROCEDURES = {
 				output: SitemapList,
 			},
 			async ({ context, errors }) => {
-				const response = await context.wordpress.seo.sitemaps.list()
+				const response = await context.wordpress.kizlo.seo.sitemaps.list()
 
 				if (response.error) {
 					context.logger.error("List sitemaps unhandled error", response.error)
@@ -61,7 +61,7 @@ export const SEO_PROCEDURES = {
 				output: SitemapIndex,
 			},
 			async ({ context, errors }) => {
-				const response = await context.wordpress.seo.sitemaps.retrieve({ type: "index" })
+				const response = await context.wordpress.kizlo.seo.sitemaps.retrieve({ type: "index" })
 
 				if (response.error) {
 					context.logger.error("Get sitemap index unhandled error", response.error)
@@ -88,7 +88,7 @@ export const SEO_PROCEDURES = {
 			output: Robots,
 		},
 		async ({ context, errors }) => {
-			const response = await context.wordpress.seo.robots.retrieve()
+			const response = await context.wordpress.kizlo.seo.robots.retrieve()
 
 			if (response.error) {
 				context.logger.error("List robots unhandled error", response.error)
@@ -118,8 +118,8 @@ export const SEO_PROCEDURES = {
 			// Authors are one collection with no key, so WordPress serves them off the keyless route.
 			const response =
 				input.type === "author"
-					? await context.wordpress.seo.sitemaps.retrieve({ type: "author", page })
-					: await context.wordpress.seo.sitemaps.listUrls({ type: input.type, key: input.key, page })
+					? await context.wordpress.kizlo.seo.sitemaps.retrieve({ type: "author", page })
+					: await context.wordpress.kizlo.seo.sitemaps.listUrls({ type: input.type, key: input.key, page })
 
 			if (response.error) {
 				context.logger.error("List sitemap urls unhandled error", response.error)

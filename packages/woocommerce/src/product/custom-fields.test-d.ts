@@ -9,6 +9,6 @@ describe("site-typed product custom fields", () => {
 	})
 
 	it("uses the canonical managed post-type schema rather than a WooCommerce response envelope", () => {
-		expectTypeOf<ProductCustomFields>().toEqualTypeOf<WP_CustomFields<"postTypes.product">>()
+		expectTypeOf<ProductCustomFields>().toEqualTypeOf<WP_CustomFields<"kizlo.postTypes.product">>()
 	})
 })

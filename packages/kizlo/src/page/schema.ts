@@ -34,7 +34,7 @@ export const PageAuthorRef = z.object({
 })
 export type PageAuthorRef = z.infer<typeof PageAuthorRef>
 
-export type PageCustomFields = WP_CustomFields<"postTypes.page">
+export type PageCustomFields = WP_CustomFields<"kizlo.postTypes.page">
 
 export const PageCustomFieldsSchema: z.ZodType<PageCustomFields, PageCustomFields> = customFieldsSchema<PageCustomFields>()
 

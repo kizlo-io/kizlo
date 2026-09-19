@@ -226,6 +226,46 @@ class CoreRouteTest extends IntrospectionTestCase
         $this->assertArrayHasKey('post', $apis['comments']['paths']['/comments']['create']['input']['properties']);
     }
 
+    /**
+     * The rule the pair above is one instance of. Nothing *this plugin* serves gets
+     * to sit on an unqualified name, because the next core resource described here
+     * would have to rename a client path to take the name back.
+     *
+     * The rule is about the registering plugin rather than the namespace. kizlo-cf7
+     * and kizlo-woocommerce also serve under `kizlo/v1`, under their own vendor
+     * names, and cannot use `kizlo.` because {@see SpecStore::isCoreFile()} reserves
+     * it for this plugin's source tree. Only this plugin is loaded here, so under
+     * `kizlo/v1` the document holds its routes and nothing else.
+     */
+    public function test_every_route_this_plugin_serves_is_qualified_and_every_described_id_is_not(): void
+    {
+        $served    = [];
+        $described = [];
+
+        foreach ($this->document()['apis'] as $apiId => $api) {
+            if ($api['namespace'] === 'kizlo/v1') {
+                $served[] = (string) $apiId;
+            } else {
+                $described[] = (string) $apiId;
+            }
+        }
+
+        $this->assertNotEmpty($served);
+        $this->assertNotEmpty($described);
+
+        foreach ($served as $apiId) {
+            $this->assertStringStartsWith(
+                'kizlo.',
+                $apiId,
+                sprintf('%s is served under kizlo/v1, so this plugin registered it unless a sibling plugin is loaded.', $apiId),
+            );
+        }
+
+        foreach ($described as $apiId) {
+            $this->assertStringStartsNotWith('kizlo.', $apiId, sprintf('%s is not served by this plugin.', $apiId));
+        }
+    }
+
     public function test_every_described_resource_carries_the_five_operations(): void
     {
         foreach (array_keys(self::RESOURCES) as $apiId) {

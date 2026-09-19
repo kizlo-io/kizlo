@@ -24,7 +24,7 @@ class WebhookSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.webhook',
+            'id'        => 'kizlo.settings.webhook',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/webhook',

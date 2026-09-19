@@ -17,8 +17,8 @@ fields.
 ```ts
 import type { WP_EndpointData } from "kizlo"
 
-export type Post = WP_EndpointData<"postTypes.post.retrieve">
-export type PostListItem = WP_EndpointData<"postTypes.post.list">[number]
+export type Post = WP_EndpointData<"kizlo.postTypes.post.retrieve">
+export type PostListItem = WP_EndpointData<"kizlo.postTypes.post.list">[number]
 ```
 
 The path uses the same dot-separated keys as `context.wordpress`. It resolves to `never` when a generated

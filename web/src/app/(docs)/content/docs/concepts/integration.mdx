@@ -34,7 +34,7 @@ export const featured = () =>
           output: z.object({ id: z.number(), headline: z.string() }),
         },
         async ({ input, context }) => {
-          const { data, error } = await context.wordpress.postTypes.post.retrieve({
+          const { data, error } = await context.wordpress.kizlo.postTypes.post.retrieve({
             identifier: String(input.params.id),
           })
           if (error) throw error
@@ -259,7 +259,7 @@ createProcedure(
     errors: FEATURED_ERROR_MAP,
   },
   async ({ input, context, errors }) => {
-    const response = await context.wordpress.postTypes.post.retrieve({
+    const response = await context.wordpress.kizlo.postTypes.post.retrieve({
       identifier: String(input.params.id),
     })
 

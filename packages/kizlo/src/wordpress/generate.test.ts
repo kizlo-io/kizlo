@@ -109,6 +109,18 @@ describe("generateWordPressClient", () => {
 		expect(first).toContain('"taxonomies.genre": WP_TaxonomiesGenreItem["kizlo"]["custom"]')
 	})
 
+	test("skips a managed-content name that carries no kizlo envelope", () => {
+		// `post-types.` and `taxonomies.` are not reserved, so a third-party schema can
+		// take the shape of a name without the `kizlo.custom` block the entry indexes.
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		document.schemas["post-types.gadget.item"] = { type: "object", properties: { sku: { type: "string", required: true } } }
+
+		const client = generateWordPressClient(document)
+
+		expect(client).toContain('"postTypes.book": WP_PostTypesBookItem["kizlo"]["custom"]')
+		expect(client).not.toContain('"postTypes.gadget"')
+	})
+
 	test("emits one shape for every target: the endpoint tree, registered and bindable", () => {
 		const client = generateWordPressClient(INTROSPECTION_FIXTURE)
 

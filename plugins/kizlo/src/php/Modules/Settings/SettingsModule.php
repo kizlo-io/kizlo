@@ -78,7 +78,7 @@ class SettingsModule
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings',
+            'id'        => 'kizlo.settings',
             'operation' => 'retrieve',
             'method'    => 'GET',
             'route'     => '/settings',

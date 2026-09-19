@@ -25,9 +25,9 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         $schemas = $this->document()['schemas'];
 
-        $item_root   = $schemas['post-types.post.item']['properties'];
-        $create_root = $schemas['post-types.post.create-input']['properties'];
-        $update_root = $schemas['post-types.post.update-input']['properties'];
+        $item_root   = $schemas['kizlo.post-types.post.item']['properties'];
+        $create_root = $schemas['kizlo.post-types.post.create-input']['properties'];
+        $update_root = $schemas['kizlo.post-types.post.update-input']['properties'];
 
         $create_envelope = $create_root['kizlo'];
         $update_envelope = $update_root['kizlo'];
@@ -353,8 +353,8 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         $schemas = $this->document()['schemas'];
 
-        $this->assertFalse($schemas['taxonomies.category.create-input']['properties']['kizlo']['additionalProperties']);
-        $this->assertFalse($schemas['taxonomies.category.update-input']['properties']['kizlo']['additionalProperties']);
+        $this->assertFalse($schemas['kizlo.taxonomies.category.create-input']['properties']['kizlo']['additionalProperties']);
+        $this->assertFalse($schemas['kizlo.taxonomies.category.update-input']['properties']['kizlo']['additionalProperties']);
     }
 
     public function test_a_nested_required_field_stays_required_on_a_partial_update(): void
@@ -395,11 +395,11 @@ class CustomFieldSchemaTest extends IntrospectionTestCase
 
         $this->assertSame(
             'integer',
-            $schemas['taxonomies.category.create-input']['properties']['kizlo']['properties']['custom']['properties']['banner']['type'],
+            $schemas['kizlo.taxonomies.category.create-input']['properties']['kizlo']['properties']['custom']['properties']['banner']['type'],
         );
         $this->assertSame(
             'kizlo.media-image',
-            $schemas['taxonomies.category.item']['properties']['kizlo']['properties']['custom']['properties']['banner']['$ref'],
+            $schemas['kizlo.taxonomies.category.item']['properties']['kizlo']['properties']['custom']['properties']['banner']['$ref'],
         );
     }
 

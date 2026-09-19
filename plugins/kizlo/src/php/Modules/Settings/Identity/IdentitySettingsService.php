@@ -24,7 +24,7 @@ class IdentitySettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.identity',
+            'id'        => 'kizlo.settings.identity',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/identity',

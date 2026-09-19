@@ -49,8 +49,8 @@ class CustomSchemaFilterTest extends IntrospectionTestCase
             return $properties;
         }, 10, 2);
 
-        $post = $this->customProperties('post-types.post.item');
-        $page = $this->customProperties('post-types.page.item');
+        $post = $this->customProperties('kizlo.post-types.post.item');
+        $page = $this->customProperties('kizlo.post-types.page.item');
 
         $this->assertContains('post', $seen, 'The filter fires for each managed post type.');
         $this->assertContains('page', $seen);
@@ -72,8 +72,8 @@ class CustomSchemaFilterTest extends IntrospectionTestCase
             return $properties;
         }, 10, 2);
 
-        $category = $this->customProperties('taxonomies.category.item');
-        $post_tag = $this->customProperties('taxonomies.post_tag.item');
+        $category = $this->customProperties('kizlo.taxonomies.category.item');
+        $post_tag = $this->customProperties('kizlo.taxonomies.post_tag.item');
 
         $this->assertContains('category', $seen);
         $this->assertSame(['type' => 'object', 'required' => true], $category['acme']);
@@ -82,10 +82,10 @@ class CustomSchemaFilterTest extends IntrospectionTestCase
 
     public function test_without_a_listener_the_custom_block_carries_no_contributed_property(): void
     {
-        $this->assertArrayNotHasKey('acme', $this->customProperties('post-types.post.item'));
-        $this->assertArrayNotHasKey('acme', $this->customProperties('taxonomies.category.item'));
+        $this->assertArrayNotHasKey('acme', $this->customProperties('kizlo.post-types.post.item'));
+        $this->assertArrayNotHasKey('acme', $this->customProperties('kizlo.taxonomies.category.item'));
 
-        $custom = $this->document()['schemas']['post-types.post.item']['properties']['kizlo']['properties']['custom'];
+        $custom = $this->document()['schemas']['kizlo.post-types.post.item']['properties']['kizlo']['properties']['custom'];
         $this->assertTrue($custom['required'], 'The default custom block is untouched.');
     }
 }

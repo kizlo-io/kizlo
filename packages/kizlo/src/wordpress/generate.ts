@@ -433,12 +433,22 @@ function renderEndpointRegistry(node: WordPressEndpointNode, path: string[] = []
 function renderCustomFieldsRegistry(document: IntrospectionDocument): string[] {
 	const entries: string[] = []
 	for (const id of Object.keys(document.schemas).sort((left, right) => left.localeCompare(right))) {
-		const match = /^(post-types|taxonomies)\.([^.]+)\.item$/.exec(id)
+		// The owning API's ID carries whatever prefix registered it, `kizlo.` for core's own
+		// content, so the registry key is built from the ID rather than assuming a bare one.
+		const match = /^((?:[^.]+\.)*)(post-types|taxonomies)\.([^.]+)\.item$/.exec(id)
 		if (!match) continue
-		const namespace = match[1] === "post-types" ? "postTypes" : "taxonomies"
-		const slug = match[2]
+		// The entry indexes `kizlo.custom`, and `post-types.`/`taxonomies.` are not reserved,
+		// so the envelope rather than the name is what makes a schema managed content.
+		if (!document.schemas[id]?.properties?.kizlo?.properties?.custom) continue
+		const prefix = (match[1] ?? "")
+			.split(".")
+			.filter(Boolean)
+			.map((segment) => `${camel(segment)}.`)
+			.join("")
+		const namespace = match[2] === "post-types" ? "postTypes" : "taxonomies"
+		const slug = match[3]
 		if (!slug) continue
-		entries.push(`\t\t${JSON.stringify(`${namespace}.${camel(slug)}`)}: ${schemaName(id)}["kizlo"]["custom"]`)
+		entries.push(`\t\t${JSON.stringify(`${prefix}${namespace}.${camel(slug)}`)}: ${schemaName(id)}["kizlo"]["custom"]`)
 	}
 	return entries
 }

@@ -35,14 +35,14 @@ function introspection(prefix: string): IntrospectionDocument {
 		version: "1.0",
 		hash: `sha256:${prefix.padEnd(64, "0")}`,
 		schemas: {
-			"post-types.page.item": itemSchema(`${prefix}Page`),
-			"post-types.post.item": itemSchema(`${prefix}Post`),
-			"post-types.product.item": itemSchema(`${prefix}Product`),
-			"taxonomies.category.item": itemSchema(`${prefix}Category`),
-			"taxonomies.post_tag.item": itemSchema(`${prefix}Tag`),
+			"kizlo.post-types.page.item": itemSchema(`${prefix}Page`),
+			"kizlo.post-types.post.item": itemSchema(`${prefix}Post`),
+			"kizlo.post-types.product.item": itemSchema(`${prefix}Product`),
+			"kizlo.taxonomies.category.item": itemSchema(`${prefix}Category`),
+			"kizlo.taxonomies.post_tag.item": itemSchema(`${prefix}Tag`),
 		},
 		apis: {
-			"post-types.post": {
+			"kizlo.post-types.post": {
 				namespace: "kizlo/v1",
 				paths: {
 					"/post-types/post/{identifier}": {
@@ -54,7 +54,7 @@ function introspection(prefix: string): IntrospectionDocument {
 								properties: { identifier: { type: "string", required: true, in: "path" } },
 							},
 							responses: {
-								"200": { content_type: "application/json", body: { $ref: "post-types.post.item" } },
+								"200": { content_type: "application/json", body: { $ref: "kizlo.post-types.post.item" } },
 								"404": { content_type: "application/json", body: { type: "object" } },
 							},
 						},
@@ -133,10 +133,10 @@ function usage(prefix: string): string {
 	type ProductIsNotNever = Assert<Equal<IsNever<ProductFields>, false>>
 	type ProductIsNotUndefined = Assert<Equal<IncludesUndefined<ProductFields>, false>>
 
-	type RawPathIsExact = Assert<Equal<WP_EndpointPath, "postTypes.post.retrieve">>
-	type RawInputIsExact = Assert<Equal<WP_EndpointInput<"postTypes.post.retrieve">, { identifier: string }>>
-	type RawDataIsNotAny = Assert<Equal<IsAny<WP_EndpointData<"postTypes.post.retrieve">>, false>>
-	type RawResultIsNotAny = Assert<Equal<IsAny<WP_EndpointResult<"postTypes.post.retrieve">>, false>>
+	type RawPathIsExact = Assert<Equal<WP_EndpointPath, "kizlo.postTypes.post.retrieve">>
+	type RawInputIsExact = Assert<Equal<WP_EndpointInput<"kizlo.postTypes.post.retrieve">, { identifier: string }>>
+	type RawDataIsNotAny = Assert<Equal<IsAny<WP_EndpointData<"kizlo.postTypes.post.retrieve">>, false>>
+	type RawResultIsNotAny = Assert<Equal<IsAny<WP_EndpointResult<"kizlo.postTypes.post.retrieve">>, false>>
 	// @ts-expect-error procedure names are not raw WordPress operation paths
 	type FakeRawPath = WP_EndpointData<"woocommerce.products.get">
 

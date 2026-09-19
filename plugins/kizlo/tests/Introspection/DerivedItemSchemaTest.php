@@ -61,7 +61,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_every_field_the_posts_controller_returns_is_described(string $slug): void
     {
-        $described = $this->itemProperties(sprintf('post-types.%s.item', $slug));
+        $described = $this->itemProperties(sprintf('kizlo.post-types.%s.item', $slug));
 
         // The Kizlo envelope is the only response field core has no opinion about.
         unset($described['kizlo']);
@@ -80,7 +80,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         $controller = CoreControllers::forPostType($slug);
 
         foreach ([WP_REST_Server::CREATABLE => 'create', WP_REST_Server::EDITABLE => 'update'] as $method => $operation) {
-            $described = $this->itemProperties(sprintf('post-types.%s.%s-input', $slug, $operation));
+            $described = $this->itemProperties(sprintf('kizlo.post-types.%s.%s-input', $slug, $operation));
 
             $this->assertArrayHasKey('kizlo', $described, $operation);
             unset($described['kizlo']);
@@ -113,7 +113,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_an_upload_type_describes_the_fields_its_own_controller_adds(): void
     {
-        $described = $this->itemProperties('post-types.attachment.item');
+        $described = $this->itemProperties('kizlo.post-types.attachment.item');
 
         foreach (['source_url', 'media_details', 'media_type', 'mime_type', 'alt_text', 'caption', 'description', 'post', 'missing_image_sizes'] as $field) {
             $this->assertArrayHasKey($field, $described, $field);
@@ -125,7 +125,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
 
     public function test_every_field_the_terms_controller_returns_is_described(): void
     {
-        $described = $this->itemProperties('taxonomies.category.item');
+        $described = $this->itemProperties('kizlo.taxonomies.category.item');
 
         unset($described['kizlo']);
 
@@ -140,7 +140,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         $controller = new WP_REST_Terms_Controller('category');
 
         foreach ([WP_REST_Server::CREATABLE => 'create', WP_REST_Server::EDITABLE => 'update'] as $method => $operation) {
-            $described = $this->itemProperties(sprintf('taxonomies.category.%s-input', $operation));
+            $described = $this->itemProperties(sprintf('kizlo.taxonomies.category.%s-input', $operation));
 
             $this->assertArrayHasKey('kizlo', $described, $operation);
             unset($described['kizlo']);
@@ -161,14 +161,14 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
     public function test_a_readonly_field_is_described_on_the_response_and_not_the_input(): void
     {
         foreach (['guid', 'id', 'link', 'modified', 'type'] as $field) {
-            $this->assertArrayHasKey($field, $this->itemProperties('post-types.post.item'), $field);
-            $this->assertArrayNotHasKey($field, $this->itemProperties('post-types.post.create-input'), $field);
+            $this->assertArrayHasKey($field, $this->itemProperties('kizlo.post-types.post.item'), $field);
+            $this->assertArrayNotHasKey($field, $this->itemProperties('kizlo.post-types.post.create-input'), $field);
         }
     }
 
     public function test_featured_media_is_described_as_image_media(): void
     {
-        $featured = $this->itemProperties('post-types.post.item')['kizlo']['properties']['featured_media'];
+        $featured = $this->itemProperties('kizlo.post-types.post.item')['kizlo']['properties']['featured_media'];
 
         $this->assertSame('kizlo.media-image', $featured['$ref']);
         $this->assertArrayNotHasKey('required', $featured);
@@ -186,7 +186,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_a_field_core_added_later_is_described(): void
     {
-        $this->assertArrayHasKey('class_list', $this->itemProperties('post-types.post.item'));
+        $this->assertArrayHasKey('class_list', $this->itemProperties('kizlo.post-types.post.item'));
     }
 
     /**
@@ -197,8 +197,8 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
     {
         $expected = array_values(get_post_format_slugs());
 
-        $this->assertSame($expected, $this->itemProperties('post-types.post.item')['format']['enum']);
-        $this->assertSame($expected, $this->itemProperties('post-types.post.create-input')['format']['enum']);
+        $this->assertSame($expected, $this->itemProperties('kizlo.post-types.post.item')['format']['enum']);
+        $this->assertSame($expected, $this->itemProperties('kizlo.post-types.post.create-input')['format']['enum']);
     }
 
     /**
@@ -213,8 +213,8 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         remove_post_type_support('post', 'excerpt');
 
         try {
-            $this->assertArrayHasKey('excerpt', $this->itemProperties('post-types.post.item'));
-            $this->assertArrayHasKey('excerpt', $this->itemProperties('post-types.post.create-input'));
+            $this->assertArrayHasKey('excerpt', $this->itemProperties('kizlo.post-types.post.item'));
+            $this->assertArrayHasKey('excerpt', $this->itemProperties('kizlo.post-types.post.create-input'));
         } finally {
             add_post_type_support('post', 'excerpt');
         }
@@ -235,7 +235,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         kizlo_include_post_type('minimal');
         $this->seedSettings(['post_types' => ['minimal' => ['rest_api_enabled' => true]]]);
 
-        $properties = $this->itemProperties('post-types.minimal.item');
+        $properties = $this->itemProperties('kizlo.post-types.minimal.item');
 
         $this->assertArrayHasKey('title', $properties);
         $this->assertArrayNotHasKey('excerpt', $properties);
@@ -253,7 +253,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         // Empty because Kizlo registers no meta of its own. {@see Document} turns
         // an empty property map into an object, so this reaches a client as `{}`
         // rather than as an array.
-        $this->assertSame([], (array) $this->itemProperties('post-types.post.item')['meta']['properties']);
+        $this->assertSame([], (array) $this->itemProperties('kizlo.post-types.post.item')['meta']['properties']);
 
         register_post_meta('post', 'acme_colour', [
             'show_in_rest' => true,
@@ -261,7 +261,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
             'type'         => 'string',
         ]);
 
-        $meta = $this->itemProperties('post-types.post.item')['meta'];
+        $meta = $this->itemProperties('kizlo.post-types.post.item')['meta'];
 
         $this->assertArrayHasKey('acme_colour', (array) $meta['properties']);
         $this->assertArrayNotHasKey('additionalProperties', $meta);
@@ -274,7 +274,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_the_term_taxonomy_field_carries_its_single_value_enum(): void
     {
-        $this->assertSame(['category'], $this->itemProperties('taxonomies.category.item')['taxonomy']['enum']);
+        $this->assertSame(['category'], $this->itemProperties('kizlo.taxonomies.category.item')['taxonomy']['enum']);
     }
 
     // ============================================================
@@ -292,7 +292,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_an_unvalidated_text_field_describes_both_of_its_forms(string $field): void
     {
-        $property = $this->itemProperties('post-types.post.create-input')[$field];
+        $property = $this->itemProperties('kizlo.post-types.post.create-input')[$field];
 
         $this->assertArrayNotHasKey('type', $property, 'A union schema carries no sibling type.');
 
@@ -327,7 +327,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_the_readonly_half_of_a_text_field_is_not_writable(): void
     {
-        $object = $this->itemProperties('post-types.post.create-input')['content']['anyOf'][1];
+        $object = $this->itemProperties('kizlo.post-types.post.create-input')['content']['anyOf'][1];
 
         $this->assertArrayNotHasKey('rendered', $object['properties']);
         $this->assertArrayNotHasKey('block_version', $object['properties']);
@@ -335,7 +335,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
 
     public function test_the_kizlo_envelope_survives_the_derivation(): void
     {
-        $envelope = $this->itemProperties('post-types.post.item')['kizlo']['properties'];
+        $envelope = $this->itemProperties('kizlo.post-types.post.item')['kizlo']['properties'];
 
         foreach (['url', 'categories', 'tags', 'author', 'featured_media', 'seo', 'custom', 'extend'] as $key) {
             $this->assertArrayHasKey($key, $envelope, $key);
@@ -358,7 +358,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
         kizlo_include_post_type('authorless');
         $this->seedSettings(['post_types' => ['authorless' => ['rest_api_enabled' => true]]]);
 
-        $envelope = $this->itemProperties('post-types.authorless.item')['kizlo']['properties'];
+        $envelope = $this->itemProperties('kizlo.post-types.authorless.item')['kizlo']['properties'];
 
         $this->assertArrayNotHasKey('author', $envelope);
         $this->assertArrayNotHasKey('featured_media', $envelope);
@@ -379,7 +379,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
             ],
         ]);
 
-        $properties = $this->itemProperties('post-types.post.item');
+        $properties = $this->itemProperties('kizlo.post-types.post.item');
 
         $this->assertSame('string', $properties['slug']['type']);
         $this->assertTrue($properties['slug']['required']);
@@ -394,12 +394,12 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
     {
         $this->assertSame(
             CoreSchemas::POST_STATUS,
-            $this->itemProperties('post-types.post.item')['status']['$ref'],
+            $this->itemProperties('kizlo.post-types.post.item')['status']['$ref'],
         );
 
         $this->assertSame(
             CoreSchemas::POST_STATUS_WRITABLE,
-            $this->itemProperties('post-types.post.create-input')['status']['$ref'],
+            $this->itemProperties('kizlo.post-types.post.create-input')['status']['$ref'],
         );
     }
 
@@ -415,7 +415,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_every_described_response_field_is_required(): void
     {
-        foreach ($this->itemProperties('post-types.post.item') as $name => $property) {
+        foreach ($this->itemProperties('kizlo.post-types.post.item') as $name => $property) {
             $this->assertTrue($property['required'] ?? false, sprintf('"%s" should always be present.', $name));
         }
     }
@@ -426,8 +426,8 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
      */
     public function test_the_input_keeps_core_s_own_required_fields(): void
     {
-        $this->assertTrue($this->itemProperties('taxonomies.category.create-input')['name']['required']);
-        $this->assertArrayNotHasKey('required', $this->itemProperties('taxonomies.category.update-input')['name']);
+        $this->assertTrue($this->itemProperties('kizlo.taxonomies.category.create-input')['name']['required']);
+        $this->assertArrayNotHasKey('required', $this->itemProperties('kizlo.taxonomies.category.update-input')['name']);
     }
 
     // ============================================================
@@ -451,8 +451,8 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
             ],
         ]);
 
-        $this->assertArrayHasKey('acme_channel', $this->itemProperties('post-types.post.item'));
-        $this->assertArrayHasKey('acme_channel', $this->itemProperties('post-types.post.create-input'));
+        $this->assertArrayHasKey('acme_channel', $this->itemProperties('kizlo.post-types.post.item'));
+        $this->assertArrayHasKey('acme_channel', $this->itemProperties('kizlo.post-types.post.create-input'));
     }
 
     /**
@@ -466,7 +466,7 @@ class DerivedItemSchemaTest extends IntrospectionTestCase
             'schema' => ['description' => 'No type, so nothing could be enforced.'],
         ]);
 
-        $this->assertArrayNotHasKey('acme_broken', $this->itemProperties('post-types.post.item'));
+        $this->assertArrayNotHasKey('acme_broken', $this->itemProperties('kizlo.post-types.post.item'));
         $this->assertErrorContains($this->errors(), 'acme_broken');
     }
 

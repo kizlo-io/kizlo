@@ -14,9 +14,9 @@ describe("site-typed custom fields", () => {
 	})
 
 	it("maps models through canonical managed-content schemas", () => {
-		expectTypeOf<PostCustomFields>().toEqualTypeOf<WP_CustomFields<"postTypes.post">>()
-		expectTypeOf<PageCustomFields>().toEqualTypeOf<WP_CustomFields<"postTypes.page">>()
-		expectTypeOf<CategoryCustomFields>().toEqualTypeOf<WP_CustomFields<"taxonomies.category">>()
-		expectTypeOf<TagCustomFields>().toEqualTypeOf<WP_CustomFields<"taxonomies.postTag">>()
+		expectTypeOf<PostCustomFields>().toEqualTypeOf<WP_CustomFields<"kizlo.postTypes.post">>()
+		expectTypeOf<PageCustomFields>().toEqualTypeOf<WP_CustomFields<"kizlo.postTypes.page">>()
+		expectTypeOf<CategoryCustomFields>().toEqualTypeOf<WP_CustomFields<"kizlo.taxonomies.category">>()
+		expectTypeOf<TagCustomFields>().toEqualTypeOf<WP_CustomFields<"kizlo.taxonomies.postTag">>()
 	})
 })

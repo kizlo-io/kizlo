@@ -20,7 +20,7 @@ export const CATEGORY_PROCEDURES = {
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.CATEGORY_NOT_FOUND()
 
-			const response = await context.wordpress.taxonomies.category.retrieve({ identifier: String(identifier.value) })
+			const response = await context.wordpress.kizlo.taxonomies.category.retrieve({ identifier: String(identifier.value) })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_taxonomy":
@@ -48,7 +48,7 @@ export const CATEGORY_PROCEDURES = {
 			errors: LIST_CATEGORY_ERROR_MAP,
 		},
 		async ({ input, context, errors }) => {
-			const response = await context.wordpress.taxonomies.category.list({
+			const response = await context.wordpress.kizlo.taxonomies.category.list({
 				page: input.query?.page,
 				per_page: input.query?.perPage,
 				search: input.query?.search,

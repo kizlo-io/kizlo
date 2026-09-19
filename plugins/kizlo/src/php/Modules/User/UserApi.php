@@ -28,7 +28,7 @@ class UserApi
         $route = kizlo_route('/users/:field/:value');
 
         kizlo_register_route([
-            'id'        => 'users',
+            'id'        => 'kizlo.users',
             'operation' => 'retrieve',
             'method'    => 'GET',
             'route'     => $route,
@@ -43,7 +43,7 @@ class UserApi
         ]);
 
         kizlo_register_route([
-            'id'        => 'users',
+            'id'        => 'kizlo.users',
             'operation' => 'update',
             'method'    => 'POST',
             'route'     => $route,
@@ -65,7 +65,7 @@ class UserApi
         ]);
 
         kizlo_register_route([
-            'id'        => 'users',
+            'id'        => 'kizlo.users',
             'operation' => 'delete',
             'method'    => 'DELETE',
             'route'     => $route,

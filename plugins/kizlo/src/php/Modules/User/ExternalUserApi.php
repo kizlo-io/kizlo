@@ -10,7 +10,7 @@ use WP_User;
 
 class ExternalUserApi
 {
-    private const API_ID = 'users.external';
+    private const API_ID = 'kizlo.users.external';
     private const MAPPING_PREFIX = '_kizlo_external_id_';
     private const PROFILE_PREFIX = '_kizlo_external_profile_';
 

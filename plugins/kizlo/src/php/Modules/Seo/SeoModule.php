@@ -166,7 +166,7 @@ class SeoModule
     public function registerRoutes()
     {
         kizlo_register_route([
-            'id'        => 'seo.robots',
+            'id'        => 'kizlo.seo.robots',
             'operation' => 'retrieve',
             'method'    => 'GET',
             'route'     => '/seo/robots',
@@ -179,7 +179,7 @@ class SeoModule
         ]);
 
         kizlo_register_route([
-            'id'        => 'seo.homepage',
+            'id'        => 'kizlo.seo.homepage',
             'operation' => 'retrieve',
             'method'    => 'GET',
             'route'     => '/seo/homepage',
@@ -192,7 +192,7 @@ class SeoModule
         ]);
 
         kizlo_register_route([
-            'id'        => 'seo.sitemaps',
+            'id'        => 'kizlo.seo.sitemaps',
             'operation' => 'list',
             'method'    => 'GET',
             'route'     => '/seo/sitemaps',
@@ -208,7 +208,7 @@ class SeoModule
         ]);
 
         kizlo_register_route([
-            'id'        => 'seo.sitemaps',
+            'id'        => 'kizlo.seo.sitemaps',
             'operation' => 'list_urls',
             'method'    => 'GET',
             'route'     => kizlo_route('/seo/sitemaps/:type/:key'),
@@ -232,7 +232,7 @@ class SeoModule
         ]);
 
         kizlo_register_route([
-            'id'        => 'seo.sitemaps',
+            'id'        => 'kizlo.seo.sitemaps',
             'operation' => 'retrieve',
             'method'    => 'GET',
             'route'     => kizlo_route('/seo/sitemaps/:type'),

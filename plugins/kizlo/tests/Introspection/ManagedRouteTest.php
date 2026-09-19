@@ -337,7 +337,7 @@ class ManagedRouteTest extends IntrospectionTestCase
         $described = [];
 
         foreach ($this->document()['apis'] as $apiId => $api) {
-            if (!str_starts_with((string) $apiId, 'post-types.') && !str_starts_with((string) $apiId, 'taxonomies.')) {
+            if (!str_starts_with((string) $apiId, 'kizlo.post-types.') && !str_starts_with((string) $apiId, 'kizlo.taxonomies.')) {
                 continue;
             }
 

@@ -6,7 +6,7 @@ import type { WP_EndpointDefinition } from "../../wordpress/types"
 export interface McpRoute {
 	/**
 	 * How a tool call names this route. It is the path the generated client exposes the same operation
-	 * at (`postTypes.book.list`), so an answer from a tool and the code a developer writes afterwards
+	 * at (`kizlo.postTypes.book.list`), so an answer from a tool and the code a developer writes afterwards
 	 * refer to the route by one name.
 	 */
 	name: string

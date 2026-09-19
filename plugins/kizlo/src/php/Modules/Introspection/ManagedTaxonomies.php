@@ -262,7 +262,7 @@ class ManagedTaxonomies
 
     public static function apiId(string $slug): string
     {
-        return 'taxonomies.' . $slug;
+        return 'kizlo.taxonomies.' . $slug;
     }
 
     // ============================================================

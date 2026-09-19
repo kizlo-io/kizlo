@@ -50,7 +50,7 @@ export function clerk(options: ClerkOptions) {
 		id: "clerk",
 		adapters: { auth },
 		...(webhooks ? { procedures: { webhooks } } : {}),
-		...(options.webhooks && !options.webhooks.handler ? { requires: { endpoints: ["users.external"] } } : {}),
+		...(options.webhooks && !options.webhooks.handler ? { requires: { endpoints: ["kizlo.users.external"] } } : {}),
 	})
 }
 
@@ -87,7 +87,7 @@ async function dispatchUserEvent(event: WebhookEvent, options: ClerkOptions, con
 		case "user.created":
 		case "user.updated": {
 			const user = await options.client.users.getUser(event.data.id)
-			const result = await context.wordpress.users.external[event.type === "user.created" ? "create" : "update"]({
+			const result = await context.wordpress.kizlo.users.external[event.type === "user.created" ? "create" : "update"]({
 				provider: "clerk",
 				value: user.id,
 				email: resolveEmail(user, options),
@@ -102,7 +102,7 @@ async function dispatchUserEvent(event: WebhookEvent, options: ClerkOptions, con
 			if (!event.data.id) {
 				throw new KizloError("BAD_REQUEST", { message: "Clerk user.deleted event is missing a user id." })
 			}
-			const result = await context.wordpress.users.external.delete({ provider: "clerk", value: event.data.id })
+			const result = await context.wordpress.kizlo.users.external.delete({ provider: "clerk", value: event.data.id })
 			if (result.error) throw result.error
 			return
 		}

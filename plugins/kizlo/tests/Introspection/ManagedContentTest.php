@@ -31,10 +31,10 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $apis = $this->document()['apis'];
 
-        $this->assertArrayHasKey('post-types.post', $apis);
-        $this->assertArrayHasKey('post-types.page', $apis);
-        $this->assertArrayHasKey('taxonomies.category', $apis);
-        $this->assertArrayHasKey('taxonomies.post_tag', $apis);
+        $this->assertArrayHasKey('kizlo.post-types.post', $apis);
+        $this->assertArrayHasKey('kizlo.post-types.page', $apis);
+        $this->assertArrayHasKey('kizlo.taxonomies.category', $apis);
+        $this->assertArrayHasKey('kizlo.taxonomies.post_tag', $apis);
     }
 
     /**
@@ -49,10 +49,10 @@ class ManagedContentTest extends IntrospectionTestCase
      */
     public function test_an_upload_type_declares_a_multipart_create_carrying_the_file(): void
     {
-        $create = $this->document()['apis']['post-types.attachment']['paths']['/post-types/attachment']['create'];
+        $create = $this->document()['apis']['kizlo.post-types.attachment']['paths']['/post-types/attachment']['create'];
 
         $this->assertSame('multipart/form-data', $create['input']['content_type']);
-        $this->assertSame('post-types.attachment.create-input', $create['input']['$extends']);
+        $this->assertSame('kizlo.post-types.attachment.create-input', $create['input']['$extends']);
 
         $file = $create['input']['properties']['file'];
 
@@ -67,7 +67,7 @@ class ManagedContentTest extends IntrospectionTestCase
      */
     public function test_an_upload_type_updates_through_json_without_a_file(): void
     {
-        $update = $this->document()['apis']['post-types.attachment']['paths']['/post-types/attachment/{identifier}']['update'];
+        $update = $this->document()['apis']['kizlo.post-types.attachment']['paths']['/post-types/attachment/{identifier}']['update'];
 
         $this->assertSame('application/json', $update['input']['content_type']);
         $this->assertArrayNotHasKey('file', $update['input']['properties']);
@@ -76,7 +76,7 @@ class ManagedContentTest extends IntrospectionTestCase
     public function test_an_ordinary_post_type_creates_through_json(): void
     {
         // The multipart body follows the controller, not every create.
-        $create = $this->document()['apis']['post-types.post']['paths']['/post-types/post']['create'];
+        $create = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post']['create'];
 
         $this->assertSame('application/json', $create['input']['content_type']);
         $this->assertArrayNotHasKey('properties', $create['input']);
@@ -84,7 +84,7 @@ class ManagedContentTest extends IntrospectionTestCase
 
     public function test_an_ordinary_post_type_keeps_its_write_operations(): void
     {
-        $paths = $this->document()['apis']['post-types.post']['paths'];
+        $paths = $this->document()['apis']['kizlo.post-types.post']['paths'];
 
         $this->assertContains('create', array_keys($paths['/post-types/post']));
         $this->assertContains('update', array_keys($paths['/post-types/post/{identifier}']));
@@ -94,7 +94,7 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $apis = $this->document()['apis'];
 
-        foreach (['post-types.revision', 'post-types.nav_menu_item', 'post-types.wp_block'] as $id) {
+        foreach (['kizlo.post-types.revision', 'kizlo.post-types.nav_menu_item', 'kizlo.post-types.wp_block'] as $id) {
             $this->assertArrayNotHasKey($id, $apis);
         }
     }
@@ -108,7 +108,7 @@ class ManagedContentTest extends IntrospectionTestCase
         register_post_type('projects', ['public' => true, 'show_in_rest' => true, 'supports' => ['title', 'editor']]);
         $this->seedSettings(['post_types' => ['projects' => ['rest_api_enabled' => true]]]);
 
-        $this->assertArrayNotHasKey('post-types.projects', $this->document()['apis']);
+        $this->assertArrayNotHasKey('kizlo.post-types.projects', $this->document()['apis']);
     }
 
     public function test_an_explicitly_included_post_type_is_described(): void
@@ -119,10 +119,10 @@ class ManagedContentTest extends IntrospectionTestCase
 
         $apis = $this->document()['apis'];
 
-        $this->assertArrayHasKey('post-types.book', $apis);
+        $this->assertArrayHasKey('kizlo.post-types.book', $apis);
         $this->assertSame(
             ['/post-types/book', '/post-types/book/{identifier}'],
-            array_keys($apis['post-types.book']['paths']),
+            array_keys($apis['kizlo.post-types.book']['paths']),
         );
     }
 
@@ -138,7 +138,7 @@ class ManagedContentTest extends IntrospectionTestCase
 
         $this->seedSettings(['post_types' => ['movie' => ['rest_api_enabled' => true]]]);
 
-        $this->assertArrayHasKey('post-types.movie', $this->document()['apis']);
+        $this->assertArrayHasKey('kizlo.post-types.movie', $this->document()['apis']);
     }
 
     public function test_a_kizlo_created_taxonomy_is_described(): void
@@ -159,14 +159,14 @@ class ManagedContentTest extends IntrospectionTestCase
 
         $this->seedSettings(['taxonomies' => ['genre' => ['rest_api_enabled' => true]]]);
 
-        $this->assertArrayHasKey('taxonomies.genre', $this->document()['apis']);
+        $this->assertArrayHasKey('kizlo.taxonomies.genre', $this->document()['apis']);
     }
 
     public function test_a_post_type_that_was_never_included_is_not_described(): void
     {
         register_post_type('secret', ['public' => false, 'show_in_rest' => true]);
 
-        $this->assertArrayNotHasKey('post-types.secret', $this->document()['apis']);
+        $this->assertArrayNotHasKey('kizlo.post-types.secret', $this->document()['apis']);
     }
 
     public function test_an_api_disabled_post_type_is_not_described(): void
@@ -175,8 +175,8 @@ class ManagedContentTest extends IntrospectionTestCase
 
         $apis = $this->document()['apis'];
 
-        $this->assertArrayNotHasKey('post-types.page', $apis);
-        $this->assertArrayHasKey('post-types.post', $apis, 'Disabling one type must not affect another.');
+        $this->assertArrayNotHasKey('kizlo.post-types.page', $apis);
+        $this->assertArrayHasKey('kizlo.post-types.post', $apis, 'Disabling one type must not affect another.');
     }
 
     public function test_an_inactive_kizlo_definition_is_not_described(): void
@@ -186,14 +186,14 @@ class ManagedContentTest extends IntrospectionTestCase
         // endpoint, so it has no contract either.
         $this->seedSettings(['post_types' => ['ghost' => ['rest_api_enabled' => true]]]);
 
-        $this->assertArrayNotHasKey('post-types.ghost', $this->document()['apis']);
+        $this->assertArrayNotHasKey('kizlo.post-types.ghost', $this->document()['apis']);
     }
 
     public function test_an_api_disabled_taxonomy_is_not_described(): void
     {
         $this->seedSettings(['taxonomies' => ['post_tag' => ['rest_api_enabled' => false]]]);
 
-        $this->assertArrayNotHasKey('taxonomies.post_tag', $this->document()['apis']);
+        $this->assertArrayNotHasKey('kizlo.taxonomies.post_tag', $this->document()['apis']);
     }
 
     // ============================================================
@@ -202,7 +202,7 @@ class ManagedContentTest extends IntrospectionTestCase
 
     public function test_every_managed_post_type_gets_the_five_crud_operations(): void
     {
-        $paths = $this->document()['apis']['post-types.post']['paths'];
+        $paths = $this->document()['apis']['kizlo.post-types.post']['paths'];
 
         $this->assertSame(['create', 'list'], array_keys($paths['/post-types/post']));
         $this->assertSame(['delete', 'retrieve', 'update'], array_keys($paths['/post-types/post/{identifier}']));
@@ -210,7 +210,7 @@ class ManagedContentTest extends IntrospectionTestCase
 
     public function test_the_identifier_stays_a_string_because_the_route_takes_an_id_or_a_slug(): void
     {
-        $retrieve = $this->document()['apis']['post-types.post']['paths']['/post-types/post/{identifier}']['retrieve'];
+        $retrieve = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post/{identifier}']['retrieve'];
 
         $this->assertSame('string', $retrieve['input']['properties']['identifier']['type']);
         $this->assertTrue($retrieve['input']['properties']['identifier']['required']);
@@ -218,18 +218,18 @@ class ManagedContentTest extends IntrospectionTestCase
 
     public function test_a_list_response_declares_the_pagination_headers(): void
     {
-        $list = $this->document()['apis']['post-types.post']['paths']['/post-types/post']['list'];
+        $list = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post']['list'];
 
         $this->assertSame(
             ['X-WP-Total', 'X-WP-TotalPages'],
             array_keys($list['responses'][200]['headers']['properties']),
         );
-        $this->assertSame(['$ref' => 'post-types.post.list-item'], $list['responses'][200]['body']['items']);
+        $this->assertSame(['$ref' => 'kizlo.post-types.post.list-item'], $list['responses'][200]['body']['items']);
     }
 
     public function test_a_taxonomy_names_put_and_patch_as_separate_operations(): void
     {
-        $operations = $this->document()['apis']['taxonomies.category']['paths']['/taxonomies/category/{identifier}'];
+        $operations = $this->document()['apis']['kizlo.taxonomies.category']['paths']['/taxonomies/category/{identifier}'];
 
         $this->assertSame('PATCH', $operations['update']['method']);
         $this->assertSame('PUT', $operations['replace']['method']);
@@ -240,8 +240,8 @@ class ManagedContentTest extends IntrospectionTestCase
     public function test_managed_write_summaries_need_no_indefinite_article(): void
     {
         $apis       = $this->document()['apis'];
-        $attachment = $apis['post-types.attachment']['paths'];
-        $category   = $apis['taxonomies.category']['paths'];
+        $attachment = $apis['kizlo.post-types.attachment']['paths'];
+        $category   = $apis['kizlo.taxonomies.category']['paths'];
 
         $this->assertSame('Create attachment entry', $attachment['/post-types/attachment']['create']['summary']);
         $this->assertSame('Update attachment entry', $attachment['/post-types/attachment/{identifier}']['update']['summary']);
@@ -259,8 +259,8 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $schemas = $this->document()['schemas'];
 
-        $item     = $schemas['post-types.post.item']['properties']['kizlo']['properties'];
-        $listItem = $schemas['post-types.post.list-item']['properties']['kizlo']['properties'];
+        $item     = $schemas['kizlo.post-types.post.item']['properties']['kizlo']['properties'];
+        $listItem = $schemas['kizlo.post-types.post.list-item']['properties']['kizlo']['properties'];
 
         $this->assertSame(['$ref' => 'kizlo.seo', 'required' => true], $item['seo']);
         $this->assertArrayNotHasKey('seo', $listItem);
@@ -273,7 +273,7 @@ class ManagedContentTest extends IntrospectionTestCase
         // rather than an optional field competing with it.
         $schemas = $this->document()['schemas'];
 
-        foreach (['kizlo.media', 'post-types.post.item', 'post-types.post.create-input', 'taxonomies.category.item'] as $id) {
+        foreach (['kizlo.media', 'kizlo.post-types.post.item', 'kizlo.post-types.post.create-input', 'kizlo.taxonomies.category.item'] as $id) {
             $this->assertArrayNotHasKey('title', $schemas[$id], sprintf('%s should not name its own type.', $id));
         }
     }
@@ -292,7 +292,7 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $schemas = $this->document()['schemas'];
 
-        foreach (['post-types.post.item', 'post-types.post.list-item', 'taxonomies.category.item'] as $id) {
+        foreach (['kizlo.post-types.post.item', 'kizlo.post-types.post.list-item', 'kizlo.taxonomies.category.item'] as $id) {
             $this->assertArrayNotHasKey('$extends', $schemas[$id], sprintf('%s should inherit nothing.', $id));
         }
 
@@ -302,7 +302,7 @@ class ManagedContentTest extends IntrospectionTestCase
 
         // The fields the base used to hold are on the type itself now.
         foreach (['id', 'date', 'slug', 'status', 'type', 'link', 'template'] as $field) {
-            $this->assertArrayHasKey($field, $schemas['post-types.post.item']['properties']);
+            $this->assertArrayHasKey($field, $schemas['kizlo.post-types.post.item']['properties']);
         }
     }
 
@@ -316,7 +316,7 @@ class ManagedContentTest extends IntrospectionTestCase
         kizlo_include_post_type('minimal');
         $this->seedSettings(['post_types' => ['minimal' => ['rest_api_enabled' => true]]]);
 
-        $properties = $this->document()['schemas']['post-types.minimal.item']['properties'];
+        $properties = $this->document()['schemas']['kizlo.post-types.minimal.item']['properties'];
 
         $this->assertArrayHasKey('title', $properties);
         $this->assertArrayNotHasKey('content', $properties);
@@ -331,7 +331,7 @@ class ManagedContentTest extends IntrospectionTestCase
         kizlo_include_post_type('anon');
         $this->seedSettings(['post_types' => ['anon' => ['rest_api_enabled' => true]]]);
 
-        $envelope = $this->document()['schemas']['post-types.anon.item']['properties']['kizlo']['properties'];
+        $envelope = $this->document()['schemas']['kizlo.post-types.anon.item']['properties']['kizlo']['properties'];
 
         $this->assertArrayNotHasKey('author', $envelope);
         $this->assertArrayNotHasKey('featured_media', $envelope);
@@ -343,8 +343,8 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $schemas = $this->document()['schemas'];
 
-        $this->assertArrayHasKey('parent', $schemas['post-types.page.item']['properties']);
-        $this->assertArrayNotHasKey('parent', $schemas['post-types.post.item']['properties']);
+        $this->assertArrayHasKey('parent', $schemas['kizlo.post-types.page.item']['properties']);
+        $this->assertArrayNotHasKey('parent', $schemas['kizlo.post-types.post.item']['properties']);
     }
 
     public function test_a_hierarchical_taxonomy_carries_parent_and_a_parent_filter(): void
@@ -352,30 +352,30 @@ class ManagedContentTest extends IntrospectionTestCase
         $schemas = $this->document()['schemas'];
         $apis    = $this->document()['apis'];
 
-        $this->assertArrayHasKey('parent', $schemas['taxonomies.category.item']['properties']);
-        $this->assertArrayNotHasKey('parent', $schemas['taxonomies.post_tag.item']['properties']);
+        $this->assertArrayHasKey('parent', $schemas['kizlo.taxonomies.category.item']['properties']);
+        $this->assertArrayNotHasKey('parent', $schemas['kizlo.taxonomies.post_tag.item']['properties']);
 
         $this->assertArrayHasKey(
             'parent',
-            $apis['taxonomies.category']['paths']['/taxonomies/category']['list']['input']['properties'],
+            $apis['kizlo.taxonomies.category']['paths']['/taxonomies/category']['list']['input']['properties'],
         );
         $this->assertArrayNotHasKey(
             'parent',
-            $apis['taxonomies.post_tag']['paths']['/taxonomies/post_tag']['list']['input']['properties'],
+            $apis['kizlo.taxonomies.post_tag']['paths']['/taxonomies/post_tag']['list']['input']['properties'],
         );
     }
 
     public function test_a_non_hierarchical_taxonomy_still_reports_parent_in_the_envelope(): void
     {
         // The term envelope mirrors WP_Term::$parent, which is always set.
-        $envelope = $this->document()['schemas']['taxonomies.post_tag.item']['properties']['kizlo']['properties'];
+        $envelope = $this->document()['schemas']['kizlo.taxonomies.post_tag.item']['properties']['kizlo']['properties'];
 
         $this->assertSame(['type' => 'integer', 'required' => true], $envelope['parent']);
     }
 
     public function test_connected_taxonomies_appear_on_the_post_schema_and_in_the_envelope(): void
     {
-        $item = $this->document()['schemas']['post-types.post.item'];
+        $item = $this->document()['schemas']['kizlo.post-types.post.item'];
 
         $this->assertSame(['type' => 'integer'], $item['properties']['categories']['items']);
         $this->assertSame(['type' => 'integer'], $item['properties']['tags']['items']);
@@ -387,7 +387,7 @@ class ManagedContentTest extends IntrospectionTestCase
 
     public function test_a_post_type_without_categories_has_no_category_block(): void
     {
-        $envelope = $this->document()['schemas']['post-types.page.item']['properties']['kizlo']['properties'];
+        $envelope = $this->document()['schemas']['kizlo.post-types.page.item']['properties']['kizlo']['properties'];
 
         $this->assertArrayNotHasKey('categories', $envelope);
         $this->assertArrayNotHasKey('tags', $envelope);
@@ -397,8 +397,8 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $schemas = $this->document()['schemas'];
 
-        $this->assertArrayHasKey('sticky', $schemas['post-types.post.item']['properties']);
-        $this->assertArrayNotHasKey('sticky', $schemas['post-types.page.item']['properties']);
+        $this->assertArrayHasKey('sticky', $schemas['kizlo.post-types.post.item']['properties']);
+        $this->assertArrayNotHasKey('sticky', $schemas['kizlo.post-types.page.item']['properties']);
     }
 
     // ============================================================
@@ -407,17 +407,17 @@ class ManagedContentTest extends IntrospectionTestCase
 
     public function test_a_create_input_is_extended_by_the_create_operation(): void
     {
-        $create = $this->document()['apis']['post-types.post']['paths']['/post-types/post']['create'];
+        $create = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post']['create'];
 
-        $this->assertSame('post-types.post.create-input', $create['input']['$extends']);
+        $this->assertSame('kizlo.post-types.post.create-input', $create['input']['$extends']);
         $this->assertSame('application/json', $create['input']['content_type']);
     }
 
     public function test_an_update_operation_adds_only_the_path_parameter_to_its_input(): void
     {
-        $update = $this->document()['apis']['post-types.post']['paths']['/post-types/post/{identifier}']['update'];
+        $update = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post/{identifier}']['update'];
 
-        $this->assertSame('post-types.post.update-input', $update['input']['$extends']);
+        $this->assertSame('kizlo.post-types.post.update-input', $update['input']['$extends']);
         $this->assertSame(['identifier'], array_keys($update['input']['properties']));
     }
 
@@ -425,13 +425,13 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $schemas = $this->document()['schemas'];
 
-        $this->assertTrue($schemas['taxonomies.category.create-input']['properties']['name']['required']);
-        $this->assertArrayNotHasKey('required', $schemas['taxonomies.category.update-input']['properties']['name']);
+        $this->assertTrue($schemas['kizlo.taxonomies.category.create-input']['properties']['name']['required']);
+        $this->assertArrayNotHasKey('required', $schemas['kizlo.taxonomies.category.update-input']['properties']['name']);
     }
 
     public function test_a_writable_text_field_accepts_a_string_or_the_raw_object_form(): void
     {
-        $title = $this->document()['schemas']['post-types.post.create-input']['properties']['title'];
+        $title = $this->document()['schemas']['kizlo.post-types.post.create-input']['properties']['title'];
 
         $this->assertSame(['type' => 'string'], $title['anyOf'][0]);
         $this->assertSame('object', $title['anyOf'][1]['type']);
@@ -443,15 +443,15 @@ class ManagedContentTest extends IntrospectionTestCase
 
     public function test_a_post_delete_response_covers_both_trashing_and_forcing(): void
     {
-        $schema = $this->document()['schemas']['post-types.post.delete-response'];
+        $schema = $this->document()['schemas']['kizlo.post-types.post.delete-response'];
 
-        $this->assertSame(['$ref' => 'post-types.post.item'], $schema['anyOf'][0]);
+        $this->assertSame(['$ref' => 'kizlo.post-types.post.item'], $schema['anyOf'][0]);
         $this->assertSame(['deleted', 'previous'], array_keys($schema['anyOf'][1]['properties']));
     }
 
     public function test_a_term_delete_response_is_always_the_forced_shape(): void
     {
-        $schema = $this->document()['schemas']['taxonomies.category.delete-response'];
+        $schema = $this->document()['schemas']['kizlo.taxonomies.category.delete-response'];
 
         $this->assertSame('object', $schema['type']);
         $this->assertSame(['deleted', 'previous'], array_keys($schema['properties']));

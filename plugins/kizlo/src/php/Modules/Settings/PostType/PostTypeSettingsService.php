@@ -18,7 +18,7 @@ class PostTypeSettingsService
 {
     private const KIND = 'post_types';
 
-    private const API_ID = 'settings.post-types';
+    private const API_ID = 'kizlo.settings.post-types';
 
     /**
      * Properties the item response carries that no request writes. Some are
