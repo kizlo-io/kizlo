@@ -9,7 +9,7 @@ class ExternalUserRouteTest extends IntrospectionTestCase
     public function test_external_user_operations_and_schema_are_exposed(): void
     {
         $document = $this->document();
-        $path = $document['apis']['users.external']['paths']['/users/external/{provider}/{value}'];
+        $path = $document['apis']['kizlo.users.external']['paths']['/users/external/{provider}/{value}'];
 
         $this->assertSame(['create', 'delete', 'update'], array_keys($path));
         $this->assertSame('POST', $path['create']['method']);

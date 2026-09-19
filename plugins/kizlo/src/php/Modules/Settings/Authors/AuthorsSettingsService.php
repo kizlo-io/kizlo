@@ -24,7 +24,7 @@ class AuthorsSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.authors',
+            'id'        => 'kizlo.settings.authors',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/authors',

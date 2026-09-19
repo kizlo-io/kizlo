@@ -80,7 +80,7 @@ function createMcpServer(state: McpState): McpServer {
 		{
 			title: "Describe a WordPress route",
 			description: "The JSON Schema for one route's arguments, plus which of them are interpolated into its path.",
-			inputSchema: { route: z.string().describe("A route name from `kizlo_list_routes`, e.g. `postTypes.book.list`.") },
+			inputSchema: { route: z.string().describe("A route name from `kizlo_list_routes`, e.g. `kizlo.postTypes.book.list`.") },
 		},
 		async ({ route }) => toolContent(describeRoute(state, { route })),
 	)

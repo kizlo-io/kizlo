@@ -48,8 +48,8 @@ class SeoSchemaTest extends IntrospectionTestCase
     public function writeInputProvider(): array
     {
         return [
-            'create' => ['post-types.post.create-input'],
-            'update' => ['post-types.post.update-input'],
+            'create' => ['kizlo.post-types.post.create-input'],
+            'update' => ['kizlo.post-types.post.update-input'],
         ];
     }
 
@@ -65,8 +65,8 @@ class SeoSchemaTest extends IntrospectionTestCase
     public function termWriteInputProvider(): array
     {
         return [
-            'create' => ['taxonomies.category.create-input'],
-            'update' => ['taxonomies.category.update-input'],
+            'create' => ['kizlo.taxonomies.category.create-input'],
+            'update' => ['kizlo.taxonomies.category.update-input'],
         ];
     }
 
@@ -134,7 +134,7 @@ class SeoSchemaTest extends IntrospectionTestCase
     {
         $result = rest_validate_value_from_schema(
             ['seo' => ['titel' => 'Typo']],
-            $this->kizloArg('post-types.post.create-input'),
+            $this->kizloArg('kizlo.post-types.post.create-input'),
             'kizlo'
         );
 
@@ -145,7 +145,7 @@ class SeoSchemaTest extends IntrospectionTestCase
     {
         $result = rest_validate_value_from_schema(
             ['seo' => ['webpage_type' => 'AboutPage']],
-            $this->kizloArg('taxonomies.category.create-input'),
+            $this->kizloArg('kizlo.taxonomies.category.create-input'),
             'kizlo'
         );
 
@@ -156,7 +156,7 @@ class SeoSchemaTest extends IntrospectionTestCase
     {
         $result = rest_validate_value_from_schema(
             ['seo' => ['webpage_type' => 'AboutPage', 'og' => ['image_id' => 12]]],
-            $this->kizloArg('post-types.post.create-input'),
+            $this->kizloArg('kizlo.post-types.post.create-input'),
             'kizlo'
         );
 
@@ -169,7 +169,7 @@ class SeoSchemaTest extends IntrospectionTestCase
 
     public function test_the_item_response_still_references_the_resolved_seo_block(): void
     {
-        $item = $this->schemas()['post-types.post.item']['properties']['kizlo']['properties']['seo'];
+        $item = $this->schemas()['kizlo.post-types.post.item']['properties']['kizlo']['properties']['seo'];
 
         $this->assertSame(CoreSchemas::SEO, $item['$ref']);
         $this->assertTrue($item['required']);

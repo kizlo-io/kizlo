@@ -139,7 +139,7 @@ class PostStatusTest extends IntrospectionTestCase
      */
     public function test_a_narrowed_filter_vocabulary_is_described_rather_than_shared(): void
     {
-        $status = $this->document()['apis']['post-types.attachment']['paths']['/post-types/attachment']['list']['input']['properties']['status'];
+        $status = $this->document()['apis']['kizlo.post-types.attachment']['paths']['/post-types/attachment']['list']['input']['properties']['status'];
 
         $this->assertArrayNotHasKey('$ref', $status['items']);
         $this->assertSame(
@@ -196,12 +196,12 @@ class PostStatusTest extends IntrospectionTestCase
     public static function referenceProvider(): array
     {
         return [
-            'post response'      => ['post-types.post.item', CoreSchemas::POST_STATUS],
-            'post list response' => ['post-types.post.list-item', CoreSchemas::POST_STATUS],
-            'page response'      => ['post-types.page.item', CoreSchemas::POST_STATUS],
-            'post create'        => ['post-types.post.create-input', CoreSchemas::POST_STATUS_WRITABLE],
-            'post update'        => ['post-types.post.update-input', CoreSchemas::POST_STATUS_WRITABLE],
-            'page create'        => ['post-types.page.create-input', CoreSchemas::POST_STATUS_WRITABLE],
+            'post response'      => ['kizlo.post-types.post.item', CoreSchemas::POST_STATUS],
+            'post list response' => ['kizlo.post-types.post.list-item', CoreSchemas::POST_STATUS],
+            'page response'      => ['kizlo.post-types.page.item', CoreSchemas::POST_STATUS],
+            'post create'        => ['kizlo.post-types.post.create-input', CoreSchemas::POST_STATUS_WRITABLE],
+            'post update'        => ['kizlo.post-types.post.update-input', CoreSchemas::POST_STATUS_WRITABLE],
+            'page create'        => ['kizlo.post-types.page.create-input', CoreSchemas::POST_STATUS_WRITABLE],
         ];
     }
 

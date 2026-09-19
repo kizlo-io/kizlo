@@ -19,7 +19,7 @@ class EmailModule
     {
 
         kizlo_register_route([
-            'id'        => 'email',
+            'id'        => 'kizlo.email',
             'operation' => 'send',
             'method'    => 'POST',
             'route'     => '/email/send',

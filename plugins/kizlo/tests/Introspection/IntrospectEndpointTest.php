@@ -307,7 +307,7 @@ class IntrospectEndpointTest extends IntrospectionTestCase
         $data = $this->get()->get_data();
 
         $this->assertArrayNotHasKey('acme.widgets', $data['apis']);
-        $this->assertArrayHasKey('post-types.post', $data['apis'], 'Core content is unaffected by a third-party mistake.');
+        $this->assertArrayHasKey('kizlo.post-types.post', $data['apis'], 'Core content is unaffected by a third-party mistake.');
         $this->assertSame(200, $this->server->dispatch(new WP_REST_Request('GET', '/kizlo/v1/healthy'))->get_status());
     }
 }

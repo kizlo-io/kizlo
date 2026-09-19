@@ -24,7 +24,7 @@ class CrawlingSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.crawling',
+            'id'        => 'kizlo.settings.crawling',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/crawling',

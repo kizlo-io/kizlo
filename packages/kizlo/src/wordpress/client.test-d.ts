@@ -135,24 +135,24 @@ describe("createWordPressClient", () => {
  */
 describe("addressing an endpoint by path", () => {
 	it("exposes only generated raw operation paths", () => {
-		const path: WP_EndpointPath = "postTypes.post.retrieve"
-		expectTypeOf(path).toEqualTypeOf<"postTypes.post.retrieve">()
+		const path: WP_EndpointPath = "kizlo.postTypes.post.retrieve"
+		expectTypeOf(path).toEqualTypeOf<"kizlo.postTypes.post.retrieve">()
 		// @ts-expect-error public procedure names do not become fake raw endpoints
 		const publicProcedure: WP_EndpointPath = "woocommerce.products.get"
 		// @ts-expect-error unknown raw endpoint path
-		const missing: WP_EndpointPath = "seo.nowhere.retrieve"
+		const missing: WP_EndpointPath = "kizlo.seo.nowhere.retrieve"
 		void publicProcedure
 		void missing
 	})
 
 	it("resolves the email endpoint's real payload", () => {
-		expectTypeOf<WP_EndpointData<"email.send">>().toEqualTypeOf<{ subject: string; to: string[] }>()
-		expectTypeOf<WP_EndpointData<"email.send">>().not.toHaveProperty("success")
+		expectTypeOf<WP_EndpointData<"kizlo.email.send">>().toEqualTypeOf<{ subject: string; to: string[] }>()
+		expectTypeOf<WP_EndpointData<"kizlo.email.send">>().not.toHaveProperty("success")
 	})
 
 	it("resolves an endpoint's input, path parameter included", () => {
-		expectTypeOf<WP_EndpointInput<"settings.postTypes.update">>().toHaveProperty("slug")
-		expectTypeOf<WP_EndpointInput<"seo.sitemaps.listUrls">>().toEqualTypeOf<{
+		expectTypeOf<WP_EndpointInput<"kizlo.settings.postTypes.update">>().toHaveProperty("slug")
+		expectTypeOf<WP_EndpointInput<"kizlo.seo.sitemaps.listUrls">>().toEqualTypeOf<{
 			key: string
 			page?: number
 			type: "post_type" | "taxonomy"
@@ -160,8 +160,8 @@ describe("addressing an endpoint by path", () => {
 	})
 
 	it("resolves the complete result and its non-null error", () => {
-		expectTypeOf<WP_EndpointError<"email.send">>().toEqualTypeOf<Exclude<WP_EndpointResult<"email.send">["error"], null>>()
-		expectTypeOf<WP_EndpointResult<"email.send">>().not.toBeNever()
+		expectTypeOf<WP_EndpointError<"kizlo.email.send">>().toEqualTypeOf<Exclude<WP_EndpointResult<"kizlo.email.send">["error"], null>>()
+		expectTypeOf<WP_EndpointResult<"kizlo.email.send">>().not.toBeNever()
 	})
 })
 
@@ -206,7 +206,7 @@ describe("described WordPress core routes", () => {
 	})
 
 	it("keeps headers callable before the endpoint result is narrowed", async () => {
-		const response = await wordpress.postTypes.post.list()
+		const response = await wordpress.kizlo.postTypes.post.list()
 		const total = response.headers.get("x-wp-total")
 
 		expectTypeOf(total).toEqualTypeOf<string | null>()
@@ -425,7 +425,7 @@ describe("services bound to the generated client", () => {
 	const email = null as unknown as EmailService
 
 	it("writes settings through the endpoint that owns the route", async () => {
-		expectTypeOf(await settings.updateSite({ title_separator: "|" })).toEqualTypeOf<WP_EndpointResult<"settings.site.update">>()
+		expectTypeOf(await settings.updateSite({ title_separator: "|" })).toEqualTypeOf<WP_EndpointResult<"kizlo.settings.site.update">>()
 		// @ts-expect-error WordPress accepts only the separators it publishes
 		await settings.updateSite({ title_separator: "!!" })
 		// @ts-expect-error the key rides the path, passed separately

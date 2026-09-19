@@ -21,8 +21,8 @@ kizlo_register_route_schema(string $id, callable $derive): void
 Kizlo calls the factory when introspection builds the document. It can also call the factory when a registered
 runtime route references the schema from its input, because WordPress needs that shape for request validation.
 
-The `kizlo.*`, `post-types.*`, and `taxonomies.*` prefixes are reserved for Kizlo core. A third-party plugin
-must use its own vendor or domain prefix.
+The `kizlo.*` prefix is reserved for Kizlo core. A third-party plugin must use its own vendor or domain
+prefix.
 
 <Callout type="warn">
   Write `'$ref'` and `'$extends'` with single quotes. PHP interpolates these keys inside double-quoted strings.

@@ -28,7 +28,7 @@ Managed post-type and taxonomy write endpoints accept a grouped `custom` object.
 WordPress are required when creating content. Update requests may include only the fields that changed.
 
 ```ts
-const response = await context.wordpress.postTypes.post.create({
+const response = await context.wordpress.kizlo.postTypes.post.create({
   title: "Hello world",
   custom: {
     company_name: "Acme Ltd",
@@ -56,7 +56,7 @@ them separate from the API's own properties.
 Custom fields previously appeared beside standard properties in requests and responses.
 
 ```ts title="Before"
-await context.wordpress.postTypes.post.create({
+await context.wordpress.kizlo.postTypes.post.create({
   title: "Hello world",
   company_name: "Acme Ltd",
 })
@@ -69,7 +69,7 @@ Move every custom field into `custom`. Raw managed WordPress responses place the
 public Kizlo models expose it directly.
 
 ```ts title="After"
-await context.wordpress.postTypes.post.create({
+await context.wordpress.kizlo.postTypes.post.create({
   title: "Hello world",
   custom: {
     company_name: "Acme Ltd",

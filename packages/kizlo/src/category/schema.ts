@@ -10,7 +10,7 @@ const WP_CATEGORY_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs",
 // CATEGORY
 // ====================================================
 
-export type CategoryCustomFields = WP_CustomFields<"taxonomies.category">
+export type CategoryCustomFields = WP_CustomFields<"kizlo.taxonomies.category">
 
 export const CategoryCustomFieldsSchema: z.ZodType<CategoryCustomFields, CategoryCustomFields> = customFieldsSchema<CategoryCustomFields>()
 

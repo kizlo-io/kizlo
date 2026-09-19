@@ -5,7 +5,7 @@ import { EmailService } from "./service"
 const PARAMS = { to: "reader@example.test", subject: "Order received", body: "<p>Thanks</p>" }
 
 function service(result: unknown): EmailService {
-	return new EmailService({ email: { send: async () => result } } as never)
+	return new EmailService({ kizlo: { email: { send: async () => result } } } as never)
 }
 
 test("a successful send resolves, rather than reading a flag WordPress never returns", async () => {

@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Namespace every API ID the plugin registers under `kizlo.`, so the generated client separates Kizlo's own routes from the WordPress and WooCommerce ones it only describes

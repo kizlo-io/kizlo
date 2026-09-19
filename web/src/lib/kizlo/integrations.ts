@@ -1,9 +1,9 @@
 import { createIntegration, createProcedure, deserializeSeo, Seo } from "kizlo"
 import z from "zod"
-import type { WP_PostTypesIntegrationItem, WP_PostTypesIntegrationListItem } from "./server/generated/introspection"
+import type { WP_KizloPostTypesIntegrationItem, WP_KizloPostTypesIntegrationListItem } from "./server/generated/introspection"
 
 // The catalog is editable WordPress content (the `integration` CPT), so `kizlo generate` only exposes
-// the raw `postTypes.integration` endpoints. This resource is the friendly `client.integrations` the
+// the raw `kizlo.postTypes.integration` endpoints. This resource is the friendly `client.integrations` the
 // pages call: a read-only projection of each entry into the small shape the catalog needs, hiding the
 // full WordPress record.
 
@@ -55,12 +55,12 @@ function toPlainText(html: string): string {
 		.trim()
 }
 
-function mapType(type: WP_PostTypesIntegrationItem["kizlo"]["custom"]["type"]): IntegrationType | null {
+function mapType(type: WP_KizloPostTypesIntegrationItem["kizlo"]["custom"]["type"]): IntegrationType | null {
 	return type === "package" || type === "plugin" || type === "both" ? type : null
 }
 
 /** The list and single endpoints share the fields this projection reads. */
-function mapIntegration(entry: WP_PostTypesIntegrationListItem | WP_PostTypesIntegrationItem): Integration {
+function mapIntegration(entry: WP_KizloPostTypesIntegrationListItem | WP_KizloPostTypesIntegrationItem): Integration {
 	const custom = entry.kizlo.custom
 	return {
 		id: entry.id,
@@ -91,7 +91,7 @@ export const integrations = createIntegration({
 				errors: { INTEGRATIONS_UNAVAILABLE: { status: 502, message: "The integrations catalog is unavailable." } },
 			},
 			async ({ context, errors }) => {
-				const response = await context.wordpress.postTypes.integration.list({
+				const response = await context.wordpress.kizlo.postTypes.integration.list({
 					status: ["publish"],
 					per_page: 100,
 					orderby: "title",
@@ -115,7 +115,7 @@ export const integrations = createIntegration({
 				errors: { INTEGRATIONS_UNAVAILABLE: { status: 502, message: "The integrations catalog is unavailable." } },
 			},
 			async ({ input, context, errors }) => {
-				const response = await context.wordpress.postTypes.integration.retrieve({ identifier: input.params.identifier })
+				const response = await context.wordpress.kizlo.postTypes.integration.retrieve({ identifier: input.params.identifier })
 				if (response.error) {
 					switch (response.error.code) {
 						case "invalid_post_type":

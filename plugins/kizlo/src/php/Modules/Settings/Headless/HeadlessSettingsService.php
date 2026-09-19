@@ -25,7 +25,7 @@ class HeadlessSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.headless',
+            'id'        => 'kizlo.settings.headless',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/headless',

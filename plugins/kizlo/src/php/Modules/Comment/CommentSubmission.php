@@ -27,8 +27,8 @@ class CommentSubmission
     public function register(): void
     {
         kizlo_register_route([
-            // Qualified, because `comments` names the routes WordPress owns.
-            // {@see CommentRoutes} for why core keeps the plain ID.
+            // Every route this plugin registers is qualified; `comments` is left
+            // to WordPress. {@see CommentRoutes} for why core keeps the plain ID.
             'id'        => 'kizlo.comments',
             'operation' => 'create',
             'method'    => 'POST',

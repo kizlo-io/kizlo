@@ -23,7 +23,7 @@ export const POST_PROCEDURES = {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.POST_NOT_FOUND()
 
-				const response = await context.wordpress.postTypes.post.retrieve({ identifier: String(result.id) })
+				const response = await context.wordpress.kizlo.postTypes.post.retrieve({ identifier: String(result.id) })
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -44,7 +44,7 @@ export const POST_PROCEDURES = {
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.POST_NOT_FOUND()
 
-			const response = await context.wordpress.postTypes.post.retrieve({ identifier: String(identifier.value) })
+			const response = await context.wordpress.kizlo.postTypes.post.retrieve({ identifier: String(identifier.value) })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_post_type":
@@ -88,7 +88,7 @@ export const POST_PROCEDURES = {
 			const orderby =
 				(q?.orderby === "relevance" && !q?.search) || (q?.orderby === "include" && q?.include === undefined) ? undefined : q?.orderby
 
-			const response = await context.wordpress.postTypes.post.list({
+			const response = await context.wordpress.kizlo.postTypes.post.list({
 				status: ["publish"],
 				after: q?.after,
 				author: normalizeArrayableValue(q?.author),

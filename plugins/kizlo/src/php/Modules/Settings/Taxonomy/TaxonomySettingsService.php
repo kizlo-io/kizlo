@@ -17,7 +17,7 @@ class TaxonomySettingsService
 {
     private const KIND = 'taxonomies';
 
-    private const API_ID = 'settings.taxonomies';
+    private const API_ID = 'kizlo.settings.taxonomies';
 
     /**
      * Properties the item response carries that no request writes.

@@ -169,9 +169,9 @@ class PermissionErrorTest extends IntrospectionTestCase
     public static function survivingCodeProvider(): array
     {
         return [
-            'a post delete refused by check_delete_permission' => ['post-types.post /post-types/post/{identifier} delete', 'rest_user_cannot_delete_post'],
-            'a term delete wp_delete_term refuses'             => ['taxonomies.category /taxonomies/category/{identifier} delete', 'rest_cannot_delete'],
-            'a status the list sanitizer refuses'              => ['post-types.post /post-types/post list', 'rest_forbidden_status'],
+            'a post delete refused by check_delete_permission' => ['kizlo.post-types.post /post-types/post/{identifier} delete', 'rest_user_cannot_delete_post'],
+            'a term delete wp_delete_term refuses'             => ['kizlo.taxonomies.category /taxonomies/category/{identifier} delete', 'rest_cannot_delete'],
+            'a status the list sanitizer refuses'              => ['kizlo.post-types.post /post-types/post list', 'rest_forbidden_status'],
         ];
     }
 
@@ -275,15 +275,15 @@ class PermissionErrorTest extends IntrospectionTestCase
      */
     private function controllerFor(string $apiId): ?WP_REST_Controller
     {
-        if (str_starts_with($apiId, 'post-types.')) {
-            return CoreControllers::forPostType(substr($apiId, strlen('post-types.')));
+        if (str_starts_with($apiId, 'kizlo.post-types.')) {
+            return CoreControllers::forPostType(substr($apiId, strlen('kizlo.post-types.')));
         }
 
-        if (str_starts_with($apiId, 'taxonomies.')) {
-            return CoreControllers::forTaxonomy(substr($apiId, strlen('taxonomies.')));
+        if (str_starts_with($apiId, 'kizlo.taxonomies.')) {
+            return CoreControllers::forTaxonomy(substr($apiId, strlen('kizlo.taxonomies.')));
         }
 
-        return $apiId === 'users' ? new WP_REST_Users_Controller() : null;
+        return $apiId === 'kizlo.users' ? new WP_REST_Users_Controller() : null;
     }
 
     /**

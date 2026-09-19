@@ -28,7 +28,7 @@ describe("Clerk webhook integration", () => {
 
 		await invokeWebhook({ client, webhooks: { signingSecret: SIGNING_SECRET } }, signedRequest(event), wordpress)
 
-		expect(wordpress.users.external[operation]).toHaveBeenCalledWith({
+		expect(wordpress.kizlo.users.external[operation]).toHaveBeenCalledWith({
 			provider: "clerk",
 			value: "user_1",
 			email: "grace@example.com",
@@ -40,8 +40,8 @@ describe("Clerk webhook integration", () => {
 				publicMetadata: { plan: "pro" },
 			},
 		})
-		expect(wordpress.users.external[operation === "create" ? "update" : "create"]).not.toHaveBeenCalled()
-		expect(wordpress.users.external.delete).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external[operation === "create" ? "update" : "create"]).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.delete).not.toHaveBeenCalled()
 	})
 
 	it("deletes by stable Clerk id without retrieving a user", async () => {
@@ -52,10 +52,10 @@ describe("Clerk webhook integration", () => {
 
 		await invokeWebhook({ client, webhooks: { signingSecret: SIGNING_SECRET } }, signedRequest(event), wordpress)
 
-		expect(wordpress.users.external.delete).toHaveBeenCalledWith({ provider: "clerk", value: "user_deleted" })
+		expect(wordpress.kizlo.users.external.delete).toHaveBeenCalledWith({ provider: "clerk", value: "user_deleted" })
 		expect(getUser).not.toHaveBeenCalled()
-		expect(wordpress.users.external.create).not.toHaveBeenCalled()
-		expect(wordpress.users.external.update).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.create).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.update).not.toHaveBeenCalled()
 	})
 
 	it("acknowledges a verified non-user event without mutating WordPress", async () => {
@@ -64,9 +64,9 @@ describe("Clerk webhook integration", () => {
 
 		await invokeWebhook({ client: clerkClientFixture(), webhooks: { signingSecret: SIGNING_SECRET } }, signedRequest(event), wordpress)
 
-		expect(wordpress.users.external.create).not.toHaveBeenCalled()
-		expect(wordpress.users.external.update).not.toHaveBeenCalled()
-		expect(wordpress.users.external.delete).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.create).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.update).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.delete).not.toHaveBeenCalled()
 	})
 
 	it.each([
@@ -85,9 +85,9 @@ describe("Clerk webhook integration", () => {
 
 		expect(handler).toHaveBeenCalledWith(expect.objectContaining({ type, data }), expect.objectContaining({ request }))
 		expect(JSON.parse(originalBody)).toMatchObject({ type, data })
-		expect(wordpress.users.external.create).not.toHaveBeenCalled()
-		expect(wordpress.users.external.update).not.toHaveBeenCalled()
-		expect(wordpress.users.external.delete).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.create).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.update).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.delete).not.toHaveBeenCalled()
 	})
 
 	it.each([
@@ -112,9 +112,9 @@ describe("Clerk webhook integration", () => {
 			invokeWebhook({ client: clerkClientFixture(), webhooks: { signingSecret: SIGNING_SECRET, handler } }, request, wordpress),
 		).rejects.toMatchObject({ code: "FORBIDDEN" })
 		expect(handler).not.toHaveBeenCalled()
-		expect(wordpress.users.external.create).not.toHaveBeenCalled()
-		expect(wordpress.users.external.update).not.toHaveBeenCalled()
-		expect(wordpress.users.external.delete).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.create).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.update).not.toHaveBeenCalled()
+		expect(wordpress.kizlo.users.external.delete).not.toHaveBeenCalled()
 	})
 
 	it("registers the route and endpoint requirement only for built-in webhook handling", () => {
@@ -130,7 +130,7 @@ describe("Clerk webhook integration", () => {
 			method: "POST",
 			path: "/webhooks",
 		})
-		expect(builtIn.requires?.endpoints).toEqual(["users.external"])
+		expect(builtIn.requires?.endpoints).toEqual(["kizlo.users.external"])
 		expect(custom.procedures?.webhooks).toBeDefined()
 		expect(custom.requires).toBeUndefined()
 	})
@@ -149,11 +149,13 @@ type WordPressFixture = ReturnType<typeof wordpressFixture>
 function wordpressFixture() {
 	const success = async () => ({ data: {}, error: null })
 	return {
-		users: {
-			external: {
-				create: vi.fn(success),
-				update: vi.fn(success),
-				delete: vi.fn(async () => ({ data: { deleted: true }, error: null })),
+		kizlo: {
+			users: {
+				external: {
+					create: vi.fn(success),
+					update: vi.fn(success),
+					delete: vi.fn(async () => ({ data: { deleted: true }, error: null })),
+				},
 			},
 		},
 	}

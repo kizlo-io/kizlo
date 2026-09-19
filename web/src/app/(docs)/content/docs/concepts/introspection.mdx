@@ -44,8 +44,8 @@ generated TypeScript member.
 
 | Introspection declaration | Generated call |
 | --- | --- |
-| API ID `post-types.post`, operation `list` | `wordpress.postTypes.post.list()` |
-| API ID `post-types.post`, operation `retrieve` | `wordpress.postTypes.post.retrieve()` |
+| API ID `kizlo.post-types.post`, operation `list` | `wordpress.kizlo.postTypes.post.list()` |
+| API ID `kizlo.post-types.post`, operation `retrieve` | `wordpress.kizlo.postTypes.post.retrieve()` |
 | API ID `woocommerce.store.cart`, operation `add_item` | `wordpress.woocommerce.store.cart.addItem()` |
 
 The input object combines the fields from the route declaration. Path parameters are inserted into the URL;
@@ -53,7 +53,7 @@ the remaining fields become query parameters for reads or a request body for wri
 first argument required, while an endpoint with no required fields can be called without one.
 
 ```ts
-const response = await context.wordpress.postTypes.post.retrieve({
+const response = await context.wordpress.kizlo.postTypes.post.retrieve({
   identifier: "hello-world",
 })
 
@@ -77,13 +77,13 @@ The call resolves to a failure instead of throwing, carrying the `rest_no_route`
 endpoint's error union. Nothing is sent, so the check you write for any failed request covers it.
 
 ```ts
-const response = await context.wordpress.postTypes.post.list()
+const response = await context.wordpress.kizlo.postTypes.post.list()
 
 // response.error.code
 // "rest_no_route"
 
 // response.error.message
-// No endpoint at "postTypes.post.list" in this project's generated client, so nothing was sent.
+// No endpoint at "kizlo.postTypes.post.list" in this project's generated client, so nothing was sent.
 // Run `kizlo generate` against the WordPress you are connecting to.
 ```
 
@@ -97,7 +97,7 @@ definition or transport defaults.
 ```ts
 const controller = new AbortController()
 
-await context.wordpress.postTypes.post.retrieve(
+await context.wordpress.kizlo.postTypes.post.retrieve(
   { identifier: "42" },
   {
     headers: { "X-Request-Source": "featured" },
@@ -116,9 +116,9 @@ Use the dotted client path to reuse a generated shape without importing the gene
 ```ts
 import type { WP_EndpointData, WP_EndpointInput, WP_EndpointResult } from "kizlo"
 
-type Post = WP_EndpointData<"postTypes.post.retrieve">
-type PostListInput = WP_EndpointInput<"postTypes.post.list">
-type PostResult = WP_EndpointResult<"postTypes.post.retrieve">
+type Post = WP_EndpointData<"kizlo.postTypes.post.retrieve">
+type PostListInput = WP_EndpointInput<"kizlo.postTypes.post.list">
+type PostResult = WP_EndpointResult<"kizlo.postTypes.post.retrieve">
 ```
 
 The reference pages cover [`WP_EndpointData`](/docs/reference/types/wp-endpoint-data),

@@ -41,7 +41,7 @@ class DerivedParametersTest extends IntrospectionTestCase
     {
         $this->assertSame(
             $this->honoured((new WP_REST_Posts_Controller('post'))->get_collection_params()),
-            $this->sorted(array_keys($this->listProperties('post-types.post', '/post-types/post'))),
+            $this->sorted(array_keys($this->listProperties('kizlo.post-types.post', '/post-types/post'))),
         );
     }
 
@@ -49,7 +49,7 @@ class DerivedParametersTest extends IntrospectionTestCase
     {
         $this->assertSame(
             $this->honoured((new WP_REST_Terms_Controller('category'))->get_collection_params()),
-            $this->sorted(array_keys($this->listProperties('taxonomies.category', '/taxonomies/category'))),
+            $this->sorted(array_keys($this->listProperties('kizlo.taxonomies.category', '/taxonomies/category'))),
         );
     }
 
@@ -62,7 +62,7 @@ class DerivedParametersTest extends IntrospectionTestCase
     {
         $this->assertSame(
             $this->honoured((new WP_REST_Posts_Controller('page'))->get_collection_params()),
-            $this->sorted(array_keys($this->listProperties('post-types.page', '/post-types/page'))),
+            $this->sorted(array_keys($this->listProperties('kizlo.post-types.page', '/post-types/page'))),
         );
     }
 
@@ -84,17 +84,17 @@ class DerivedParametersTest extends IntrospectionTestCase
     public static function previouslyUndescribedProvider(): array
     {
         return [
-            'tax_relation'   => ['post-types.post', '/post-types/post', 'tax_relation'],
-            'search_columns' => ['post-types.post', '/post-types/post', 'search_columns'],
-            'search_semantics' => ['post-types.post', '/post-types/post', 'search_semantics'],
-            'ignore_sticky'  => ['post-types.post', '/post-types/post', 'ignore_sticky'],
-            'menu_order'     => ['post-types.page', '/post-types/page', 'menu_order'],
+            'tax_relation'   => ['kizlo.post-types.post', '/post-types/post', 'tax_relation'],
+            'search_columns' => ['kizlo.post-types.post', '/post-types/post', 'search_columns'],
+            'search_semantics' => ['kizlo.post-types.post', '/post-types/post', 'search_semantics'],
+            'ignore_sticky'  => ['kizlo.post-types.post', '/post-types/post', 'ignore_sticky'],
+            'menu_order'     => ['kizlo.post-types.page', '/post-types/page', 'menu_order'],
 
             // Core registers these for attachments as well as hierarchical types.
             // Kizlo gated them on hierarchy alone, so "media attached to post N"
             // was unreachable through the contract.
-            'attachment parent'         => ['post-types.attachment', '/post-types/attachment', 'parent'],
-            'attachment parent_exclude' => ['post-types.attachment', '/post-types/attachment', 'parent_exclude'],
+            'attachment parent'         => ['kizlo.post-types.attachment', '/post-types/attachment', 'parent'],
+            'attachment parent_exclude' => ['kizlo.post-types.attachment', '/post-types/attachment', 'parent_exclude'],
         ];
     }
 
@@ -108,7 +108,7 @@ class DerivedParametersTest extends IntrospectionTestCase
     {
         $this->boot();
 
-        $this->assertArrayHasKey('tax_relation', $this->listProperties('post-types.post', '/post-types/post'));
+        $this->assertArrayHasKey('tax_relation', $this->listProperties('kizlo.post-types.post', '/post-types/post'));
 
         $this->assertSame(200, $this->dispatch('GET', '/kizlo/v1/post-types/post', ['tax_relation' => 'OR'])->get_status());
 
@@ -160,7 +160,7 @@ class DerivedParametersTest extends IntrospectionTestCase
      */
     public function test_a_taxonomy_filter_describes_both_of_its_forms(): void
     {
-        $categories = $this->listProperties('post-types.post', '/post-types/post')['categories'];
+        $categories = $this->listProperties('kizlo.post-types.post', '/post-types/post')['categories'];
 
         $this->assertArrayNotHasKey('type', $categories, 'A union schema carries no sibling type.');
         $this->assertArrayHasKey('oneOf', $categories);
@@ -206,7 +206,7 @@ class DerivedParametersTest extends IntrospectionTestCase
      */
     public function test_the_advanced_form_follows_the_taxonomy(): void
     {
-        $properties = $this->listProperties('post-types.post', '/post-types/post');
+        $properties = $this->listProperties('kizlo.post-types.post', '/post-types/post');
 
         $this->assertArrayNotHasKey('include_children', $this->objectForm($properties['tags'])['properties']);
         $this->assertArrayHasKey('operator', $this->objectForm($properties['tags'])['properties']);
@@ -233,7 +233,7 @@ class DerivedParametersTest extends IntrospectionTestCase
      */
     public function test_the_status_filter_refers_to_the_shared_vocabulary(): void
     {
-        $status = $this->listProperties('post-types.post', '/post-types/post')['status'];
+        $status = $this->listProperties('kizlo.post-types.post', '/post-types/post')['status'];
 
         $this->assertSame('array', $status['type']);
         $this->assertSame(['$ref' => CoreSchemas::POST_STATUS_FILTER], $status['items']);
@@ -268,7 +268,7 @@ class DerivedParametersTest extends IntrospectionTestCase
      */
     public function test_the_status_default_is_core_s_scalar(): void
     {
-        $this->assertSame('publish', $this->listProperties('post-types.post', '/post-types/post')['status']['default']);
+        $this->assertSame('publish', $this->listProperties('kizlo.post-types.post', '/post-types/post')['status']['default']);
     }
 
     /**
@@ -314,7 +314,7 @@ class DerivedParametersTest extends IntrospectionTestCase
             return $params;
         });
 
-        $this->assertArrayHasKey('acme_channel', $this->listProperties('post-types.post', '/post-types/post'));
+        $this->assertArrayHasKey('acme_channel', $this->listProperties('kizlo.post-types.post', '/post-types/post'));
     }
 
     /**
@@ -335,7 +335,7 @@ class DerivedParametersTest extends IntrospectionTestCase
         $first  = $this->document();
         $second = $this->document();
 
-        $this->assertArrayNotHasKey('acme_broken', $first['apis']['post-types.post']['paths']['/post-types/post']['list']['input']['properties']);
+        $this->assertArrayNotHasKey('acme_broken', $first['apis']['kizlo.post-types.post']['paths']['/post-types/post']['list']['input']['properties']);
         $this->assertErrorContains($first['diagnostics'], 'acme_broken');
         $this->assertSame($first['diagnostics'], $second['diagnostics']);
         $this->assertSame($first['hash'], $second['hash']);

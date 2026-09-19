@@ -17,7 +17,7 @@ that endpoint.
 ```ts
 import type { WP_EndpointInput } from "kizlo"
 
-export type PostListInput = WP_EndpointInput<"postTypes.post.list">
+export type PostListInput = WP_EndpointInput<"kizlo.postTypes.post.list">
 
 export function featuredInput(input: PostListInput): PostListInput {
   return { ...input, sticky: true }

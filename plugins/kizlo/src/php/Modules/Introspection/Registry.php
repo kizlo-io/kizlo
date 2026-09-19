@@ -585,7 +585,7 @@ class Registry
     private static function reservedPrefix(string $id): string
     {
         foreach (Spec::RESERVED_ID_PREFIXES as $prefix) {
-            if (str_starts_with($id, $prefix)) {
+            if ($id === rtrim($prefix, '.') || str_starts_with($id, $prefix)) {
                 return $prefix;
             }
         }

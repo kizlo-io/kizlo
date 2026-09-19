@@ -329,7 +329,7 @@ class ManagedPostTypes
 
     public static function apiId(string $slug): string
     {
-        return 'post-types.' . $slug;
+        return 'kizlo.post-types.' . $slug;
     }
 
     // ============================================================

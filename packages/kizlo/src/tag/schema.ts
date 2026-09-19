@@ -10,7 +10,7 @@ const WP_TAG_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs", "ter
 // TAG
 // ====================================================
 
-export type TagCustomFields = WP_CustomFields<"taxonomies.postTag">
+export type TagCustomFields = WP_CustomFields<"kizlo.taxonomies.postTag">
 
 export const TagCustomFieldsSchema: z.ZodType<TagCustomFields, TagCustomFields> = customFieldsSchema<TagCustomFields>()
 

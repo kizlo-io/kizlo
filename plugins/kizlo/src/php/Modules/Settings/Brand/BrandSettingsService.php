@@ -40,7 +40,7 @@ class BrandSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.brand',
+            'id'        => 'kizlo.settings.brand',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/brand',

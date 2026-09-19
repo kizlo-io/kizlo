@@ -23,7 +23,7 @@ class UploadsSettingsService
     private function registerRestRoutes(): void
     {
         kizlo_register_route([
-            'id'        => 'settings.uploads',
+            'id'        => 'kizlo.settings.uploads',
             'operation' => 'update',
             'method'    => 'PUT',
             'route'     => '/settings/uploads',

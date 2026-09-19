@@ -41,7 +41,7 @@ export const PostTagRef = z.object({
 })
 export type PostTagRef = z.infer<typeof PostTagRef>
 
-export type PostCustomFields = WP_CustomFields<"postTypes.post">
+export type PostCustomFields = WP_CustomFields<"kizlo.postTypes.post">
 
 export const PostCustomFieldsSchema: z.ZodType<PostCustomFields, PostCustomFields> = customFieldsSchema<PostCustomFields>()
 
