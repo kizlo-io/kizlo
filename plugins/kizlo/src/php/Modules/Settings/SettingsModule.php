@@ -58,6 +58,9 @@ class SettingsModule
      */
     public function register(): void
     {
+        add_action('activated_plugin', [SettingsCache::class, 'invalidate'], 10, 2);
+        add_action('deactivated_plugin', [SettingsCache::class, 'invalidate'], 10, 2);
+
         $this->site->register();
         $this->brand->register();
         $this->identity->register();

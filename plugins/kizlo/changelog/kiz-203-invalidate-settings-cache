@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Refresh managed post types and taxonomies after a plugin is activated or deactivated
