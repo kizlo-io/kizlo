@@ -5,6 +5,7 @@ namespace Kizlo\Tests\Settings;
 use Kizlo\Modules\Registration\Registrar;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\Modules\Settings\Settings;
+use Kizlo\Modules\Settings\SettingsCache;
 use Kizlo\Modules\Settings\Taxonomy\TaxonomySettings;
 use Kizlo\Support\Utils;
 use Kizlo\Tests\TestCase;
@@ -94,6 +95,71 @@ class SettingsCacheTest extends TestCase
         $names = array_column(Utils::getSettings()->postTypes->get('book')->getCustomFields(), 'name');
 
         $this->assertSame(['blurb'], $names);
+    }
+
+    public function test_plugin_activation_invalidates_and_rebuilds_contributed_settings(): void
+    {
+        $post_types = static fn(array $types): array => $types + ['book' => []];
+        $taxonomies = static fn(array $items): array => $items + ['genre' => []];
+
+        $post_type = PostTypeSettings::load('book');
+        $post_type->setData(['custom_fields' => [['type' => 'text', 'name' => 'blurb', 'label' => 'Blurb']]]);
+        $post_type->save('book');
+
+        $taxonomy = TaxonomySettings::load('genre');
+        $taxonomy->setData(['custom_fields' => [['type' => 'text', 'name' => 'mood', 'label' => 'Mood']]]);
+        $taxonomy->save('genre');
+
+        Settings::cached();
+        $this->assertArrayNotHasKey('book', get_transient(self::KEY)['post_types']);
+        $this->assertArrayNotHasKey('genre', get_transient(self::KEY)['taxonomies']);
+
+        register_post_type('book', ['public' => true, 'show_in_rest' => true]);
+        register_taxonomy('genre', 'book', ['public' => true, 'show_in_rest' => true]);
+        add_filter('kizlo_internal_post_types', $post_types);
+        add_filter('kizlo_internal_taxonomies', $taxonomies);
+
+        $this->assertSame(10, has_action('activated_plugin', [SettingsCache::class, 'invalidate']));
+
+        do_action('activated_plugin', 'fixture/fixture.php', false);
+
+        $this->assertFalse(get_transient(self::KEY));
+
+        $settings = Settings::cached();
+
+        $this->assertSame(['blurb'], array_column($settings->postTypes->get('book')->getCustomFields(), 'name'));
+        $this->assertSame(['mood'], array_column($settings->taxonomies->get('genre')->getCustomFields(), 'name'));
+    }
+
+    public function test_plugin_deactivation_invalidates_and_removes_contributed_objects(): void
+    {
+        $post_types = static fn(array $types): array => $types + ['book' => []];
+        $taxonomies = static fn(array $items): array => $items + ['genre' => []];
+
+        register_post_type('book', ['public' => true, 'show_in_rest' => true]);
+        register_taxonomy('genre', 'book', ['public' => true, 'show_in_rest' => true]);
+        add_filter('kizlo_internal_post_types', $post_types);
+        add_filter('kizlo_internal_taxonomies', $taxonomies);
+
+        $cached = Settings::cached();
+        $this->assertArrayHasKey('book', $cached->postTypes->all());
+        $this->assertArrayHasKey('genre', $cached->taxonomies->all());
+
+        remove_filter('kizlo_internal_post_types', $post_types);
+        remove_filter('kizlo_internal_taxonomies', $taxonomies);
+        unregister_taxonomy('genre');
+        unregister_post_type('book');
+
+        $this->assertSame(10, has_action('deactivated_plugin', [SettingsCache::class, 'invalidate']));
+
+        do_action('deactivated_plugin', 'fixture/fixture.php', true);
+
+        $this->assertFalse(get_transient(self::KEY));
+
+        $settings = Settings::cached();
+
+        $this->assertArrayNotHasKey('book', $settings->postTypes->all());
+        $this->assertArrayNotHasKey('genre', $settings->taxonomies->all());
     }
 
     public function test_the_internal_post_types_filter_is_not_memoized(): void

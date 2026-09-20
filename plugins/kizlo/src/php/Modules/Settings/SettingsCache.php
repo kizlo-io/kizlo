@@ -33,8 +33,13 @@ class SettingsCache
 
     /**
      * Invalidate the settings transient cache.
+     *
+     * The optional arguments make this method usable directly as the callback for
+     * WordPress's plugin activation and deactivation actions. Every plugin change
+     * invalidates the cache because whether it contributes a managed object is only
+     * knowable after the next request has registered the complete object set.
      */
-    public static function invalidate(): void
+    public static function invalidate(string $plugin = '', bool $network_wide = false): void
     {
         delete_transient(self::KEY);
     }
