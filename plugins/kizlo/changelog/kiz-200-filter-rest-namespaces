@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Allow sites and integrations to opt REST namespaces into automatic contract discovery.

@@ -7,6 +7,7 @@ use Kizlo\Modules\Introspection\OperationErrors;
 use Kizlo\Modules\Introspection\PathNormalizer;
 use Kizlo\Modules\Settings\Settings;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
+use WP_REST_Posts_Controller;
 use WP_REST_Server;
 
 /**
@@ -25,6 +26,8 @@ use WP_REST_Server;
  */
 class CoreRouteTest extends IntrospectionTestCase
 {
+    private const FIXTURE_NAMESPACE = 'acme/v1';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -57,6 +60,134 @@ class CoreRouteTest extends IntrospectionTestCase
         }
 
         $this->assertSame([], $missing, 'Routes WordPress serves that the contract does not describe.');
+    }
+
+    public function test_the_namespace_filter_receives_the_defaults_and_owns_the_result(): void
+    {
+        $received = null;
+        $replace  = static function (array $namespaces) use (&$received): array {
+            $received = $namespaces;
+            return [];
+        };
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $replace);
+
+        try {
+            $apis = $this->document()['apis'];
+
+            $this->assertSame(RouteDiscovery::NAMESPACES, $received);
+            $this->assertArrayNotHasKey('posts', $apis);
+            $this->assertArrayNotHasKey('directorySizes', $apis);
+            $this->assertArrayHasKey('kizlo.comments', $apis);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $replace);
+        }
+    }
+
+    public function test_a_namespace_can_be_opted_into_route_discovery(): void
+    {
+        $register = $this->registerFixtureNamespace();
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+        $route    = static function (array $declaration, string $namespace): array {
+            if ($namespace === self::FIXTURE_NAMESPACE) {
+                $declaration['summary'] = 'Retrieve an opted-in probe';
+            }
+
+            return $declaration;
+        };
+        $schema = static function (array $properties, string $apiId): array {
+            if ($apiId === 'probes') {
+                $properties['filtered'] = ['type' => 'boolean'];
+            }
+
+            return $properties;
+        };
+
+        $this->assertArrayNotHasKey('probes', $this->document()['apis']);
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        add_filter(RouteDiscovery::ROUTE_FILTER, $route, 10, 2);
+        add_filter(RouteDiscovery::SCHEMA_FILTER, $schema, 10, 2);
+
+        try {
+            $document  = $this->document();
+            $api       = $document['apis']['probes'];
+            $operation = $api['paths']['/probes/{id}']['retrieve'];
+            $ref       = $operation['responses']['200']['body']['$ref'];
+
+            $this->assertSame(self::FIXTURE_NAMESPACE, $api['namespace']);
+            $this->assertSame('GET', $operation['method']);
+            $this->assertSame('Retrieve an opted-in probe', $operation['summary']);
+            $this->assertSame(['in' => 'path', 'type' => 'integer', 'required' => true], $operation['input']['properties']['id']);
+            $this->assertSame(['type' => 'boolean'], $document['schemas'][$ref]['properties']['filtered']);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_filter(RouteDiscovery::ROUTE_FILTER, $route);
+            remove_filter(RouteDiscovery::SCHEMA_FILTER, $schema);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    public function test_duplicate_namespaces_are_discovered_once(): void
+    {
+        $register = $this->registerFixtureNamespace();
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE, self::FIXTURE_NAMESPACE];
+        $seen     = 0;
+        $count    = static function (array $declaration, string $namespace) use (&$seen): array {
+            if ($namespace === self::FIXTURE_NAMESPACE) {
+                $seen++;
+            }
+
+            return $declaration;
+        };
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        add_filter(RouteDiscovery::ROUTE_FILTER, $count, 10, 2);
+
+        try {
+            $this->assertArrayHasKey('probes', $this->document()['apis']);
+            $this->assertSame(1, $seen);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_filter(RouteDiscovery::ROUTE_FILTER, $count);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    public function test_an_invalid_namespace_filter_result_keeps_the_defaults_and_reports_it(): void
+    {
+        $invalid = static fn(): string => self::FIXTURE_NAMESPACE;
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $invalid);
+
+        try {
+            $document = $this->document();
+
+            $this->assertArrayHasKey('posts', $document['apis']);
+            $this->assertErrorContains($document['diagnostics'], 'must return an array of REST namespaces');
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $invalid);
+        }
+    }
+
+    public function test_invalid_namespace_entries_are_ignored_without_hiding_valid_ones(): void
+    {
+        $register = $this->registerFixtureNamespace();
+        $include  = static fn(array $namespaces): array => [...$namespaces, 'missing-version', 42, self::FIXTURE_NAMESPACE];
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+
+        try {
+            $document = $this->document();
+
+            $this->assertArrayHasKey('posts', $document['apis']);
+            $this->assertArrayHasKey('probes', $document['apis']);
+            $this->assertErrorContains($document['diagnostics'], 'invalid REST namespace ("missing-version")');
+            $this->assertErrorContains($document['diagnostics'], 'invalid REST namespace (integer)');
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
     }
 
     /**
@@ -498,5 +629,26 @@ class CoreRouteTest extends IntrospectionTestCase
         $wp_rest_server = new WP_REST_Server();
 
         do_action('rest_api_init', $wp_rest_server);
+    }
+
+    private function registerFixtureNamespace(): \Closure
+    {
+        $register = static function (): void {
+            $controller = new WP_REST_Posts_Controller('post');
+
+            register_rest_route(self::FIXTURE_NAMESPACE, '/probes/(?P<id>[\d]+)', [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [$controller, 'get_item'],
+                'permission_callback' => '__return_true',
+                'args'                => [
+                    'id' => ['type' => 'integer', 'required' => true],
+                ],
+            ]);
+        };
+
+        add_action('rest_api_init', $register);
+        $this->boot();
+
+        return $register;
     }
 }

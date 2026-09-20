@@ -125,6 +125,24 @@ The reference pages cover [`WP_EndpointData`](/docs/reference/types/wp-endpoint-
 [`WP_EndpointInput`](/docs/reference/types/wp-endpoint-input), and
 [`WP_EndpointResult`](/docs/reference/types/wp-endpoint-result).
 
+## Describe another REST namespace
+
+Kizlo derives controller-backed routes from `wp/v2` and `wp-site-health/v1`. Add another registered namespace
+when its WordPress controller schemas are enough for your generated client.
+
+```php title="wp-content/plugins/acme-kizlo/acme-kizlo.php"
+add_filter('kizlo_introspection_core_namespaces', static function (array $namespaces): array {
+    $namespaces[] = 'acme/v1';
+
+    return $namespaces;
+});
+```
+
+The filter changes introspection only and registers no endpoint. Mechanical discovery uses the route paths,
+controller schemas, and generated names as they are. Use
+[`kizlo_register_route_spec`](/docs/php/functions/register-route-spec) when you need curated names, response
+shapes, error codes, or collision control.
+
 ## Add a route the plugin does not own
 
 An integration plugin can add a core or third-party route to the document without registering a new WordPress
