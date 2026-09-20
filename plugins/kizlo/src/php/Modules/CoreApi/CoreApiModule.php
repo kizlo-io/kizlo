@@ -28,6 +28,8 @@ namespace Kizlo\Modules\CoreApi;
  * `kizlo_introspection_routes` is applied when the document is built, which is
  * after every route on `rest_api_init` exists and the server is long since
  * constructed. That is the only point where the question has a stable answer.
+ * Core's handler errors use the same timing and the same public collection
+ * filter as an integration's route-error registrations.
  */
 class CoreApiModule
 {
@@ -38,6 +40,7 @@ class CoreApiModule
 
         add_filter('kizlo_introspection_routes', [$this, 'describe']);
         add_filter('kizlo_introspection_schemas', [$this, 'describeSchemas']);
+        add_filter('kizlo_introspection_route_errors', [CoreRouteErrors::class, 'register']);
     }
 
     /**

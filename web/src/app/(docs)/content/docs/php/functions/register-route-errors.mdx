@@ -1,0 +1,70 @@
+---
+title: kizlo_register_route_errors
+icon: Function
+description: Add error codes to an introspected route without redeclaring its contract.
+---
+
+`kizlo_register_route_errors` adds handler error codes to a route that Kizlo already introspects. Use it for a
+WordPress or third-party route whose registration you do not control.
+
+## Parameters
+
+```php
+kizlo_register_route_errors(array $route, array $errors): void
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `$route` | `array` | Selector with `namespace`, a readable `path`, and one HTTP `method`. |
+| `$errors` | `string[]` | Non-empty WordPress error codes returned by the route handler. |
+
+Use placeholders for named route parameters, such as `/posts/{id}`. The placeholder name must match the
+registered capture name (`id` in this example). You do not need to know its regex constraint or the generated
+API ID and operation name. Kizlo adds codes only when the selector identifies exactly one introspected route.
+
+## Example
+
+```php title="wp-content/plugins/acme-integration/routes.php"
+kizlo_register_route_errors(
+    [
+        'namespace' => 'wp/v2',
+        'path'      => '/posts/{id}',
+        'method'    => 'GET',
+    ],
+    [
+        'rest_post_invalid_id',
+        'rest_post_incorrect_password',
+    ],
+);
+```
+
+Multiple registrations for the same selector compose. Kizlo reports malformed selectors, duplicate codes,
+and selectors that match no route or more than one route in the document diagnostics. It adds no codes for an
+ambiguous selector.
+
+## Add registrations dynamically
+
+Use the `kizlo_introspection_route_errors` collection filter when registrations come from a loop. Append the
+same selector and error pair accepted by the helper.
+
+```php title="wp-content/plugins/acme-integration/routes.php"
+add_filter('kizlo_introspection_route_errors', function (array $entries): array {
+    foreach (acme_route_errors() as $path => $errors) {
+        $entries[] = [
+            'route' => [
+                'namespace' => 'acme/v1',
+                'path'      => $path,
+                'method'    => 'GET',
+            ],
+            'errors' => $errors,
+        ];
+    }
+
+    return $entries;
+});
+```
+
+## Returns
+
+`void`. Matching codes appear in `GET /kizlo/v1/introspect` and the generated error union after you run
+`kizlo generate`.
