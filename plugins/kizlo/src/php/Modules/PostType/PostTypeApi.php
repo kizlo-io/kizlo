@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\PostType;
 
 use WP_Error;
+use WP_Post;
 use WP_REST_Request;
 use Kizlo\Modules\Introspection\CoreControllers;
 use Kizlo\Modules\Introspection\CoreItemSchema;
@@ -229,8 +230,22 @@ class PostTypeApi
 
         $request->set_param('id', $id);
 
+        $post       = get_post($id);
         $controller = CoreControllers::forPostType($key);
-        return $controller->delete_item($request);
+        $previous   = $post instanceof WP_Post
+            ? $this->extension->extendSingle($controller->prepare_item_for_response($post, $request)->get_data(), $post)
+            : null;
+        $response   = $controller->delete_item($request);
+
+        if (is_wp_error($response) || !is_array($previous)) return $response;
+
+        $data = $response->get_data();
+        if (is_array($data['previous'] ?? null)) {
+            $data['previous'] = $previous;
+            $response->set_data($data);
+        }
+
+        return $response;
     }
 
     private function resolve_id(string $identifier, string $post_type): ?int

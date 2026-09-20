@@ -2,6 +2,7 @@
 
 namespace Kizlo\Modules\PostType;
 
+use WP_Post;
 use Kizlo\Modules\Post\PostSchema;
 use Kizlo\Modules\Settings\Settings;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
@@ -9,15 +10,15 @@ use Kizlo\Support\Utils;
 
 class PostTypeExtension
 {
-    public function extendSingle(array $data): array
+    public function extendSingle(array $data, ?WP_Post $post = null): array
     {
         $extend        = $data['kizlo']['extend'] ?? [];
-        $post          = get_post($data['id']);
+        $post          = $post ?? get_post($data['id']);
         $settings      = Utils::getSettings();
         $post_seo      = new PostSchema($settings);
 
         $data['kizlo'] = array_merge(
-            $this->extendBase($data, $settings),
+            $this->extendBase($data, $settings, $post),
             [
                 'seo'    => [
                     'head'   => $post_seo->buildMeta($post),
@@ -27,7 +28,7 @@ class PostTypeExtension
             ]
         );
 
-        return $this->groupCustomFields($data);
+        return $this->groupCustomFields($data, $post);
     }
 
     public function extendListItem(array $data): array
@@ -49,9 +50,9 @@ class PostTypeExtension
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function groupCustomFields(array $data): array
+    private function groupCustomFields(array $data, ?WP_Post $post = null): array
     {
-        $post = get_post($data['id']);
+        $post = $post ?? get_post($data['id']);
         if (!$post) {
             $data['kizlo']['custom'] = (object) [];
             return $data;
@@ -69,11 +70,11 @@ class PostTypeExtension
         return $data;
     }
 
-    private function extendBase(array $data, Settings $settings): array
+    private function extendBase(array $data, Settings $settings, ?WP_Post $post = null): array
     {
         $base = [];
         $id   = $data['id'];
-        $post = get_post($id);
+        $post = $post ?? get_post($id);
 
         if ($post) {
             $base['url'] = $settings->resolvePostUrl($post, $settings->postTypes->get($post->post_type));
