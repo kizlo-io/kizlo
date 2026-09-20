@@ -4,6 +4,7 @@ namespace Kizlo\Modules\Appearance;
 
 use WP_REST_Response;
 use Kizlo\Modules\Appearance\AppearanceRepository;
+use Kizlo\Modules\CoreApi\RouteDiscovery;
 use WP_Error;
 
 class AppearanceModule
@@ -19,8 +20,10 @@ class AppearanceModule
     {
         add_filter('rest_prepare_nav_menu_item', [$this, 'prepareMenuItemCallback'], PHP_INT_MAX, 2);
 
-        // See CommentModule::register() for why this waits for `rest_api_init`.
-        add_action('rest_api_init', [MenuRoutes::class, 'register']);
+        // See CommentModule::register(): the menu routes are described from the
+        // route table, and only the `kizlo` block this module attaches has to be
+        // contributed on top of what core's item schema declares.
+        add_filter(RouteDiscovery::SCHEMA_FILTER, [MenuSchemas::class, 'contribute'], 10, 2);
     }
 
     public function prepareMenuItemCallback(WP_REST_Response | WP_Error $response, object $menu_item): WP_REST_Response | WP_Error

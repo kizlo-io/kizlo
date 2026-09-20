@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Introspection;
 
+use Kizlo\Modules\CoreApi\RouteDiscovery;
+
 /**
  * Managed post type and taxonomy contributions.
  *
@@ -53,7 +55,9 @@ class ManagedContent
 
         CoreCollectionParams::flush();
         CoreItemSchema::flush();
+        CoreRouteArgs::flush();
         CoreSchemas::flush();
+        RouteDiscovery::flush();
         Registry::flush();
     }
 }

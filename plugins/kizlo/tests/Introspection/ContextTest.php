@@ -246,7 +246,7 @@ class ContextTest extends IntrospectionTestCase
         $this->boot();
 
         foreach ($this->operations() as $where => $operation) {
-            if (isset($operation['input']['properties']['context']) || in_array($where, self::KEEPS_THE_ERROR, true)) {
+            if (isset($this->inputProperties($operation)['context']) || in_array($where, self::KEEPS_THE_ERROR, true)) {
                 continue;
             }
 
@@ -264,8 +264,11 @@ class ContextTest extends IntrospectionTestCase
     {
         $this->boot();
 
-        $this->assertContains('rest_forbidden_context', $this->document()['apis']['menus']['paths']['/menus']['list']['errors']);
-
+        // The contract no longer claims this code. A described route is derived
+        // from the route table, which records no error codes, so it carries only
+        // the pre-dispatch set until KIZ-199 gives a route somewhere to declare
+        // its own. What the route can still *do* is unchanged, and that is what
+        // makes putting the code back worth doing.
         $post     = self::factory()->post->create(['post_type' => 'post', 'post_status' => 'publish']);
         $response = $this->dispatch('GET', '/wp/v2/menus', ['post' => $post]);
 
@@ -285,8 +288,8 @@ class ContextTest extends IntrospectionTestCase
 
         $list = $this->document()['apis']['comments']['paths']['/comments']['list'];
 
-        $this->assertContains('rest_forbidden_param', $list['errors']);
-
+        // As above: the parameters the code is raised for are still described,
+        // which is the half derivation can see. The code itself waits on KIZ-199.
         foreach (['author', 'author_exclude', 'author_email', 'type', 'status'] as $protected) {
             $this->assertArrayHasKey($protected, $list['input']['properties']);
         }
@@ -321,8 +324,22 @@ class ContextTest extends IntrospectionTestCase
     // HELPERS
     // ============================================================
 
-    /** The list route the term controller can still refuse without a `context`. */
-    private const KEEPS_THE_ERROR = ['menus /menus list'];
+    /**
+     * The list routes the term controller can still refuse without a `context`.
+     *
+     * `WP_REST_Terms_Controller::get_items_permissions_check()` raises
+     * `rest_forbidden_context` twice. The first is guarded by
+     * `'edit' === $request['context']` and is therefore unreachable here. The
+     * second answers a `?post=` whose post the caller cannot read terms for, and
+     * never consults `context` at all — so every described taxonomy list keeps
+     * the code, and this grows with them.
+     */
+    private const KEEPS_THE_ERROR = [
+        'menus /menus list',
+        'categories /categories list',
+        'tags /tags list',
+        'wpPatternCategory /wp_pattern_category list',
+    ];
 
     /**
      * Every operation in the document, keyed by where it is, so a failure names

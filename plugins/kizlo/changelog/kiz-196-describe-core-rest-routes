@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Describe the WordPress core REST API in the generated contract, so wp/v2 and wp-site-health/v1 routes are typed alongside Kizlo's own

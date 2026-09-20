@@ -2,7 +2,6 @@
 
 namespace Kizlo\Modules\Introspection;
 
-use Kizlo\Modules\Appearance\MenuSchemas;
 use Kizlo\Modules\Comment\CommentSchemas;
 use Kizlo\Modules\Seo\SeoSchemas;
 use Kizlo\Modules\Settings\SettingsSchemas;
@@ -94,7 +93,7 @@ class CoreSchemas
             self::POST_STATUS          => self::postStatus($status['filter']),
             self::POST_STATUS_WRITABLE => self::postStatusWritable($status['writable']),
             self::POST_STATUS_FILTER   => self::postStatusFilter($status['filter']),
-        ] + SettingsSchemas::all() + SeoSchemas::all() + CommentSchemas::all() + MenuSchemas::all() + UserSchemas::all();
+        ] + SettingsSchemas::all() + SeoSchemas::all() + CommentSchemas::all() + UserSchemas::all();
     }
 
     /**

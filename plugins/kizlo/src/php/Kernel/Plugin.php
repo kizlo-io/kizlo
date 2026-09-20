@@ -5,6 +5,7 @@ namespace Kizlo\Kernel;
 use Kizlo\Modules\Admin\AdminModule;
 use Kizlo\Modules\Appearance\AppearanceModule;
 use Kizlo\Modules\Comment\CommentModule;
+use Kizlo\Modules\CoreApi\CoreApiModule;
 use Kizlo\Modules\CustomFields\CustomFieldsModule;
 use Kizlo\Modules\Email\EmailModule;
 use Kizlo\Modules\Extension\ExtensionModule;
@@ -53,6 +54,7 @@ class Plugin
         RestApiModule::class,
         TaxonomyModule::class,
         CommentModule::class,
+        CoreApiModule::class,
         UploadModule::class,
         CustomFieldsModule::class,
         IntrospectionModule::class,

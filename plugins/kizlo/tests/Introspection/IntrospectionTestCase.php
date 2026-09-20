@@ -71,6 +71,25 @@ abstract class IntrospectionTestCase extends SeoTestCase
      *
      * @return array<int, array<string, string>>
      */
+    /**
+     * The input properties an operation declares.
+     *
+     * An operation that declares none serializes as `{}` rather than `[]`,
+     * because {@see \Kizlo\Modules\Introspection\Document} keeps a map a map
+     * whether or not it has entries. A sweep over the whole document meets one
+     * as soon as a singleton like `wp/v2/settings` is described, so the
+     * coercion lives here rather than in every caller.
+     *
+     * @param array<string, mixed> $operation
+     * @return array<string, mixed>
+     */
+    protected function inputProperties(array $operation): array
+    {
+        $properties = $operation['input']['properties'] ?? [];
+
+        return is_array($properties) ? $properties : (array) $properties;
+    }
+
     protected function errors(): array
     {
         return $this->diagnostics(Diagnostics::ERROR);

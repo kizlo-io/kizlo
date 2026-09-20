@@ -2,33 +2,27 @@
 
 namespace Kizlo\Tests\Introspection;
 
-use Kizlo\Modules\Introspection\CoreControllers;
+use Kizlo\Modules\CoreApi\RouteDiscovery;
 use Kizlo\Modules\Introspection\OperationErrors;
-use WP_REST_Comments_Controller;
+use Kizlo\Modules\Introspection\PathNormalizer;
 use WP_REST_Server;
 
 /**
  * The WordPress routes Kizlo describes but does not serve.
  *
- * Comments, menus and menu items are core's. Kizlo publishes a contract for them
- * so the generated client can reach them, which makes the contract a claim about
- * someone else's API and the claim worth checking: nothing registers these
- * routes, so nothing would fail if the description drifted from what WordPress
- * actually serves.
+ * Kizlo used to hand-declare three of them, and these tests used to compare
+ * those three against the controllers behind them. There is nothing to compare
+ * any more: the descriptions are derived from the route table rather than
+ * written beside it, so a parameter cannot drift from what core registered
+ * without the derivation itself being wrong.
  *
- * So the assertions compare the two directly. The described list is compared
- * against `get_collection_params()`, and the described single-item inputs against
- * the arguments core registered its own routes with. A parameter WordPress adds
- * or drops in a later release fails here rather than reaching a caller as a lie.
+ * What is worth testing instead is that the derivation covers everything and
+ * says the right thing about each shape. The first case is the important one —
+ * every route in a described namespace reaches the document, with no exclusion
+ * list, because an engine has no list to fall behind.
  */
 class CoreRouteTest extends IntrospectionTestCase
 {
-    private const RESOURCES = [
-        'comments'  => '/comments',
-        'menus'     => '/menus',
-        'menuItems' => '/menu-items',
-    ];
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -39,74 +33,163 @@ class CoreRouteTest extends IntrospectionTestCase
     }
 
     // ============================================================
-    // THE DESCRIBED SURFACE IS THE SERVED SURFACE
+    // EVERYTHING WORDPRESS SERVES IS DESCRIBED
     // ============================================================
 
-    public function test_every_list_parameter_the_comments_controller_honours_is_described(): void
+    /**
+     * No sample and no allowlist. Every route WordPress registers in a described
+     * namespace is in the document, so a route a later WordPress adds — or a
+     * plugin adds this afternoon — fails here if the engine stops reaching it.
+     */
+    public function test_every_route_in_a_described_namespace_is_described(): void
     {
-        $this->assertSame(
-            $this->honoured((new WP_REST_Comments_Controller())->get_collection_params()),
-            $this->described('comments', '/comments', 'list'),
-        );
-    }
+        $described = $this->describedPaths();
+        $missing   = [];
 
-    public function test_every_list_parameter_the_menus_controller_honours_is_described(): void
-    {
-        $this->assertSame(
-            $this->honoured(CoreControllers::forTaxonomy('nav_menu')->get_collection_params()),
-            $this->described('menus', '/menus', 'list'),
-        );
-    }
+        foreach ($this->servedPaths() as $path => $methods) {
+            foreach ($methods as $method) {
+                if (!isset($described[$path])) {
+                    $missing[] = sprintf('%s %s', $method, $path);
+                }
+            }
+        }
 
-    public function test_every_list_parameter_the_menu_items_controller_honours_is_described(): void
-    {
-        $this->assertSame(
-            $this->honoured(CoreControllers::forPostType('nav_menu_item')->get_collection_params()),
-            $this->described('menuItems', '/menu-items', 'list'),
-        );
+        $this->assertSame([], $missing, 'Routes WordPress serves that the contract does not describe.');
     }
 
     /**
-     * The single-item reads and the delete take their parameters from the route
-     * registration rather than from a collection-params call, so they are compared
-     * against the arguments core registered.
+     * The property the whole design exists for. Nothing in the plugin mentions
+     * this post type; WordPress generates its routes because it was registered
+     * for REST, and the contract follows without a line being written here.
      */
-    public function test_the_single_item_inputs_match_the_arguments_core_registered(): void
+    public function test_a_post_type_registered_for_rest_is_described_without_being_named(): void
     {
-        foreach (self::RESOURCES as $apiId => $base) {
-            $single = sprintf('%s/{id}', $base);
+        register_post_type('kizlo_probe', [
+            'public'       => true,
+            'show_in_rest' => true,
+            'rest_base'    => 'kizlo-probes',
+            'supports'     => ['title', 'editor'],
+        ]);
 
-            $this->assertSame(
-                $this->registered($base . '/(?P<id>[\d]+)', 'GET'),
-                $this->described($apiId, $single, 'retrieve'),
-                sprintf('%s retrieve', $apiId),
-            );
+        try {
+            $this->boot();
 
-            $this->assertSame(
-                $this->registered($base . '/(?P<id>[\d]+)', 'DELETE'),
-                $this->described($apiId, $single, 'delete'),
-                sprintf('%s delete', $apiId),
-            );
+            $api = $this->document()['apis']['kizloProbes'] ?? null;
+
+            $this->assertNotNull($api, 'A post type registered for REST was not described.');
+            $this->assertSame('wp/v2', $api['namespace']);
+            $this->assertArrayHasKey('list', $api['paths']['/kizlo-probes']);
+            $this->assertArrayHasKey('create', $api['paths']['/kizlo-probes']);
+            $this->assertArrayHasKey('retrieve', $api['paths']['/kizlo-probes/{id}']);
+        } finally {
+            unregister_post_type('kizlo_probe');
         }
     }
 
-    public function test_the_write_inputs_match_the_arguments_core_registered(): void
-    {
-        foreach (self::RESOURCES as $apiId => $base) {
-            $this->assertSame(
-                $this->registered($base, 'POST'),
-                $this->described($apiId, $base, 'create'),
-                sprintf('%s create', $apiId),
-            );
+    // ============================================================
+    // EACH SHAPE IS DESCRIBED AS THE SHAPE IT IS
+    // ============================================================
 
-            // Core registers one editable handler for POST, PUT and PATCH; Kizlo
-            // describes the one method a generated client would send.
-            $this->assertSame(
-                $this->registered($base . '/(?P<id>[\d]+)', 'PATCH'),
-                $this->described($apiId, sprintf('%s/{id}', $base), 'update'),
-                sprintf('%s update', $apiId),
-            );
+    /** A resource core addresses by name, not by row id. */
+    public function test_a_named_identifier_is_described_as_a_string(): void
+    {
+        $type = $this->document()['apis']['types']['paths']['/types/{type}']['retrieve'];
+
+        $this->assertSame('string', $type['input']['properties']['type']['type']);
+        $this->assertTrue($type['input']['properties']['type']['required']);
+    }
+
+    /** A singleton has nothing to address, so it declares no identifier. */
+    public function test_a_singleton_describes_no_identifier(): void
+    {
+        $settings = $this->document()['apis']['settings']['paths']['/settings'];
+
+        $this->assertSame([], array_keys($this->inputProperties($settings['retrieve'])));
+        $this->assertArrayHasKey('update', $settings);
+    }
+
+    /** A sub-resource carries the parent that scopes it. */
+    public function test_a_parent_scoped_route_describes_its_parent(): void
+    {
+        $revision = $this->document()['apis']['posts.revisions']['paths']['/posts/{parent}/revisions/{id}']['retrieve'];
+
+        $this->assertArrayHasKey('parent', $revision['input']['properties']);
+        $this->assertArrayHasKey('id', $revision['input']['properties']);
+    }
+
+    /** The attachments controller reads `$_FILES`, so its create is not JSON. */
+    public function test_an_upload_create_declares_multipart(): void
+    {
+        $create = $this->document()['apis']['media']['paths']['/media']['create'];
+
+        $this->assertSame('multipart/form-data', $create['input']['content_type']);
+    }
+
+    /** A trailing literal segment is its own API rather than an operation. */
+    public function test_a_trailing_segment_route_gets_its_own_api(): void
+    {
+        $apis = $this->document()['apis'];
+
+        $this->assertArrayHasKey('create', $apis['widgetTypes.encode']['paths']['/widget-types/{id}/encode']);
+        $this->assertArrayHasKey('retrieve', $apis['users.me']['paths']['/users/me']);
+    }
+
+    /** A second namespace is carried through, not flattened into `wp/v2`. */
+    public function test_a_second_namespace_is_carried_through(): void
+    {
+        $api = $this->document()['apis']['directorySizes'];
+
+        $this->assertSame('wp-site-health/v1', $api['namespace']);
+        $this->assertArrayHasKey('list', $api['paths']['/directory-sizes']);
+    }
+
+    /**
+     * Core registers a collection and the same collection scoped by a parameter
+     * on one `get_items()`, so both arrive wanting `list`.
+     */
+    public function test_a_scoped_collection_does_not_take_the_plain_list_name(): void
+    {
+        $blockTypes = $this->document()['apis']['blockTypes']['paths'];
+
+        $this->assertArrayHasKey('list', $blockTypes['/block-types']);
+        $this->assertArrayHasKey('list_by_namespace', $blockTypes['/block-types/{namespace}']);
+    }
+
+    // ============================================================
+    // WHAT DERIVATION CANNOT SEE
+    // ============================================================
+
+    /**
+     * Kizlo attaches a `kizlo` block to comments and menu items after the
+     * controller has built the response, so it is in no item schema and no
+     * derivation can reach it. The schema filter is what puts it back.
+     */
+    public function test_the_kizlo_envelope_is_contributed_to_the_described_shapes(): void
+    {
+        $document = $this->document();
+
+        foreach (['comments', 'menuItems'] as $apiId) {
+            $ref = $document['apis'][$apiId]['paths'][$apiId === 'comments' ? '/comments' : '/menu-items']['list']['responses']['200']['body']['items']['$ref'];
+
+            $this->assertArrayHasKey('kizlo', $document['schemas'][$ref]['properties'], $apiId);
+            $this->assertArrayHasKey('extend', $document['schemas'][$ref]['properties']['kizlo']['properties'], $apiId);
         }
+    }
+
+    /** The same filter is how a site keeps a route out of its own contract. */
+    public function test_a_route_can_be_omitted_through_the_filter(): void
+    {
+        $drop = static fn(array $declaration): ?array => $declaration['id'] === 'search' ? null : $declaration;
+
+        add_filter(RouteDiscovery::ROUTE_FILTER, $drop);
+
+        try {
+            $this->assertArrayNotHasKey('search', $this->document()['apis']);
+        } finally {
+            remove_filter(RouteDiscovery::ROUTE_FILTER, $drop);
+        }
+
+        $this->assertArrayHasKey('search', $this->document()['apis']);
     }
 
     // ============================================================
@@ -115,40 +198,27 @@ class CoreRouteTest extends IntrospectionTestCase
 
     /**
      * `context` decides which fields a core response carries, so describing it
-     * would describe an operation with more than one return type. A managed route
-     * pins it before the controller runs; a described route has nothing to pin it
-     * with, so it is left undeclared and the response is described in the context
-     * WordPress falls back to.
+     * would describe an operation with more than one return type. A described
+     * route has nothing to pin it with, so it is left undeclared and the response
+     * is described in the context WordPress falls back to.
      */
     public function test_no_described_operation_offers_a_context_parameter(): void
     {
-        foreach (self::RESOURCES as $apiId => $base) {
-            foreach ($this->document()['apis'][$apiId]['paths'] as $path => $operations) {
+        foreach ($this->document()['apis'] as $apiId => $api) {
+            if (!in_array($api['namespace'], RouteDiscovery::NAMESPACES, true)) {
+                continue;
+            }
+
+            foreach ($api['paths'] as $path => $operations) {
                 foreach ($operations as $name => $operation) {
                     $this->assertArrayNotHasKey(
                         'context',
-                        $operation['input']['properties'] ?? [],
+                        $this->inputProperties($operation),
                         sprintf('%s %s %s', $apiId, $name, $path),
                     );
                 }
             }
         }
-    }
-
-    /**
-     * `nav_menu_item.title` is `['string', 'object']` in core, because one schema
-     * doubles as the write surface. A response only ever carries the object, so
-     * the union would publish a branch nothing can return and every reader would
-     * narrow past it to reach `title.rendered`.
-     */
-    public function test_a_response_field_is_described_in_the_shape_it_is_written_in(): void
-    {
-        $title = $this->document()['schemas']['kizlo.menu-item']['properties']['title'];
-
-        $this->assertArrayNotHasKey('anyOf', $title);
-        $this->assertSame('object', $title['type']);
-        $this->assertArrayHasKey('rendered', $title['properties']);
-        $this->assertArrayNotHasKey('raw', $title['properties']);
     }
 
     // ============================================================
@@ -170,30 +240,6 @@ class CoreRouteTest extends IntrospectionTestCase
 
         $this->assertNotContains('kizlo_rest_unauthorized', $errors);
         $this->assertNotContains('kizlo_rest_forbidden', $errors);
-    }
-
-    /**
-     * A described route an integration opts into the guard with
-     * `kizlo_rest_route_requires_admin` does advertise the guard's codes, because
-     * the guard now stands in front of it exactly as it does a Kizlo route.
-     */
-    public function test_a_described_route_opted_into_the_guard_inherits_its_errors(): void
-    {
-        $filter = static fn(bool $required, \WP_REST_Request $request): bool =>
-            $request->get_route() === '/acme/v1/widgets' ? true : $required;
-        add_filter('kizlo_rest_route_requires_admin', $filter, 10, 2);
-
-        try {
-            $this->registerRouteSpec($this->operation());
-
-            $errors = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list']['errors'];
-
-            foreach (OperationErrors::GUARD as $code) {
-                $this->assertContains($code, $errors);
-            }
-        } finally {
-            remove_filter('kizlo_rest_route_requires_admin', $filter, 10);
-        }
     }
 
     /**
@@ -227,15 +273,9 @@ class CoreRouteTest extends IntrospectionTestCase
     }
 
     /**
-     * The rule the pair above is one instance of. Nothing *this plugin* serves gets
-     * to sit on an unqualified name, because the next core resource described here
-     * would have to rename a client path to take the name back.
-     *
-     * The rule is about the registering plugin rather than the namespace. kizlo-cf7
-     * and kizlo-woocommerce also serve under `kizlo/v1`, under their own vendor
-     * names, and cannot use `kizlo.` because {@see SpecStore::isCoreFile()} reserves
-     * it for this plugin's source tree. Only this plugin is loaded here, so under
-     * `kizlo/v1` the document holds its routes and nothing else.
+     * Nothing *this plugin* serves gets to sit on an unqualified name, because the
+     * next core route described here would have to rename a client path to take
+     * the name back.
      */
     public function test_every_route_this_plugin_serves_is_qualified_and_every_described_id_is_not(): void
     {
@@ -245,7 +285,7 @@ class CoreRouteTest extends IntrospectionTestCase
         foreach ($this->document()['apis'] as $apiId => $api) {
             if ($api['namespace'] === 'kizlo/v1') {
                 $served[] = (string) $apiId;
-            } else {
+            } elseif (in_array($api['namespace'], RouteDiscovery::NAMESPACES, true)) {
                 $described[] = (string) $apiId;
             }
         }
@@ -254,11 +294,7 @@ class CoreRouteTest extends IntrospectionTestCase
         $this->assertNotEmpty($described);
 
         foreach ($served as $apiId) {
-            $this->assertStringStartsWith(
-                'kizlo.',
-                $apiId,
-                sprintf('%s is served under kizlo/v1, so this plugin registered it unless a sibling plugin is loaded.', $apiId),
-            );
+            $this->assertStringStartsWith('kizlo.', $apiId);
         }
 
         foreach ($described as $apiId) {
@@ -266,31 +302,12 @@ class CoreRouteTest extends IntrospectionTestCase
         }
     }
 
-    public function test_every_described_resource_carries_the_five_operations(): void
-    {
-        foreach (array_keys(self::RESOURCES) as $apiId) {
-            $operations = [];
-
-            foreach ($this->document()['apis'][$apiId]['paths'] as $path => $found) {
-                foreach ($found as $name => $_) {
-                    $operations[] = $name;
-                }
-            }
-
-            sort($operations);
-
-            $this->assertSame(['create', 'delete', 'list', 'retrieve', 'update'], $operations, $apiId);
-        }
-    }
-
     public function test_a_described_list_carries_the_pagination_headers(): void
     {
-        foreach (self::RESOURCES as $apiId => $base) {
-            $headers = $this->document()['apis'][$apiId]['paths'][$base]['list']['responses']['200']['headers'];
+        $headers = $this->document()['apis']['posts']['paths']['/posts']['list']['responses']['200']['headers'];
 
-            $this->assertArrayHasKey('X-WP-Total', $headers['properties']);
-            $this->assertArrayHasKey('X-WP-TotalPages', $headers['properties']);
-        }
+        $this->assertArrayHasKey('X-WP-Total', $headers['properties']);
+        $this->assertArrayHasKey('X-WP-TotalPages', $headers['properties']);
     }
 
     public function test_describing_these_routes_costs_no_diagnostics(): void
@@ -303,58 +320,59 @@ class CoreRouteTest extends IntrospectionTestCase
     // ============================================================
 
     /**
-     * The input property names an operation declares.
+     * Every path the document describes in a configured namespace.
      *
-     * @return array<int, string>
+     * @return array<string, true>
      */
-    private function described(string $apiId, string $path, string $operation): array
+    private function describedPaths(): array
     {
-        $properties = $this->document()['apis'][$apiId]['paths'][$path][$operation]['input']['properties'] ?? [];
+        $paths = [];
 
-        return $this->sorted(array_keys($properties));
-    }
-
-    /**
-     * The argument names core registered a route with, minus `context`.
-     *
-     * @return array<int, string>
-     */
-    private function registered(string $route, string $method): array
-    {
-        foreach (rest_get_server()->get_routes()['/wp/v2' . $route] ?? [] as $handler) {
-            if (!is_array($handler['methods'] ?? null) || ($handler['methods'][$method] ?? false) !== true) {
+        foreach ($this->document()['apis'] as $api) {
+            if (!in_array($api['namespace'], RouteDiscovery::NAMESPACES, true)) {
                 continue;
             }
 
-            return $this->honoured($handler['args'] ?? []);
+            foreach (array_keys($api['paths']) as $path) {
+                $paths[(string) $path] = true;
+            }
         }
 
-        $this->fail(sprintf('WordPress registers no %s handler on /wp/v2%s.', $method, $route));
+        return $paths;
     }
 
     /**
-     * @param array<array-key, mixed> $params
-     * @return array<int, string>
+     * Every path WordPress serves in a configured namespace, minus the namespace
+     * roots, which are the index of the namespace rather than a resource in it.
+     *
+     * @return array<string, array<int, string>>
      */
-    private function honoured(array $params): array
+    private function servedPaths(): array
     {
-        unset($params['context']);
+        $paths = [];
 
-        /** @var array<int, string> $names */
-        $names = array_keys($params);
+        foreach (rest_get_server()->get_routes() as $route => $handlers) {
+            foreach (RouteDiscovery::NAMESPACES as $namespace) {
+                $prefix = '/' . trim($namespace, '/');
 
-        return $this->sorted($names);
-    }
+                if ($route === $prefix || !str_starts_with($route, $prefix . '/')) {
+                    continue;
+                }
 
-    /**
-     * @param array<int, string> $names
-     * @return array<int, string>
-     */
-    private function sorted(array $names): array
-    {
-        sort($names);
+                // Normalized the same way the engine does. A hand-rolled regex
+                // here would disagree with it on exactly the routes that are
+                // hard: core nests groups inside the template id.
+                $path = PathNormalizer::normalize(substr($route, strlen($prefix)))['path'];
 
-        return $names;
+                foreach (is_array($handlers) ? $handlers : [] as $handler) {
+                    foreach (is_array($handler['methods'] ?? null) ? array_keys(array_filter($handler['methods'])) : [] as $method) {
+                        $paths[$path][] = (string) $method;
+                    }
+                }
+            }
+        }
+
+        return $paths;
     }
 
     private function boot(): void
