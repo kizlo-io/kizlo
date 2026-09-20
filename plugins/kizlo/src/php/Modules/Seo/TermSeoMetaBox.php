@@ -26,12 +26,21 @@ class TermSeoMetaBox
 
     public function register(): void
     {
+        // Priority 30: after Registrar::registerObjects() at 20, so the managed set is
+        // complete. Reading it during boot would leave the term editor for every
+        // taxonomy an extension plugin contributes without these fields. Both hooks
+        // below belong to admin screens, which run long after init.
+        add_action('init', [$this, 'registerTaxonomyFields'], 30);
+
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
+    }
+
+    public function registerTaxonomyFields(): void
+    {
         foreach (array_keys(Utils::getSettings()->taxonomies->all()) as $taxonomy) {
             add_action("{$taxonomy}_edit_form_fields", [$this, 'render']);
             add_action("edited_{$taxonomy}", [$this, 'save']);
         }
-
-        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
     }
 
     /**

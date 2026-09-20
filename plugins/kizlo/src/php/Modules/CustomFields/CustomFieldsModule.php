@@ -41,6 +41,15 @@ class CustomFieldsModule
         (new PostCustomFieldsMetaBox())->register();
         (new TermCustomFieldsForm())->register();
 
+        // Priority 30: after Registrar::registerObjects() at 20, so the managed set is
+        // complete. Reading it during boot would miss every object an extension plugin
+        // contributes, and silently drop the writes for it. The hooks below belong to
+        // REST requests, which dispatch long after init.
+        add_action('init', [$this, 'registerWriteHooks'], 30);
+    }
+
+    public function registerWriteHooks(): void
+    {
         foreach (array_keys(Utils::getSettings()->postTypes->all()) as $post_type) {
             add_action("rest_after_insert_{$post_type}", function (WP_Post $post, WP_REST_Request $request) {
                 $this->save(CustomFieldsStore::META_POST, $post->ID, $request);

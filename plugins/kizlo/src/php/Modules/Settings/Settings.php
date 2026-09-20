@@ -6,6 +6,7 @@ use WP_Post;
 use WP_Term;
 use WP_User;
 use Kizlo\Support\Variables;
+use Kizlo\Modules\Registration\Registrar;
 use Kizlo\Modules\Settings\Site\SiteSettings;
 use Kizlo\Modules\Settings\Brand\BrandSettings;
 use Kizlo\Modules\Settings\Identity\IdentitySettings;
@@ -88,7 +89,11 @@ class Settings
 
     /**
      * Load all settings from transient cache, falling back to fresh load.
-     * Cache is rebuilt automatically on miss.
+     *
+     * A miss is only written back once {@see Registrar::objectsRegistered()} holds.
+     * Before that the post type and taxonomy membership this builds is whatever the
+     * current point in the boot sequence can see, which is correct for the caller
+     * asking but wrong to hand to everyone else for a day.
      */
     public static function cached(): static
     {
@@ -114,7 +119,10 @@ class Settings
         }
 
         $instance = static::load();
-        $instance->cache();
+
+        if (Registrar::objectsRegistered()) {
+            $instance->cache();
+        }
 
         return $instance;
     }

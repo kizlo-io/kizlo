@@ -2,6 +2,7 @@
 
 namespace Kizlo\Tests\Introspection;
 
+use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\Registration\PostTypeRegistration;
 use Kizlo\Modules\Registration\Registrar;
 use Kizlo\Modules\Registration\TaxonomyRegistration;
@@ -124,6 +125,28 @@ class ManagedContentTest extends IntrospectionTestCase
             ['/post-types/book', '/post-types/book/{identifier}'],
             array_keys($apis['kizlo.post-types.book']['paths']),
         );
+    }
+
+    /**
+     * An integration contributes its post type through `kizlo_internal_post_types`,
+     * which it joins after core has booted. The configured fields still have to reach
+     * the schemas: a `custom` bag that collapses to a bare object is what a generated
+     * client sees as an untyped record, and the assertions over it stop holding.
+     */
+    public function test_an_integration_contributed_post_type_carries_its_custom_fields(): void
+    {
+        register_post_type('book', ['public' => true, 'show_in_rest' => true, 'supports' => ['title', 'editor']]);
+        add_filter('kizlo_internal_post_types', static fn(array $types): array => $types + ['book' => []]);
+
+        $this->seedSettings(['post_types' => ['book' => [
+            'rest_api_enabled' => true,
+            'custom_fields'    => FieldDefinitions::normalize([['type' => 'text', 'name' => 'blurb', 'label' => 'Blurb']]),
+        ]]]);
+
+        $item = $this->document()['schemas']['kizlo.post-types.book.item']['properties']['kizlo']['properties']['custom'];
+
+        $this->assertArrayHasKey('blurb', $item['properties']);
+        $this->assertSame('string', $item['properties']['blurb']['type']);
     }
 
     public function test_a_kizlo_created_post_type_is_described(): void
