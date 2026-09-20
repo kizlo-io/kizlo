@@ -58,13 +58,11 @@ use WP_REST_Controller;
  */
 final class RouteDiscovery
 {
-    /**
-     * The namespaces described here.
-     *
-     * WordPress's own, and only two of them for now. The walk is namespace-blind,
-     * so widening this list is the whole of describing another one.
-     */
+    /** The namespaces described when no site or integration changes the list. */
     public const NAMESPACES = ['wp/v2', 'wp-site-health/v1'];
+
+    /** The REST namespaces whose registered routes are derived. */
+    public const NAMESPACE_FILTER = 'kizlo_introspection_core_namespaces';
 
     /** Each derived declaration, before registration. Return null to drop the route. */
     public const ROUTE_FILTER = 'kizlo_introspection_core_route';
@@ -266,10 +264,11 @@ final class RouteDiscovery
      */
     private static function routes(): array
     {
-        $found = [];
+        $found      = [];
+        $namespaces = self::namespaces();
 
         foreach (rest_get_server()->get_routes() as $route => $handlers) {
-            foreach (self::NAMESPACES as $namespace) {
+            foreach ($namespaces as $namespace) {
                 $prefix = '/' . trim($namespace, '/');
 
                 if ($route === $prefix || !str_starts_with($route, $prefix . '/')) {
@@ -285,6 +284,46 @@ final class RouteDiscovery
         });
 
         return $found;
+    }
+
+    /**
+     * The configured namespace list, with a broken contribution excluded rather
+     * than allowed to make introspection fatal.
+     *
+     * @return array<int, string>
+     */
+    private static function namespaces(): array
+    {
+        $filtered = apply_filters(self::NAMESPACE_FILTER, self::NAMESPACES);
+
+        if (!is_array($filtered)) {
+            SpecStore::addError(
+                ['keyword' => self::NAMESPACE_FILTER],
+                sprintf('The "%s" filter must return an array of REST namespaces; the default list was kept.', self::NAMESPACE_FILTER),
+            );
+
+            return self::NAMESPACES;
+        }
+
+        $namespaces = [];
+
+        foreach ($filtered as $namespace) {
+            if (!Spec::isValidNamespace($namespace)) {
+                SpecStore::addError(
+                    ['keyword' => self::NAMESPACE_FILTER],
+                    sprintf(
+                        'The "%s" filter returned an invalid REST namespace (%s); that entry was ignored.',
+                        self::NAMESPACE_FILTER,
+                        is_string($namespace) ? sprintf('"%s"', $namespace) : gettype($namespace),
+                    ),
+                );
+                continue;
+            }
+
+            $namespaces[$namespace] = true;
+        }
+
+        return array_keys($namespaces);
     }
 
     /**
