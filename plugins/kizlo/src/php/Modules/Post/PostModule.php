@@ -2,6 +2,8 @@
 
 namespace Kizlo\Modules\Post;
 
+use Kizlo\Modules\CoreApi\RouteDiscovery;
+
 class PostModule
 {
     public PostExtension $post_extension;
@@ -17,5 +19,7 @@ class PostModule
     {
         $this->post_extension->register();
         $this->post_listener->register();
+
+        add_filter(RouteDiscovery::SCHEMA_FILTER, [PostRouteSchemas::class, 'contribute'], 10, 5);
     }
 }

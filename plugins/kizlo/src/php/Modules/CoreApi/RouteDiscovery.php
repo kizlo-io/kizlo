@@ -202,7 +202,7 @@ final class RouteDiscovery
 
                     $claimed[$apiId][$operation] = $path;
 
-                    $schemaId = self::schema($schemas, $byShape, $apiId, $controller, $path);
+                    $schemaId = self::schema($schemas, $byShape, $apiId, $controller, $operation, $path);
 
                     $declaration = self::declare(
                         $apiId,
@@ -462,7 +462,7 @@ final class RouteDiscovery
     }
 
     // ============================================================
-    // ONE SCHEMA
+    // DERIVED SCHEMAS
     // ============================================================
 
     /**
@@ -478,12 +478,19 @@ final class RouteDiscovery
      * @param array<string, array<string, mixed>> $schemas
      * @param array<string, string>               $byShape
      */
-    private static function schema(array &$schemas, array &$byShape, string $apiId, WP_REST_Controller $controller, string $path): string
+    private static function schema(
+        array &$schemas,
+        array &$byShape,
+        string $apiId,
+        WP_REST_Controller $controller,
+        string $operation,
+        string $path,
+    ): string
     {
         $properties = CoreItemSchema::responseForController($controller, $path, CoreResource::CONTEXT);
 
         /** @var array<string, array<string, mixed>> $properties */
-        $properties = apply_filters(self::SCHEMA_FILTER, $properties, $apiId, $controller);
+        $properties = apply_filters(self::SCHEMA_FILTER, $properties, $apiId, $controller, $operation, $path);
 
         $fingerprint = md5((string) wp_json_encode($properties));
 
@@ -492,6 +499,15 @@ final class RouteDiscovery
         }
 
         $id = self::schemaId($apiId);
+
+        if (isset($schemas[$id])) {
+            $suffix = str_replace('_', '-', $operation);
+            $id     .= '.' . $suffix;
+
+            for ($copy = 2; isset($schemas[$id]); $copy++) {
+                $id = sprintf('%s.%s-%d', self::schemaId($apiId), $suffix, $copy);
+            }
+        }
 
         $schemas[$id] = [
             'type'        => 'object',

@@ -1,0 +1,4 @@
+Significance: major
+Type: changed
+
+Limit core WordPress route envelopes to custom fields, extensions, and enabled SEO for every included content type.

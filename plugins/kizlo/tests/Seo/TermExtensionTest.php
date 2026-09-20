@@ -8,7 +8,7 @@ use Kizlo\Modules\Taxonomy\TermExtension;
 /**
  * The REST delivery layer for terms: `TermExtension` injects the resolved SEO
  * head + JSON-LD (built from taxonomy templates and per-term overrides) into the
- * single-term response, and a light term base into every response.
+ * single-term response, while every response carries the open extension bag.
  */
 class TermExtensionTest extends SeoTestCase
 {
@@ -28,8 +28,7 @@ class TermExtensionTest extends SeoTestCase
 
         $this->assertSame('News | Example Site', $data['kizlo']['seo']['head']['title']);
         $this->assertArrayHasKey('@graph', $data['kizlo']['seo']['schema']);
-        $this->assertSame('News', $data['kizlo']['name']);
-        $this->assertSame('news', $data['kizlo']['slug']);
+        $this->assertSame([], $data['kizlo']['extend']);
     }
 
     public function test_single_response_reflects_per_term_overrides(): void
@@ -44,14 +43,14 @@ class TermExtensionTest extends SeoTestCase
         $this->assertSame('Overridden term title', $data['kizlo']['seo']['head']['title']);
     }
 
-    public function test_list_item_carries_base_but_not_seo(): void
+    public function test_list_item_carries_only_extend_and_not_seo(): void
     {
         $this->seedSettings();
         $term = $this->category('News', 'news');
 
         $data = (new TermExtension())->extendListItem(['id' => $term->term_id], $term);
 
-        $this->assertSame('News', $data['kizlo']['name']);
+        $this->assertSame(['extend'], array_keys($data['kizlo']));
         $this->assertArrayNotHasKey('seo', $data['kizlo']);
     }
 }

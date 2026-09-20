@@ -5,6 +5,8 @@ namespace Kizlo\Tests\Introspection;
 use Kizlo\Modules\CoreApi\RouteDiscovery;
 use Kizlo\Modules\Introspection\OperationErrors;
 use Kizlo\Modules\Introspection\PathNormalizer;
+use Kizlo\Modules\Settings\Settings;
+use Kizlo\Modules\CustomFields\FieldDefinitions;
 use WP_REST_Server;
 
 /**
@@ -81,6 +83,23 @@ class CoreRouteTest extends IntrospectionTestCase
             $this->assertArrayHasKey('list', $api['paths']['/kizlo-probes']);
             $this->assertArrayHasKey('create', $api['paths']['/kizlo-probes']);
             $this->assertArrayHasKey('retrieve', $api['paths']['/kizlo-probes/{id}']);
+
+            $properties = $this->responseProperties($this->document(), 'kizloProbes', '/kizlo-probes/{id}', 'retrieve');
+            $this->assertArrayNotHasKey('kizlo', $properties);
+
+            $include = static fn(array $postTypes): array => [...$postTypes, 'kizlo_probe'];
+            add_filter('kizlo_included_post_types', $include);
+
+            try {
+                Settings::invalidateCache();
+                $properties = $this->responseProperties($this->document(), 'kizloProbes', '/kizlo-probes/{id}', 'retrieve');
+
+                $this->assertArrayHasKey('kizlo', $properties);
+                $this->assertSame(['custom', 'extend'], $this->sorted(array_keys($properties['kizlo']['properties'])));
+            } finally {
+                remove_filter('kizlo_included_post_types', $include);
+                Settings::invalidateCache();
+            }
         } finally {
             unregister_post_type('kizlo_probe');
         }
@@ -173,6 +192,82 @@ class CoreRouteTest extends IntrospectionTestCase
 
             $this->assertArrayHasKey('kizlo', $document['schemas'][$ref]['properties'], $apiId);
             $this->assertArrayHasKey('extend', $document['schemas'][$ref]['properties']['kizlo']['properties'], $apiId);
+        }
+    }
+
+    public function test_included_content_contributes_the_operation_appropriate_envelope(): void
+    {
+        $document = $this->document();
+
+        foreach ([
+            ['posts', '/posts', '/posts/{id}'],
+            ['categories', '/categories', '/categories/{id}'],
+        ] as [$apiId, $collection, $item]) {
+            $list     = $this->responseProperties($document, $apiId, $collection, 'list')['kizlo']['properties'];
+            $retrieve = $this->responseProperties($document, $apiId, $item, 'retrieve')['kizlo']['properties'];
+
+            $this->assertSame(['custom', 'extend'], $this->sorted(array_keys($list)), $apiId);
+            $this->assertSame(['custom', 'extend', 'seo'], $this->sorted(array_keys($retrieve)), $apiId);
+
+            foreach (['tags', 'author', 'categories', 'featured_image', 'id', 'name', 'slug', 'description', 'parent', 'count', 'url'] as $field) {
+                $this->assertArrayNotHasKey($field, $list, $apiId);
+                $this->assertArrayNotHasKey($field, $retrieve, $apiId);
+            }
+        }
+
+        $media = $this->responseProperties($document, 'media', '/media/{id}', 'retrieve')['kizlo']['properties'];
+        $this->assertSame(['custom', 'extend'], $this->sorted(array_keys($media)));
+    }
+
+    public function test_operation_specific_envelopes_use_distinct_reusable_schemas(): void
+    {
+        $document = $this->document();
+        $paths    = $document['apis']['posts']['paths'];
+
+        $listRef     = $paths['/posts']['list']['responses']['200']['body']['items']['$ref'];
+        $createRef   = $paths['/posts']['create']['responses']['201']['body']['$ref'];
+        $retrieveRef = $paths['/posts/{id}']['retrieve']['responses']['200']['body']['$ref'];
+        $updateRef   = $paths['/posts/{id}']['update']['responses']['200']['body']['$ref'];
+
+        $this->assertSame($listRef, $createRef);
+        $this->assertSame($retrieveRef, $updateRef);
+        $this->assertNotSame($listRef, $retrieveRef);
+        $this->assertArrayHasKey($listRef, $document['schemas']);
+        $this->assertArrayHasKey($retrieveRef, $document['schemas']);
+    }
+
+    public function test_core_envelopes_describe_configured_and_contributed_custom_fields(): void
+    {
+        $definitions = FieldDefinitions::normalize([['type' => 'text', 'name' => 'banner']]);
+        $this->seedSettings([
+            'post_types' => ['page' => ['custom_fields' => $definitions]],
+            'taxonomies' => ['category' => ['custom_fields' => $definitions]],
+        ]);
+
+        add_filter('kizlo_post_type_custom_schema', static function (array $properties, string $slug): array {
+            if ($slug === 'page') $properties['acme'] = ['type' => 'object', 'required' => true];
+            return $properties;
+        }, 10, 2);
+        add_filter('kizlo_taxonomy_custom_schema', static function (array $properties, string $slug): array {
+            if ($slug === 'category') $properties['acme'] = ['type' => 'object', 'required' => true];
+            return $properties;
+        }, 10, 2);
+
+        try {
+            $document = $this->document();
+
+            foreach ([
+                ['pages', '/pages/{id}'],
+                ['categories', '/categories/{id}'],
+            ] as [$apiId, $path]) {
+                $custom = $this->responseProperties($document, $apiId, $path, 'retrieve')['kizlo']['properties']['custom']['properties'];
+
+                $this->assertSame('string', $custom['banner']['type']);
+                $this->assertSame(['type' => 'object', 'required' => true], $custom['acme']);
+            }
+        } finally {
+            remove_all_filters('kizlo_post_type_custom_schema');
+            remove_all_filters('kizlo_taxonomy_custom_schema');
         }
     }
 
@@ -373,6 +468,27 @@ class CoreRouteTest extends IntrospectionTestCase
         }
 
         return $paths;
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @return array<string, array<string, mixed>>
+     */
+    private function responseProperties(array $document, string $apiId, string $path, string $operation): array
+    {
+        $response = $document['apis'][$apiId]['paths'][$path][$operation]['responses'];
+        $success  = $response[array_key_first($response)];
+        $body     = $success['body'];
+        $ref      = $body['$ref'] ?? $body['items']['$ref'];
+
+        return $document['schemas'][$ref]['properties'];
+    }
+
+    /** @param string[] $values */
+    private function sorted(array $values): array
+    {
+        sort($values);
+        return $values;
     }
 
     private function boot(): void

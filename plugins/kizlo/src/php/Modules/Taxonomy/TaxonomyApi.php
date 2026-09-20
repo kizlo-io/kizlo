@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\Taxonomy;
 
 use WP_Error;
+use WP_Term;
 use WP_REST_Request;
 use WP_REST_Terms_Controller;
 use Kizlo\Modules\Introspection\CoreControllers;
@@ -25,6 +26,13 @@ use Kizlo\Modules\Introspection\RouteRegistrar;
  */
 class TaxonomyApi
 {
+    private TaxonomyExtension $extension;
+
+    public function __construct()
+    {
+        $this->extension = new TaxonomyExtension();
+    }
+
     public function register(): void
     {
         add_action('rest_api_init', function (): void {
@@ -107,7 +115,14 @@ class TaxonomyApi
      */
     private function list(string $taxonomy, WP_REST_Request $request): mixed
     {
-        return CoreControllers::forTaxonomy($taxonomy)->get_items($request);
+        $response = CoreControllers::forTaxonomy($taxonomy)->get_items($request);
+
+        if (is_wp_error($response)) return $response;
+
+        $items = array_map($this->extension->extendListItem(...), $response->get_data());
+
+        $response->set_data($items);
+        return $response;
     }
 
     private function retrieve(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
@@ -119,12 +134,22 @@ class TaxonomyApi
 
         $request->set_param('id', $id);
 
-        return CoreControllers::forTaxonomy($taxonomy)->get_item($request);
+        $response = CoreControllers::forTaxonomy($taxonomy)->get_item($request);
+
+        if (is_wp_error($response)) return $response;
+
+        $response->set_data($this->extension->extendSingle($response->get_data()));
+        return $response;
     }
 
     private function create(string $taxonomy, WP_REST_Request $request): mixed
     {
-        return CoreControllers::forTaxonomy($taxonomy)->create_item($request);
+        $response = CoreControllers::forTaxonomy($taxonomy)->create_item($request);
+
+        if (is_wp_error($response)) return $response;
+
+        $response->set_data($this->extension->extendSingle($response->get_data()));
+        return $response;
     }
 
     private function update(string $taxonomy, string $identifier, WP_REST_Request $request): mixed
@@ -136,7 +161,12 @@ class TaxonomyApi
 
         $request->set_param('id', $id);
 
-        return CoreControllers::forTaxonomy($taxonomy)->update_item($request);
+        $response = CoreControllers::forTaxonomy($taxonomy)->update_item($request);
+
+        if (is_wp_error($response)) return $response;
+
+        $response->set_data($this->extension->extendSingle($response->get_data()));
+        return $response;
     }
 
     /**
@@ -153,7 +183,22 @@ class TaxonomyApi
 
         $request->set_param('id', $id);
 
-        return CoreControllers::forTaxonomy($taxonomy)->delete_item($request);
+        $controller = CoreControllers::forTaxonomy($taxonomy);
+        $term       = get_term($id, $taxonomy);
+        $previous   = $term instanceof WP_Term
+            ? $this->extension->extendSingle($controller->prepare_item_for_response($term, $request)->get_data(), $term)
+            : null;
+        $response   = $controller->delete_item($request);
+
+        if (is_wp_error($response) || !is_array($previous)) return $response;
+
+        $data = $response->get_data();
+        if (is_array($data['previous'] ?? null)) {
+            $data['previous'] = $previous;
+            $response->set_data($data);
+        }
+
+        return $response;
     }
 
     private function resolve_id(string $identifier, string $taxonomy): ?int

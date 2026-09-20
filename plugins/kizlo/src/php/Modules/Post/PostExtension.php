@@ -12,7 +12,20 @@ class PostExtension
 {
     public function register(): void
     {
-        add_filter('rest_prepare_post', [$this, 'prepare'], PHP_INT_MAX, 3);
+        if (!did_action('rest_api_init')) {
+            add_action('rest_api_init', [$this, 'bind'], PHP_INT_MAX);
+
+            return;
+        }
+
+        $this->bind();
+    }
+
+    public function bind(): void
+    {
+        foreach (array_keys(Utils::getSettings()->postTypes->all()) as $post_type) {
+            add_filter("rest_prepare_{$post_type}", [$this, 'prepare'], PHP_INT_MAX, 3);
+        }
     }
 
     public function prepare(WP_REST_Response $response, WP_Post $post, WP_REST_Request $request): WP_REST_Response
@@ -38,69 +51,26 @@ class PostExtension
 
     public function extendSingle(array $data, WP_Post $post): array
     {
-        $base = $this->_extendPostBase($post);
-
         $settings = Utils::getSettings();
-        $post_seo = new PostSchema($settings);
+        $kizlo    = kizlo_apply_extend_filter('post', $post);
 
-        $data['kizlo'] = array_merge([
-            'seo'            => [
+        if ($settings->postTypes->get($post->post_type)->getSeoEnabled()) {
+            $post_seo = new PostSchema($settings);
+            $kizlo = ['seo' => [
                 'head'  => $post_seo->buildMeta($post),
                 'schema' => $post_seo->jsonLd($post),
-            ]
-        ], $base, kizlo_apply_extend_filter('post', $post));
+            ]] + $kizlo;
+        }
+
+        $data['kizlo'] = $kizlo;
 
         return $data;
     }
 
     public function extendListItem(array $data, WP_Post $post): array
     {
-        $base = $this->_extendPostBase($post);
-
-        $data['kizlo'] = array_merge([], $base,  kizlo_apply_extend_filter('post_list_item', $post));
+        $data['kizlo'] = kizlo_apply_extend_filter('post_list_item', $post);
 
         return $data;
-    }
-
-    private function _extendPostBase(WP_Post $post)
-    {
-        $categories = [];
-        foreach (wp_get_post_categories($post->ID, ['fields' => 'all']) as $term) {
-            $categories[] = [
-                'id'   => $term->term_id,
-                'name' => $term->name,
-                'slug' => $term->slug,
-            ];
-        }
-
-        $tags = [];
-        foreach (wp_get_post_tags($post->ID, ['fields' => 'all']) as $term) {
-            $tags[] = [
-                'id'   => $term->term_id,
-                'name' => $term->name,
-                'slug' => $term->slug,
-            ];
-        }
-
-        $author_id = (int) $post->post_author;
-        $author    = [
-            'id'           => $author_id,
-            'name'         => get_the_author_meta('display_name', $author_id),
-            'slug'         => get_the_author_meta('user_nicename', $author_id),
-            'avatar_url'   => get_avatar_url($author_id),
-        ];
-
-        $featured_image = null;
-        $thumbnail_id   = get_post_thumbnail_id($post->ID);
-        if ($thumbnail_id) {
-            $featured_image = kizlo_ensure_media_image_data($thumbnail_id);
-        }
-
-        return [
-            'tags'           => $tags,
-            'author'         => $author,
-            'categories'     => $categories,
-            'featured_image' => $featured_image,
-        ];
     }
 }

@@ -17,11 +17,22 @@ use Kizlo\Modules\CustomFields\CustomFieldsStore;
  * Hooks `rest_prepare_{taxonomy}` for every Kizlo-managed taxonomy (the same set
  * the term editor is registered on), so a single-term response carries the
  * resolved `head` meta + JSON-LD `schema` built from the taxonomy templates and
- * any per-term overrides. List responses only carry the light term base.
+ * any per-term overrides. List responses carry only Kizlo's extension bags.
  */
 class TermExtension
 {
     public function register(): void
+    {
+        if (!did_action('rest_api_init')) {
+            add_action('rest_api_init', [$this, 'bind'], PHP_INT_MAX);
+
+            return;
+        }
+
+        $this->bind();
+    }
+
+    public function bind(): void
     {
         foreach (array_keys(Utils::getSettings()->taxonomies->all()) as $taxonomy) {
             add_filter("rest_prepare_{$taxonomy}", [$this, 'prepare'], PHP_INT_MAX, 3);
@@ -52,44 +63,26 @@ class TermExtension
 
     public function extendSingle(array $data, WP_Term $term): array
     {
-        $term_seo = new TermSchema(Utils::getSettings());
+        $settings = Utils::getSettings();
+        $kizlo    = kizlo_apply_extend_filter('term', $term);
 
-        $data['kizlo'] = array_merge([
-            'seo' => [
+        if ($settings->taxonomies->get($term->taxonomy)->getSeoEnabled()) {
+            $term_seo = new TermSchema($settings);
+            $kizlo = ['seo' => [
                 'head'   => $term_seo->buildMeta($term),
                 'schema' => $term_seo->jsonLd($term),
-            ],
-        ], $this->extendBase($term), kizlo_apply_extend_filter('term', $term));
+            ]] + $kizlo;
+        }
+
+        $data['kizlo'] = $kizlo;
 
         return $data;
     }
 
     public function extendListItem(array $data, WP_Term $term): array
     {
-        $data['kizlo'] = array_merge([], $this->extendBase($term), kizlo_apply_extend_filter('term_list_item', $term));
+        $data['kizlo'] = kizlo_apply_extend_filter('term_list_item', $term);
 
         return $data;
-    }
-
-    /**
-     * The shared term base carried on both single and list responses.
-     *
-     * @return array{id: int, name: string, slug: string, description: string, parent: int, count: int, url: string}
-     */
-    private function extendBase(WP_Term $term): array
-    {
-        $settings = Utils::getSettings();
-
-        $taxonomy = $settings->taxonomies->get($term->taxonomy);
-
-        return [
-            'id'            => $term->term_id,
-            'name'          => $term->name,
-            'slug'          => $term->slug,
-            'description'   => $term->description,
-            'parent'        => $term->parent,
-            'count'         => $term->count,
-            'url'           => $settings->resolveTermUrl($term, $taxonomy),
-        ];
     }
 }
