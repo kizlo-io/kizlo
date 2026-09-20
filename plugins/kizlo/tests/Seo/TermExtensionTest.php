@@ -3,6 +3,7 @@
 namespace Kizlo\Tests\Seo;
 
 use WP_Term;
+use Kizlo\Modules\Settings\Settings;
 use Kizlo\Modules\Taxonomy\TermExtension;
 
 /**
@@ -17,6 +18,28 @@ class TermExtensionTest extends SeoTestCase
         $id = self::factory()->category->create(['name' => $name, 'slug' => $slug]);
 
         return get_term($id, 'category');
+    }
+
+    /**
+     * One filter per managed taxonomy, so binding has to see the complete managed set.
+     * `register()` defers to `rest_api_init`, which is after `init`, so by then it does.
+     * What this pins is the other half: a taxonomy an extension plugin contributes is
+     * in that set even when binding reads a cold settings cache.
+     *
+     * Asserted against `bind()` rather than `register()` because `did_action(
+     * 'rest_api_init')` is process state a previous test may already have set.
+     */
+    public function test_binding_attaches_filters_for_a_contributed_taxonomy(): void
+    {
+        register_taxonomy('genre', 'post', ['public' => true, 'show_in_rest' => true]);
+        add_filter('kizlo_internal_taxonomies', static fn(array $taxonomies): array => $taxonomies + ['genre' => []]);
+
+        // A fresh request's settings state, so the managed set is there to be read.
+        Settings::invalidateCache();
+
+        (new TermExtension())->bind();
+
+        $this->assertNotFalse(has_filter('rest_prepare_genre'));
     }
 
     public function test_single_response_carries_resolved_seo_head_and_schema(): void

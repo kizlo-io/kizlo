@@ -45,6 +45,15 @@ class SeoModule
     {
         add_filter('kizlo_validate_managed_write', [$this, 'validateWrite'], 10, 3);
 
+        // Priority 30: after Registrar::registerObjects() at 20, so the managed set is
+        // complete. Reading it during boot attached these only for the objects a
+        // half-built set happened to contain, so an override on any other one was
+        // accepted and then dropped. The hooks serve REST requests, dispatched later.
+        add_action('init', [$this, 'registerWriteHooks'], 30);
+    }
+
+    public function registerWriteHooks(): void
+    {
         foreach (array_keys(Utils::getSettings()->postTypes->all()) as $post_type) {
             add_action("rest_after_insert_{$post_type}", function (WP_Post $post, WP_REST_Request $request) {
                 $this->save(SeoOverridesStore::META_POST, $post->ID, $request);

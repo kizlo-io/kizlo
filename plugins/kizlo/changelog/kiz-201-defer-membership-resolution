@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Apply configured custom fields and SEO to post types and taxonomies an integration contributes, such as WooCommerce products

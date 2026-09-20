@@ -32,13 +32,14 @@ class TaxonomySettings extends SettingsIndexedAbstract
         'post_tag' => ['seo_enabled' => true],
     ];
 
+    /**
+     * Applied on every call rather than memoized. Extension plugins join this filter
+     * on `kizlo_loaded`, so a result captured during core's own boot would answer for
+     * the rest of the request with their taxonomies missing.
+     */
     private static function internalTaxonomies(): array
     {
-        static $cache = null;
-        if ($cache === null) {
-            $cache = apply_filters('kizlo_internal_taxonomies', self::INTERNAL_TAXONOMIES);
-        }
-        return $cache;
+        return apply_filters('kizlo_internal_taxonomies', self::INTERNAL_TAXONOMIES);
     }
 
     protected function validate(string $key, mixed $value): void

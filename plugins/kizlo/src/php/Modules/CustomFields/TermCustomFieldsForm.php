@@ -24,14 +24,23 @@ class TermCustomFieldsForm
 
     public function register(): void
     {
+        // Priority 30: after Registrar::registerObjects() at 20, so the managed set is
+        // complete. Reading it during boot left the term editor for every taxonomy an
+        // extension plugin contributes without these fields. All four hooks below
+        // belong to admin screens, which run long after init.
+        add_action('init', [$this, 'registerTaxonomyFields'], 30);
+
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
+    }
+
+    public function registerTaxonomyFields(): void
+    {
         foreach ($this->managedTaxonomies() as $taxonomy) {
             add_action("{$taxonomy}_add_form_fields", [$this, 'renderAdd']);
             add_action("{$taxonomy}_edit_form_fields", [$this, 'renderEdit']);
             add_action("created_{$taxonomy}", [$this, 'save']);
             add_action("edited_{$taxonomy}", [$this, 'save']);
         }
-
-        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
     }
 
     public function enqueue(string $hook): void

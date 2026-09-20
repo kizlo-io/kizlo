@@ -14,6 +14,12 @@ namespace Kizlo\Modules\Registration;
  */
 class Registrar
 {
+    /**
+     * Whether {@see registerObjects()} has run, so the post type and taxonomy
+     * registry is complete for this request.
+     */
+    private static bool $registered = false;
+
     public function register(): void
     {
         add_filter('kizlo_included_post_types', [$this, 'includePostTypes']);
@@ -30,6 +36,30 @@ class Registrar
         $this->registerTaxonomies();
 
         RewriteFlusher::flushIfPending();
+
+        self::$registered = true;
+    }
+
+    /**
+     * Whether every post type and taxonomy this request will have is registered.
+     *
+     * Membership is only settled once this is true: extension plugins join the
+     * `kizlo_internal_*` filters on `kizlo_loaded`, and WordPress registers the
+     * objects themselves on `init`. Anything deriving a set of objects, rather
+     * than reading one it was handed, has to wait for it.
+     */
+    public static function objectsRegistered(): bool
+    {
+        return self::$registered;
+    }
+
+    /**
+     * Forget that registration ran. Test seam: WordPress resets its hooks between
+     * tests but a static flag outlives them.
+     */
+    public static function reset(): void
+    {
+        self::$registered = false;
     }
 
     private function registerPostTypes(): void

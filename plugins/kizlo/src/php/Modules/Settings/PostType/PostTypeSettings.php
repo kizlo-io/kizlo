@@ -36,13 +36,14 @@ class PostTypeSettings extends SettingsIndexedAbstract
         'attachment' => ['article_type' => 'none', 'seo_enabled' => false],
     ];
 
+    /**
+     * Applied on every call rather than memoized. Extension plugins join this filter
+     * on `kizlo_loaded`, so a result captured during core's own boot would answer for
+     * the rest of the request with their post types missing.
+     */
     private static function internalPostTypes(): array
     {
-        static $cache = null;
-        if ($cache === null) {
-            $cache = apply_filters('kizlo_internal_post_types', self::INTERNAL_POST_TYPES);
-        }
-        return $cache;
+        return apply_filters('kizlo_internal_post_types', self::INTERNAL_POST_TYPES);
     }
 
     public const KNOWN_SUPPORTS = [
