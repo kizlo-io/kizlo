@@ -11,7 +11,7 @@ import type {
 	WCK_CartTotals,
 } from "./types"
 
-type UpdateCustomerInput = NonNullable<WP_EndpointInput<"woocommerce.store.cart.updateCustomer">["body"]>
+type UpdateCustomerInput = NonNullable<WP_EndpointInput<"woocommerce.store.cart.updateCustomer.create">["body"]>
 type SerializedBillingAddress = NonNullable<UpdateCustomerInput["billing_address"]>
 type SerializedShippingAddress = NonNullable<UpdateCustomerInput["shipping_address"]>
 type SerializedFullShippingAddress = Record<string, string | boolean> & {
@@ -453,6 +453,8 @@ export function serializeCartUpdateInput(input: UpdateCartInput): UpdateCustomer
 export function serializeCartShippingAddress(address: CartShippingAddress): SerializedFullShippingAddress
 export function serializeCartShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress
 export function serializeCartShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress {
+	// A field the caller left out is dropped rather than sent empty, because the
+	// cart merges whatever arrives and an empty string is a value.
 	return compactAddress({
 		...address.additionalFields,
 		first_name: address.firstName,

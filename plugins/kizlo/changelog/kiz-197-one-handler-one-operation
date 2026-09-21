@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Publish one operation for a handler whose callback core does not name, however many write verbs it registers.

@@ -7,7 +7,7 @@ import type { WP_EndpointData } from "kizlo"
  * with the whole cart rather than the piece it changed, and they all run through `CartSchema`. So
  * one alias covers the lot rather than each call site restating what it expects back.
  */
-export type WCK_Cart = WP_EndpointData<"woocommerce.store.cart.get">
+export type WCK_Cart = WP_EndpointData<"woocommerce.store.cart.retrieve">
 
 export type WCK_CartItem = WCK_Cart["items"][number]
 export type WCK_CartCoupon = WCK_Cart["coupons"][number]

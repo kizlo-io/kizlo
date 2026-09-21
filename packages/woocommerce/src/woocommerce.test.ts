@@ -412,7 +412,7 @@ function session() {
 }
 
 test("cart.addItem without a product cannot resolve one", async () => {
-	const response = await store().cart.addItem({ body: {} as { id: number } }, session())
+	const response = await store().cart.addItem.create({ body: {} as { id: number } }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_product")
 })
@@ -421,7 +421,7 @@ test("cart.removeItem without a key matches no cart item", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.removeItem({ body: {} as { key: string } }, session())
+	const response = await store().cart.removeItem.create({ body: {} as { key: string } }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_key")
 })
@@ -430,7 +430,7 @@ test("cart.updateItem without a key changes nothing it can name", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.updateItem({ body: { quantity: 3 } as { key: string; quantity: number } }, session())
+	const response = await store().cart.updateItem.create({ body: { quantity: 3 } as { key: string; quantity: number } }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_invalid_key")
 })
@@ -439,7 +439,7 @@ test("cart.applyCoupon without a code applies no coupon", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.applyCoupon({ body: {} as { code: string } }, session())
+	const response = await store().cart.applyCoupon.create({ body: {} as { code: string } }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_coupon_error")
 })
@@ -448,7 +448,7 @@ test("cart.removeCoupon without a code removes no coupon", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 
-	const response = await store().cart.removeCoupon({ body: {} as { code: string } }, session())
+	const response = await store().cart.removeCoupon.create({ body: {} as { code: string } }, session())
 
 	expect(response.error?.code).toBe("woocommerce_rest_cart_coupon_error")
 })
@@ -460,7 +460,7 @@ test("cart.removeCoupon without a code removes no coupon", async () => {
  */
 test("cart.addItem without a quantity takes the product's minimum", async () => {
 	await emptyCart()
-	const response = await store().cart.addItem({ body: { id: productId } }, session())
+	const response = await store().cart.addItem.create({ body: { id: productId } }, session())
 
 	expect(response.error).toBeNull()
 	expect(response.data?.items_count).toBe(1)
@@ -476,7 +476,7 @@ test("cart.addItem without a quantity takes the product's minimum", async () => 
  */
 test("cart.addItem reports the item it created with 201", async () => {
 	await emptyCart()
-	const response = await store().cart.addItem({ body: { id: productId, quantity: 1 } }, session())
+	const response = await store().cart.addItem.create({ body: { id: productId, quantity: 1 } }, session())
 
 	expect(response.error).toBeNull()
 	expect(response.status).toBe(201)
@@ -485,11 +485,11 @@ test("cart.addItem reports the item it created with 201", async () => {
 
 test("cart.updateItem changes an item it did not create with 200", async () => {
 	await emptyCart()
-	const added = await store().cart.addItem({ body: { id: productId, quantity: 1 } }, session())
+	const added = await store().cart.addItem.create({ body: { id: productId, quantity: 1 } }, session())
 	const key = added.data?.items[0]?.key
 	if (!key) throw new Error("cart.addItem returned no item to update.")
 
-	const response = await store().cart.updateItem({ body: { key, quantity: 2 } }, session())
+	const response = await store().cart.updateItem.create({ body: { key, quantity: 2 } }, session())
 
 	expect(response.error).toBeNull()
 	expect(response.status).toBe(200)

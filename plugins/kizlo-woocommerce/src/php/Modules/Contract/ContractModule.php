@@ -3,30 +3,36 @@
 namespace Kizlo\WooCommerce\Modules\Contract;
 
 /**
- * Publishes the WooCommerce routes Kizlo consumes but does not serve.
+ * Puts both WooCommerce REST namespaces into the contract.
  *
- * Registration waits for `init`, which is later than it looks like it needs to
- * be and is late for two reasons.
+ * This module used to register a written catalogue: two `wc/v3` resources and a
+ * literal seventeen Store API operations. It registers nothing now. It opts the
+ * two namespaces into route-table discovery and answers the questions discovery
+ * cannot answer on its own, so every path and method WooCommerce serves is
+ * described, including the ones nobody here has heard of.
  *
- * The Store API's container has to exist to be asked, which it does from
- * `woocommerce_blocks_loaded` onwards, and {@see \Kizlo\WooCommerce\Modules\Product\ProductModule}
- * extends the Store API product on that same hook. Deriving from the same hook
- * meant the two ran in whatever order {@see \Kizlo\WooCommerce\Plugin} happened
- * to list its modules in, and the product spec quietly lost its
- * `extensions.kizlo` block when the list was reordered.
+ * ## Why these four filters
  *
- * The second reason is not about ordering within this plugin at all.
- * `WC_REST_Customers_Controller::get_collection_params()` builds its `role` enum
- * from `array_keys( $wp_roles->role_names )`, reading the global directly, and
- * that global does not exist during `plugins_loaded`. Asking the controller for
- * its parameters before `init` is a fatal, not a missing enum.
+ * The namespace filter is the opt-in. The prefix filter is what stops `wc/v3`
+ * and `wc/store/v1` both claiming `products`, since an API ID is the path's
+ * literal segments and the two namespaces share them. The response filter is how
+ * a Store API `AbstractRoute` gets read at all, because it is not a
+ * `WP_REST_Controller` and discovery cannot reach its shape unaided. The route
+ * and schema filters carry the handful of corrections upstream metadata misses.
  *
- * Nothing depends on these landing earlier: a spec route registers no endpoint,
- * and the document is not built until something asks for `/introspect`.
+ * The filter names are written out rather than referenced through
+ * `RouteDiscovery`'s constants. This is a separate plugin, and these are Kizlo's
+ * published extension points: an integration hooking them has the names, not the
+ * class.
  *
- * Schemas are registered before routes, so the `$ref`s the routes carry resolve
- * against something. The registry sorts this out either way, but the order says
- * what depends on what.
+ * ## Why `init`, still
+ *
+ * Nothing here asks WooCommerce anything at registration time any more, but two
+ * of the callbacks do when they run, and they run at document build. The Store
+ * API container has to exist to be asked, and
+ * `WC_REST_Customers_Controller::get_collection_params()` reads the `$wp_roles`
+ * global, which does not exist before `init`. Registering the filters early is
+ * harmless; firing them early would not be.
  */
 class ContractModule
 {
@@ -37,10 +43,16 @@ class ContractModule
 
     public function describe(): void
     {
-        RestApiRoutes::registerSchemas();
-        StoreApiRoutes::registerSchemas();
+        StoreApiSchemas::registerSchemas();
 
-        RestApiRoutes::register();
-        StoreApiRoutes::register();
+        add_filter('kizlo_introspection_core_namespaces', [WooCommerceNamespaces::class, 'describe']);
+        add_filter('kizlo_introspection_core_api_prefix', [WooCommerceNamespaces::class, 'prefix'], 10, 2);
+        add_filter('kizlo_introspection_core_response', [StoreApiSchemas::class, 'contribute'], 10, 5);
+        add_filter('kizlo_introspection_core_route', [RouteCorrections::class, 'apply'], 10, 4);
+        add_filter('kizlo_introspection_core_schema', [RestApiSchemas::class, 'contribute'], 10, 5);
+
+        // Not a Kizlo filter: this completes WooCommerce's own registration so
+        // the argument is describable in the first place.
+        add_filter('rest_endpoints', [RouteCorrections::class, 'completeArguments']);
     }
 }

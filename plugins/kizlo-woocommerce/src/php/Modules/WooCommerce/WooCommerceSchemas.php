@@ -6,8 +6,8 @@ namespace Kizlo\WooCommerce\Modules\WooCommerce;
  * Every schema ID this plugin's contract uses, and the handful of bodies that
  * are written here rather than derived.
  *
- * Most are not written here. {@see \Kizlo\WooCommerce\Modules\Contract\RestApiRoutes}
- * and {@see \Kizlo\WooCommerce\Modules\Contract\StoreApiRoutes} build theirs from
+ * Most are not written here. Route discovery derives them, and
+ * {@see \Kizlo\WooCommerce\Modules\Contract\StoreApiSchemas} corrects them from
  * WooCommerce's own controllers, because copying WooCommerce's field lists into
  * Kizlo's contract would create exactly the second source of truth this contract
  * exists to remove, and it would go stale on a WooCommerce release rather than on
@@ -35,19 +35,25 @@ final class WooCommerceSchemas
      */
     public const CURRENCY_FORMAT = 'woocommerce.currency-format';
 
-    /** Derived from the WooCommerce REST v3 controllers. */
-    public const PRODUCT  = 'woocommerce.product';
-    public const CUSTOMER = 'woocommerce.customer';
+    /**
+     * IDs route discovery generates, named here only because something has to
+     * name them: the product is referenced by the Kizlo product block, and the
+     * cart and the order head the labels the Store API corrections report under.
+     * Nothing here registers them.
+     *
+     * Named after the API that claims them, which is the path's literal segments
+     * under the namespace's prefix, so they are plural where the path is.
+     */
+    public const STORE_CART    = 'woocommerce.store.cart';
+    public const STORE_ORDER   = 'woocommerce.store.order';
+    public const STORE_PRODUCT = 'woocommerce.store.products';
 
-    /** Derived from the WooCommerce Store API schema classes. */
-    public const STORE_CART                    = 'woocommerce.store.cart';
-    public const STORE_CHECKOUT                = 'woocommerce.store.checkout';
-    public const STORE_CHECKOUT_ORDER          = 'woocommerce.store.checkout-order';
-    public const STORE_ORDER                   = 'woocommerce.store.order';
-    public const STORE_PRODUCT                 = 'woocommerce.store.product';
-    public const STORE_PRODUCT_SUMMARY         = 'woocommerce.store.product-summary';
-    public const STORE_PRODUCT_DETAIL          = 'woocommerce.store.product-detail';
-    public const STORE_PRODUCT_COLLECTION_DATA = 'woocommerce.store.product-collection-data';
+    /**
+     * The product as WordPress exposes it in embed context, which is what the
+     * recommendation collections carry. Registered rather than derived per route,
+     * because nothing serves it: it only ever appears inside another product.
+     */
+    public const STORE_PRODUCT_SUMMARY = 'woocommerce.store.product-summary';
 
     public static function register(): void
     {

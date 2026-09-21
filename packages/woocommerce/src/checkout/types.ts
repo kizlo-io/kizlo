@@ -6,7 +6,7 @@ import type { WP_EndpointData } from "kizlo"
  * `get`, `update` and `process` all resolve to this: three operations on one path served by one
  * schema class.
  */
-export type WCK_Checkout = WP_EndpointData<"woocommerce.store.checkout.get">
+export type WCK_Checkout = WP_EndpointData<"woocommerce.store.checkout.retrieve">
 
 /**
  * What paying an existing order answers with.
@@ -15,4 +15,4 @@ export type WCK_Checkout = WP_EndpointData<"woocommerce.store.checkout.get">
  * minus what only a draft has, so the two are close enough to confuse and far enough apart that one
  * type would be wrong for the other.
  */
-export type WCK_CheckoutOrder = WP_EndpointData<"woocommerce.store.checkout.processOrder">
+export type WCK_CheckoutOrder = WP_EndpointData<"woocommerce.store.checkout.updateById">

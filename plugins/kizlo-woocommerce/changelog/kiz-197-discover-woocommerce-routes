@@ -1,0 +1,4 @@
+Significance: major
+Type: changed
+
+Describe every registered wc/v3 and wc/store/v1 route instead of a fixed catalogue.
