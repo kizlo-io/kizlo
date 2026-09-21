@@ -1,7 +1,7 @@
 import type { IntrospectionDocument } from "./introspection"
 
 export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
-	version: "1.0",
+	version: "1.1",
 	hash: `sha256:${"a".repeat(64)}`,
 	schemas: {
 		"kizlo.error": {
@@ -115,10 +115,12 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 						summary: "List books",
 						errors: ["rest_forbidden"],
 						input: {
-							type: "object",
-							properties: {
-								page: { type: "integer" },
-								status: { type: "string", enum: ["draft", "publish"] },
+							query: {
+								type: "object",
+								properties: {
+									page: { type: "integer" },
+									status: { type: "string", enum: ["draft", "publish"] },
+								},
 							},
 						},
 						responses: {
@@ -137,9 +139,11 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 						method: "POST",
 						errors: ["invalid_book"],
 						input: {
-							type: "object",
-							content_type: "application/json",
-							$extends: "post-types.book.create-input",
+							body: {
+								type: "object",
+								content_type: "application/json",
+								$extends: "post-types.book.create-input",
+							},
 						},
 						responses: {
 							"201": { content_type: "application/json", body: { $ref: "acme.book" } },
@@ -153,8 +157,10 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 						description: "Retrieve one book.",
 						errors: ["rest_not_found"],
 						input: {
-							type: "object",
-							properties: { identifier: { type: "string", required: true, in: "path" } },
+							params: {
+								type: "object",
+								properties: { identifier: { type: "string", required: true } },
+							},
 						},
 						responses: {
 							"200": { content_type: "application/json", body: { $ref: "acme.book" } },
@@ -166,15 +172,59 @@ export const INTROSPECTION_FIXTURE: IntrospectionDocument = {
 						summary: "Restore a book to one of its revisions",
 						errors: ["rest_not_found"],
 						input: {
-							type: "object",
-							content_type: "application/json",
-							properties: {
-								identifier: { type: "string", required: true, in: "path" },
-								revision: { type: "integer", required: true },
+							params: {
+								type: "object",
+								properties: { identifier: { type: "string", required: true } },
+							},
+							// A body method that also takes a query parameter, which the old method-based split could not say.
+							query: {
+								type: "object",
+								properties: { context: { type: "string", enum: ["view", "edit"] } },
+							},
+							body: {
+								type: "object",
+								content_type: "application/json",
+								properties: { revision: { type: "integer", required: true } },
 							},
 						},
 						responses: {
 							"200": { content_type: "application/json", body: { $ref: "acme.book" } },
+							"404": { content_type: "application/json", body: { $ref: "kizlo.error" } },
+						},
+					},
+				},
+			},
+		},
+		"shipping.zone-locations": {
+			namespace: "wc/v3",
+			paths: {
+				"/shipping/zones/{zone_id}/locations": {
+					update: {
+						method: "PUT",
+						summary: "Replace every location in a shipping zone",
+						errors: ["woocommerce_rest_shipping_zone_invalid"],
+						input: {
+							params: {
+								type: "object",
+								properties: { zone_id: { type: "integer", required: true } },
+							},
+							body: {
+								type: "array",
+								content_type: "application/json",
+								items: {
+									type: "object",
+									properties: {
+										code: { type: "string", required: true },
+										type: { type: "string", enum: ["country", "state", "postcode", "continent"] },
+									},
+								},
+							},
+						},
+						responses: {
+							"200": {
+								content_type: "application/json",
+								body: { type: "array", items: { type: "object", properties: { code: { type: "string", required: true } } } },
+							},
 							"404": { content_type: "application/json", body: { $ref: "kizlo.error" } },
 						},
 					},

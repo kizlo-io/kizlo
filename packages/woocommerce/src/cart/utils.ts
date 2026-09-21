@@ -11,7 +11,7 @@ import type {
 	WCK_CartTotals,
 } from "./types"
 
-type UpdateCustomerInput = WP_EndpointInput<"woocommerce.store.cart.updateCustomer">
+type UpdateCustomerInput = NonNullable<WP_EndpointInput<"woocommerce.store.cart.updateCustomer">["body"]>
 type SerializedBillingAddress = NonNullable<UpdateCustomerInput["billing_address"]>
 type SerializedShippingAddress = NonNullable<UpdateCustomerInput["shipping_address"]>
 type SerializedFullShippingAddress = Record<string, string | boolean> & {

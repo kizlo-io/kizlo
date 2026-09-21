@@ -3,8 +3,8 @@ import type { WPK_Seo } from "./seo/types"
 import type { WP_EndpointData, WP_EndpointInput } from "./wordpress"
 
 type PostItem = WP_EndpointData<"kizlo.postTypes.post.retrieve">
-type PostSeoInput = NonNullable<NonNullable<WP_EndpointInput<"kizlo.postTypes.post.create">["kizlo"]>["seo"]>
-type CategorySeoInput = NonNullable<NonNullable<WP_EndpointInput<"kizlo.taxonomies.category.create">["kizlo"]>["seo"]>
+type PostSeoInput = NonNullable<NonNullable<NonNullable<WP_EndpointInput<"kizlo.postTypes.post.create">["body"]>["kizlo"]>["seo"]>
+type CategorySeoInput = NonNullable<NonNullable<NonNullable<WP_EndpointInput<"kizlo.taxonomies.category.create">["body"]>["kizlo"]>["seo"]>
 
 type Has<T, K extends PropertyKey> = K extends keyof T ? true : false
 

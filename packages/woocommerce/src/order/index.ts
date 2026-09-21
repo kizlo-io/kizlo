@@ -19,9 +19,8 @@ export const ORDER_PROCEDURES = {
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.orders.get(
 				{
-					id: input.params.orderId,
-					key: input.query?.key,
-					billing_email: input.query?.billingEmail,
+					params: { id: input.params.orderId },
+					query: { key: input.query?.key, billing_email: input.query?.billingEmail },
 				},
 				{ headers: context.sessionHeaders },
 			)

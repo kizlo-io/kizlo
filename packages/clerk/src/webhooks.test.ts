@@ -29,15 +29,16 @@ describe("Clerk webhook integration", () => {
 		await invokeWebhook({ client, webhooks: { signingSecret: SIGNING_SECRET } }, signedRequest(event), wordpress)
 
 		expect(wordpress.kizlo.users.external[operation]).toHaveBeenCalledWith({
-			provider: "clerk",
-			value: "user_1",
-			email: "grace@example.com",
-			first_name: "Grace",
-			last_name: "Hopper",
-			profile: {
-				username: "grace",
-				imageUrl: "https://example.com/grace.jpg",
-				publicMetadata: { plan: "pro" },
+			params: { provider: "clerk", value: "user_1" },
+			body: {
+				email: "grace@example.com",
+				first_name: "Grace",
+				last_name: "Hopper",
+				profile: {
+					username: "grace",
+					imageUrl: "https://example.com/grace.jpg",
+					publicMetadata: { plan: "pro" },
+				},
 			},
 		})
 		expect(wordpress.kizlo.users.external[operation === "create" ? "update" : "create"]).not.toHaveBeenCalled()
@@ -52,7 +53,7 @@ describe("Clerk webhook integration", () => {
 
 		await invokeWebhook({ client, webhooks: { signingSecret: SIGNING_SECRET } }, signedRequest(event), wordpress)
 
-		expect(wordpress.kizlo.users.external.delete).toHaveBeenCalledWith({ provider: "clerk", value: "user_deleted" })
+		expect(wordpress.kizlo.users.external.delete).toHaveBeenCalledWith({ params: { provider: "clerk", value: "user_deleted" } })
 		expect(getUser).not.toHaveBeenCalled()
 		expect(wordpress.kizlo.users.external.create).not.toHaveBeenCalled()
 		expect(wordpress.kizlo.users.external.update).not.toHaveBeenCalled()

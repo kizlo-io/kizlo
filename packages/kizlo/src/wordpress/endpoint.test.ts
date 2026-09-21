@@ -15,9 +15,42 @@ const RETRIEVE: WP_EndpointDefinition = {
 	responseContentTypes: { "200": "application/json" },
 }
 
+/** The shape the flat input could not describe: a path parameter and a body that is not an object. */
+const REPLACE_LOCATIONS: WP_EndpointDefinition = {
+	namespace: "wc/v3",
+	path: "/shipping/zones/{zone_id}/locations",
+	method: "PUT",
+	pathParameters: ["zone_id"],
+	requestContentType: "application/json",
+	responseContentTypes: { "200": "application/json" },
+}
+
+const LIST: WP_EndpointDefinition = {
+	namespace: "kizlo/v1",
+	path: "/books",
+	method: "GET",
+	pathParameters: [],
+	responseContentTypes: { "200": "application/json" },
+}
+
+const CREATE: WP_EndpointDefinition = {
+	namespace: "kizlo/v1",
+	path: "/books",
+	method: "POST",
+	pathParameters: [],
+	requestContentType: "application/json",
+	responseContentTypes: { "201": "application/json" },
+}
+
 function client() {
 	const transport = new WordPressTransport({ credentials })
-	const endpoints = { books: { retrieve: wpEndpoint<{ identifier: string }, WP_Result<{ id: number }, "invalid_book">>(RETRIEVE) } }
+	const endpoints = {
+		books: {
+			retrieve: wpEndpoint<{ params: { identifier: string } }, WP_Result<{ id: number }, "invalid_book">>(RETRIEVE),
+			create: wpEndpoint<{ body?: { title?: string } }, WP_Result<{ id: number }, "invalid_book">>(CREATE),
+			list: wpEndpoint<{ query?: { page?: number } }, WP_Result<{ id: number }[], "invalid_book">>(LIST),
+		},
+	}
 	return createWordPressClient(transport, endpoints)
 }
 
@@ -26,13 +59,13 @@ afterEach(() => vi.unstubAllGlobals())
 describe("wpEndpoint", () => {
 	test("is the definition itself, with nothing about the connection bound", () => {
 		// The type parameters are phantom, so the leaf stays the definition rather than wrapping it.
-		expect(wpEndpoint<{ identifier: string }, never>(RETRIEVE)).toBe(RETRIEVE)
+		expect(wpEndpoint<{ params: { identifier: string } }, never>(RETRIEVE)).toBe(RETRIEVE)
 	})
 })
 
 describe("buildWordPressRequest", () => {
-	test("interpolates path parameters and keeps the remainder as query", () => {
-		expect(buildWordPressRequest(RETRIEVE, { identifier: "dune messiah", page: 2 })).toEqual({
+	test("interpolates params into the path and puts query on the URL", () => {
+		expect(buildWordPressRequest(RETRIEVE, { params: { identifier: "dune messiah" }, query: { page: 2 } })).toEqual({
 			request: {
 				base: "/wp-json/kizlo/v1",
 				path: "/books/dune%20messiah",
@@ -42,6 +75,47 @@ describe("buildWordPressRequest", () => {
 			},
 			error: null,
 		})
+	})
+
+	test("sends a bare array body as itself rather than wrapped in an object", () => {
+		const built = buildWordPressRequest(REPLACE_LOCATIONS, {
+			params: { zone_id: 1 },
+			body: [{ code: "US", type: "country" }],
+		})
+
+		expect(built.request).toEqual({
+			base: "/wp-json/wc/v3",
+			path: "/shipping/zones/1/locations",
+			method: "PUT",
+			body: [{ code: "US", type: "country" }],
+			requestContentType: "application/json",
+			responseContentTypes: { "200": "application/json" },
+		})
+	})
+
+	test("lets a body method carry query parameters, which the method-based split could not", () => {
+		const built = buildWordPressRequest(CREATE, { query: { context: "edit" }, body: { title: "Dune" } })
+
+		expect(built.request).toMatchObject({
+			method: "POST",
+			searchParams: { context: "edit" },
+			body: { title: "Dune" },
+		})
+	})
+
+	/** A field can legitimately be called `body`; it is a body field, not the body. */
+	test("reads each part from where the caller put it, never from the field names", () => {
+		const built = buildWordPressRequest(CREATE, { body: { title: "Dune", body: "In the week before…" } })
+
+		expect(built.request?.body).toEqual({ title: "Dune", body: "In the week before…" })
+	})
+
+	test("sends a declared body that was not supplied as an empty object", () => {
+		expect(buildWordPressRequest(CREATE, {}).request).toMatchObject({ body: {}, requestContentType: "application/json" })
+	})
+
+	test("sends no body for an operation that declares none", () => {
+		expect(buildWordPressRequest(RETRIEVE, { params: { identifier: "dune" } }).request).not.toHaveProperty("body")
 	})
 
 	/**
@@ -59,8 +133,8 @@ describe("buildWordPressRequest", () => {
 		["an object", { identifier: { id: 1 } }],
 		["NaN", { identifier: Number.NaN }],
 		["a symbol", { identifier: Symbol("dune") }],
-	])("reports the parameter rather than throwing when it is %s", (_label, input) => {
-		const built = buildWordPressRequest(RETRIEVE, input)
+	])("reports the parameter rather than throwing when it is %s", (_label, params) => {
+		const built = buildWordPressRequest(RETRIEVE, { params })
 
 		expect(built.request).toBeNull()
 		expect(built.error?.code).toBe("invalid_path_parameter")
@@ -68,7 +142,7 @@ describe("buildWordPressRequest", () => {
 	})
 
 	test("interpolates a zero, which is a segment a route can be asked for", () => {
-		expect(buildWordPressRequest(RETRIEVE, { identifier: 0 }).request?.path).toBe("/books/0")
+		expect(buildWordPressRequest(RETRIEVE, { params: { identifier: 0 } }).request?.path).toBe("/books/0")
 	})
 })
 
@@ -77,7 +151,7 @@ describe("createWordPressClient", () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
 		vi.stubGlobal("fetch", fetch)
 
-		const result = await client().books.retrieve({ identifier: "dune" })
+		const result = await client().books.retrieve({ params: { identifier: "dune" } })
 
 		expect(result).toMatchObject({ data: { id: 1 }, error: null })
 		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune")
@@ -88,7 +162,7 @@ describe("createWordPressClient", () => {
 		vi.stubGlobal("fetch", fetch)
 
 		// `undefined` is the case types do not catch: the field is there, so the call compiles.
-		const result = await client().books.retrieve({ identifier: undefined as unknown as string })
+		const result = await client().books.retrieve({ params: { identifier: undefined as unknown as string } })
 
 		expect(result).toMatchObject({ data: null, status: 0 })
 		expect(result.error?.code).toBe("invalid_path_parameter")
@@ -101,7 +175,7 @@ describe("createWordPressClient", () => {
 		vi.stubGlobal("fetch", fetch)
 		const controller = new AbortController()
 
-		await client().books.retrieve({ identifier: "dune" }, { signal: controller.signal })
+		await client().books.retrieve({ params: { identifier: "dune" } }, { signal: controller.signal })
 
 		// The transport composes the caller's signal with its own timeout, so it governs without being it.
 		const signal = fetch.mock.calls[0]?.[1]?.signal
@@ -110,11 +184,32 @@ describe("createWordPressClient", () => {
 		expect(signal?.aborted).toBe(true)
 	})
 
+	test("merges per-call searchParams with the query the operation declares", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
+		vi.stubGlobal("fetch", fetch)
+
+		await client().books.list({ query: { page: 2 } }, { searchParams: { _embed: "related" } })
+
+		// Both survive: the query says which books, the option says how WordPress should answer.
+		const url = new URL(String(fetch.mock.calls[0]?.[0]))
+		expect(url.searchParams.get("page")).toBe("2")
+		expect(url.searchParams.get("_embed")).toBe("related")
+	})
+
+	test("carries per-call searchParams for an operation that declares no query", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
+		vi.stubGlobal("fetch", fetch)
+
+		await client().books.retrieve({ params: { identifier: "dune" } }, { searchParams: { _embed: "related" } })
+
+		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books/dune?_embed=related")
+	})
+
 	test("sends per-call headers without letting them reach the request the definition owns", async () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
 		vi.stubGlobal("fetch", fetch)
 
-		await client().books.retrieve({ identifier: "dune" }, { headers: { "X-Kizlo-Guest-Token": "t_1", "X-Kizlo-User-Id": "7" } })
+		await client().books.retrieve({ params: { identifier: "dune" } }, { headers: { "X-Kizlo-Guest-Token": "t_1", "X-Kizlo-User-Id": "7" } })
 
 		const sent = fetch.mock.calls[0]?.[1]?.headers as Record<string, string>
 		expect(sent["X-Kizlo-Guest-Token"]).toBe("t_1")
@@ -166,7 +261,7 @@ describe("an endpoint the tree does not have", () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
 		vi.stubGlobal("fetch", fetch)
 
-		const result = await absent().books.destroy({ identifier: "dune" })
+		const result = await absent().books.destroy({ params: { identifier: "dune" } })
 
 		expect(result).toMatchObject({ data: null, status: 0 })
 		expect(result.error.code).toBe("rest_no_route")
@@ -176,7 +271,7 @@ describe("an endpoint the tree does not have", () => {
 	})
 
 	test("keeps proxying through an absent branch, so the leaf still names the whole path", async () => {
-		const result = await absent().postTypes.post.list({ status: ["publish"] })
+		const result = await absent().postTypes.post.list({ query: { status: ["publish"] } })
 
 		expect(result.error.code).toBe("rest_no_route")
 		expect(result.error.message).toContain('"postTypes.post.list"')

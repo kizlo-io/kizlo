@@ -15,7 +15,7 @@ class DocumentTest extends IntrospectionTestCase
     {
         $document = $this->document();
 
-        $this->assertSame('1.0', $document['version']);
+        $this->assertSame('1.1', $document['version']);
         $this->assertStringStartsWith('sha256:', $document['hash']);
         $this->assertSame(['version', 'hash', 'schemas', 'apis', 'diagnostics'], array_keys($document));
     }

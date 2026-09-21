@@ -52,10 +52,10 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $create = $this->document()['apis']['kizlo.post-types.attachment']['paths']['/post-types/attachment']['create'];
 
-        $this->assertSame('multipart/form-data', $create['input']['content_type']);
-        $this->assertSame('kizlo.post-types.attachment.create-input', $create['input']['$extends']);
+        $this->assertSame('multipart/form-data', $this->inputContentType($create));
+        $this->assertSame('kizlo.post-types.attachment.create-input', $create['input']['body']['$extends']);
 
-        $file = $create['input']['properties']['file'];
+        $file = $this->inputProperties($create)['file'];
 
         $this->assertSame('file', $file['type']);
         $this->assertTrue($file['required']);
@@ -70,8 +70,8 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $update = $this->document()['apis']['kizlo.post-types.attachment']['paths']['/post-types/attachment/{identifier}']['update'];
 
-        $this->assertSame('application/json', $update['input']['content_type']);
-        $this->assertArrayNotHasKey('file', $update['input']['properties']);
+        $this->assertSame('application/json', $this->inputContentType($update));
+        $this->assertArrayNotHasKey('file', $this->inputProperties($update));
     }
 
     public function test_an_ordinary_post_type_creates_through_json(): void
@@ -79,7 +79,7 @@ class ManagedContentTest extends IntrospectionTestCase
         // The multipart body follows the controller, not every create.
         $create = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post']['create'];
 
-        $this->assertSame('application/json', $create['input']['content_type']);
+        $this->assertSame('application/json', $this->inputContentType($create));
         $this->assertArrayNotHasKey('properties', $create['input']);
     }
 
@@ -235,8 +235,8 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $retrieve = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post/{identifier}']['retrieve'];
 
-        $this->assertSame('string', $retrieve['input']['properties']['identifier']['type']);
-        $this->assertTrue($retrieve['input']['properties']['identifier']['required']);
+        $this->assertSame('string', $this->inputProperties($retrieve)['identifier']['type']);
+        $this->assertTrue($this->inputProperties($retrieve)['identifier']['required']);
     }
 
     public function test_a_list_response_declares_the_pagination_headers(): void
@@ -380,11 +380,11 @@ class ManagedContentTest extends IntrospectionTestCase
 
         $this->assertArrayHasKey(
             'parent',
-            $apis['kizlo.taxonomies.category']['paths']['/taxonomies/category']['list']['input']['properties'],
+            $this->inputProperties($apis['kizlo.taxonomies.category']['paths']['/taxonomies/category']['list']),
         );
         $this->assertArrayNotHasKey(
             'parent',
-            $apis['kizlo.taxonomies.post_tag']['paths']['/taxonomies/post_tag']['list']['input']['properties'],
+            $this->inputProperties($apis['kizlo.taxonomies.post_tag']['paths']['/taxonomies/post_tag']['list']),
         );
     }
 
@@ -432,16 +432,16 @@ class ManagedContentTest extends IntrospectionTestCase
     {
         $create = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post']['create'];
 
-        $this->assertSame('kizlo.post-types.post.create-input', $create['input']['$extends']);
-        $this->assertSame('application/json', $create['input']['content_type']);
+        $this->assertSame('kizlo.post-types.post.create-input', $create['input']['body']['$extends']);
+        $this->assertSame('application/json', $this->inputContentType($create));
     }
 
     public function test_an_update_operation_adds_only_the_path_parameter_to_its_input(): void
     {
         $update = $this->document()['apis']['kizlo.post-types.post']['paths']['/post-types/post/{identifier}']['update'];
 
-        $this->assertSame('kizlo.post-types.post.update-input', $update['input']['$extends']);
-        $this->assertSame(['identifier'], array_keys($update['input']['properties']));
+        $this->assertSame('kizlo.post-types.post.update-input', $update['input']['body']['$extends']);
+        $this->assertSame(['identifier'], array_keys($this->inputProperties($update)));
     }
 
     public function test_a_term_name_is_required_on_create_and_optional_on_update(): void

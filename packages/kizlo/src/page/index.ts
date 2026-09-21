@@ -23,7 +23,7 @@ export const PAGE_PROCEDURES = {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.PAGE_NOT_FOUND()
 
-				const response = await context.wordpress.kizlo.postTypes.page.retrieve({ identifier: String(result.id) })
+				const response = await context.wordpress.kizlo.postTypes.page.retrieve({ params: { identifier: String(result.id) } })
 				if (response.error) {
 					switch (response.error.code) {
 						case "invalid_post_type":
@@ -43,7 +43,7 @@ export const PAGE_PROCEDURES = {
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.PAGE_NOT_FOUND()
 
-			const response = await context.wordpress.kizlo.postTypes.page.retrieve({ identifier: String(identifier.value) })
+			const response = await context.wordpress.kizlo.postTypes.page.retrieve({ params: { identifier: String(identifier.value) } })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_post_type":
@@ -88,26 +88,28 @@ export const PAGE_PROCEDURES = {
 				(q?.orderby === "relevance" && !q?.search) || (q?.orderby === "include" && q?.include === undefined) ? undefined : q?.orderby
 
 			const response = await context.wordpress.kizlo.postTypes.page.list({
-				status: ["publish"],
-				after: q?.after,
-				author: normalizeArrayableValue(q?.author),
-				author_exclude: normalizeArrayableValue(q?.authorExclude),
-				before: q?.before,
-				modified_after: q?.modifiedAfter,
-				modified_before: q?.modifiedBefore,
-				exclude: normalizeArrayableValue(q?.exclude),
-				include: normalizeArrayableValue(q?.include),
-				menu_order: q?.menuOrder,
-				offset: q?.offset,
-				order: q?.order,
-				orderby,
-				page: q?.page,
-				parent: normalizeArrayableValue(q?.parent),
-				parent_exclude: normalizeArrayableValue(q?.parentExclude),
-				per_page: q?.perPage,
-				search: q?.search,
-				search_columns: q?.searchColumns,
-				slug: normalizeArrayableValue(q?.slug),
+				query: {
+					status: ["publish"],
+					after: q?.after,
+					author: normalizeArrayableValue(q?.author),
+					author_exclude: normalizeArrayableValue(q?.authorExclude),
+					before: q?.before,
+					modified_after: q?.modifiedAfter,
+					modified_before: q?.modifiedBefore,
+					exclude: normalizeArrayableValue(q?.exclude),
+					include: normalizeArrayableValue(q?.include),
+					menu_order: q?.menuOrder,
+					offset: q?.offset,
+					order: q?.order,
+					orderby,
+					page: q?.page,
+					parent: normalizeArrayableValue(q?.parent),
+					parent_exclude: normalizeArrayableValue(q?.parentExclude),
+					per_page: q?.perPage,
+					search: q?.search,
+					search_columns: q?.searchColumns,
+					slug: normalizeArrayableValue(q?.slug),
+				},
 			})
 
 			if (response.error) {

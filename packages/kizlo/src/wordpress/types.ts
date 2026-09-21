@@ -20,8 +20,12 @@ export interface WP_Endpoint<TInput, TResult> extends WP_EndpointDefinition {
  * what the caller knows only at the moment of calling. Headers belong here rather than on the
  * definition because a request can carry per-caller state (a guest cart token, the caller's geo)
  * that the route it travels to has no way to declare.
+ *
+ * `searchParams` is the same idea for the URL, and is merged into the query the operation declares
+ * rather than replacing it. It is for the parameters WordPress answers for every route — `_embed`,
+ * `_fields` — which belong to no route's contract and so can never appear in a generated input.
  */
-export type WP_CallOptions = Pick<WP_RequestInput, "signal" | "timeout" | "headers">
+export type WP_CallOptions = Pick<WP_RequestInput, "signal" | "timeout" | "headers" | "searchParams">
 
 /**
  * The callable shape of an endpoint tree: every definition leaf becomes the request it runs. `any`
@@ -211,6 +215,17 @@ export interface WP_RequestInput {
  * `response.error` for every other failure and this one arrives the same way.
  */
 export type WP_RequestBuild = { request: WP_RequestInput; error: null } | { request: null; error: WP_Error<"invalid_path_parameter"> }
+
+/**
+ * A call's input in the three parts a request is made of, mirroring the contract. Each part is
+ * optional because an operation only declares the ones it has, and `body` is `unknown` because a
+ * route is free to take a bare array rather than an object.
+ */
+export interface WP_RequestParts {
+	params?: Record<string, unknown>
+	query?: Record<string, unknown>
+	body?: unknown
+}
 
 export type WP_RequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
 

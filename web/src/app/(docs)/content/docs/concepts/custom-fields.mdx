@@ -29,9 +29,11 @@ WordPress are required when creating content. Update requests may include only t
 
 ```ts
 const response = await context.wordpress.kizlo.postTypes.post.create({
-  title: "Hello world",
-  custom: {
-    company_name: "Acme Ltd",
+  body: {
+    title: "Hello world",
+    custom: {
+      company_name: "Acme Ltd",
+    },
   },
 })
 
@@ -57,8 +59,10 @@ Custom fields previously appeared beside standard properties in requests and res
 
 ```ts title="Before"
 await context.wordpress.kizlo.postTypes.post.create({
-  title: "Hello world",
-  company_name: "Acme Ltd",
+  body: {
+    title: "Hello world",
+    company_name: "Acme Ltd",
+  },
 })
 
 response.data.company_name
@@ -70,9 +74,11 @@ public Kizlo models expose it directly.
 
 ```ts title="After"
 await context.wordpress.kizlo.postTypes.post.create({
-  title: "Hello world",
-  custom: {
-    company_name: "Acme Ltd",
+  body: {
+    title: "Hello world",
+    custom: {
+      company_name: "Acme Ltd",
+    },
   },
 })
 

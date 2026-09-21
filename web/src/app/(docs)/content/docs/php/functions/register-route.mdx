@@ -38,7 +38,7 @@ Set `id` to publish the route in `GET /kizlo/v1/introspect`:
 | --- | --- | --- |
 | `id` | `string` | API ID that groups related operations. |
 | `operation` | `string` | Operation name in lowercase snake_case, such as `list`, `retrieve`, or `bulk_delete`. |
-| `input` | `array` | Request schema. Top-level properties become route arguments. |
+| `input` | `array` | Request schema. Accepts a flat object schema, or the `params`/`query`/`body` parts described in [`kizlo_register_route_spec`](/docs/php/functions/register-route-spec#input-parts). Either way its properties become route arguments. |
 | `errors` | `string[]` | Handler-specific WordPress error codes the operation can return. |
 | `responses` | `array` | Status-keyed response contracts for success and error responses. |
 | `summary` | `string` | Optional short operation summary. |

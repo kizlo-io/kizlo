@@ -118,7 +118,8 @@ class CoreRouteTest extends IntrospectionTestCase
             $this->assertSame(self::FIXTURE_NAMESPACE, $api['namespace']);
             $this->assertSame('GET', $operation['method']);
             $this->assertSame('Retrieve an opted-in probe', $operation['summary']);
-            $this->assertSame(['in' => 'path', 'type' => 'integer', 'required' => true], $operation['input']['properties']['id']);
+            // A path capture is in `params` rather than marked, which is what says it is one.
+            $this->assertSame(['type' => 'integer', 'required' => true], $operation['input']['params']['properties']['id']);
             $this->assertSame(['type' => 'boolean'], $document['schemas'][$ref]['properties']['filtered']);
         } finally {
             remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
@@ -245,8 +246,8 @@ class CoreRouteTest extends IntrospectionTestCase
     {
         $type = $this->document()['apis']['types']['paths']['/types/{type}']['retrieve'];
 
-        $this->assertSame('string', $type['input']['properties']['type']['type']);
-        $this->assertTrue($type['input']['properties']['type']['required']);
+        $this->assertSame('string', $this->inputProperties($type)['type']['type']);
+        $this->assertTrue($this->inputProperties($type)['type']['required']);
     }
 
     /** A singleton has nothing to address, so it declares no identifier. */
@@ -263,8 +264,8 @@ class CoreRouteTest extends IntrospectionTestCase
     {
         $revision = $this->document()['apis']['posts.revisions']['paths']['/posts/{parent}/revisions/{id}']['retrieve'];
 
-        $this->assertArrayHasKey('parent', $revision['input']['properties']);
-        $this->assertArrayHasKey('id', $revision['input']['properties']);
+        $this->assertArrayHasKey('parent', $this->inputProperties($revision));
+        $this->assertArrayHasKey('id', $this->inputProperties($revision));
     }
 
     /** The attachments controller reads `$_FILES`, so its create is not JSON. */
@@ -272,7 +273,7 @@ class CoreRouteTest extends IntrospectionTestCase
     {
         $create = $this->document()['apis']['media']['paths']['/media']['create'];
 
-        $this->assertSame('multipart/form-data', $create['input']['content_type']);
+        $this->assertSame('multipart/form-data', $this->inputContentType($create));
     }
 
     /** A trailing literal segment is its own API rather than an operation. */
@@ -580,8 +581,8 @@ class CoreRouteTest extends IntrospectionTestCase
         $this->assertSame('kizlo/v1', $apis['kizlo.comments']['namespace']);
 
         // The submission takes the forwarded end user; the WordPress route does not.
-        $this->assertArrayHasKey('post_id', $apis['kizlo.comments']['paths']['/comments']['create']['input']['properties']);
-        $this->assertArrayHasKey('post', $apis['comments']['paths']['/comments']['create']['input']['properties']);
+        $this->assertArrayHasKey('post_id', $this->inputProperties($apis['kizlo.comments']['paths']['/comments']['create']));
+        $this->assertArrayHasKey('post', $this->inputProperties($apis['comments']['paths']['/comments']['create']));
     }
 
     /**

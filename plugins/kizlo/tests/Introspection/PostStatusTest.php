@@ -139,7 +139,7 @@ class PostStatusTest extends IntrospectionTestCase
      */
     public function test_a_narrowed_filter_vocabulary_is_described_rather_than_shared(): void
     {
-        $status = $this->document()['apis']['kizlo.post-types.attachment']['paths']['/post-types/attachment']['list']['input']['properties']['status'];
+        $status = $this->inputProperties($this->document()['apis']['kizlo.post-types.attachment']['paths']['/post-types/attachment']['list'])['status'];
 
         $this->assertArrayNotHasKey('$ref', $status['items']);
         $this->assertSame(

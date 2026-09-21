@@ -22,7 +22,7 @@ function kizloTypes(): string {
 }
 
 function document(schemas: Record<string, IntrospectionSchema>): IntrospectionDocument {
-	return { version: "1.0", hash: `sha256:${"a".repeat(64)}`, schemas, apis: {}, diagnostics: [] }
+	return { version: "1.1", hash: `sha256:${"a".repeat(64)}`, schemas, apis: {}, diagnostics: [] }
 }
 
 async function check(schemas: Record<string, IntrospectionSchema>): Promise<GeneratedClientCheck> {

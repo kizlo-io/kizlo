@@ -20,7 +20,7 @@ export const CATEGORY_PROCEDURES = {
 			const identifier = parseIdentifier(input.params.identifier)
 			if (!identifier) throw errors.CATEGORY_NOT_FOUND()
 
-			const response = await context.wordpress.kizlo.taxonomies.category.retrieve({ identifier: String(identifier.value) })
+			const response = await context.wordpress.kizlo.taxonomies.category.retrieve({ params: { identifier: String(identifier.value) } })
 			if (response.error) {
 				switch (response.error.code) {
 					case "invalid_taxonomy":
@@ -49,17 +49,19 @@ export const CATEGORY_PROCEDURES = {
 		},
 		async ({ input, context, errors }) => {
 			const response = await context.wordpress.kizlo.taxonomies.category.list({
-				page: input.query?.page,
-				per_page: input.query?.perPage,
-				search: input.query?.search,
-				exclude: normalizeArrayableValue(input.query?.exclude),
-				include: normalizeArrayableValue(input.query?.include),
-				order: input.query?.order,
-				orderby: input.query?.orderBy,
-				hide_empty: input.query?.hideEmpty,
-				parent: input.query?.parent,
-				post: input.query?.post,
-				slug: normalizeArrayableValue(input.query?.slug),
+				query: {
+					page: input.query?.page,
+					per_page: input.query?.perPage,
+					search: input.query?.search,
+					exclude: normalizeArrayableValue(input.query?.exclude),
+					include: normalizeArrayableValue(input.query?.include),
+					order: input.query?.order,
+					orderby: input.query?.orderBy,
+					hide_empty: input.query?.hideEmpty,
+					parent: input.query?.parent,
+					post: input.query?.post,
+					slug: normalizeArrayableValue(input.query?.slug),
+				},
 			})
 
 			if (response.error) {

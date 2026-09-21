@@ -48,13 +48,13 @@ generated TypeScript member.
 | API ID `kizlo.post-types.post`, operation `retrieve` | `wordpress.kizlo.postTypes.post.retrieve()` |
 | API ID `woocommerce.store.cart`, operation `add_item` | `wordpress.woocommerce.store.cart.addItem()` |
 
-The input object combines the fields from the route declaration. Path parameters are inserted into the URL;
-the remaining fields become query parameters for reads or a request body for writes. Required fields make the
-first argument required, while an endpoint with no required fields can be called without one.
+The input names the three parts of a request. `params` is interpolated into the URL, `query` becomes the
+query string, and `body` is sent as the payload. An endpoint only declares the parts it has, and a part is
+required when something inside it is; an endpoint that requires nothing can be called without an argument.
 
 ```ts
 const response = await context.wordpress.kizlo.postTypes.post.retrieve({
-  identifier: "hello-world",
+  params: { identifier: "hello-world" },
 })
 
 if (response.error) {
@@ -98,7 +98,7 @@ definition or transport defaults.
 const controller = new AbortController()
 
 await context.wordpress.kizlo.postTypes.post.retrieve(
-  { identifier: "42" },
+  { params: { identifier: "42" } },
   {
     headers: { "X-Request-Source": "featured" },
     signal: controller.signal,

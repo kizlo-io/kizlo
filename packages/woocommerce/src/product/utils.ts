@@ -20,7 +20,7 @@ import type {
 	WCSK_ProductSummary,
 } from "./types"
 
-type StoreProductListInput = WP_EndpointInput<"woocommerce.store.products.list">
+type StoreProductListInput = NonNullable<WP_EndpointInput<"woocommerce.store.products.list">["query"]>
 type DynamicTaxonomyInput = Partial<Record<`_unstable_tax_${string}`, string>>
 export type SerializedProductListInput = StoreProductListInput & DynamicTaxonomyInput
 

@@ -72,7 +72,10 @@ abstract class IntrospectionTestCase extends SeoTestCase
      * @return array<int, array<string, string>>
      */
     /**
-     * The input properties an operation declares.
+     * Every input property an operation declares, across the parts it declares
+     * them in. Most tests are asking whether a parameter is described at all,
+     * not which part carries it; a test about the part reads `input.params` and
+     * the rest directly.
      *
      * An operation that declares none serializes as `{}` rather than `[]`,
      * because {@see \Kizlo\Modules\Introspection\Document} keeps a map a map
@@ -85,9 +88,42 @@ abstract class IntrospectionTestCase extends SeoTestCase
      */
     protected function inputProperties(array $operation): array
     {
-        $properties = $operation['input']['properties'] ?? [];
+        $input  = $this->input($operation);
+        $merged = [];
 
-        return is_array($properties) ? $properties : (array) $properties;
+        foreach (['params', 'query', 'body'] as $part) {
+            $group      = (array) ($input[$part] ?? []);
+            $properties = $group['properties'] ?? [];
+            $merged     += is_array($properties) ? $properties : (array) $properties;
+        }
+
+        return $merged;
+    }
+
+    /**
+     * An operation's request, as a map. An operation that declares no part at
+     * all encodes as `{}` for the same reason the maps above do, so it comes
+     * back from a decoded document as an object rather than an empty array.
+     *
+     * @param array<string, mixed> $operation
+     * @return array<string, mixed>
+     */
+    protected function input(array $operation): array
+    {
+        return (array) ($operation['input'] ?? []);
+    }
+
+    /**
+     * The content type of the request body, or null when the operation has none.
+     *
+     * @param array<string, mixed> $operation
+     */
+    protected function inputContentType(array $operation): ?string
+    {
+        $body        = (array) ($this->input($operation)['body'] ?? []);
+        $contentType = $body['content_type'] ?? null;
+
+        return is_string($contentType) ? $contentType : null;
     }
 
     protected function errors(): array

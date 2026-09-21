@@ -21,7 +21,7 @@
 		"fumadocs-mdx": "15.0.12",
 		"fumadocs-typescript": "^5.2.6",
 		"fumadocs-ui": "16.10.4",
-		"kizlo": "workspace:*",
+		"kizlo": "0.21.0",
 		"lucide-react": "^1.20.0",
 		"next": "catalog:",
 		"radix-ui": "^1.6.0",

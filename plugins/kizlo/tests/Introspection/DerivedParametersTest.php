@@ -335,7 +335,7 @@ class DerivedParametersTest extends IntrospectionTestCase
         $first  = $this->document();
         $second = $this->document();
 
-        $this->assertArrayNotHasKey('acme_broken', $first['apis']['kizlo.post-types.post']['paths']['/post-types/post']['list']['input']['properties']);
+        $this->assertArrayNotHasKey('acme_broken', $this->inputProperties($first['apis']['kizlo.post-types.post']['paths']['/post-types/post']['list']));
         $this->assertErrorContains($first['diagnostics'], 'acme_broken');
         $this->assertSame($first['diagnostics'], $second['diagnostics']);
         $this->assertSame($first['hash'], $second['hash']);
@@ -355,7 +355,7 @@ class DerivedParametersTest extends IntrospectionTestCase
      */
     private function listProperties(string $apiId, string $path): array
     {
-        return $this->document()['apis'][$apiId]['paths'][$path]['list']['input']['properties'];
+        return $this->inputProperties($this->document()['apis'][$apiId]['paths'][$path]['list']);
     }
 
     /**

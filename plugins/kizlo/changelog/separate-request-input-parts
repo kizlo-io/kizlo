@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Describe an operation's request as separate params, query, and body schemas.
