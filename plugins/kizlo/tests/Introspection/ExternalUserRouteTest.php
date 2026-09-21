@@ -15,8 +15,8 @@ class ExternalUserRouteTest extends IntrospectionTestCase
         $this->assertSame('POST', $path['create']['method']);
         $this->assertSame('PUT', $path['update']['method']);
         $this->assertSame('DELETE', $path['delete']['method']);
-        $this->assertSame(['provider', 'value'], array_keys($path['delete']['input']['properties']));
-        $this->assertSame(['provider', 'value', 'email', 'first_name', 'last_name', 'profile'], array_keys($path['create']['input']['properties']));
+        $this->assertSame(['provider', 'value'], array_keys($this->inputProperties($path['delete'])));
+        $this->assertSame(['provider', 'value', 'email', 'first_name', 'last_name', 'profile'], array_keys($this->inputProperties($path['create'])));
         $this->assertContains('external_user_protected', $path['create']['errors']);
         $this->assertContains('external_user_not_found', $path['update']['errors']);
         $this->assertContains('external_user_delete_failed', $path['delete']['errors']);

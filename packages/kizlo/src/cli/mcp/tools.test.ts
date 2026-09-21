@@ -35,12 +35,13 @@ describe("listRoutes", () => {
 		if (!result.ok) throw new Error(result.error)
 		const value = result.value as { count: number; routes: { name: string; method: string; summary?: string }[] }
 
-		expect(value.count).toBe(4)
+		expect(value.count).toBe(5)
 		expect(value.routes.map((route) => route.name)).toEqual([
 			"postTypes.book.create",
 			"postTypes.book.list",
 			"postTypes.book.restoreRevision",
 			"postTypes.book.retrieve",
+			"shipping.zoneLocations.update",
 		])
 		expect(value.routes.find((route) => route.name === "postTypes.book.list")).toMatchObject({
 			method: "GET",
@@ -56,7 +57,7 @@ describe("listRoutes", () => {
 	})
 
 	it("names the namespaces WordPress serves when the filter matches none", () => {
-		const result = listRoutes(stateWith(), { namespace: "wc/v3" })
+		const result = listRoutes(stateWith(), { namespace: "acme/v1" })
 
 		expect(result).toEqual({ ok: false, error: expect.stringContaining("kizlo/v1") })
 	})
@@ -75,7 +76,10 @@ describe("describeRoute", () => {
 		const value = result.value as { method: string; path: string; pathParameters: string[]; input: Record<string, unknown> }
 
 		expect(value).toMatchObject({ method: "GET", path: "/post-types/book/{identifier}", pathParameters: ["identifier"] })
-		expect(value.input.required).toEqual(["identifier"])
+		// The parts are the schema's top level now, and `params` is demanded because something in it is.
+		expect(value.input.required).toEqual(["params"])
+		const params = (value.input.properties as Record<string, { required?: string[] }>).params
+		expect(params?.required).toEqual(["identifier"])
 	})
 
 	it("resolves the schemas an input extends", () => {
@@ -83,8 +87,9 @@ describe("describeRoute", () => {
 		if (!result.ok) throw new Error(result.error)
 		const input = (result.value as { input: Record<string, unknown> }).input
 
-		expect(Object.keys(input.properties as Record<string, unknown>)).toEqual(["title"])
-		expect(input.required).toEqual(["title"])
+		const body = (input.properties as Record<string, { properties?: Record<string, unknown>; required?: string[] }>).body
+		expect(Object.keys(body?.properties ?? {})).toEqual(["title"])
+		expect(body?.required).toEqual(["title"])
 	})
 
 	it("points an unknown route at the listing tool", () => {
@@ -98,7 +103,10 @@ describe("callRoute", () => {
 	it("interpolates path parameters and sends the rest as query", async () => {
 		const calls = captureFetch({ id: 7 })
 
-		const result = await callRoute(stateWith(), { route: "postTypes.book.retrieve", input: { identifier: "my-book", context: "edit" } })
+		const result = await callRoute(stateWith(), {
+			route: "postTypes.book.retrieve",
+			input: { params: { identifier: "my-book" }, query: { context: "edit" } },
+		})
 
 		expect(result).toEqual({ ok: true, value: { status: 200, data: { id: 7 } } })
 		expect(calls[0]?.method).toBe("GET")
@@ -117,7 +125,7 @@ describe("callRoute", () => {
 	it("sends a non-GET route as the body its content type declares", async () => {
 		const calls = captureFetch({ id: 12 }, 201)
 
-		const result = await callRoute(stateWith(), { route: "postTypes.book.create", input: { title: "New" } })
+		const result = await callRoute(stateWith(), { route: "postTypes.book.create", input: { body: { title: "New" } } })
 
 		expect(result).toEqual({ ok: true, value: { status: 201, data: { id: 12 } } })
 		expect(calls[0]?.method).toBe("POST")
@@ -127,7 +135,7 @@ describe("callRoute", () => {
 	it("reports what WordPress refused rather than the raw envelope", async () => {
 		captureFetch({ code: "rest_not_found", message: "No book." }, 404)
 
-		const result = await callRoute(stateWith(), { route: "postTypes.book.retrieve", input: { identifier: "gone" } })
+		const result = await callRoute(stateWith(), { route: "postTypes.book.retrieve", input: { params: { identifier: "gone" } } })
 
 		expect(result).toEqual({ ok: false, error: expect.stringContaining("rest_not_found") })
 	})
@@ -155,7 +163,7 @@ describe("document handover", () => {
 					namespace: "kizlo/v1",
 					paths: {
 						"/post-types/magazine": {
-							list: { method: "GET", errors: [], input: { type: "object" }, responses: { "200": { content_type: "application/json" } } },
+							list: { method: "GET", errors: [], input: {}, responses: { "200": { content_type: "application/json" } } },
 						},
 					},
 				},

@@ -61,7 +61,7 @@ export const SEO_PROCEDURES = {
 				output: SitemapIndex,
 			},
 			async ({ context, errors }) => {
-				const response = await context.wordpress.kizlo.seo.sitemaps.retrieve({ type: "index" })
+				const response = await context.wordpress.kizlo.seo.sitemaps.retrieve({ params: { type: "index" } })
 
 				if (response.error) {
 					context.logger.error("Get sitemap index unhandled error", response.error)
@@ -118,8 +118,8 @@ export const SEO_PROCEDURES = {
 			// Authors are one collection with no key, so WordPress serves them off the keyless route.
 			const response =
 				input.type === "author"
-					? await context.wordpress.kizlo.seo.sitemaps.retrieve({ type: "author", page })
-					: await context.wordpress.kizlo.seo.sitemaps.listUrls({ type: input.type, key: input.key, page })
+					? await context.wordpress.kizlo.seo.sitemaps.retrieve({ params: { type: "author" }, query: { page } })
+					: await context.wordpress.kizlo.seo.sitemaps.listUrls({ params: { type: input.type, key: input.key }, query: { page } })
 
 			if (response.error) {
 				context.logger.error("List sitemap urls unhandled error", response.error)

@@ -157,7 +157,7 @@ describe("startMcpServer", () => {
 		expect(
 			JSON.parse(((await before.json()) as { result: { content: { text: string }[] } }).result.content[0]?.text ?? "{}"),
 		).toMatchObject({
-			count: 4,
+			count: 5,
 		})
 
 		reloadable.document = {
@@ -167,7 +167,7 @@ describe("startMcpServer", () => {
 					namespace: "kizlo/v1",
 					paths: {
 						"/post-types/magazine": {
-							list: { method: "GET", errors: [], input: { type: "object" }, responses: { "200": { content_type: "application/json" } } },
+							list: { method: "GET", errors: [], input: {}, responses: { "200": { content_type: "application/json" } } },
 						},
 					},
 				},

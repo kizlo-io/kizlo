@@ -19,7 +19,7 @@ import type { ActiveWordPressClient, WP_EndpointResult } from "kizlo"
 export async function getFeaturedPost(
   wordpress: ActiveWordPressClient,
 ): Promise<WP_EndpointResult<"kizlo.postTypes.post.retrieve">> {
-  return wordpress.kizlo.postTypes.post.retrieve({ identifier: "featured" })
+  return wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: "featured" } })
 }
 ```
 

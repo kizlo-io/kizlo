@@ -1,6 +1,6 @@
 import { WP_Error } from "./error"
 import type { WordPressTransport } from "./transport"
-import type { WP_CallOptions, WP_Client, WP_Endpoint, WP_EndpointDefinition, WP_RequestBuild } from "./types"
+import type { WP_CallOptions, WP_Client, WP_Endpoint, WP_EndpointDefinition, WP_RequestBuild, WP_RequestParts } from "./types"
 
 /**
  * One generated endpoint, as data. The two type parameters are phantom, so this is the definition
@@ -32,18 +32,28 @@ function describeValue(value: unknown): string {
 }
 
 /**
- * Turn a definition and its input into a request: interpolate path parameters, then split the rest.
+ * Turn a definition and its input into a request: interpolate `params` into the path, put `query` on
+ * the URL, and forward `body` as it stands.
+ *
+ * Each part goes exactly where the caller put it, so nothing has to be inferred from the input's own
+ * keys. That matters because a field can legitimately be named `body` — `kizlo.email.send` takes one
+ * — and it is what lets a body method also carry query parameters, which the old method-based split
+ * could not express.
+ *
+ * Whether the request has a body at all is the definition's to answer: `requestContentType` is set
+ * for exactly those operations that declare one. A declared body left unsupplied is sent as an empty
+ * object rather than dropped, which is the shape a call with no fields has always sent.
  *
  * A path parameter that cannot be interpolated comes back as an error rather than throwing. The
  * generated input marks these required, so TypeScript catches the ones it can see, and what reaches
  * here is the value that was present but unusable — typically an identifier read off a request the
  * caller never validated.
  */
-export function buildWordPressRequest(definition: WP_EndpointDefinition, input: object): WP_RequestBuild {
+export function buildWordPressRequest(definition: WP_EndpointDefinition, input: WP_RequestParts): WP_RequestBuild {
 	let path = definition.path
-	const rest: Record<string, unknown> = { ...input }
+	const params = input.params ?? {}
 	for (const name of definition.pathParameters) {
-		const value = rest[name]
+		const value = params[name]
 		if (!isUsablePathParameter(value)) {
 			const message = `WordPress path parameter "${name}" must be a non-empty string or a finite number, received ${describeValue(value)}.`
 			return { request: null, error: new WP_Error({ code: "invalid_path_parameter", message }) }
@@ -52,16 +62,16 @@ export function buildWordPressRequest(definition: WP_EndpointDefinition, input: 
 		const encoded = encodeURIComponent(String(value))
 		const marker = `{${name}}`
 		while (path.includes(marker)) path = path.replace(marker, encoded)
-		delete rest[name]
 	}
 
-	const hasBody = ["POST", "PUT", "PATCH"].includes(definition.method)
+	const hasBody = definition.requestContentType !== undefined
 	return {
 		request: {
 			base: `/wp-json/${definition.namespace}`,
 			path,
 			method: definition.method,
-			...(hasBody ? { body: rest, requestContentType: definition.requestContentType } : { searchParams: rest }),
+			...(hasBody ? { body: input.body ?? {}, requestContentType: definition.requestContentType } : {}),
+			...(input.query ? { searchParams: input.query } : {}),
 			responseContentTypes: definition.responseContentTypes,
 			dataResponseStatuses: definition.dataResponseStatuses,
 		},
@@ -81,12 +91,17 @@ function isEndpoint(value: object): value is WP_EndpointDefinition {
 }
 
 function createCaller(definition: WP_EndpointDefinition, transport: WordPressTransport) {
-	return async (input: object = {}, options?: WP_CallOptions) => {
+	return async (input: WP_RequestParts = {}, options?: WP_CallOptions) => {
 		const built = buildWordPressRequest(definition, input)
 		// Nothing was sent, so this reports the shape a transport failure has: status 0, no headers.
 		if (built.error) return { data: null, status: 0, headers: new Headers(), error: built.error }
 
-		return transport.request({ ...built.request, ...options })
+		// Spread last would drop the operation's own filters, and the two describe different things:
+		// the query says which resources, the option says how WordPress should answer for them.
+		const { searchParams, ...rest } = options ?? {}
+		const query = searchParams ? { ...built.request.searchParams, ...searchParams } : built.request.searchParams
+
+		return transport.request({ ...built.request, ...rest, ...(query ? { searchParams: query } : {}) })
 	}
 }
 

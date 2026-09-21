@@ -123,73 +123,131 @@ class OperationValidator
     {
         $input = $operation['input'];
 
-        if (($input['type'] ?? null) !== 'object') {
-            $this->diagnostics->error($location + ['keyword' => 'input'], 'Operation input must be an object schema.');
+        if (!is_array($input)) {
+            $this->diagnostics->error($location + ['keyword' => 'input'], 'Operation input must describe "params", "query", or "body".');
             return null;
         }
 
-        $contentType = $input['content_type'] ?? null;
-        $hasBody     = OperationNormalizer::hasRequestBody($operation['method']);
+        $validator = new SchemaValidator($this->resolver, $this->diagnostics);
+        $cleaned   = [];
 
-        if ($contentType !== null && !$hasBody) {
-            $this->diagnostics->warning(
-                $location + ['keyword' => 'input'],
-                'Only an operation with a request body declares "content_type". Ignored.',
-            );
-            unset($input['content_type']);
-            $contentType = null;
+        foreach (['params', 'query'] as $part) {
+            if (!array_key_exists($part, $input)) {
+                continue;
+            }
+
+            $group = $input[$part];
+
+            if (!is_array($group) || ($group['type'] ?? null) !== 'object') {
+                $this->diagnostics->error($location + ['keyword' => $part], sprintf('Operation "%s" must be an object schema.', $part));
+                return null;
+            }
+
+            if (isset($group['content_type'])) {
+                $this->diagnostics->warning(
+                    $location + ['keyword' => $part],
+                    'Only an operation with a request body declares "content_type". Ignored.',
+                );
+                unset($group['content_type']);
+            }
+
+            $group = $validator->clean($group, $location, $part, ['file' => false]);
+
+            if ($group === null) {
+                return null;
+            }
+
+            $cleaned[$part] = $group;
         }
 
-        if ($contentType !== null && !in_array($contentType, Spec::REQUEST_CONTENT_TYPES, true)) {
+        $body = $this->cleanBody($operation, $input, $location, $validator);
+
+        if ($body === false) {
+            return null;
+        }
+
+        if ($body !== null) {
+            $cleaned['body'] = $body;
+        }
+
+        return $this->checkPathParameters($operation, $cleaned, $location);
+    }
+
+    /**
+     * The body and the content type that describes it, or false when the
+     * operation cannot be published. Null means it simply has no body.
+     *
+     * @param array<string, mixed>  $operation
+     * @param array<string, mixed>  $input
+     * @param array<string, string> $location
+     * @return array<string, mixed>|null|false
+     */
+    private function cleanBody(array $operation, array $input, array $location, SchemaValidator $validator): array|null|false
+    {
+        if (!array_key_exists('body', $input)) {
+            return null;
+        }
+
+        if (!OperationNormalizer::hasRequestBody($operation['method'])) {
             $this->diagnostics->error(
-                $location + ['keyword' => 'input'],
+                $location + ['keyword' => 'body'],
+                sprintf('A %s operation has no request body, so "body" cannot be described.', (string) $operation['method']),
+            );
+            return false;
+        }
+
+        $body = $input['body'];
+
+        if (!is_array($body)) {
+            $this->diagnostics->error($location + ['keyword' => 'body'], 'Operation "body" must be a schema.');
+            return false;
+        }
+
+        $contentType = $body['content_type'] ?? null;
+
+        if (!in_array($contentType, Spec::REQUEST_CONTENT_TYPES, true)) {
+            $this->diagnostics->error(
+                $location + ['keyword' => 'body'],
                 sprintf('"%s" is not a supported request content type.', is_string($contentType) ? $contentType : gettype($contentType)),
             );
-            return null;
+            return false;
         }
 
-        $schema = $input;
+        $schema = $body;
         unset($schema['content_type']);
 
-        $cleaned = (new SchemaValidator($this->resolver, $this->diagnostics))->clean($schema, $location, 'input', [
+        $cleaned = $validator->clean($schema, $location, 'body', [
             'file' => $contentType === Spec::MULTIPART_CONTENT_TYPE,
         ]);
 
         if ($cleaned === null) {
-            return null;
+            return false;
         }
 
-        if ($contentType !== null) {
-            $cleaned = ['content_type' => $contentType] + $cleaned;
-        }
-
-        return $this->markPathParameters($operation, $cleaned, $location);
+        return ['content_type' => $contentType] + $cleaned;
     }
 
     /**
-     * Every `{parameter}` in the path has to be a declared, required input
-     * property, and the ones that are get marked `in: path`.
-     *
-     * Without the marker a client has to re-derive the URL by matching property
-     * names against the path template. With it, `/categories/{category}/products/{slug}`
-     * needs no parsing at all. Query versus body stays implied by the method,
-     * since WordPress merges every source on the way in anyway.
+     * Every `{parameter}` in the path has to be a declared, required property of
+     * `params`. Nothing is marked: the part a value belongs to is now the part
+     * it was declared in, so a client interpolates `params`, serializes `query`,
+     * and sends `body` without re-deriving anything from the path template.
      *
      * @param array<string, mixed>  $operation
      * @param array<string, mixed>  $input
      * @param array<string, string> $location
      * @return array<string, mixed>|null
      */
-    private function markPathParameters(array $operation, array $input, array $location): ?array
+    private function checkPathParameters(array $operation, array $input, array $location): ?array
     {
-        $properties = $input['properties'] ?? [];
+        $properties = $input['params']['properties'] ?? [];
         $properties = is_array($properties) ? $properties : [];
 
         foreach ($operation['path_parameters'] as $parameter) {
             if (!isset($properties[$parameter])) {
                 $this->diagnostics->error(
-                    $location + ['keyword' => 'input'],
-                    sprintf('Path parameter "%s" is not declared in "input.properties".', $parameter),
+                    $location + ['keyword' => 'params'],
+                    sprintf('Path parameter "%s" is not declared in "params.properties".', $parameter),
                 );
                 return null;
             }
@@ -198,17 +256,11 @@ class OperationValidator
 
             if (!is_array($property) || ($property['required'] ?? false) !== true) {
                 $this->diagnostics->error(
-                    $location + ['keyword' => 'input', 'pointer' => sprintf('input.properties.%s', $parameter)],
+                    $location + ['keyword' => 'params', 'pointer' => sprintf('params.properties.%s', $parameter)],
                     sprintf('Path parameter "%s" must be required.', $parameter),
                 );
                 return null;
             }
-
-            $properties[$parameter] = ['in' => 'path'] + $property;
-        }
-
-        if ($properties !== []) {
-            $input['properties'] = $properties;
         }
 
         return $input;

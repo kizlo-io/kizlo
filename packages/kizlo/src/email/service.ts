@@ -9,7 +9,7 @@ export class EmailService {
 	}
 
 	public async send(params: EmailSendParams): Promise<void> {
-		const { error } = await this.wordpress.kizlo.email.send(params)
+		const { error } = await this.wordpress.kizlo.email.send({ body: params })
 		if (error) throw error
 	}
 }

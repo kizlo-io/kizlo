@@ -58,9 +58,12 @@ export const CART_PROCEDURES = {
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input: { body: input }, errors }) => {
-			const response = await context.wordpress.woocommerce.store.cart.updateCustomer(serializeCartUpdateInput(input), {
-				headers: context.sessionHeaders,
-			})
+			const response = await context.wordpress.woocommerce.store.cart.updateCustomer(
+				{ body: serializeCartUpdateInput(input) },
+				{
+					headers: context.sessionHeaders,
+				},
+			)
 
 			if (response.error) {
 				switch (response.error.code) {
@@ -92,7 +95,7 @@ export const CART_PROCEDURES = {
 		},
 		async ({ context, input: { body }, errors }) => {
 			const response = await context.wordpress.woocommerce.store.cart.selectShippingRate(
-				{ rate_id: body.rateId, package_id: body.packageId },
+				{ body: { rate_id: body.rateId, package_id: body.packageId } },
 				{ headers: context.sessionHeaders },
 			)
 
@@ -126,9 +129,11 @@ export const CART_PROCEDURES = {
 			async ({ context, input: { body: input }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.addItem(
 					{
-						id: input.variationId ?? input.productId,
-						quantity: input.quantity,
-						variation: input.selectedAttributes ?? [],
+						body: {
+							id: input.variationId ?? input.productId,
+							quantity: input.quantity,
+							variation: input.selectedAttributes ?? [],
+						},
 					},
 					{ headers: context.sessionHeaders },
 				)
@@ -176,7 +181,7 @@ export const CART_PROCEDURES = {
 			},
 			async ({ context, input: { params, body }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.updateItem(
-					{ key: params.key, quantity: body.quantity },
+					{ body: { key: params.key, quantity: body.quantity } },
 					{ headers: context.sessionHeaders },
 				)
 
@@ -213,7 +218,10 @@ export const CART_PROCEDURES = {
 				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { params }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.removeItem({ key: params.key }, { headers: context.sessionHeaders })
+				const response = await context.wordpress.woocommerce.store.cart.removeItem(
+					{ body: { key: params.key } },
+					{ headers: context.sessionHeaders },
+				)
 
 				if (response.error) {
 					switch (response.error.code) {
@@ -243,7 +251,7 @@ export const CART_PROCEDURES = {
 			},
 			async ({ context, input: { body }, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.applyCoupon(
-					{ code: body.code },
+					{ body: { code: body.code } },
 					{ headers: context.sessionHeaders },
 				)
 
@@ -275,7 +283,7 @@ export const CART_PROCEDURES = {
 			},
 			async ({ context, input, errors }) => {
 				const response = await context.wordpress.woocommerce.store.cart.removeCoupon(
-					{ code: input.params.code },
+					{ body: { code: input.params.code } },
 					{ headers: context.sessionHeaders },
 				)
 

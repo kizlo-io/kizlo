@@ -1,4 +1,4 @@
-import type { IntrospectionDocument, IntrospectionSchema } from "../../wordpress/introspection"
+import type { IntrospectionDocument, IntrospectionOperationInput, IntrospectionSchema } from "../../wordpress/introspection"
 
 export type JsonSchema = Record<string, unknown>
 
@@ -13,6 +13,26 @@ export type JsonSchema = Record<string, unknown>
  */
 export function toJsonSchema(schema: IntrospectionSchema, document: IntrospectionDocument): JsonSchema {
 	return convert(schema, document, new Set())
+}
+
+/**
+ * The same, for an operation's request rather than one schema: each part it declares becomes a
+ * property, so a caller validates and builds `{ params, query, body }` — the shape the request
+ * builder takes. A part is required when the schema under it demands anything.
+ */
+export function inputJsonSchema(input: IntrospectionOperationInput, document: IntrospectionDocument): JsonSchema {
+	const properties: Record<string, JsonSchema> = {}
+	const required: string[] = []
+	for (const part of ["params", "query", "body"] as const) {
+		const schema = input[part]
+		if (!schema) continue
+		const converted = convert(schema, document, new Set())
+		properties[part] = converted
+		const demands =
+			schema.type === "object" ? Array.isArray(converted.required) && converted.required.length > 0 : schema.required !== false
+		if (demands) required.push(part)
+	}
+	return { type: "object", properties, ...(required.length > 0 ? { required } : {}) }
 }
 
 /**

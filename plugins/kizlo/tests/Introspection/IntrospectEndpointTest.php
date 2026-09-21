@@ -156,7 +156,7 @@ class IntrospectEndpointTest extends IntrospectionTestCase
         $response = $this->get();
 
         $this->assertSame(200, $response->get_status());
-        $this->assertSame('1.0', $response->get_data()['version']);
+        $this->assertSame('1.1', $response->get_data()['version']);
         $this->assertSame(['version', 'hash', 'schemas', 'apis', 'diagnostics'], array_keys($response->get_data()));
     }
 

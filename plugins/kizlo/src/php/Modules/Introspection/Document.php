@@ -22,7 +22,7 @@ class Document
      * keep the current version. This is independent of the plugin version sent
      * in `X-Kizlo-Version`.
      */
-    public const VERSION = '1.0';
+    public const VERSION = '1.1';
 
     /**
      * Keys whose value is a map. An empty PHP array encodes as `[]`, which would
@@ -31,7 +31,7 @@ class Document
      *
      * @var array<int, string>
      */
-    private const MAP_KEYS = ['schemas', 'apis', 'paths', 'properties', 'patternProperties', 'responses', 'data'];
+    private const MAP_KEYS = ['schemas', 'apis', 'paths', 'properties', 'patternProperties', 'responses', 'data', 'input'];
 
     public static function encode(mixed $value): string
     {

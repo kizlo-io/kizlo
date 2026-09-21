@@ -35,8 +35,8 @@ describe("generated endpoints", () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
 		vi.stubGlobal("fetch", fetch)
 		const result = await call<{ id: number }>(definition({ path: "/books/{identifier}", pathParameters: ["identifier"] }), {
-			identifier: "dune messiah",
-			page: 2,
+			params: { identifier: "dune messiah" },
+			query: { page: 2 },
 		})
 
 		expect(result.data).toEqual({ id: 1 })
@@ -68,12 +68,12 @@ describe("generated endpoints", () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ id: 1 }))
 		vi.stubGlobal("fetch", fetch)
 
-		await call(definition(), { context: "edit" })
+		await call(definition(), { query: { context: "edit" } })
 
 		expect(fetch.mock.calls[0]?.[0]).toBe("https://wp.example/wp-json/kizlo/v1/books?context=edit")
 	})
 
-	test("partitions path input from a JSON request body", async () => {
+	test("keeps the path parameter out of the JSON request body", async () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }, { status: 201 }))
 		vi.stubGlobal("fetch", fetch)
 		await call(
@@ -84,7 +84,7 @@ describe("generated endpoints", () => {
 				requestContentType: "application/json",
 				responseContentTypes: { "201": "application/json" },
 			}),
-			{ id: 7, title: "Dune" },
+			{ params: { id: 7 }, body: { title: "Dune" } },
 		)
 
 		const [url, init] = fetch.mock.calls[0] ?? []
@@ -98,9 +98,7 @@ describe("generated endpoints", () => {
 		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }))
 		vi.stubGlobal("fetch", fetch)
 		await call(definition({ method: "POST", requestContentType: "multipart/form-data" }), {
-			title: "Dune",
-			cover: new Blob(["cover"]),
-			tags: ["sci-fi", "classic"],
+			body: { title: "Dune", cover: new Blob(["cover"]), tags: ["sci-fi", "classic"] },
 		})
 		const multipart = fetch.mock.calls[0]?.[1]?.body
 		const multipartHeaders = fetch.mock.calls[0]?.[1]?.headers as Record<string, string> | undefined
@@ -109,8 +107,7 @@ describe("generated endpoints", () => {
 		expect(multipartHeaders?.["Content-Type"]).toBeUndefined()
 
 		await call(definition({ method: "PATCH", requestContentType: "application/x-www-form-urlencoded" }), {
-			title: "Dune",
-			tags: ["sci-fi", "classic"],
+			body: { title: "Dune", tags: ["sci-fi", "classic"] },
 		})
 		expect(String(fetch.mock.calls[1]?.[1]?.body)).toBe("title=Dune&tags=sci-fi%2Cclassic")
 		const urlEncodedHeaders = fetch.mock.calls[1]?.[1]?.headers as Record<string, string> | undefined
@@ -163,7 +160,7 @@ describe("generated endpoints", () => {
 		const circular: Record<string, unknown> = {}
 		circular.self = circular
 
-		const result = await call(definition({ method: "POST", requestContentType: "application/json" }), circular)
+		const result = await call(definition({ method: "POST", requestContentType: "application/json" }), { body: circular })
 
 		expect(result.error?.code).toBe("unknown_error")
 		expect(result.status).toBe(0)

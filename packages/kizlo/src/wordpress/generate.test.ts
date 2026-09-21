@@ -44,22 +44,28 @@ const KIZLO_MODULE = `declare module "kizlo" {
 `
 
 /** Calls every flavour of generated output has to accept, and the mistakes all of them must reject. */
-const CLIENT_CALLS = `wordpress.postTypes.book.list({ page: 1, status: "draft" })
+const CLIENT_CALLS = `wordpress.postTypes.book.list({ query: { page: 1, status: "draft" } })
 	wordpress.postTypes.book.list()
-	wordpress.postTypes.book.retrieve({ identifier: "dune" })
-	wordpress.postTypes.book.create({ title: "Dune" })
+	wordpress.postTypes.book.retrieve({ params: { identifier: "dune" } })
+	wordpress.postTypes.book.create({ body: { title: "Dune" } })
+	wordpress.shipping.zoneLocations.update({ params: { zone_id: 1 }, body: [{ code: "US", type: "country" }] })
+	wordpress.postTypes.book.restoreRevision({ params: { identifier: "dune" }, query: { context: "edit" }, body: { revision: 3 } })
 	// @ts-expect-error unknown API ID
 	wordpress.postTypes.album.list({})
 	// @ts-expect-error unknown endpoint
 	wordpress.postTypes.book.archive({})
 	// @ts-expect-error unknown input field
-	wordpress.postTypes.book.list({ unknown: true })
+	wordpress.postTypes.book.list({ query: { unknown: true } })
 	// @ts-expect-error invalid enum value
-	wordpress.postTypes.book.list({ status: "private" })
+	wordpress.postTypes.book.list({ query: { status: "private" } })
 	// @ts-expect-error invalid path value type
-	wordpress.postTypes.book.retrieve({ identifier: 42 })
+	wordpress.postTypes.book.retrieve({ params: { identifier: 42 } })
+	// @ts-expect-error a query field passed where the part it belongs to is named
+	wordpress.postTypes.book.list({ page: 1 })
+	// @ts-expect-error an object body where the route declares an array
+	wordpress.shipping.zoneLocations.update({ params: { zone_id: 1 }, body: { code: "US" } })
 	// Resolved through the registry augmentation, wherever the generated output carries it.
-	createProcedure({}, ({ context }) => context.wordpress.postTypes.book.list({ page: 1 }))
+	createProcedure({}, ({ context }) => context.wordpress.postTypes.book.list({ query: { page: 1 } }))
 `
 
 function compile(files: Record<string, string>): string[] {
@@ -99,7 +105,7 @@ describe("generateWordPressClient", () => {
 		expect(first).toContain("publication?: {\n\t\timprint?: {\n\t\t\tname: string\n\t\t}\n\t}")
 		expect(first).toContain("@deprecated")
 		expect(first).toContain("export interface WP_PostTypesBookCreateInput")
-		expect(first).toContain("export type WP_PostTypesBookCreateEndpointInput = WP_PostTypesBookCreateInput")
+		expect(first).toContain("export type WP_PostTypesBookCreateEndpointInput = {\n\tbody: WP_PostTypesBookCreateInput\n}")
 		expect(first).not.toContain("A shared entity.\nexport type WP_AcmeEntity")
 		expect(first).toContain("export const introspection = {")
 		expect(first).toContain("\tpostTypes: {")
@@ -149,7 +155,7 @@ describe("generateWordPressClient", () => {
 					WP_EndpointResult,
 				} from "kizlo"
 				const path: WP_EndpointPath = "postTypes.book.retrieve"
-				const input: WP_EndpointInput<typeof path> = { identifier: "dune" }
+				const input: WP_EndpointInput<typeof path> = { params: { identifier: "dune" } }
 				const data: WP_EndpointData<typeof path> = { id: 1, status: "publish" }
 				declare const error: WP_EndpointError<typeof path>
 				declare const result: WP_EndpointResult<typeof path>
@@ -278,7 +284,7 @@ describe("generateWordPressClient", () => {
 				"wordpress.ts": client,
 				"usage.ts": `import type { WordPressClient } from "./wordpress"
 				declare const wordpress: WordPressClient
-				wordpress.postTypes.book.retrieve({ identifier: "dune" }).then((response) => {
+				wordpress.postTypes.book.retrieve({ params: { identifier: "dune" } }).then((response) => {
 					const retryAfterBeforeNarrowing: string | null = response.headers.get("retry-after")
 					if (response.status === 401) {
 						const retryAfter: string = response.headers.get("retry-after")
@@ -336,9 +342,9 @@ describe("generateWordPressClient", () => {
 				"wordpress.ts": client,
 				"usage.ts": `import type { WordPressClient } from "./wordpress"
 				declare const wordpress: WordPressClient
-				wordpress.postTypes.book.restoreRevision({ identifier: "dune", revision: 3 })
+				wordpress.postTypes.book.restoreRevision({ params: { identifier: "dune" }, body: { revision: 3 } })
 				// @ts-expect-error the name as declared is not the name the client publishes
-				wordpress.postTypes.book.restore_revision({ identifier: "dune", revision: 3 })`,
+				wordpress.postTypes.book.restore_revision({ params: { identifier: "dune" }, body: { revision: 3 } })`,
 			}),
 		).toEqual([])
 	})

@@ -29,12 +29,27 @@ kizlo_register_route_spec(callable $derive): void
 | `namespace` | `string` | Route namespace, such as `wc/v3`. |
 | `route` | `string` | Route path inside the namespace. |
 | `method` | `string` | One HTTP method. Arrays and the plural `methods` key are rejected. |
-| `input` | `array` | Request schema. Named route captures must have required properties with matching names. |
+| `input` | `array` | Request schema, in the parts below. |
 | `errors` | `string[]` | Handler-specific WordPress error codes. |
 | `responses` | `array` | Status-keyed response contracts. |
 | `summary` | `string` | Optional short operation summary. |
 | `description` | `string` | Optional operation description. |
 | `deprecated` | `bool` | Optional deprecation marker. |
+
+## Input parts
+
+`input` describes the request in the three parts it is made of. Declare only the parts the route has.
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `params` | `array` | Object schema for the route's path captures. Every named capture needs a required property with a matching name. |
+| `query` | `array` | Object schema for the query string. A body method may declare one too. |
+| `body` | `array` | Schema for the request payload, on `POST`, `PUT`, and `PATCH`. Any supported schema, including an array. Carries its own `content_type`, defaulting to `application/json`. |
+
+A flat object schema is still accepted, and is read as the parts it was always describing: the path captures
+become `params`, and the rest becomes the `body` on a body method and the `query` otherwise. Routes registered
+that way keep working unchanged. Use the parts when you need something the flat shape cannot say, such as a
+body that is not an object.
 
 Runtime keys such as `callback`, `permission_callback`, `args`, `sanitize_callback`, and
 `validate_callback` are rejected because this function describes an endpoint rather than serving it. Keep the
@@ -55,9 +70,11 @@ kizlo_register_route_spec(fn(): array => [
     'route'     => '/orders/(?P<id>\\d+)',
     'method'    => 'GET',
     'input'     => [
-        'type'       => 'object',
-        'properties' => [
-            'id' => ['type' => 'integer', 'required' => true],
+        'params' => [
+            'type'       => 'object',
+            'properties' => [
+                'id' => ['type' => 'integer', 'required' => true],
+            ],
         ],
     ],
     'errors'    => ['acme_order_not_found'],
@@ -68,5 +85,5 @@ kizlo_register_route_spec(fn(): array => [
 ]);
 ```
 
-After `kizlo generate`, call it as `context.wordpress.acme.orders.retrieve({ id: 42 })`. Register referenced
+After `kizlo generate`, call it as `context.wordpress.acme.orders.retrieve({ params: { id: 42 } })`. Register referenced
 schemas with [`kizlo_register_route_schema`](/docs/php/functions/register-route-schema).

@@ -73,9 +73,9 @@ class ContextTest extends IntrospectionTestCase
     public function test_no_managed_retrieve_describes_a_context_parameter(): void
     {
         foreach (['kizlo.post-types.post' => '/post-types/post', 'kizlo.taxonomies.category' => '/taxonomies/category'] as $apiId => $path) {
-            $input = $this->document()['apis'][$apiId]['paths'][$path . '/{identifier}']['retrieve']['input'];
+            $retrieve = $this->document()['apis'][$apiId]['paths'][$path . '/{identifier}']['retrieve'];
 
-            $this->assertArrayNotHasKey('context', $input['properties'], $apiId);
+            $this->assertArrayNotHasKey('context', $this->inputProperties($retrieve), $apiId);
         }
     }
 
@@ -291,7 +291,7 @@ class ContextTest extends IntrospectionTestCase
         // As above: the parameters the code is raised for are still described,
         // which is the half derivation can see. The code itself waits on KIZ-199.
         foreach (['author', 'author_exclude', 'author_email', 'type', 'status'] as $protected) {
-            $this->assertArrayHasKey($protected, $list['input']['properties']);
+            $this->assertArrayHasKey($protected, $this->inputProperties($list));
         }
     }
 
@@ -367,7 +367,7 @@ class ContextTest extends IntrospectionTestCase
      */
     private function listProperties(string $apiId, string $path): array
     {
-        return $this->document()['apis'][$apiId]['paths'][$path]['list']['input']['properties'];
+        return $this->inputProperties($this->document()['apis'][$apiId]['paths'][$path]['list']);
     }
 
     private function boot(): void

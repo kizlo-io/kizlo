@@ -84,7 +84,7 @@ class RouteRegistrar
             );
         }
 
-        foreach (RuntimeKeywordScanner::ignored(RuntimeKeywordScanner::find($input)) as $hit) {
+        foreach (RuntimeKeywordScanner::ignored(RuntimeKeywordScanner::find(OperationNormalizer::flatten($input))) as $hit) {
             self::fail(
                 'kizlo_register_route',
                 ['api_id' => (string) $args['id'], 'pointer' => $hit['pointer'], 'keyword' => $hit['keyword']],
@@ -182,7 +182,7 @@ class RouteRegistrar
 
         $input = is_array($args['input'] ?? null) ? $args['input'] : [];
 
-        foreach (RuntimeKeywordScanner::find($input) as $hit) {
+        foreach (RuntimeKeywordScanner::find(OperationNormalizer::flatten($input)) as $hit) {
             self::fail(
                 'kizlo_register_route_spec',
                 ['api_id' => $id, 'pointer' => $hit['pointer'], 'keyword' => $hit['keyword']],
@@ -248,6 +248,29 @@ class RouteRegistrar
     // ============================================================
 
     /**
+     * Normalize a declared input without flattening the parts it may be written
+     * in. Running the schema normalizer over the whole map would treat `params`
+     * and the rest as schema keywords, so each part is normalized on its own.
+     *
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     */
+    private static function normalizeDeclaredInput(array $input): array
+    {
+        if (!OperationNormalizer::isSeparated($input)) {
+            return SchemaNormalizer::normalize($input);
+        }
+
+        $normalized = [];
+
+        foreach ($input as $part => $group) {
+            $normalized[$part] = is_array($group) ? SchemaNormalizer::normalize($group) : $group;
+        }
+
+        return $normalized;
+    }
+
+    /**
      * The contract half of a declaration, with executable callbacks removed. The
      * emitted document never carries a callable — it would not serialize, and it
      * would expose controller internals if it did.
@@ -263,7 +286,7 @@ class RouteRegistrar
             'namespace' => $namespace,
             'route'     => $args['route'] ?? '',
             'method'    => $args['method'] ?? null,
-            'input'     => is_array($args['input'] ?? null) ? SchemaNormalizer::normalize($args['input']) : [],
+            'input'     => is_array($args['input'] ?? null) ? self::normalizeDeclaredInput($args['input']) : [],
             'errors'    => $args['errors'] ?? [],
             'responses' => $args['responses'] ?? [],
         ];
@@ -386,6 +409,9 @@ class RouteRegistrar
      */
     private static function registerEndpoint(string $route, array $routeArgs, ?array $input): void
     {
+        // A declaration may name the request's parts; WordPress validates them as one map.
+        $input = $input === null ? null : OperationNormalizer::flatten($input);
+
         if ($input !== null) {
             // Coerced first, so a repairable declaration reaches WordPress in the
             // form it was meant to take: `'required' => 1` is enforced rather than

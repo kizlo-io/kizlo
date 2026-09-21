@@ -32,7 +32,7 @@ function itemSchema(field: string): IntrospectionSchema {
 
 function introspection(prefix: string): IntrospectionDocument {
 	return {
-		version: "1.0",
+		version: "1.1",
 		hash: `sha256:${prefix.padEnd(64, "0")}`,
 		schemas: {
 			"kizlo.post-types.page.item": itemSchema(`${prefix}Page`),
@@ -50,8 +50,10 @@ function introspection(prefix: string): IntrospectionDocument {
 							method: "GET",
 							errors: ["rest_not_found"],
 							input: {
-								type: "object",
-								properties: { identifier: { type: "string", required: true, in: "path" } },
+								params: {
+									type: "object",
+									properties: { identifier: { type: "string", required: true } },
+								},
 							},
 							responses: {
 								"200": { content_type: "application/json", body: { $ref: "kizlo.post-types.post.item" } },
@@ -134,7 +136,7 @@ function usage(prefix: string): string {
 	type ProductIsNotUndefined = Assert<Equal<IncludesUndefined<ProductFields>, false>>
 
 	type RawPathIsExact = Assert<Equal<WP_EndpointPath, "kizlo.postTypes.post.retrieve">>
-	type RawInputIsExact = Assert<Equal<WP_EndpointInput<"kizlo.postTypes.post.retrieve">, { identifier: string }>>
+	type RawInputIsExact = Assert<Equal<WP_EndpointInput<"kizlo.postTypes.post.retrieve">, { params: { identifier: string } }>>
 	type RawDataIsNotAny = Assert<Equal<IsAny<WP_EndpointData<"kizlo.postTypes.post.retrieve">>, false>>
 	type RawResultIsNotAny = Assert<Equal<IsAny<WP_EndpointResult<"kizlo.postTypes.post.retrieve">>, false>>
 	// @ts-expect-error procedure names are not raw WordPress operation paths

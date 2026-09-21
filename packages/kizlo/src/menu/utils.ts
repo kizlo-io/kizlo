@@ -12,24 +12,26 @@ export function deserializeListMenuInput(input?: ListMenuInputOut): WPK_MenuItem
 			: input?.orderby
 
 	return {
-		after: input?.after,
-		before: input?.before,
-		exclude: listed(input?.exclude),
-		include: listed(input?.include),
-		menu_order: input?.menuOrder,
-		menus: listed(input?.menus),
-		menus_exclude: listed(input?.menusExclude),
-		offset: input?.offset,
-		order: input?.order,
-		orderby,
-		page: input?.page,
-		per_page: input?.perPage,
-		search: input?.search,
-		slug: listed(input?.slug),
-		tax_relation: input?.taxRelation,
-		search_columns: input?.searchColumns,
-		// A menu item is only published or nothing; the draft ones exist but are not menu entries.
-		status: ["publish"],
+		query: {
+			after: input?.after,
+			before: input?.before,
+			exclude: listed(input?.exclude),
+			include: listed(input?.include),
+			menu_order: input?.menuOrder,
+			menus: listed(input?.menus),
+			menus_exclude: listed(input?.menusExclude),
+			offset: input?.offset,
+			order: input?.order,
+			orderby,
+			page: input?.page,
+			per_page: input?.perPage,
+			search: input?.search,
+			slug: listed(input?.slug),
+			tax_relation: input?.taxRelation,
+			search_columns: input?.searchColumns,
+			// A menu item is only published or nothing; the draft ones exist but are not menu entries.
+			status: ["publish"],
+		},
 	}
 }
 

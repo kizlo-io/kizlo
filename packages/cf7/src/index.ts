@@ -38,8 +38,8 @@ export function contactFormSeven<TId extends string, TOptions extends ContactFor
 					}
 
 					const response = await context.wordpress.cf7.forms.submit({
-						...(formResult.value as Record<string, unknown>),
-						form_id: options.id,
+						params: { form_id: options.id },
+						body: { ...(formResult.value as Record<string, unknown>) },
 					})
 					if (response.error) throw response.error
 

@@ -1,7 +1,7 @@
 import { buildWordPressRequest } from "../../wordpress/endpoint"
 import { WordPressTransport } from "../../wordpress/transport"
 import { routesOf, sortRoutes } from "./routes"
-import { toJsonSchema } from "./schema"
+import { inputJsonSchema } from "./schema"
 import type { McpState } from "./state"
 
 /**
@@ -59,10 +59,10 @@ export function describeRoute(state: McpState, input: { route: string }): ToolRe
 			...(route.summary !== undefined ? { summary: route.summary } : {}),
 			...(route.description !== undefined ? { description: route.description } : {}),
 			...(route.deprecated ? { deprecated: true } : {}),
-			// Named separately because they read as ordinary fields in the schema: they are interpolated
-			// into the path rather than sent as a query or a body, so a caller must supply every one.
+			// Repeated from `input.params` because every one of them must be supplied: the path cannot be
+			// built without them, where a query or body field is only as required as the schema says.
 			pathParameters: route.definition.pathParameters,
-			input: toJsonSchema(route.operation.input, state.document),
+			input: inputJsonSchema(route.operation.input, state.document),
 		},
 	}
 }

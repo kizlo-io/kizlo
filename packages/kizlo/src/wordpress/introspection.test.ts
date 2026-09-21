@@ -17,16 +17,16 @@ describe("parseIntrospectionDocument", () => {
 	})
 
 	test("names the kizlo package when WordPress published a newer version", () => {
-		expect(parse("1.1")).toThrow(IntrospectionVersionError)
-		expect(parse("1.1")).toThrow(
-			`WordPress published introspection 1.1, newer than the ${WORDPRESS_INTROSPECTION_VERSION} this kizlo understands. Update the kizlo package.`,
+		expect(parse("1.2")).toThrow(IntrospectionVersionError)
+		expect(parse("1.2")).toThrow(
+			`WordPress published introspection 1.2, newer than the ${WORDPRESS_INTROSPECTION_VERSION} this kizlo understands. Update the kizlo package.`,
 		)
 		expect(parse("2.0")).toThrow("Update the kizlo package.")
 	})
 
 	test("names the WordPress plugin when WordPress published an older version", () => {
-		expect(parse("0.9")).toThrow(
-			`WordPress published introspection 0.9, older than the ${WORDPRESS_INTROSPECTION_VERSION} this kizlo understands. Update the Kizlo plugin in WordPress.`,
+		expect(parse("1.0")).toThrow(
+			`WordPress published introspection 1.0, older than the ${WORDPRESS_INTROSPECTION_VERSION} this kizlo understands. Update the Kizlo plugin in WordPress.`,
 		)
 	})
 
@@ -37,8 +37,8 @@ describe("parseIntrospectionDocument", () => {
 	// The version is the whole report: the schema would name every other field that moved with it, and
 	// none of them is something the user can act on.
 	test("reports a version mismatch without the schema detail", () => {
-		expect(() => parseIntrospectionDocument({ version: "1.1" })).toThrow(IntrospectionVersionError)
-		expect(parse("1.1")).not.toThrow("Invalid WordPress introspection document")
+		expect(() => parseIntrospectionDocument({ version: "1.2" })).toThrow(IntrospectionVersionError)
+		expect(parse("1.2")).not.toThrow("Invalid WordPress introspection document")
 	})
 
 	test("rejects malformed operations", () => {

@@ -294,10 +294,49 @@ function renderResult(apiId: string, operationId: string, operation: Introspecti
  */
 const NO_INPUT = "Record<string, never>"
 
+/**
+ * Whether anything inside an object schema has to be supplied, following `$extends` the way
+ * {@link inheritedPropertyTypes} does, since an inherited property is as required as an own one.
+ */
+function hasRequiredMember(schema: IntrospectionSchema, context: RenderContext, seen = new Set<string>()): boolean {
+	if (Object.values(schema.properties ?? {}).some((child) => child.required)) return true
+	const parents = schema.$extends ? (Array.isArray(schema.$extends) ? schema.$extends : [schema.$extends]) : []
+	for (const parent of parents) {
+		if (seen.has(parent)) continue
+		seen.add(parent)
+		const parentSchema = context.schemas.get(parent)
+		if (parentSchema && hasRequiredMember(parentSchema, context, seen)) return true
+	}
+	return false
+}
+
+/**
+ * Whether a part must be passed. An object part is demanded only when something in it is required,
+ * so a list's `query` stays optional and a retrieve's `params` does not. Anything else — an array
+ * body, a scalar body — is the value itself rather than a container of fields, and has no way to be
+ * half-supplied, so passing it is the only way to send one.
+ */
+function isRequiredPart(schema: IntrospectionSchema, context: RenderContext): boolean {
+	return schema.type === "object" ? hasRequiredMember(schema, context) : schema.required !== false
+}
+
+/**
+ * The parts an operation takes, each rendered under its own key. A part the operation does not
+ * declare is absent, and one whose contents are undescribed is dropped rather than rendered as an
+ * open record: an operation left with no part at all takes nothing, which is what {@link NO_INPUT}
+ * says.
+ */
 function renderInput(apiId: string, operationId: string, operation: IntrospectionOperation, context: RenderContext): string {
 	const name = endpointName(apiId, operationId, "EndpointInput")
-	const input = renderType(operation.input, context)
-	const declaration = input === UNDESCRIBED_OBJECT ? NO_INPUT : input
+	const members: string[] = []
+	for (const part of ["params", "query", "body"] as const) {
+		const schema = operation.input[part]
+		if (!schema) continue
+		const rendered = renderType(schema, context, "\t")
+		if (rendered === UNDESCRIBED_OBJECT) continue
+		members.push(`\t${part}${isRequiredPart(schema, context) ? "" : "?"}: ${rendered}`)
+	}
+	const declaration = members.length === 0 ? NO_INPUT : `{\n${members.join("\n")}\n}`
 	return `${jsdoc(operation.description ?? operation.summary, operation.deprecated)}export type ${name} = ${declaration}`
 }
 
@@ -352,9 +391,7 @@ function sortedEndpoints(node: WordPressEndpointNode): WordPressEndpointEntry[] 
  * CLI's MCP server dispatches routes the client never generated a member for.
  */
 export function endpointDefinition(entry: Pick<WordPressEndpointEntry, "namespace" | "path" | "operation">): WP_EndpointDefinition {
-	const pathParameters = sortedEntries(entry.operation.input.properties ?? {})
-		.filter(([, schema]) => schema.in === "path")
-		.map(([name]) => name)
+	const pathParameters = sortedEntries(entry.operation.input.params?.properties ?? {}).map(([name]) => name)
 	const responseContentTypes = Object.fromEntries(
 		sortedEntries(entry.operation.responses).map(([status, response]) => [status, response.content_type]),
 	)
@@ -366,7 +403,7 @@ export function endpointDefinition(entry: Pick<WordPressEndpointEntry, "namespac
 		path: entry.path,
 		method: entry.operation.method,
 		pathParameters,
-		...(entry.operation.input.content_type ? { requestContentType: entry.operation.input.content_type } : {}),
+		...(entry.operation.input.body?.content_type ? { requestContentType: entry.operation.input.body.content_type } : {}),
 		responseContentTypes,
 		...(dataResponseStatuses.length > 0 ? { dataResponseStatuses } : {}),
 	}

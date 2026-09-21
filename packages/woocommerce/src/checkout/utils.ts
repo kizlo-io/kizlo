@@ -12,7 +12,7 @@ import { deserializeExtensions } from "../product/utils"
 import type { Checkout, CheckoutAdditionalFields, CheckoutExtensions } from "./schema"
 import type { WCK_Checkout, WCK_CheckoutOrder } from "./types"
 
-type Gateway = NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["payment_method"]>
+type Gateway = NonNullable<NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["body"]>["payment_method"]>
 
 const CHECKOUT_KEYS = [
 	"__experimentalCart",

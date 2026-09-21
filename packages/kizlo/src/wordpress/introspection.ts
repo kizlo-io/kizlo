@@ -1,6 +1,6 @@
 import z from "zod/v4"
 
-export const WORDPRESS_INTROSPECTION_VERSION = "1.0"
+export const WORDPRESS_INTROSPECTION_VERSION = "1.1"
 
 export type IntrospectionRequestContentType = "application/json" | "multipart/form-data" | "application/x-www-form-urlencoded"
 export type IntrospectionResponseContentType =
@@ -29,7 +29,6 @@ export interface IntrospectionSchema {
 	oneOf?: IntrospectionSchema[]
 	additionalProperties?: boolean | IntrospectionSchema
 	patternProperties?: Record<string, IntrospectionSchema>
-	in?: "path"
 }
 
 export interface IntrospectionResponse {
@@ -39,13 +38,27 @@ export interface IntrospectionResponse {
 	body?: IntrospectionSchema
 }
 
+/**
+ * A request in the three parts it is actually made of. Splitting them is what lets an operation
+ * describe a path parameter and a bare array body at once, and a body method carry query parameters
+ * rather than having every non-path field swept into the body by the HTTP method alone.
+ *
+ * A part an operation does not have is absent rather than empty. The content type belongs to `body`
+ * because it describes that payload and nothing else.
+ */
+export interface IntrospectionOperationInput {
+	params?: IntrospectionSchema & { type: "object" }
+	query?: IntrospectionSchema & { type: "object" }
+	body?: IntrospectionSchema & { content_type?: IntrospectionRequestContentType }
+}
+
 export interface IntrospectionOperation {
 	method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
 	summary?: string
 	description?: string
 	deprecated?: boolean
 	errors: string[]
-	input: IntrospectionSchema & { type: "object"; content_type?: IntrospectionRequestContentType }
+	input: IntrospectionOperationInput
 	responses: Record<string, IntrospectionResponse>
 }
 
@@ -88,7 +101,6 @@ const schema: z.ZodType<IntrospectionSchema> = z.lazy(() =>
 			oneOf: z.array(schema).min(1).optional(),
 			additionalProperties: z.union([z.boolean(), schema]).optional(),
 			patternProperties: z.record(z.string(), schema).optional(),
-			in: z.literal("path").optional(),
 		})
 		.loose(),
 )
@@ -104,6 +116,22 @@ const response = z
 	})
 	.loose()
 
+const objectSchema = schema.and(z.object({ type: z.literal("object") }))
+
+const operationInput: z.ZodType<IntrospectionOperationInput> = z
+	.object({
+		params: objectSchema.optional(),
+		query: objectSchema.optional(),
+		body: schema
+			.and(
+				z.object({
+					content_type: z.enum(["application/json", "multipart/form-data", "application/x-www-form-urlencoded"]).optional(),
+				}),
+			)
+			.optional(),
+	})
+	.loose()
+
 const operation: z.ZodType<IntrospectionOperation> = z
 	.object({
 		method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]),
@@ -111,12 +139,7 @@ const operation: z.ZodType<IntrospectionOperation> = z
 		description: z.string().optional(),
 		deprecated: z.boolean().optional(),
 		errors: z.array(z.string().min(1)),
-		input: schema.and(
-			z.object({
-				type: z.literal("object"),
-				content_type: z.enum(["application/json", "multipart/form-data", "application/x-www-form-urlencoded"]).optional(),
-			}),
-		),
+		input: operationInput,
 		responses: z
 			.record(z.string().regex(/^(?:[1-5][0-9]{2}|default)$/), response)
 			.refine((value) => Object.keys(value).length > 0, "At least one response is required."),

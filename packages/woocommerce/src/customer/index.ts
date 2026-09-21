@@ -17,7 +17,7 @@ export const CUSTOMER_PROCEDURES = {
 			// `role` defaults to `customer` on this endpoint, so a signed-in user with any other WordPress
 			// role (subscriber, shop_manager, ...) would be filtered out. `all` matches the old retrieve-by-id
 			// behaviour, which never looked at the role.
-			const response = await context.wordpress.woocommerce.customers.list({ email: session.email, role: "all" })
+			const response = await context.wordpress.woocommerce.customers.list({ query: { email: session.email, role: "all" } })
 			if (response.error) {
 				switch (response.error.code) {
 					case "woocommerce_rest_cannot_view":

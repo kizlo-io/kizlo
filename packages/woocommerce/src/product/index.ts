@@ -26,7 +26,7 @@ export const PRODUCT_PROCEDURES = {
 			if (input.query?.previewToken) {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.PRODUCT_NOT_FOUND()
-				const response = await context.wordpress.woocommerce.products.retrieve({ id: Number(result.id) })
+				const response = await context.wordpress.woocommerce.products.retrieve({ params: { id: Number(result.id) } })
 				if (response.error) {
 					switch (response.error.code) {
 						case "woocommerce_rest_product_invalid_id":
@@ -43,8 +43,8 @@ export const PRODUCT_PROCEDURES = {
 			const embeds = includeRecommendations ? { _embed: PRODUCT_EMBEDS } : {}
 			const response =
 				typeof identifier === "number"
-					? await context.wordpress.woocommerce.store.products.getById({ id: identifier, ...embeds })
-					: await context.wordpress.woocommerce.store.products.getBySlug({ slug: identifier, ...embeds })
+					? await context.wordpress.woocommerce.store.products.getById({ params: { id: identifier } }, { searchParams: embeds })
+					: await context.wordpress.woocommerce.store.products.getBySlug({ params: { slug: identifier } }, { searchParams: embeds })
 			if (response.error) {
 				switch (response.error.code) {
 					case "woocommerce_rest_product_invalid_id":
@@ -75,7 +75,7 @@ export const PRODUCT_PROCEDURES = {
 			const searchParams = serializeProductListInput(input.query)
 			const includeRecommendations = input.query?.recommendations ?? false
 			const embeds = includeRecommendations ? { _embed: PRODUCT_EMBEDS } : {}
-			const response = await context.wordpress.woocommerce.store.products.list({ ...searchParams, ...embeds })
+			const response = await context.wordpress.woocommerce.store.products.list({ query: searchParams }, { searchParams: embeds })
 			if (response.error) {
 				switch (response.error.code) {
 					default:
@@ -107,15 +107,17 @@ export const PRODUCT_PROCEDURES = {
 		async ({ context, errors, input }) => {
 			const searchParams = serializeProductListInput(input.query)
 			const response = await context.wordpress.woocommerce.store.products.collectionData({
-				...searchParams,
-				calculate_price_range: true,
-				calculate_rating_counts: input.query?.ratingCounts,
-				calculate_taxonomy_counts: input.query?.taxonomyCounts,
-				calculate_stock_status_counts: input.query?.stockStatusCounts,
-				calculate_attribute_counts: input.query?.attributeCounts?.map((item) => ({
-					taxonomy: item.taxonomy,
-					query_type: item.operator,
-				})),
+				query: {
+					...searchParams,
+					calculate_price_range: true,
+					calculate_rating_counts: input.query?.ratingCounts,
+					calculate_taxonomy_counts: input.query?.taxonomyCounts,
+					calculate_stock_status_counts: input.query?.stockStatusCounts,
+					calculate_attribute_counts: input.query?.attributeCounts?.map((item) => ({
+						taxonomy: item.taxonomy,
+						query_type: item.operator,
+					})),
+				},
 			})
 			if (response.error) {
 				switch (response.error.code) {

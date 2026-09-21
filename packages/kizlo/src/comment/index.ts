@@ -18,8 +18,8 @@ export const COMMENT_PROCEDURES = {
 		},
 		async ({ context, errors, input }) => {
 			const response = await context.wordpress.comments.retrieve({
-				id: input.params.id,
-				password: input.query?.password,
+				params: { id: input.params.id },
+				query: { password: input.query?.password },
 			})
 			if (response.error) {
 				switch (response.error.code) {
@@ -74,7 +74,7 @@ export const COMMENT_PROCEDURES = {
 				search: input.query?.search,
 			}
 
-			const response = await context.wordpress.comments.list(searchParams)
+			const response = await context.wordpress.comments.list({ query: searchParams })
 			if (response.error) {
 				switch (response.error.code) {
 					case "rest_cannot_read":
@@ -141,7 +141,7 @@ export const COMMENT_PROCEDURES = {
 				author_url: input.body.authorUrl,
 				parent: input.body.parentId,
 			}
-			const response = await context.wordpress.kizlo.comments.create(submission)
+			const response = await context.wordpress.kizlo.comments.create({ body: submission })
 			if (response.error) {
 				switch (response.error.code) {
 					case "require_name_email": {

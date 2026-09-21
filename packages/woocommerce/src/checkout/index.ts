@@ -50,11 +50,13 @@ export const CHECKOUT_PROCEDURES = {
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.update(
 				{
-					order_notes: input.body.customerNote,
-					payment_method: gateway(input.body.paymentMethod),
-					additional_fields: input.body.additionalFields,
-					extensions: input.body.extensions,
-					__experimental_calc_totals: input.body.recalculateTotals,
+					body: {
+						order_notes: input.body.customerNote,
+						payment_method: gateway(input.body.paymentMethod),
+						additional_fields: input.body.additionalFields,
+						extensions: input.body.extensions,
+						__experimental_calc_totals: input.body.recalculateTotals,
+					},
 				},
 				{ headers: context.sessionHeaders },
 			)
@@ -105,18 +107,20 @@ export const CHECKOUT_PROCEDURES = {
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.process(
 				{
-					billing_address: serializeCheckoutBillingAddress(input.body.billingAddress),
-					shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
-					payment_method: gateway(input.body.paymentMethod),
-					customer_note: input.body.customerNote,
-					create_account: input.body.createAccount ?? false,
-					customer_password: input.body.customerPassword,
-					payment_data: input.body.paymentData,
-					additional_fields: input.body.additionalFields,
-					extensions: withKizloRedirectPaths(input.body.extensions, {
-						successPath: input.body.successPath,
-						cancelPath: input.body.cancelPath,
-					}),
+					body: {
+						billing_address: serializeCheckoutBillingAddress(input.body.billingAddress),
+						shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
+						payment_method: gateway(input.body.paymentMethod),
+						customer_note: input.body.customerNote,
+						create_account: input.body.createAccount ?? false,
+						customer_password: input.body.customerPassword,
+						payment_data: input.body.paymentData,
+						additional_fields: input.body.additionalFields,
+						extensions: withKizloRedirectPaths(input.body.extensions, {
+							successPath: input.body.successPath,
+							cancelPath: input.body.cancelPath,
+						}),
+					},
 				},
 				{ headers: context.sessionHeaders },
 			)
@@ -196,19 +200,21 @@ export const CHECKOUT_PROCEDURES = {
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.processOrder(
 				{
-					key: input.body.key,
-					id: input.params.orderId,
-					payment_data: input.body.paymentData,
-					billing_email: input.body.billingEmail,
-					payment_method: gateway(input.body.paymentMethod),
-					billing_address: serializeCheckoutBillingAddress(input.body.billingAddress),
-					shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
-					customer_note: input.body.customerNote,
-					additional_fields: input.body.additionalFields,
-					extensions: withKizloRedirectPaths(input.body.extensions, {
-						successPath: input.body.successPath,
-						cancelPath: input.body.cancelPath,
-					}),
+					params: { id: input.params.orderId },
+					body: {
+						key: input.body.key,
+						payment_data: input.body.paymentData,
+						billing_email: input.body.billingEmail,
+						payment_method: gateway(input.body.paymentMethod),
+						billing_address: serializeCheckoutBillingAddress(input.body.billingAddress),
+						shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
+						customer_note: input.body.customerNote,
+						additional_fields: input.body.additionalFields,
+						extensions: withKizloRedirectPaths(input.body.extensions, {
+							successPath: input.body.successPath,
+							cancelPath: input.body.cancelPath,
+						}),
+					},
 				},
 				{ headers: context.sessionHeaders },
 			)

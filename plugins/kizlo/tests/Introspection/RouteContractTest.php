@@ -44,7 +44,7 @@ class RouteContractTest extends IntrospectionTestCase
             'responses' => ['200' => ['body' => ['type' => 'string']]],
         ]));
 
-        $this->assertErrorContains($this->widgetErrors(), 'Path parameter "id" is not declared in "input.properties"');
+        $this->assertErrorContains($this->widgetErrors(), 'Path parameter "id" is not declared in "params.properties"');
     }
 
     public function test_a_path_parameter_must_be_required(): void
@@ -73,7 +73,7 @@ class RouteContractTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets/{identifier}']['retrieve'];
 
-        $this->assertSame('string', $operation['input']['properties']['identifier']['type']);
+        $this->assertSame('string', $this->inputProperties($operation)['identifier']['type']);
     }
 
     public function test_an_unnamed_group_in_a_route_fails_introspection(): void
@@ -204,7 +204,7 @@ class RouteContractTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create'];
 
-        $this->assertSame('application/json', $operation['input']['content_type']);
+        $this->assertSame('application/json', $this->inputContentType($operation));
     }
 
     public function test_an_operation_without_a_body_carries_no_request_content_type(): void
@@ -213,7 +213,7 @@ class RouteContractTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['list'];
 
-        $this->assertArrayNotHasKey('content_type', $operation['input']);
+        $this->assertArrayNotHasKey('content_type', $this->input($operation));
     }
 
     public function test_declaring_a_request_content_type_without_a_body_fails(): void
@@ -223,6 +223,131 @@ class RouteContractTest extends IntrospectionTestCase
         ]));
 
         $this->assertErrorContains($this->warnings(), 'Only an operation with a request body declares "content_type"');
+    }
+
+    // ============================================================
+    // Request parts
+    // ============================================================
+
+    public function test_an_operation_describes_params_query_and_body_separately(): void
+    {
+        $this->registerRouteSpec($this->operation([
+            'operation' => 'update',
+            'method'    => 'PUT',
+            'route'     => kizlo_route('/widgets/:id'),
+            'input'     => [
+                'params' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer', 'required' => true]]],
+                'query'  => ['type' => 'object', 'properties' => ['context' => ['type' => 'string']]],
+                'body'   => ['type' => 'object', 'properties' => ['name' => ['type' => 'string', 'required' => true]]],
+            ],
+            'responses' => ['200' => ['body' => ['type' => 'string']]],
+        ]));
+
+        $input = $this->document()['apis']['acme.widgets']['paths']['/widgets/{id}']['update']['input'];
+
+        $this->assertSame(['id'], array_keys($input['params']['properties']));
+        $this->assertSame(['context'], array_keys($input['query']['properties']));
+        $this->assertSame(['name'], array_keys($input['body']['properties']));
+        $this->assertSame('application/json', $input['body']['content_type']);
+    }
+
+    /** The shape the flat input could not describe at all: a path parameter and a bare array body. */
+    public function test_a_body_may_be_an_array_rather_than_an_object(): void
+    {
+        $this->registerRouteSpec($this->operation([
+            'operation' => 'update',
+            'method'    => 'PUT',
+            'route'     => kizlo_route('/widgets/:id'),
+            'input'     => [
+                'params' => ['type' => 'object', 'properties' => ['id' => ['type' => 'integer', 'required' => true]]],
+                'body'   => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => ['code' => ['type' => 'string', 'required' => true]]]],
+            ],
+            'responses' => ['200' => ['body' => ['type' => 'string']]],
+        ]));
+
+        $body = $this->document()['apis']['acme.widgets']['paths']['/widgets/{id}']['update']['input']['body'];
+
+        $this->assertSame('array', $body['type']);
+        $this->assertSame('object', $body['items']['type']);
+        $this->assertSame('application/json', $body['content_type']);
+    }
+
+    public function test_a_body_method_may_also_declare_query_parameters(): void
+    {
+        $this->registerRouteSpec($this->operation([
+            'operation' => 'create',
+            'method'    => 'POST',
+            'input'     => [
+                'query' => ['type' => 'object', 'properties' => ['context' => ['type' => 'string']]],
+                'body'  => ['type' => 'object', 'properties' => ['name' => ['type' => 'string']]],
+            ],
+            'responses' => ['201' => ['body' => ['type' => 'string']]],
+        ]));
+
+        $input = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create']['input'];
+
+        $this->assertSame(['context'], array_keys($input['query']['properties']));
+        $this->assertSame(['name'], array_keys($input['body']['properties']));
+    }
+
+    public function test_describing_a_body_on_a_method_that_has_none_fails(): void
+    {
+        $this->registerRouteSpec($this->operation([
+            'input' => ['body' => ['type' => 'object', 'properties' => ['name' => ['type' => 'string']]]],
+        ]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'A GET operation has no request body, so "body" cannot be described.');
+    }
+
+    public function test_a_part_that_is_not_an_object_schema_fails(): void
+    {
+        $this->registerRouteSpec($this->operation([
+            'input' => ['query' => ['type' => 'array', 'items' => ['type' => 'string']]],
+        ]));
+
+        $this->assertErrorContains($this->widgetErrors(), 'Operation "query" must be an object schema.');
+    }
+
+    /**
+     * A route declared the older way still produces the operation it always did,
+     * now said in parts: the path capture is `params` and the rest is the query.
+     */
+    public function test_a_flat_declaration_is_read_as_the_parts_it_describes(): void
+    {
+        $this->registerRouteSpec($this->operation([
+            'operation' => 'retrieve',
+            'route'     => kizlo_route('/widgets/:id'),
+            'input'     => [
+                'type'       => 'object',
+                'properties' => [
+                    'id'     => ['type' => 'integer', 'required' => true],
+                    'search' => ['type' => 'string'],
+                ],
+            ],
+            'responses' => ['200' => ['body' => ['type' => 'string']]],
+        ]));
+
+        $input = $this->document()['apis']['acme.widgets']['paths']['/widgets/{id}']['retrieve']['input'];
+
+        $this->assertSame(['id'], array_keys($input['params']['properties']));
+        $this->assertSame(['search'], array_keys($input['query']['properties']));
+        $this->assertArrayNotHasKey('body', $input);
+    }
+
+    public function test_a_flat_declaration_on_a_body_method_becomes_the_body(): void
+    {
+        $this->registerRouteSpec($this->operation([
+            'operation' => 'create',
+            'method'    => 'POST',
+            'input'     => ['type' => 'object', 'properties' => ['name' => ['type' => 'string', 'required' => true]]],
+            'responses' => ['201' => ['body' => ['type' => 'string']]],
+        ]));
+
+        $input = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create']['input'];
+
+        $this->assertSame(['name'], array_keys($input['body']['properties']));
+        $this->assertSame('application/json', $input['body']['content_type']);
+        $this->assertArrayNotHasKey('query', $input);
     }
 
     public function test_an_unsupported_request_content_type_fails(): void

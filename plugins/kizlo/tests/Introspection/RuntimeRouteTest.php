@@ -171,7 +171,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
 
         $this->assertSame('POST', $operation['method']);
         $this->assertSame('Created.', $operation['responses'][201]['description']);
-        $this->assertSame('application/json', $operation['input']['content_type']);
+        $this->assertSame('application/json', $this->inputContentType($operation));
     }
 
     public function test_a_runtime_route_adds_shared_errors_and_responses(): void
@@ -300,7 +300,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
         $this->assertSame(['city'], array_keys($args['address']['properties']));
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create'];
-        $this->assertSame(['$ref' => 'acme.address'], $operation['input']['properties']['address']);
+        $this->assertSame(['$ref' => 'acme.address'], $this->inputProperties($operation)['address']);
     }
 
     /**
@@ -577,7 +577,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
 
         $operation = $this->document()['apis']['acme.widgets']['paths']['/widgets']['create'];
 
-        $this->assertSame('42', $operation['input']['properties']['customer_id']['title']);
+        $this->assertSame('42', $this->inputProperties($operation)['customer_id']['title']);
         $this->assertSame(200, $this->dispatch('POST', '/kizlo/v1/widgets', ['customer_id' => 1])->get_status());
     }
 
