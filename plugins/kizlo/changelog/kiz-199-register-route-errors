@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Allow integrations to register error codes for an introspected route without redeclaring its contract.

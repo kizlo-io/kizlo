@@ -16,6 +16,7 @@
 		"/docs/php/functions/extend-post-type",
 		"/docs/php/functions/include-post-type",
 		"/docs/php/functions/register-route",
+		"/docs/php/functions/register-route-errors",
 		"/docs/php/functions/register-route-interceptor",
 		"/docs/php/functions/register-route-schema",
 		"/docs/php/functions/register-route-spec",

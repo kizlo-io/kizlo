@@ -276,6 +276,8 @@ class Registry
             $declarations[] = ['declaration' => $declaration, 'core' => true];
         }
 
+        $declarations = RouteErrors::apply($declarations, $errors);
+
         foreach ($declarations as ['declaration' => $declaration, 'core' => $core]) {
             if (!is_array($declaration)) {
                 $errors->error(['keyword' => 'kizlo_introspection_routes'], 'A contributed route must be an array.');

@@ -154,3 +154,10 @@ When the upstream API already exposes WordPress-style schemas, derive the declar
 [`kizlo_translate_spec_properties`](/docs/php/functions/translate-spec-properties) or
 [`kizlo_translate_spec_schema`](/docs/php/functions/translate-spec-schema). Regenerate the introspection after
 the companion plugin is active, then call the new API ID and operation through the naming rules above.
+
+## Add errors to an existing route
+
+When Kizlo already introspects the route, register its handler errors without repeating the input or response
+contract. [`kizlo_register_route_errors`](/docs/php/functions/register-route-errors) identifies the route by
+namespace, readable path, and HTTP method. Path placeholders must match the registered parameter names. Use
+its collection filter when you build registrations in a loop.

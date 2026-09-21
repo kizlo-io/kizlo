@@ -200,6 +200,38 @@ function kizlo_register_route_spec(callable $derive): void
 }
 
 /**
+ * Add error codes to a route that is already part of introspection.
+ *
+ * The route selector uses the namespace, readable path and one HTTP method.
+ * Path placeholders must name the registered capture groups. Callers do not
+ * need the generated API ID or operation name, or to redeclare input and responses.
+ *
+ * @since 1.0.0
+ *
+ * @param array{namespace: string, path: string, method: string} $route  The route to augment.
+ * @param array<int, string>                                    $errors Error codes its handler can return.
+ *
+ * @example
+ * kizlo_register_route_errors(
+ *     [
+ *         'namespace' => 'wp/v2',
+ *         'path'      => '/posts/{id}',
+ *         'method'    => 'GET',
+ *     ],
+ *     [
+ *         'rest_post_invalid_id',
+ *         'rest_post_incorrect_password',
+ *     ],
+ * );
+ *
+ * @return void
+ */
+function kizlo_register_route_errors(array $route, array $errors): void
+{
+    \Kizlo\Modules\Introspection\SpecStore::addRouteErrors($route, $errors);
+}
+
+/**
  * Start a plugin that builds on Kizlo, but only at versions that can carry it.
  *
  * Kizlo's PHP API grows in core releases, so a plugin calling a function added

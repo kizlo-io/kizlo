@@ -468,6 +468,92 @@ class CoreRouteTest extends IntrospectionTestCase
         $this->assertNotContains('kizlo_rest_forbidden', $errors);
     }
 
+    public function test_core_controller_families_contribute_their_handler_errors(): void
+    {
+        $document = $this->document();
+
+        foreach ([
+            ['media', '/media', 'create', 'rest_upload_no_data'],
+            ['users', '/users', 'create', 'rest_cannot_create_user'],
+            ['users.applicationPasswords', '/users/{user_id}/application-passwords', 'list', 'rest_cannot_list_application_passwords'],
+            ['settings', '/settings', 'update', 'rest_invalid_stored_value'],
+        ] as [$apiId, $path, $operation, $code]) {
+            $this->assertContains($code, $document['apis'][$apiId]['paths'][$path][$operation]['errors'], $apiId);
+        }
+    }
+
+    public function test_custom_content_uses_its_core_controller_family_errors(): void
+    {
+        register_post_type('kizlo_error_probe', [
+            'public'       => true,
+            'show_in_rest' => true,
+            'rest_base'    => 'kizlo-error-probes',
+        ]);
+        register_taxonomy('kizlo_error_kind', 'kizlo_error_probe', [
+            'public'       => true,
+            'show_in_rest' => true,
+            'rest_base'    => 'kizlo-error-kinds',
+        ]);
+
+        try {
+            $this->boot();
+            $document = $this->document();
+
+            $this->assertContains(
+                'rest_post_invalid_id',
+                $document['apis']['kizloErrorProbes']['paths']['/kizlo-error-probes/{id}']['retrieve']['errors'],
+            );
+            $this->assertContains(
+                'rest_term_invalid',
+                $document['apis']['kizloErrorKinds']['paths']['/kizlo-error-kinds/{id}']['retrieve']['errors'],
+            );
+        } finally {
+            unregister_taxonomy('kizlo_error_kind');
+            unregister_post_type('kizlo_error_probe');
+        }
+    }
+
+    public function test_an_unknown_controller_family_gets_no_guessed_handler_errors(): void
+    {
+        $controller = new class extends \WP_REST_Controller {
+            public function __construct()
+            {
+                $this->namespace = 'wp/v2';
+                $this->rest_base = 'kizlo-unknown-errors';
+            }
+
+            public function register_routes(): void
+            {
+                register_rest_route($this->namespace, '/' . $this->rest_base, [
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => [$this, 'get_items'],
+                    'permission_callback' => '__return_true',
+                ]);
+            }
+
+            public function get_items($request): \WP_REST_Response
+            {
+                return new \WP_REST_Response([]);
+            }
+
+            public function get_item_schema(): array
+            {
+                return ['type' => 'object', 'properties' => []];
+            }
+        };
+
+        add_action('rest_api_init', [$controller, 'register_routes']);
+
+        try {
+            $this->boot();
+            $errors = $this->document()['apis']['kizloUnknownErrors']['paths']['/kizlo-unknown-errors']['list']['errors'];
+
+            $this->assertSame(OperationErrors::NATIVE, $errors);
+        } finally {
+            remove_action('rest_api_init', [$controller, 'register_routes']);
+        }
+    }
+
     /**
      * Only a Kizlo-owned callback is wrapped, so only a Kizlo-owned route can
      * answer `invalid_param`. Listing it on a described route would promise a code

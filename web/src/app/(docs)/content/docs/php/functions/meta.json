@@ -4,6 +4,7 @@
 	"pages": [
 		"register-route",
 		"register-route-spec",
+		"register-route-errors",
 		"register-route-schema",
 		"translate-spec-properties",
 		"translate-spec-schema",

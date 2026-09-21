@@ -38,8 +38,8 @@ use WP_REST_Controller;
  * Error codes. Nothing in a registration records which `WP_Error` codes a handler
  * can return and no runtime API exposes it, so a described route carries only the
  * pre-dispatch set {@see \Kizlo\Modules\Introspection\OperationErrors::NATIVE}
- * that WordPress itself can answer with. Per-route codes need a channel of their
- * own.
+ * that WordPress itself can answer with. Handler codes arrive separately through
+ * `kizlo_register_route_errors()` or `kizlo_introspection_route_errors`.
  *
  * Whatever a response gains after the controller built it. Kizlo adds a `kizlo`
  * block to comments and menu items through `rest_prepare_comment` and
@@ -69,18 +69,6 @@ final class RouteDiscovery
 
     /** Each derived response shape, so a runtime addition can be described. */
     public const SCHEMA_FILTER = 'kizlo_introspection_core_schema';
-
-    /**
-     * Which method describes an operation when one handler answers several.
-     *
-     * Core registers one editable handler for `POST`, `PUT` and `PATCH`, so all
-     * three reach `update_item()` and all three would be called `update`. The
-     * contract allows one method per operation, and a generated client has to
-     * send something, so the most specific is chosen.
-     *
-     * @var array<int, string>
-     */
-    private const PREFERRED = ['PATCH', 'POST', 'PUT', 'GET', 'DELETE'];
 
     /** @var array{declarations: array<int, array<string, mixed>>, schemas: array<string, array<string, mixed>>}|null */
     private static ?array $memo = null;
@@ -188,7 +176,7 @@ final class RouteDiscovery
 
                 $callback = is_array($handler['callback'] ?? null) ? (string) ($handler['callback'][1] ?? '') : '';
 
-                foreach (self::operations($handler, $callback, $addresses) as $operation => $method) {
+                foreach (RouteMethods::operations($handler, $callback, $addresses) as $operation => $method) {
                     $operation = (string) $operation;
 
                     if (($claimed[$apiId][$operation] ?? $path) !== $path) {
@@ -326,40 +314,6 @@ final class RouteDiscovery
         return array_keys($namespaces);
     }
 
-    /**
-     * The operations one handler offers, each mapped to the method that describes it.
-     *
-     * @param array<string, mixed> $handler
-     * @return array<string, string>
-     */
-    private static function operations(array $handler, string $callback, bool $addresses): array
-    {
-        $byOperation = [];
-
-        foreach (is_array($handler['methods'] ?? null) ? $handler['methods'] : [] as $method => $enabled) {
-            if ($enabled !== true || !is_string($method)) {
-                continue;
-            }
-
-            $byOperation[RouteIdentity::operation($method, $callback, $addresses)][] = $method;
-        }
-
-        $chosen = [];
-
-        foreach ($byOperation as $operation => $methods) {
-            foreach (self::PREFERRED as $preferred) {
-                if (in_array($preferred, $methods, true)) {
-                    $chosen[$operation] = $preferred;
-                    continue 2;
-                }
-            }
-
-            $chosen[$operation] = (string) reset($methods);
-        }
-
-        return $chosen;
-    }
-
     // ============================================================
     // ONE DECLARATION
     // ============================================================
@@ -388,8 +342,9 @@ final class RouteDiscovery
             'route'     => $route,
             'method'    => $method,
             'summary'   => self::summary($operation, $apiId, $lists),
-            // The one thing here that is not derived. {@see CoreRouteErrors}
-            'errors'    => CoreRouteErrors::forResource($apiId, $operation),
+            // Handler errors are contributed separately through the same public
+            // route-error channel integrations use.
+            'errors'    => [],
             // Derivation hands back core's own validation and sanitization
             // callbacks, which a described route has nothing to put them on.
             'input'     => SchemaNormalizer::normalize(self::input($namespace, $route, $method, $parameters, $controller, $operation)),

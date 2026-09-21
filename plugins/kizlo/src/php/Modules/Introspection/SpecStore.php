@@ -3,7 +3,7 @@
 namespace Kizlo\Modules\Introspection;
 
 /**
- * Backing store for the two public contract registration helpers.
+ * Backing store for the public contract registration helpers.
  *
  * The public helpers accept factories rather than resolved arrays. Registration
  * therefore costs one closure allocation on an ordinary request, and the work
@@ -12,8 +12,9 @@ namespace Kizlo\Modules\Introspection;
  * are the exception: that one dependency graph is materialized at
  * `rest_api_init`, because WordPress needs it to validate the endpoint.
  *
- * Materialized entries contribute through the `kizlo_introspection_schemas` /
- * `kizlo_introspection_routes` filters like anyone else. What the store adds is
+ * Materialized entries contribute through the `kizlo_introspection_schemas`,
+ * `kizlo_introspection_routes` and `kizlo_introspection_route_errors` filters
+ * like anyone else. What the store adds is
  * provenance: it fingerprints everything registered from inside the Kizlo
  * plugin, which is how the registry later tells a core registration into
  * `kizlo.*` from a third-party one.
@@ -25,6 +26,9 @@ class SpecStore
 
     /** @var array<int, array<string, mixed>> */
     private static array $routes = [];
+
+    /** @var array<int, array{route: array<string, mixed>, errors: array<int, mixed>}> */
+    private static array $routeErrors = [];
 
     /** @var array<string, array<int, array{derive: callable, trusted: bool}>> */
     private static array $schemaFactories = [];
@@ -47,6 +51,7 @@ class SpecStore
      * @var array{
      *     schemas: array<int, array{id: string, schema: array<string, mixed>}>,
      *     routes: array<int, array<string, mixed>>,
+     *     routeErrors: array<int, array{route: array<string, mixed>, errors: array<int, mixed>}>,
      *     schemaFactories: array<string, array<int, array{derive: callable, trusted: bool}>>,
      *     routeFactories: array<int, array{derive: callable, trusted: bool}>,
      *     trusted: array<string, true>
@@ -144,6 +149,17 @@ class SpecStore
     }
 
     /**
+     * @param array<string, mixed> $route
+     * @param array<int, mixed>    $errors
+     */
+    public static function addRouteErrors(array $route, array $errors): void
+    {
+        self::hook();
+
+        self::$routeErrors[] = ['route' => $route, 'errors' => $errors];
+    }
+
+    /**
      * Record a failure raised outside the registry's own diagnostics bag, so
      * `/introspect` reports it alongside everything the registry finds. A
      * derivation runs on every build, so repeated location-message pairs are the
@@ -196,6 +212,7 @@ class SpecStore
         self::$baseline ??= [
             'schemas'         => self::$schemas,
             'routes'          => self::$routes,
+            'routeErrors'     => self::$routeErrors,
             'schemaFactories' => self::$schemaFactories,
             'routeFactories'  => self::$routeFactories,
             'trusted'         => self::$trusted,
@@ -203,6 +220,7 @@ class SpecStore
 
         self::$schemas             = self::$baseline['schemas'];
         self::$routes              = self::$baseline['routes'];
+        self::$routeErrors         = self::$baseline['routeErrors'];
         self::$schemaFactories     = self::$baseline['schemaFactories'];
         self::$routeFactories      = self::$baseline['routeFactories'];
         self::$trusted             = self::$baseline['trusted'];
@@ -252,6 +270,10 @@ class SpecStore
 
         add_filter('kizlo_introspection_routes', static function (array $routes): array {
             return array_merge($routes, self::$routes);
+        });
+
+        add_filter('kizlo_introspection_route_errors', static function (array $entries): array {
+            return array_merge($entries, self::$routeErrors);
         });
     }
 
