@@ -8,6 +8,7 @@
 	"baseBranch": "main",
 	"updateInternalDependencies": "patch",
 	"ignore": ["@apps/*", "@kizlo/plugin-*", "@tooling/*", "@templates/*"],
+	"bumpVersionsWithWorkspaceProtocolOnly": true,
 	"___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
 		"onlyUpdatePeerDependentsWhenOutOfRange": true
 	}
