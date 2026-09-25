@@ -1,0 +1,4 @@
+Significance: minor
+Type: changed
+
+Collapse custom-field groups, repeaters, and repeater rows in the post and term editors, so a long field set opens as a compact list of headers
