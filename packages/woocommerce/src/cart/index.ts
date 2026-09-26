@@ -33,10 +33,13 @@ export const CART_PROCEDURES = {
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, errors }) => {
-			const response = await context.wordpress.woocommerce.store.cart.get({}, { headers: context.sessionHeaders })
+			const response = await context.wordpress.woocommerce.store.cart.retrieve({}, { headers: context.sessionHeaders })
 
+			// The handler codes below are not in the generated error union: a discovered route declares no handler
+			// errors, so the union narrows to WordPress's pre-dispatch codes. Widening the code is what lets the
+			// switches in this file keep handling them, and it goes away with KIZ-207, which registers them.
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					default:
 						context.logger.error("Get cart unhandled error", response.error, { code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()
@@ -58,7 +61,7 @@ export const CART_PROCEDURES = {
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input: { body: input }, errors }) => {
-			const response = await context.wordpress.woocommerce.store.cart.updateCustomer(
+			const response = await context.wordpress.woocommerce.store.cart.updateCustomer.create(
 				{ body: serializeCartUpdateInput(input) },
 				{
 					headers: context.sessionHeaders,
@@ -66,7 +69,7 @@ export const CART_PROCEDURES = {
 			)
 
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "rest_invalid_param":
 					case "woocommerce_rest_invalid_address":
 					case "woocommerce_rest_invalid_address_country":
@@ -94,13 +97,13 @@ export const CART_PROCEDURES = {
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input: { body }, errors }) => {
-			const response = await context.wordpress.woocommerce.store.cart.selectShippingRate(
+			const response = await context.wordpress.woocommerce.store.cart.selectShippingRate.create(
 				{ body: { rate_id: body.rateId, package_id: body.packageId } },
 				{ headers: context.sessionHeaders },
 			)
 
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "woocommerce_rest_cart_shipping_rate_not_found":
 						throw errors.CART_SHIPPING_RATE_NOT_FOUND({ message: response.error.message })
 					case "woocommerce_rest_shipping_disabled":
@@ -127,7 +130,7 @@ export const CART_PROCEDURES = {
 				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { body: input }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.addItem(
+				const response = await context.wordpress.woocommerce.store.cart.addItem.create(
 					{
 						body: {
 							id: input.variationId ?? input.productId,
@@ -139,7 +142,7 @@ export const CART_PROCEDURES = {
 				)
 
 				if (response.error) {
-					switch (response.error.code) {
+					switch (response.error.code as string) {
 						case "woocommerce_rest_product_out_of_stock":
 							throw errors.CART_ITEM_OUT_OF_STOCK({ message: response.error.message })
 						case "woocommerce_rest_product_partially_out_of_stock":
@@ -180,13 +183,13 @@ export const CART_PROCEDURES = {
 				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { params, body }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.updateItem(
+				const response = await context.wordpress.woocommerce.store.cart.updateItem.create(
 					{ body: { key: params.key, quantity: body.quantity } },
 					{ headers: context.sessionHeaders },
 				)
 
 				if (response.error) {
-					switch (response.error.code) {
+					switch (response.error.code as string) {
 						case "woocommerce_rest_cart_invalid_key":
 							throw errors.CART_ITEM_NOT_FOUND({ message: response.error.message })
 						case "woocommerce_rest_cart_invalid_product":
@@ -218,13 +221,13 @@ export const CART_PROCEDURES = {
 				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { params }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.removeItem(
+				const response = await context.wordpress.woocommerce.store.cart.removeItem.create(
 					{ body: { key: params.key } },
 					{ headers: context.sessionHeaders },
 				)
 
 				if (response.error) {
-					switch (response.error.code) {
+					switch (response.error.code as string) {
 						case "woocommerce_rest_cart_invalid_key":
 							throw errors.CART_ITEM_NOT_FOUND({ message: response.error.message })
 						default:
@@ -250,13 +253,13 @@ export const CART_PROCEDURES = {
 				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input: { body }, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.applyCoupon(
+				const response = await context.wordpress.woocommerce.store.cart.applyCoupon.create(
 					{ body: { code: body.code } },
 					{ headers: context.sessionHeaders },
 				)
 
 				if (response.error) {
-					switch (response.error.code) {
+					switch (response.error.code as string) {
 						case "woocommerce_rest_cart_coupon_error":
 							throw errors.CART_COUPON_INVALID({ message: response.error.message })
 						case "woocommerce_rest_cart_coupon_disabled":
@@ -282,13 +285,13 @@ export const CART_PROCEDURES = {
 				middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 			},
 			async ({ context, input, errors }) => {
-				const response = await context.wordpress.woocommerce.store.cart.removeCoupon(
+				const response = await context.wordpress.woocommerce.store.cart.removeCoupon.create(
 					{ body: { code: input.params.code } },
 					{ headers: context.sessionHeaders },
 				)
 
 				if (response.error) {
-					switch (response.error.code) {
+					switch (response.error.code as string) {
 						case "woocommerce_rest_cart_coupon_error":
 							throw errors.CART_COUPON_INVALID({ message: response.error.message })
 						case "woocommerce_rest_cart_coupon_disabled":

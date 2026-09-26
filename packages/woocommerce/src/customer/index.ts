@@ -18,8 +18,11 @@ export const CUSTOMER_PROCEDURES = {
 			// role (subscriber, shop_manager, ...) would be filtered out. `all` matches the old retrieve-by-id
 			// behaviour, which never looked at the role.
 			const response = await context.wordpress.woocommerce.customers.list({ query: { email: session.email, role: "all" } })
+			// The handler codes below are not in the generated error union: a discovered route declares no handler
+			// errors, so the union narrows to WordPress's pre-dispatch codes. Widening the code is what lets the
+			// switches in this file keep handling them, and it goes away with KIZ-207, which registers them.
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "woocommerce_rest_cannot_view":
 						throw errors.FORBIDDEN()
 					default:

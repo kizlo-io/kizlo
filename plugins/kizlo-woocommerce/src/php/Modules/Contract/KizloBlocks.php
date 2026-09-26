@@ -10,7 +10,7 @@ use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
  * The fields this plugin adds to WooCommerce's own responses.
  *
  * Everything else in the WooCommerce contract is derived from WooCommerce, which
- * is the point of {@see StoreApiRoutes} and {@see RestApiRoutes}. These blocks
+ * is the point of {@see StoreApiSchemas} and {@see RestApiSchemas}. These blocks
  * cannot be: they are this plugin's additions, so no WooCommerce schema mentions
  * them and nothing but this file knows their shape.
  *

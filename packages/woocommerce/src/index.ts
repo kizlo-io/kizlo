@@ -23,7 +23,7 @@ export function woocommerce() {
 				"woocommerce.products",
 				"woocommerce.store.cart",
 				"woocommerce.store.checkout",
-				"woocommerce.store.orders",
+				"woocommerce.store.order",
 				"woocommerce.store.products",
 			],
 		},

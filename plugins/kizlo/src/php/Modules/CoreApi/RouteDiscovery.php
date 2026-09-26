@@ -33,7 +33,7 @@ use WP_REST_Controller;
  *
  * ## What it cannot derive
  *
- * Two things, and both are deliberate rather than overlooked.
+ * Three things, and all of them are deliberate rather than overlooked.
  *
  * Error codes. Nothing in a registration records which `WP_Error` codes a handler
  * can return and no runtime API exposes it, so a described route carries only the
@@ -47,12 +47,22 @@ use WP_REST_Controller;
  * derivation can see. {@see self::SCHEMA_FILTER} is how that gets back in, and
  * {@see \Kizlo\Modules\Comment\CommentSchemas} is its first caller.
  *
+ * The response of a route no `WP_REST_Controller` serves. `get_item_schema()` is
+ * the only shape this can read on its own, and a closure route or a route object
+ * of somebody else's design has no such method to call. Whoever registered it can
+ * read it, so {@see self::RESPONSE_FILTER} asks them. Unanswered, the route is
+ * still described, with an object whose fields are declared unknown rather than
+ * invented: a caller can reach the route and read the body itself, which is more
+ * than it could do when such a route was dropped altogether.
+ *
  * ## Escaping it
  *
- * Neither filter is for Kizlo's benefit alone. {@see self::ROUTE_FILTER} hands
- * each derived declaration out before it is registered, so a site can correct
- * one, extend one, or return null to keep a route out of its contract entirely.
- * A plugin that wants full control instead of correction still has
+ * None of the filters is for Kizlo's benefit alone. {@see self::ROUTE_FILTER}
+ * hands each derived declaration out before it is registered, so a site can
+ * correct one, extend one, or return null to keep a route out of its contract
+ * entirely. {@see self::PREFIX_FILTER} lets a namespace say what its routes are
+ * called, which is what keeps two namespaces serving `/products` from claiming
+ * one name. A plugin that wants full control instead of correction still has
  * `kizlo_register_route_spec()`, which takes a complete declaration and is what
  * {@see CoreResource} is built on.
  */
@@ -64,16 +74,40 @@ final class RouteDiscovery
     /** The REST namespaces whose registered routes are derived. */
     public const NAMESPACE_FILTER = 'kizlo_introspection_core_namespaces';
 
+    /**
+     * The API ID prefix a namespace's discovered routes are named under.
+     *
+     * An API ID is every literal in the path and nothing else, which is what
+     * makes it stable, and also what makes `wc/v3/products` and
+     * `wc/store/v1/products` the same name. Two namespaces describing the same
+     * resource is normal, so the namespace has to be able to say what its own
+     * routes are called. Empty by default: `wp/v2` owns the unqualified names.
+     */
+    public const PREFIX_FILTER = 'kizlo_introspection_core_api_prefix';
+
     /** Each derived declaration, before registration. Return null to drop the route. */
     public const ROUTE_FILTER = 'kizlo_introspection_core_route';
 
     /** Each derived response shape, so a runtime addition can be described. */
     public const SCHEMA_FILTER = 'kizlo_introspection_core_schema';
 
+    /**
+     * The response properties for a route core's own derivation cannot read.
+     *
+     * `WP_REST_Controller` publishes `get_item_schema()`, and everything else
+     * publishes whatever it likes: the WooCommerce Store API answers from an
+     * `AbstractRoute` with its own `get_item_schema()`. Whoever registered the route
+     * knows how to read it, so they are asked. Return null to say you cannot.
+     */
+    public const RESPONSE_FILTER = 'kizlo_introspection_core_response';
+
     /** @var array{declarations: array<int, array<string, mixed>>, schemas: array<string, array<string, mixed>>}|null */
     private static ?array $memo = null;
 
     private static bool $ready = false;
+
+    /** @var array<string, string> */
+    private static array $prefixes = [];
 
     /**
      * Say that the route table is finished.
@@ -108,7 +142,8 @@ final class RouteDiscovery
 
     public static function flush(): void
     {
-        self::$memo = null;
+        self::$memo     = null;
+        self::$prefixes = [];
     }
 
     // ============================================================
@@ -154,27 +189,25 @@ final class RouteDiscovery
                 continue;
             }
 
+            $prefix = self::prefix($namespace);
+            $apiId  = $prefix === '' ? $apiId : $prefix . '.' . $apiId;
+
             $addresses = str_ends_with($path, '}');
-            $parameter = $addresses ? (string) end($normalized['parameters']) : '';
+
+            // The name a collision is scoped by is the path's last capture,
+            // wherever it sits. `/settings/{group_id}/batch` claims `create`
+            // twice and is scoped by the group it batches, even though the path
+            // does not end in the parameter that names it.
+            $parameter = $normalized['parameters'] === [] ? '' : (string) end($normalized['parameters']);
 
             foreach ($handlers as $handler) {
                 if (!is_array($handler)) {
                     continue;
                 }
 
-                $controller = self::controller($handler);
-
-                if (!$controller instanceof WP_REST_Controller) {
-                    // Nothing to derive a response from. A closure route is not
-                    // describable here, and saying so beats describing it wrong.
-                    SpecStore::addError(
-                        ['path' => $path, 'keyword' => 'callback'],
-                        sprintf('No REST controller serves "%s", so its response cannot be derived.', $path),
-                    );
-                    continue;
-                }
-
-                $callback = is_array($handler['callback'] ?? null) ? (string) ($handler['callback'][1] ?? '') : '';
+                $subject    = self::subject($handler);
+                $controller = $subject instanceof WP_REST_Controller ? $subject : null;
+                $callback   = is_array($handler['callback'] ?? null) ? (string) ($handler['callback'][1] ?? '') : '';
 
                 foreach (RouteMethods::operations($handler, $callback, $addresses) as $operation => $method) {
                     $operation = (string) $operation;
@@ -188,7 +221,7 @@ final class RouteDiscovery
 
                     $claimed[$apiId][$operation] = $path;
 
-                    $schemaId = self::schema($schemas, $byShape, $apiId, $controller, $operation, $path);
+                    $schemaId = self::schema($schemas, $byShape, $apiId, $prefix, $subject, $operation, $path, $namespace, $route);
 
                     $declaration = self::declare(
                         $apiId,
@@ -314,6 +347,42 @@ final class RouteDiscovery
         return array_keys($namespaces);
     }
 
+    /**
+     * What this namespace's discovered API IDs are named under.
+     *
+     * Validated as an API ID because that is what it becomes the head of, and a
+     * broken contribution loses its prefix rather than the contract: an ID that
+     * cannot be parsed would take every route in the namespace down with it.
+     */
+    private static function prefix(string $namespace): string
+    {
+        if (isset(self::$prefixes[$namespace])) {
+            return self::$prefixes[$namespace];
+        }
+
+        $prefix = apply_filters(self::PREFIX_FILTER, '', $namespace);
+
+        if ($prefix === '' || $prefix === null) {
+            return self::$prefixes[$namespace] = '';
+        }
+
+        if (!Spec::isValidApiId($prefix)) {
+            SpecStore::addError(
+                ['keyword' => self::PREFIX_FILTER],
+                sprintf(
+                    'The "%s" filter returned an invalid API ID prefix (%s) for "%s"; the namespace was described unprefixed.',
+                    self::PREFIX_FILTER,
+                    is_string($prefix) ? sprintf('"%s"', $prefix) : gettype($prefix),
+                    $namespace,
+                ),
+            );
+
+            return self::$prefixes[$namespace] = '';
+        }
+
+        return self::$prefixes[$namespace] = $prefix;
+    }
+
     // ============================================================
     // ONE DECLARATION
     // ============================================================
@@ -329,8 +398,8 @@ final class RouteDiscovery
         string $path,
         string $method,
         string $operation,
-        WP_REST_Controller $controller,
-        string $schemaId,
+        ?WP_REST_Controller $controller,
+        ?string $schemaId,
         array $parameters,
     ): array {
         $lists = str_starts_with($operation, 'list');
@@ -365,7 +434,7 @@ final class RouteDiscovery
         string $route,
         string $method,
         array $parameters,
-        WP_REST_Controller $controller,
+        ?WP_REST_Controller $controller,
         string $operation,
     ): array {
         $registered = CoreRouteArgs::forRoute($namespace, $route, $method);
@@ -408,23 +477,30 @@ final class RouteDiscovery
     /**
      * @return array<array-key, mixed>
      */
-    private static function responses(string $operation, string $schemaId, bool $lists, string $namespace, string $route, string $method): array
+    private static function responses(string $operation, ?string $schemaId, bool $lists, string $namespace, string $route, string $method): array
     {
-        $body = $lists
-            ? ['type' => 'array', 'items' => ['$ref' => $schemaId]]
-            : ['$ref' => $schemaId];
-
-        if ($operation === 'delete') {
-            $body = DeletedSchema::trashable($schemaId);
-        }
-
-        if ($operation === 'delete_all') {
-            $body = DeletedSchema::counted();
-        }
+        // Nothing published this route's shape, so the contract says that rather
+        // than naming fields nobody declared. The route stays callable and the
+        // caller gets an object it has to read for itself. Its arity is still
+        // known: a collection answers with a list of those objects, so an
+        // undescribed record does not cost the caller the array around it.
+        $opaque = ['type' => 'object', 'additionalProperties' => true];
+        $body   = match (true) {
+            $schemaId === null && $lists => ['type' => 'array', 'items' => $opaque],
+            $schemaId === null           => $opaque,
+            $operation === 'delete'      => DeletedSchema::trashable($schemaId),
+            $operation === 'delete_all'  => DeletedSchema::counted(),
+            $lists                       => ['type' => 'array', 'items' => ['$ref' => $schemaId]],
+            default                      => ['$ref' => $schemaId],
+        };
 
         $success = $operation === 'create' ? '201' : '200';
 
-        $responses = [$success => ['description' => 'The result.', 'body' => $body]];
+        $description = $schemaId === null
+            ? 'The result. Its fields are not described by the route registration.'
+            : 'The result.';
+
+        $responses = [$success => ['description' => $description, 'body' => $body]];
 
         if ($lists && self::paginates($namespace, $route, $method)) {
             $responses[$success]['headers'] = ManagedPostTypes::paginationHeaders();
@@ -476,30 +552,73 @@ final class RouteDiscovery
         array &$schemas,
         array &$byShape,
         string $apiId,
-        WP_REST_Controller $controller,
+        string $prefix,
+        ?object $subject,
         string $operation,
         string $path,
-    ): string
+        string $namespace,
+        string $route,
+    ): ?string
     {
-        $properties = CoreItemSchema::responseForController($controller, $path, CoreResource::CONTEXT);
+        if ($subject instanceof WP_REST_Controller) {
+            // The normalized path deliberately omits the namespace. It cannot
+            // identify the controller schema cache entry because two namespaces
+            // may both register (for example) `/settings` with different shapes.
+            $properties = CoreItemSchema::responseForController(
+                $subject,
+                sprintf('/%s%s', trim($namespace, '/'), $route),
+                CoreResource::CONTEXT,
+            );
 
-        /** @var array<string, array<string, mixed>> $properties */
-        $properties = apply_filters(self::SCHEMA_FILTER, $properties, $apiId, $controller, $operation, $path);
+            // Only the controller path is filtered. The filter has always been
+            // handed a controller and its callers type it as one, so a route
+            // without one is corrected through self::RESPONSE_FILTER instead.
+            /** @var array<string, array<string, mixed>> $properties */
+            $properties = apply_filters(self::SCHEMA_FILTER, $properties, $apiId, $subject, $operation, $path);
+        } else {
+            /** @var array<string, array<string, mixed>>|null $derived */
+            $derived = apply_filters(self::RESPONSE_FILTER, null, $subject, $namespace, $route, $operation);
 
-        $fingerprint = md5((string) wp_json_encode($properties));
+            $properties = is_array($derived) ? $derived : [];
+        }
+
+        // Nothing answered, whichever side was asked. A controller can publish no
+        // schema at all, or one whose every property is filtered out of this
+        // context, and an empty property set is not a shape: describing it as one
+        // publishes "this response has no fields", which is an invented claim
+        // rather than an honest unknown. It would also hand every empty
+        // derivation in a prefix the same fingerprint below, so two unrelated
+        // routes would share a schema and whichever claimed the ID first would
+        // name it for both.
+        if ($properties === []) {
+            // A warning, not a failure: the route is in the document and a
+            // caller can reach it. Only its fields are unknown.
+            SpecStore::addWarning(
+                ['path' => $path, 'keyword' => 'callback'],
+                sprintf('Nothing describes the response of "%s", so it is described as an opaque object.', $path),
+            );
+
+            return null;
+        }
+
+        // A prefix owns its schema namespace. Reusing a structurally identical
+        // schema across prefixes would make a core route point at a WooCommerce
+        // schema (or one WooCommerce namespace point at the other), changing an
+        // otherwise unrelated public contract according to discovery order.
+        $fingerprint = sprintf('%s:%s', $prefix, md5((string) wp_json_encode($properties)));
 
         if (isset($byShape[$fingerprint])) {
             return $byShape[$fingerprint];
         }
 
-        $id = self::schemaId($apiId);
+        $id = self::schemaId($apiId, $prefix);
 
         if (isset($schemas[$id])) {
             $suffix = str_replace('_', '-', $operation);
             $id     .= '.' . $suffix;
 
             for ($copy = 2; isset($schemas[$id]); $copy++) {
-                $id = sprintf('%s.%s-%d', self::schemaId($apiId), $suffix, $copy);
+                $id = sprintf('%s.%s-%d', self::schemaId($apiId, $prefix), $suffix, $copy);
             }
         }
 
@@ -522,25 +641,44 @@ final class RouteDiscovery
      * trusted. These arrive through a filter at document build instead, which is
      * the only moment the route table can answer, and they describe someone
      * else's records in any case.
+     *
+     * A namespace that named itself is already qualified, so it heads its own
+     * schema rather than being buried under `wp.`: `wc/store/v1` prefixed with
+     * `woocommerce.store` describes its cart as `woocommerce.store.cart`, not as
+     * `wp.woocommerce-store-cart`.
      */
-    private static function schemaId(string $apiId): string
+    private static function schemaId(string $apiId, string $prefix): string
     {
-        $slug = strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', str_replace('.', '-', $apiId)));
+        $local = $prefix === '' ? $apiId : substr($apiId, strlen($prefix) + 1);
+        $slug  = strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', str_replace('.', '-', $local)));
 
-        return 'wp.' . $slug;
+        return ($prefix === '' ? 'wp' : $prefix) . '.' . $slug;
     }
 
     /**
+     * Whatever object serves the route, controller or not.
+     *
+     * `WP_REST_Controller` is the shape core registers its own routes with and
+     * the only one this can read unaided. Anything else is handed to
+     * {@see self::RESPONSE_FILTER}, which is how a Store API `AbstractRoute`
+     * gets described by the integration that registered it.
+     *
      * @param array<string, mixed> $handler
      */
-    private static function controller(array $handler): ?WP_REST_Controller
+    private static function subject(array $handler): ?object
     {
         $callback = $handler['callback'] ?? null;
 
-        if (is_array($callback) && ($callback[0] ?? null) instanceof WP_REST_Controller) {
+        if (is_array($callback) && is_object($callback[0] ?? null)) {
             return $callback[0];
         }
 
-        return null;
+        if ($callback instanceof \Closure) {
+            $bound = (new \ReflectionFunction($callback))->getClosureThis();
+
+            return $bound ?? $callback;
+        }
+
+        return is_object($callback) ? $callback : null;
     }
 }

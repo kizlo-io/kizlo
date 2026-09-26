@@ -24,8 +24,8 @@ function confirmContext(response: unknown) {
 			woocommerce: {
 				store: {
 					checkout: {
-						get: vi.fn(),
-						process: vi.fn().mockResolvedValue(response),
+						retrieve: vi.fn(),
+						create: vi.fn().mockResolvedValue(response),
 					},
 				},
 			},
@@ -69,8 +69,8 @@ test("confirm submits caller-owned checkout data directly without a hidden read"
 		code: "CHECKOUT_VALIDATION_FAILED",
 		data: { fields: { billing_email: "Required" } },
 	})
-	expect(context.wordpress.woocommerce.store.checkout.get).not.toHaveBeenCalled()
-	expect(context.wordpress.woocommerce.store.checkout.process).toHaveBeenCalledWith(
+	expect(context.wordpress.woocommerce.store.checkout.retrieve).not.toHaveBeenCalled()
+	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledWith(
 		{
 			body: expect.objectContaining({
 				billing_address: expect.objectContaining({ first_name: "Ada", tax_id: "GB-42" }),
@@ -98,7 +98,7 @@ test("createAccount is independent from customerPassword", async () => {
 	)
 
 	await expect(promise).rejects.toEqual(expect.objectContaining<Partial<KizloError>>({ code: "CHECKOUT_ACCOUNT_CREATION_FAILED" }))
-	expect(context.wordpress.woocommerce.store.checkout.process).toHaveBeenCalledWith(
+	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledWith(
 		{ body: expect.objectContaining({ create_account: true, customer_password: undefined }) },
 		expect.anything(),
 	)
@@ -115,7 +115,7 @@ test("createAccount defaults to false even when a password is provided", async (
 	)
 
 	await expect(promise).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" })
-	expect(context.wordpress.woocommerce.store.checkout.process).toHaveBeenCalledWith(
+	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledWith(
 		{ body: expect.objectContaining({ create_account: false, customer_password: "secret" }) },
 		expect.anything(),
 	)
@@ -128,7 +128,7 @@ test("confirm forwards the per-checkout redirect paths as extensions.kizlo", asy
 	)
 
 	await expect(promise).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" })
-	expect(context.wordpress.woocommerce.store.checkout.process).toHaveBeenCalledWith(
+	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledWith(
 		{ body: expect.objectContaining({ extensions: { kizlo: { success_path: "/thanks", cancel_path: "/cart" } } }) },
 		expect.anything(),
 	)
@@ -136,7 +136,7 @@ test("confirm forwards the per-checkout redirect paths as extensions.kizlo", asy
 
 function retryContext(response: unknown) {
 	return {
-		wordpress: { woocommerce: { store: { checkout: { processOrder: vi.fn().mockResolvedValue(response) } } } },
+		wordpress: { woocommerce: { store: { checkout: { updateById: vi.fn().mockResolvedValue(response) } } } },
 		sessionHeaders: { "X-Kizlo-Guest-Token": "guest" },
 		logger: { error: vi.fn() },
 	}
@@ -158,8 +158,9 @@ test("retry forwards the per-checkout redirect paths as extensions.kizlo", async
 	})
 
 	await expect(promise).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" })
-	expect(context.wordpress.woocommerce.store.checkout.processOrder).toHaveBeenCalledWith(
+	expect(context.wordpress.woocommerce.store.checkout.updateById).toHaveBeenCalledWith(
 		expect.objectContaining({
+			params: { id: "42" },
 			body: expect.objectContaining({ extensions: { kizlo: { success_path: "/thanks", cancel_path: "/cart" } } }),
 		}),
 		expect.anything(),

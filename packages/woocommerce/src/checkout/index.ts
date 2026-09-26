@@ -23,9 +23,12 @@ export const CHECKOUT_PROCEDURES = {
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, errors }) => {
-			const response = await context.wordpress.woocommerce.store.checkout.get({}, { headers: context.sessionHeaders })
+			const response = await context.wordpress.woocommerce.store.checkout.retrieve({}, { headers: context.sessionHeaders })
+			// The handler codes below are not in the generated error union: a discovered route declares no handler
+			// errors, so the union narrows to WordPress's pre-dispatch codes. Widening the code is what lets the
+			// switches in this file keep handling them, and it goes away with KIZ-207, which registers them.
 			if (response.error) {
-				if (response.error.code === "woocommerce_rest_checkout_missing_order") {
+				if ((response.error.code as string) === "woocommerce_rest_checkout_missing_order") {
 					throw errors.CHECKOUT_ORDER_NOT_FOUND({ message: response.error.message })
 				}
 
@@ -62,7 +65,7 @@ export const CHECKOUT_PROCEDURES = {
 			)
 			if (response.error) {
 				const conflict = conflictData(response.error.data)
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "rest_invalid_param":
 						throw errors.CHECKOUT_VALIDATION_FAILED({
 							message: response.error.message,
@@ -105,7 +108,7 @@ export const CHECKOUT_PROCEDURES = {
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input, errors }) => {
-			const response = await context.wordpress.woocommerce.store.checkout.process(
+			const response = await context.wordpress.woocommerce.store.checkout.create(
 				{
 					body: {
 						billing_address: serializeCheckoutBillingAddress(input.body.billingAddress),
@@ -126,7 +129,7 @@ export const CHECKOUT_PROCEDURES = {
 			)
 			if (response.error) {
 				const conflict = conflictData(response.error.data)
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "rest_invalid_param":
 						throw errors.CHECKOUT_VALIDATION_FAILED({
 							message: response.error.message,
@@ -198,9 +201,9 @@ export const CHECKOUT_PROCEDURES = {
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input, errors }) => {
-			const response = await context.wordpress.woocommerce.store.checkout.processOrder(
+			const response = await context.wordpress.woocommerce.store.checkout.updateById(
 				{
-					params: { id: input.params.orderId },
+					params: { id: String(input.params.orderId) },
 					body: {
 						key: input.body.key,
 						payment_data: input.body.paymentData,
@@ -219,7 +222,7 @@ export const CHECKOUT_PROCEDURES = {
 				{ headers: context.sessionHeaders },
 			)
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "rest_invalid_param":
 						throw errors.CHECKOUT_VALIDATION_FAILED({
 							message: response.error.message,

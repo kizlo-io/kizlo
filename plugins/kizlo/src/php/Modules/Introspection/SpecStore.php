@@ -42,7 +42,7 @@ class SpecStore
     /** @var array<string, true> Fingerprints of entries registered from inside the plugin. */
     private static array $trusted = [];
 
-    /** @var array<string, array{location: array<string, string>, message: string}> */
+    /** @var array<string, array{type: string, location: array<string, string>, message: string}> */
     private static array $errors = [];
 
     /**
@@ -169,11 +169,33 @@ class SpecStore
      */
     public static function addError(array $location, string $message): void
     {
+        self::record('error', $location, $message);
+    }
+
+    /**
+     * Record something worth saying that cost the contract nothing.
+     *
+     * A route described with an opaque response is the case this exists for: it
+     * is in the document and a caller can reach it, so reporting it as a failure
+     * would fail a strict build over a contract that is complete and honest.
+     *
+     * @param array<string, string> $location
+     */
+    public static function addWarning(array $location, string $message): void
+    {
+        self::record('warning', $location, $message);
+    }
+
+    /**
+     * @param array<string, string> $location
+     */
+    private static function record(string $type, array $location, string $message): void
+    {
         ksort($location, SORT_STRING);
 
-        $error = ['location' => $location, 'message' => $message];
+        $entry = ['type' => $type, 'location' => $location, 'message' => $message];
 
-        self::$errors[self::fingerprint('error', $error)] = $error;
+        self::$errors[self::fingerprint($type, $entry)] = $entry;
     }
 
     /**
@@ -186,8 +208,13 @@ class SpecStore
 
     public static function applyDiagnostics(Diagnostics $diagnostics): void
     {
-        foreach (self::$errors as $error) {
-            $diagnostics->error($error['location'], $error['message']);
+        foreach (self::$errors as $entry) {
+            if ($entry['type'] === 'warning') {
+                $diagnostics->warning($entry['location'], $entry['message']);
+                continue;
+            }
+
+            $diagnostics->error($entry['location'], $entry['message']);
         }
     }
 

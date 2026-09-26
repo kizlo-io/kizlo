@@ -17,16 +17,19 @@ export const ORDER_PROCEDURES = {
 			middlewares: [sessionMiddleware()],
 		},
 		async ({ context, input, errors }) => {
-			const response = await context.wordpress.woocommerce.store.orders.get(
+			const response = await context.wordpress.woocommerce.store.order.retrieve(
 				{
-					params: { id: input.params.orderId },
+					params: { id: String(input.params.orderId) },
 					query: { key: input.query?.key, billing_email: input.query?.billingEmail },
 				},
 				{ headers: context.sessionHeaders },
 			)
 
+			// The handler codes below are not in the generated error union: a discovered route declares no handler
+			// errors, so the union narrows to WordPress's pre-dispatch codes. Widening the code is what lets the
+			// switches in this file keep handling them, and it goes away with KIZ-207, which registers them.
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "woocommerce_rest_invalid_order":
 						if (response.status === 404) throw errors.ORDER_NOT_FOUND({ message: response.error.message })
 						throw errors.ORDER_FORBIDDEN({ message: response.error.message })

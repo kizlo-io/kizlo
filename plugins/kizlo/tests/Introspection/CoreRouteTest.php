@@ -28,6 +28,9 @@ class CoreRouteTest extends IntrospectionTestCase
 {
     private const FIXTURE_NAMESPACE = 'acme/v1';
 
+    /** A second namespace from the same vendor, serving the same path. */
+    private const FIXTURE_STORE_NAMESPACE = 'acme/store/v1';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -185,6 +188,323 @@ class CoreRouteTest extends IntrospectionTestCase
             $this->assertArrayHasKey('probes', $document['apis']);
             $this->assertErrorContains($document['diagnostics'], 'invalid REST namespace ("missing-version")');
             $this->assertErrorContains($document['diagnostics'], 'invalid REST namespace (integer)');
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    // ============================================================
+    // A NAMESPACE NAMES ITS OWN ROUTES
+    // ============================================================
+
+    /**
+     * An API ID is every literal in the path, which is what makes it stable and
+     * also what makes two namespaces serving `/probes` want one name. The prefix
+     * is how a namespace says which `/probes` it means.
+     */
+    public function test_a_namespace_can_name_its_own_apis(): void
+    {
+        $register = $this->registerFixtureNamespace();
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+        $prefix   = static fn(string $prefix, string $namespace): string
+            => $namespace === self::FIXTURE_NAMESPACE ? 'acme' : $prefix;
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        add_filter(RouteDiscovery::PREFIX_FILTER, $prefix, 10, 2);
+
+        try {
+            $document = $this->document();
+
+            $this->assertArrayHasKey('acme.probes', $document['apis']);
+            $this->assertArrayNotHasKey('probes', $document['apis']);
+
+            // A namespace naming itself says nothing about anyone else, so the
+            // unprefixed core surface is exactly where it was.
+            $this->assertArrayHasKey('posts', $document['apis']);
+
+            // The schema is named after the API rather than buried under `wp.`,
+            // because the prefix already qualified it.
+            $ref = $document['apis']['acme.probes']['paths']['/probes/{id}']['retrieve']['responses']['200']['body']['$ref'];
+            $this->assertSame('acme.probes', $ref);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_filter(RouteDiscovery::PREFIX_FILTER, $prefix);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    public function test_two_namespaces_can_describe_the_same_path(): void
+    {
+        $first  = $this->registerFixtureNamespace();
+        $second = $this->registerFixtureNamespace(self::FIXTURE_STORE_NAMESPACE, 'page');
+
+        $include = static fn(array $namespaces): array
+            => [...$namespaces, self::FIXTURE_NAMESPACE, self::FIXTURE_STORE_NAMESPACE];
+
+        $prefix = static fn(string $prefix, string $namespace): string => match ($namespace) {
+            self::FIXTURE_NAMESPACE       => 'acme',
+            self::FIXTURE_STORE_NAMESPACE => 'acme.store',
+            default                       => $prefix,
+        };
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        add_filter(RouteDiscovery::PREFIX_FILTER, $prefix, 10, 2);
+
+        try {
+            $document = $this->document();
+
+            $this->assertSame(self::FIXTURE_NAMESPACE, $document['apis']['acme.probes']['namespace']);
+            $this->assertSame(self::FIXTURE_STORE_NAMESPACE, $document['apis']['acme.store.probes']['namespace']);
+
+            $firstRef = $document['apis']['acme.probes']['paths']['/probes/{id}']['retrieve']['responses']['200']['body']['$ref'];
+            $storeRef = $document['apis']['acme.store.probes']['paths']['/probes/{id}']['retrieve']['responses']['200']['body']['$ref'];
+
+            $this->assertSame('acme.probes', $firstRef);
+            $this->assertSame('acme.store.probes', $storeRef);
+            $this->assertArrayHasKey('sticky', $document['schemas'][$firstRef]['properties']);
+            $this->assertArrayNotHasKey('parent', $document['schemas'][$firstRef]['properties']);
+            $this->assertArrayHasKey('parent', $document['schemas'][$storeRef]['properties']);
+            $this->assertArrayNotHasKey('sticky', $document['schemas'][$storeRef]['properties']);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_filter(RouteDiscovery::PREFIX_FILTER, $prefix);
+            remove_action('rest_api_init', $first);
+            remove_action('rest_api_init', $second);
+        }
+    }
+
+    /** Why the prefix exists: unprefixed, the second namespace loses its API. */
+    public function test_two_namespaces_sharing_a_path_collide_without_a_prefix(): void
+    {
+        $first  = $this->registerFixtureNamespace();
+        $second = $this->registerFixtureNamespace(self::FIXTURE_STORE_NAMESPACE);
+
+        $include = static fn(array $namespaces): array
+            => [...$namespaces, self::FIXTURE_NAMESPACE, self::FIXTURE_STORE_NAMESPACE];
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+
+        try {
+            $this->assertErrorContains($this->document()['diagnostics'], 'one API has one namespace');
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $first);
+            remove_action('rest_api_init', $second);
+        }
+    }
+
+    public function test_an_invalid_api_prefix_is_ignored_and_reported(): void
+    {
+        $register = $this->registerFixtureNamespace();
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+        $prefix   = static fn(string $prefix, string $namespace): string
+            => $namespace === self::FIXTURE_NAMESPACE ? 'not a prefix' : $prefix;
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        add_filter(RouteDiscovery::PREFIX_FILTER, $prefix, 10, 2);
+
+        try {
+            $document = $this->document();
+
+            $this->assertArrayHasKey('probes', $document['apis']);
+            $this->assertErrorContains($document['diagnostics'], 'invalid API ID prefix ("not a prefix")');
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_filter(RouteDiscovery::PREFIX_FILTER, $prefix);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    // ============================================================
+    // A ROUTE NO CONTROLLER SERVES
+    // ============================================================
+
+    /**
+     * `get_item_schema()` is the only response shape this can read unaided, and
+     * a route object of somebody else's design has no such method. Whoever
+     * registered it does know how to read it, so they are asked.
+     */
+    public function test_a_route_without_a_controller_is_described_from_the_response_filter(): void
+    {
+        $register = $this->registerSubjectRoute();
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+        $response = static function (mixed $properties, ?object $subject, string $namespace, string $route): mixed {
+            if ($route !== '/gadgets') {
+                return $properties;
+            }
+
+            return ['ok' => ['type' => 'boolean', 'required' => true]];
+        };
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        add_filter(RouteDiscovery::RESPONSE_FILTER, $response, 10, 4);
+
+        try {
+            $document = $this->document();
+            $ref      = $document['apis']['gadgets']['paths']['/gadgets']['list']['responses']['200']['body']['items']['$ref'];
+
+            $this->assertSame(['type' => 'boolean', 'required' => true], $document['schemas'][$ref]['properties']['ok']);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_filter(RouteDiscovery::RESPONSE_FILTER, $response);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    /** A callable wrapper does not hide the controller it is bound to. */
+    public function test_a_closure_bound_to_a_controller_uses_the_controller_schema(): void
+    {
+        $controller = new WP_REST_Posts_Controller('post');
+        $callback   = \Closure::fromCallable([$controller, 'get_item']);
+        $register   = static function () use ($callback): void {
+            register_rest_route(self::FIXTURE_NAMESPACE, '/bound-probes/(?P<id>[\d]+)', [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => $callback,
+                'permission_callback' => '__return_true',
+                'args'                => ['id' => ['type' => 'integer', 'required' => true]],
+            ]);
+        };
+        $include = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+
+        add_action('rest_api_init', $register);
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        $this->boot();
+
+        try {
+            $properties = $this->responseProperties($this->document(), 'boundProbes', '/bound-probes/{id}', 'retrieve');
+
+            $this->assertArrayHasKey('id', $properties);
+            $this->assertArrayHasKey('title', $properties);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    /**
+     * Unanswered, the route is still described. A caller can reach it and read
+     * the body itself, which is more than it could do when the route was dropped.
+     */
+    public function test_a_route_nothing_describes_is_described_opaquely(): void
+    {
+        $register = $this->registerSubjectRoute();
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+
+        try {
+            $document = $this->document();
+            $list     = $document['apis']['gadgets']['paths']['/gadgets']['list'];
+
+            // A collection of undescribed records is still a collection: the
+            // record is opaque, the array around it is not.
+            $this->assertSame(
+                ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+                $list['responses']['200']['body'],
+            );
+            $this->assertErrorContains($document['diagnostics'], 'described as an opaque object');
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    /**
+     * A controller can publish nothing to read: no schema of its own, or one
+     * whose every property is filtered out of this context. That is an unknown
+     * shape rather than a shape with no fields, so it has to reach the same
+     * opaque fallback the filter path reaches.
+     *
+     * Two of them matter together. An empty property set hashes to one
+     * fingerprint, so a schema minted for either would be borrowed by the other
+     * and each would answer as the unrelated record that claimed the ID first.
+     */
+    public function test_a_controller_that_publishes_no_properties_is_described_opaquely(): void
+    {
+        $register = static function (): void {
+            $bare = new class () extends \WP_REST_Controller {
+                /** @return array<string, mixed> */
+                public function get_item_schema(): array
+                {
+                    return ['title' => 'bare', 'type' => 'object', 'properties' => []];
+                }
+
+                public function get_items($request): \WP_REST_Response
+                {
+                    return new \WP_REST_Response([]);
+                }
+            };
+
+            foreach (['/bare-probes', '/other-bare-probes'] as $path) {
+                register_rest_route(self::FIXTURE_NAMESPACE, $path, [
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => [$bare, 'get_items'],
+                    'permission_callback' => '__return_true',
+                ]);
+            }
+        };
+        $include = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+
+        add_action('rest_api_init', $register);
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        $this->boot();
+
+        try {
+            $document = $this->document();
+
+            foreach (['bareProbes' => '/bare-probes', 'otherBareProbes' => '/other-bare-probes'] as $apiId => $path) {
+                $body = $document['apis'][$apiId]['paths'][$path]['list']['responses']['200']['body'];
+
+                $this->assertSame(
+                    ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+                    $body,
+                    sprintf('%s was given a shape it does not publish.', $path),
+                );
+            }
+
+            $this->assertSame([], $this->emptySchemas($document), 'Schemas published with no properties.');
+            $this->assertErrorContains($document['diagnostics'], 'described as an opaque object');
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    /**
+     * The other half of the same rule: a shape that does have properties is
+     * still shared between the registrations that derive it, which is what the
+     * fingerprint is for and what keeps a large record from being doubled.
+     */
+    public function test_two_routes_deriving_one_shape_share_its_schema(): void
+    {
+        $register = static function (): void {
+            $controller = new WP_REST_Posts_Controller('post');
+
+            foreach (['/shape-probes', '/twin-shape-probes'] as $path) {
+                register_rest_route(self::FIXTURE_NAMESPACE, $path, [
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => [$controller, 'get_items'],
+                    'permission_callback' => '__return_true',
+                ]);
+            }
+        };
+        $include = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+
+        add_action('rest_api_init', $register);
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+        $this->boot();
+
+        try {
+            $document = $this->document();
+            $refs     = [];
+
+            foreach (['shapeProbes' => '/shape-probes', 'twinShapeProbes' => '/twin-shape-probes'] as $apiId => $path) {
+                $refs[] = $document['apis'][$apiId]['paths'][$path]['list']['responses']['200']['body']['items']['$ref'];
+            }
+
+            $this->assertSame($refs[0], $refs[1], 'One derived shape was published as two schemas.');
+            $this->assertNotSame([], $document['schemas'][$refs[0]]['properties']);
         } finally {
             remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
             remove_action('rest_api_init', $register);
@@ -629,6 +949,90 @@ class CoreRouteTest extends IntrospectionTestCase
     }
 
     // ============================================================
+    // ONE HANDLER IS ONE OPERATION
+    // ============================================================
+
+    /**
+     * An editable handler is one callback, so it is one behaviour however many
+     * verbs reach it. Named by method instead, its POST reads as a create, and
+     * a caller adding one gadget would replace every gadget there is.
+     */
+    public function test_one_editable_handler_publishes_one_operation(): void
+    {
+        $register = $this->registerWriteRoute(['editable' => WP_REST_Server::EDITABLE]);
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+
+        try {
+            $operations = $this->document()['apis']['gadgets']['paths']['/gadgets'];
+
+            $this->assertSame(['update'], array_keys($operations));
+            $this->assertSame('PATCH', $operations['update']['method']);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    /**
+     * Two entries are two callbacks and genuinely two behaviours, which is how
+     * the Store API registers its checkout.
+     */
+    public function test_two_handler_entries_publish_two_operations(): void
+    {
+        $register = $this->registerWriteRoute([
+            'creatable' => WP_REST_Server::CREATABLE,
+            'editable'  => WP_REST_Server::EDITABLE,
+        ]);
+        $include = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+
+        try {
+            $operations = $this->document()['apis']['gadgets']['paths']['/gadgets'];
+
+            $this->assertSame(['create', 'update'], $this->sorted(array_keys($operations)));
+            $this->assertSame('POST', $operations['create']['method']);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    /** A handler that registers one write verb still says what that verb does. */
+    public function test_a_single_write_verb_keeps_its_own_operation(): void
+    {
+        $register = $this->registerWriteRoute(['creatable' => WP_REST_Server::CREATABLE]);
+        $include  = static fn(array $namespaces): array => [...$namespaces, self::FIXTURE_NAMESPACE];
+
+        add_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+
+        try {
+            $operations = $this->document()['apis']['gadgets']['paths']['/gadgets'];
+
+            $this->assertSame(['create'], array_keys($operations));
+            $this->assertSame('POST', $operations['create']['method']);
+        } finally {
+            remove_filter(RouteDiscovery::NAMESPACE_FILTER, $include);
+            remove_action('rest_api_init', $register);
+        }
+    }
+
+    /**
+     * A callback core's own controllers use says what the route does, so the
+     * verbs it registers are never regrouped: `/wp/v2/settings` is one editable
+     * `update_item` and stays one update, exactly as it reads today.
+     */
+    public function test_a_recognized_callback_is_left_alone(): void
+    {
+        $operations = $this->document()['apis']['settings']['paths']['/settings'];
+
+        $this->assertSame(['retrieve', 'update'], $this->sorted(array_keys($operations)));
+        $this->assertSame('PATCH', $operations['update']['method']);
+    }
+
+    // ============================================================
     // HELPERS
     // ============================================================
 
@@ -702,6 +1106,20 @@ class CoreRouteTest extends IntrospectionTestCase
         return $document['schemas'][$ref]['properties'];
     }
 
+    /**
+     * Schema IDs published with no properties at all.
+     *
+     * @param array<string, mixed> $document
+     * @return array<int, string>
+     */
+    private function emptySchemas(array $document): array
+    {
+        return array_keys(array_filter(
+            $document['schemas'],
+            static fn(array $schema): bool => ($schema['properties'] ?? null) === [],
+        ));
+    }
+
     /** @param string[] $values */
     private function sorted(array $values): array
     {
@@ -718,12 +1136,72 @@ class CoreRouteTest extends IntrospectionTestCase
         do_action('rest_api_init', $wp_rest_server);
     }
 
-    private function registerFixtureNamespace(): \Closure
+    /**
+     * A route served by an object that is not a `WP_REST_Controller`, which is
+     * what the WooCommerce Store API registers and what core's derivation cannot
+     * read on its own.
+     */
+    private function registerSubjectRoute(): \Closure
     {
         $register = static function (): void {
-            $controller = new WP_REST_Posts_Controller('post');
+            $subject = new class () {
+                public function handle(): \WP_REST_Response
+                {
+                    return new \WP_REST_Response(['ok' => true]);
+                }
+            };
 
-            register_rest_route(self::FIXTURE_NAMESPACE, '/probes/(?P<id>[\d]+)', [
+            register_rest_route(self::FIXTURE_NAMESPACE, '/gadgets', [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [$subject, 'handle'],
+                'permission_callback' => '__return_true',
+            ]);
+        };
+
+        add_action('rest_api_init', $register);
+        $this->boot();
+
+        return $register;
+    }
+
+    /**
+     * A write route served by an object core does not recognise, registered as
+     * one handler entry per given method group.
+     *
+     * @param array<string, string> $entries
+     */
+    private function registerWriteRoute(array $entries): \Closure
+    {
+        $register = static function () use ($entries): void {
+            $subject = new class () {
+                public function handle(): \WP_REST_Response
+                {
+                    return new \WP_REST_Response(['ok' => true]);
+                }
+            };
+
+            register_rest_route(self::FIXTURE_NAMESPACE, '/gadgets', array_values(array_map(
+                static fn(string $methods): array => [
+                    'methods'             => $methods,
+                    'callback'            => [$subject, 'handle'],
+                    'permission_callback' => '__return_true',
+                ],
+                $entries,
+            )));
+        };
+
+        add_action('rest_api_init', $register);
+        $this->boot();
+
+        return $register;
+    }
+
+    private function registerFixtureNamespace(string $namespace = self::FIXTURE_NAMESPACE, string $postType = 'post'): \Closure
+    {
+        $register = static function () use ($namespace, $postType): void {
+            $controller = new WP_REST_Posts_Controller($postType);
+
+            register_rest_route($namespace, '/probes/(?P<id>[\d]+)', [
                 'methods'             => WP_REST_Server::READABLE,
                 'callback'            => [$controller, 'get_item'],
                 'permission_callback' => '__return_true',

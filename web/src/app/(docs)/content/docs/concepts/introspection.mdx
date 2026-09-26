@@ -46,7 +46,7 @@ generated TypeScript member.
 | --- | --- |
 | API ID `kizlo.post-types.post`, operation `list` | `wordpress.kizlo.postTypes.post.list()` |
 | API ID `kizlo.post-types.post`, operation `retrieve` | `wordpress.kizlo.postTypes.post.retrieve()` |
-| API ID `woocommerce.store.cart`, operation `add_item` | `wordpress.woocommerce.store.cart.addItem()` |
+| API ID `woocommerce.store.cart.addItem`, operation `create` | `wordpress.woocommerce.store.cart.addItem.create({ body: { id: 42 } })` |
 
 The input names the three parts of a request. `params` is interpolated into the URL, `query` becomes the
 query string, and `body` is sent as the payload. An endpoint only declares the parts it has, and a part is
@@ -142,6 +142,48 @@ The filter changes introspection only and registers no endpoint. Mechanical disc
 controller schemas, and generated names as they are. Use
 [`kizlo_register_route_spec`](/docs/php/functions/register-route-spec) when you need curated names, response
 shapes, error codes, or collision control.
+
+## Name a namespace's APIs
+
+An API ID is the literal segments of a path and nothing else, so two namespaces that both serve `/products`
+ask for the same ID, and an API belongs to one namespace. Give a namespace a prefix and its routes get names
+of their own. `wp/v2` and `wp-site-health/v1` keep the unprefixed names by default.
+
+```php title="wp-content/plugins/acme-kizlo/acme-kizlo.php"
+add_filter('kizlo_introspection_core_api_prefix', static function (string $prefix, string $namespace): string {
+    return $namespace === 'acme/v1' ? 'acme' : $prefix;
+}, 10, 2);
+```
+
+`acme/v1/products` is then `acme.products`, reached as `wordpress.acme.products.list()`. The prefix heads the
+schema IDs too, so its records never merge with another namespace's. A prefix that is not a valid API ID is
+reported and ignored.
+
+## Describe a route no controller serves
+
+Discovery reads a response from `WP_REST_Controller::get_item_schema()`. A closure route, or a route object of
+another design, publishes no such method, so it is described with an object whose fields are unknown. It stays
+callable, and the diagnostic says so. Whoever registered the route can read it, so this filter asks them.
+
+```php title="wp-content/plugins/acme-kizlo/acme-kizlo.php"
+add_filter(
+    'kizlo_introspection_core_response',
+    static function (mixed $properties, ?object $subject, string $namespace, string $route, string $operation): mixed {
+        if ($namespace !== 'acme/v1' || !$subject instanceof Acme_Route) {
+            return $properties;
+        }
+
+        return kizlo_translate_spec_properties($subject->get_item_schema()['properties'], "acme {$route}");
+    },
+    10,
+    5,
+);
+```
+
+Return the value you were handed for anything you cannot describe, and the route keeps its opaque object
+rather than a shape you had to invent. Only a route without a `WP_REST_Controller` reaches this filter. To add
+fields to a response a controller already describes, such as ones a response filter attaches at runtime, use
+`kizlo_introspection_core_schema`, which is handed the derived properties and the controller behind them.
 
 ## Add a route the plugin does not own
 

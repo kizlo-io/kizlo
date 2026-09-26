@@ -6,8 +6,7 @@ use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\Introspection\ManagedContent;
 use Kizlo\Modules\Introspection\Registry;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
-use Kizlo\WooCommerce\Modules\Contract\RestApiRoutes;
-use Kizlo\WooCommerce\Modules\Contract\StoreApiRoutes;
+use Kizlo\WooCommerce\Modules\Contract\ContractModule;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 use Kizlo\WooCommerce\Modules\Product\ProductModule;
 use Kizlo\WooCommerce\Tests\TestCase;
@@ -30,28 +29,26 @@ class ReferencedCustomFieldContractTest extends TestCase
 
         (new ProductModule())->extendStoreApiProductSchema();
         WooCommerceSchemas::register();
-        RestApiRoutes::registerSchemas();
-        StoreApiRoutes::registerSchemas();
-        RestApiRoutes::register();
-        StoreApiRoutes::register();
+        (new ContractModule())->describe();
+        $this->bootRestServer();
 
         ManagedContent::flush();
         $document = Registry::build();
         $schemas  = $document['schemas'];
 
         $this->assertArrayHasKey(
-            'woocommerce.product',
+            'woocommerce.products',
             $schemas,
             wp_json_encode($document['diagnostics'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
         );
         $this->assertArrayHasKey(
-            'woocommerce.store.product',
+            'woocommerce.store.products',
             $schemas,
             wp_json_encode($document['diagnostics'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
         );
 
-        $rest = $schemas['woocommerce.product']['properties']['kizlo']['properties']['custom']['properties'];
-        $store = $schemas['woocommerce.store.product']['properties']['extensions']['properties']['kizlo']['properties']['custom']['properties'];
+        $rest = $schemas['woocommerce.products']['properties']['kizlo']['properties']['custom']['properties'];
+        $store = $schemas['woocommerce.store.products']['properties']['extensions']['properties']['kizlo']['properties']['custom']['properties'];
 
         foreach ([$rest, $store] as $custom) {
             $this->assertSame('kizlo.media-image', $custom['qa_image']['$ref']);
@@ -63,7 +60,7 @@ class ReferencedCustomFieldContractTest extends TestCase
             $this->operations($document['apis']['woocommerce.products']),
         );
         $this->assertSame(
-            ['collection_data', 'get_by_id', 'get_by_slug', 'list'],
+            ['list', 'retrieve', 'retrieve_by_slug'],
             $this->operations($document['apis']['woocommerce.store.products']),
         );
 

@@ -92,6 +92,18 @@ final class RouteIdentity
     }
 
     /**
+     * Whether the callback name says what the route does.
+     *
+     * A handler this returns false for is named by method and path shape, which
+     * is what {@see RouteMethods} has to know before it decides whether one
+     * handler's verbs are one operation or several.
+     */
+    public static function recognizes(?string $callback): bool
+    {
+        return isset(self::CALLBACKS[$callback ?? '']);
+    }
+
+    /**
      * @param string|null $callback  The controller method serving the route.
      * @param bool        $addresses Whether the path ends in a parameter.
      */
@@ -119,7 +131,11 @@ final class RouteIdentity
      */
     public static function scoped(string $operation, string $parameter): string
     {
-        return sprintf('%s_by_%s', $operation, self::snake($parameter));
+        $scope = self::snake($parameter);
+
+        // A path with nothing to be scoped by keeps its name and lets the
+        // registry report the clash, which beats publishing `create_by_`.
+        return $scope === '' ? $operation : sprintf('%s_by_%s', $operation, $scope);
     }
 
     private static function camel(string $value): string

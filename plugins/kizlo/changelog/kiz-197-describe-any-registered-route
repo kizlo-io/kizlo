@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Describe routes no WP_REST_Controller serves, and let a namespace name its own APIs.

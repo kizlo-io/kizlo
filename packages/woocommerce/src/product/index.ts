@@ -27,8 +27,11 @@ export const PRODUCT_PROCEDURES = {
 				const result = await context.verifyPreviewToken(input.query.previewToken)
 				if (!result) throw errors.PRODUCT_NOT_FOUND()
 				const response = await context.wordpress.woocommerce.products.retrieve({ params: { id: Number(result.id) } })
+				// The handler codes below are not in the generated error union: a discovered route declares no handler
+				// errors, so the union narrows to WordPress's pre-dispatch codes. Widening the code is what lets the
+				// switches in this file keep handling them, and it goes away with KIZ-207, which registers them.
 				if (response.error) {
-					switch (response.error.code) {
+					switch (response.error.code as string) {
 						case "woocommerce_rest_product_invalid_id":
 							throw errors.PRODUCT_NOT_FOUND({ message: response.error.message })
 						default:
@@ -43,10 +46,10 @@ export const PRODUCT_PROCEDURES = {
 			const embeds = includeRecommendations ? { _embed: PRODUCT_EMBEDS } : {}
 			const response =
 				typeof identifier === "number"
-					? await context.wordpress.woocommerce.store.products.getById({ params: { id: identifier } }, { searchParams: embeds })
-					: await context.wordpress.woocommerce.store.products.getBySlug({ params: { slug: identifier } }, { searchParams: embeds })
+					? await context.wordpress.woocommerce.store.products.retrieve({ params: { id: identifier } }, { searchParams: embeds })
+					: await context.wordpress.woocommerce.store.products.retrieveBySlug({ params: { slug: identifier } }, { searchParams: embeds })
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					case "woocommerce_rest_product_invalid_id":
 					case "woocommerce_rest_product_invalid_slug":
 						throw errors.PRODUCT_NOT_FOUND({ message: response.error.message })
@@ -77,7 +80,7 @@ export const PRODUCT_PROCEDURES = {
 			const embeds = includeRecommendations ? { _embed: PRODUCT_EMBEDS } : {}
 			const response = await context.wordpress.woocommerce.store.products.list({ query: searchParams }, { searchParams: embeds })
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					default:
 						context.logger.error("List products unhandled error", response.error, { code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()
@@ -106,7 +109,7 @@ export const PRODUCT_PROCEDURES = {
 		},
 		async ({ context, errors, input }) => {
 			const searchParams = serializeProductListInput(input.query)
-			const response = await context.wordpress.woocommerce.store.products.collectionData({
+			const response = await context.wordpress.woocommerce.store.products.collectionData.retrieve({
 				query: {
 					...searchParams,
 					calculate_price_range: true,
@@ -120,7 +123,7 @@ export const PRODUCT_PROCEDURES = {
 				},
 			})
 			if (response.error) {
-				switch (response.error.code) {
+				switch (response.error.code as string) {
 					default:
 						context.logger.error("Filter products unhandled error", response.error, { code: response.error.code })
 						throw errors.INTERNAL_SERVER_ERROR()

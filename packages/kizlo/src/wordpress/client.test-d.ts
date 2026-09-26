@@ -250,23 +250,25 @@ describe("described WooCommerce routes", () => {
 	const wordpress = null as unknown as ActiveWordPressClient
 
 	it("carries the session headers on a cart call without putting them in the input", async () => {
-		expectTypeOf(await wordpress.woocommerce.store.cart.get({}, { headers: { "X-Kizlo-Guest-Token": "t_1" } })).toEqualTypeOf<
-			WP_EndpointResult<"woocommerce.store.cart.get">
+		expectTypeOf(await wordpress.woocommerce.store.cart.retrieve({}, { headers: { "X-Kizlo-Guest-Token": "t_1" } })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.retrieve">
 		>()
 		// @ts-expect-error the cart is named by a header, so the operation takes no parameters
-		await wordpress.woocommerce.store.cart.get({ query: { guest_token: "t_1" } })
+		await wordpress.woocommerce.store.cart.retrieve({ query: { guest_token: "t_1" } })
 	})
 
 	it("types each cart mutation with the arguments WooCommerce registered", async () => {
-		expectTypeOf(await wordpress.woocommerce.store.cart.addItem({ body: { id: 4, quantity: 2, variation: [] } })).toEqualTypeOf<
-			WP_EndpointResult<"woocommerce.store.cart.addItem">
+		expectTypeOf(await wordpress.woocommerce.store.cart.addItem.create({ body: { id: 4, quantity: 2, variation: [] } })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.addItem.create">
 		>()
-		expectTypeOf<WP_EndpointInput<"woocommerce.store.cart.updateItem">["body"]>().toHaveProperty("key")
-		expectTypeOf<WP_EndpointInput<"woocommerce.store.cart.applyCoupon">["body"]>().toHaveProperty("code")
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.cart.updateItem.create">["body"]>().toHaveProperty("key")
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.cart.applyCoupon.create">["body"]>().toHaveProperty("code")
 		// @ts-expect-error remove-item takes the item key, never the product ID
-		await wordpress.woocommerce.store.cart.removeItem({ body: { id: 4 } })
+		await wordpress.woocommerce.store.cart.removeItem.create({ body: { id: 4 } })
 		// Every cart route answers with the whole cart, which is what lets one deserializer serve them all.
-		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.addItem">>().toEqualTypeOf<WP_EndpointData<"woocommerce.store.cart.get">>()
+		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.addItem.create">>().toEqualTypeOf<
+			WP_EndpointData<"woocommerce.store.cart.retrieve">
+		>()
 	})
 
 	/**
@@ -277,15 +279,15 @@ describe("described WooCommerce routes", () => {
 	 */
 	it("refuses a cart mutation missing what its handler reads", async () => {
 		// @ts-expect-error the cart cannot add an unnamed product
-		await wordpress.woocommerce.store.cart.addItem({ quantity: 2 })
+		await wordpress.woocommerce.store.cart.addItem.create({ quantity: 2 })
 		// @ts-expect-error an update names the item it changes and the quantity to change it to
-		await wordpress.woocommerce.store.cart.updateItem({ key: "a1b2" })
+		await wordpress.woocommerce.store.cart.updateItem.create({ key: "a1b2" })
 		// @ts-expect-error removal is by item key, and there is no cart-wide default
-		await wordpress.woocommerce.store.cart.removeItem()
+		await wordpress.woocommerce.store.cart.removeItem.create()
 		// @ts-expect-error both coupon operations name a code
-		await wordpress.woocommerce.store.cart.applyCoupon()
+		await wordpress.woocommerce.store.cart.applyCoupon.create()
 		// @ts-expect-error and neither treats an absent one as "whichever is applied"
-		await wordpress.woocommerce.store.cart.removeCoupon()
+		await wordpress.woocommerce.store.cart.removeCoupon.create()
 	})
 
 	/**
@@ -293,14 +295,14 @@ describe("described WooCommerce routes", () => {
 	 * every optional Woo argument: these calls are meaningful with nothing in them and stay callable.
 	 */
 	it("leaves an operation callable when its arguments really are optional", async () => {
-		expectTypeOf(await wordpress.woocommerce.store.cart.get()).toEqualTypeOf<WP_EndpointResult<"woocommerce.store.cart.get">>()
-		expectTypeOf(await wordpress.woocommerce.store.cart.updateCustomer()).toEqualTypeOf<
-			WP_EndpointResult<"woocommerce.store.cart.updateCustomer">
+		expectTypeOf(await wordpress.woocommerce.store.cart.retrieve()).toEqualTypeOf<WP_EndpointResult<"woocommerce.store.cart.retrieve">>()
+		expectTypeOf(await wordpress.woocommerce.store.cart.updateCustomer.create()).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.updateCustomer.create">
 		>()
 		// `CartController::add_to_cart()` fills a null quantity with the product's minimum, and a
 		// variation only means anything on a variable product, so neither is required alongside the ID.
-		expectTypeOf(await wordpress.woocommerce.store.cart.addItem({ body: { id: 4 } })).toEqualTypeOf<
-			WP_EndpointResult<"woocommerce.store.cart.addItem">
+		expectTypeOf(await wordpress.woocommerce.store.cart.addItem.create({ body: { id: 4 } })).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.cart.addItem.create">
 		>()
 	})
 
@@ -312,15 +314,15 @@ describe("described WooCommerce routes", () => {
 		await wordpress.woocommerce.store.products.list({ query: { stock_status: ["nonsense"] } })
 		// @ts-expect-error `context` is undeclared, so no caller can reshape the response
 		await wordpress.woocommerce.store.products.list({ query: { context: "edit" } })
-		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.products.collectionData">["query"]>>().toHaveProperty(
+		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.products.collectionData.retrieve">["query"]>>().toHaveProperty(
 			"calculate_price_range",
 		)
 		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.products.list">["query"]>["date_column"]>().toEqualTypeOf<
 			"date" | "date_gmt" | "modified" | "modified_gmt" | undefined
 		>()
-		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.products.collectionData">["query"]>["date_column"]>().toEqualTypeOf<
-			"date" | "date_gmt" | "modified" | "modified_gmt" | undefined
-		>()
+		expectTypeOf<
+			NonNullable<WP_EndpointInput<"woocommerce.store.products.collectionData.retrieve">["query"]>["date_column"]
+		>().toEqualTypeOf<"date" | "date_gmt" | "modified" | "modified_gmt" | undefined>()
 	})
 
 	it("types the pagination headers resolveList reads off a product page", () => {
@@ -334,16 +336,18 @@ describe("described WooCommerce routes", () => {
 
 	it("separates updating a checkout from submitting one", () => {
 		// WooCommerce honours this without registering it, so it is described by hand or not at all.
-		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["body"]>>().toHaveProperty("__experimental_calc_totals")
-		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.checkout.process">["body"]>>().toHaveProperty("payment_data")
+		expectTypeOf<"__experimental_calc_totals">().toExtend<
+			keyof NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["body"]>
+		>()
+		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.checkout.create">["body"]>>().toHaveProperty("payment_data")
 		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["body"]>>().not.toHaveProperty("payment_data")
 		// Returned by both checkout responses and declared by neither.
-		expectTypeOf<WP_EndpointData<"woocommerce.store.checkout.get">>().toHaveProperty("__experimentalCart")
+		expectTypeOf<WP_EndpointData<"woocommerce.store.checkout.retrieve">>().toHaveProperty("__experimentalCart")
 	})
 
 	it("substitutes the order into the path a retry is paid on", async () => {
 		const order = {
-			params: { id: 12 },
+			params: { id: "12" },
 			body: {
 				key: "wc_order_x",
 				billing_address: {} as never,
@@ -352,13 +356,12 @@ describe("described WooCommerce routes", () => {
 			},
 		}
 
-		expectTypeOf(await wordpress.woocommerce.store.checkout.processOrder(order)).toEqualTypeOf<
-			WP_EndpointResult<"woocommerce.store.checkout.processOrder">
+		expectTypeOf(await wordpress.woocommerce.store.checkout.updateById(order)).toEqualTypeOf<
+			WP_EndpointResult<"woocommerce.store.checkout.updateById">
 		>()
-		// @ts-expect-error WooCommerce matches digits only on this route
-		await wordpress.woocommerce.store.checkout.processOrder({ ...order, params: { id: "12" } })
+		expectTypeOf<WP_EndpointInput<"woocommerce.store.checkout.updateById">["params"]["id"]>().toEqualTypeOf<string>()
 		// @ts-expect-error the order is required, since it is the path
-		await wordpress.woocommerce.store.checkout.processOrder({ key: "wc_order_x" })
+		await wordpress.woocommerce.store.checkout.updateById({ key: "wc_order_x" })
 	})
 
 	it("reaches the REST v3 routes the Store API has no answer for", async () => {
@@ -395,7 +398,7 @@ describe("described WooCommerce routes", () => {
 		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.customers.delete">["query"]>>().toHaveProperty("reassign")
 		expectTypeOf<NonNullable<WP_EndpointInput<"woocommerce.products.delete">["query"]>>().not.toHaveProperty("reassign")
 		// A delete answers with what it removed rather than a deletion envelope.
-		expectTypeOf<WP_EndpointData<"woocommerce.customers.delete">>().toHaveProperty("email")
+		expectTypeOf<"email">().toExtend<keyof WP_EndpointData<"woocommerce.customers.delete">>()
 		expectTypeOf(await wordpress.woocommerce.customers.delete({ params: { id: 2 }, query: { force: true, reassign: 1 } })).toEqualTypeOf<
 			WP_EndpointResult<"woocommerce.customers.delete">
 		>()
@@ -412,8 +415,8 @@ describe("described WooCommerce routes", () => {
 		// @ts-expect-error the removed merge endpoint no longer contributes a cart subtree
 		wordpress.woocommerce.kizlo.cart
 		expectTypeOf<WP_EndpointResult<"woocommerce.kizlo.orders.manageStock">>().not.toBeNever()
-		expectTypeOf<WP_EndpointResult<"woocommerce.store.cart.get">>().not.toBeNever()
-		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.get">>().not.toHaveProperty("guest_token")
+		expectTypeOf<WP_EndpointResult<"woocommerce.store.cart.retrieve">>().not.toBeNever()
+		expectTypeOf<WP_EndpointData<"woocommerce.store.cart.retrieve">>().not.toHaveProperty("guest_token")
 	})
 })
 
@@ -424,7 +427,9 @@ describe("described WooCommerce routes", () => {
  * division from both ends, so moving a code between them cannot pass unnoticed.
  */
 describe("error codes on a generated call", () => {
-	type CodeOn<TPath extends WP_EndpointPath> = Extract<WP_EndpointResult<TPath>, { data: null }>["error"]["code"]
+	// Addressed through the endpoint's own error type rather than by extracting `data: null`, because
+	// a route that answers 204 has no body and its success carries null data too.
+	type CodeOn<TPath extends WP_EndpointPath> = WP_EndpointError<TPath>["code"]
 	/** An endpoint declaring nothing of its own, so its codes are the common bucket exactly. */
 	type CommonCode = Extract<WP_Result<{ id: number }, never>, { data: null }>["error"]["code"]
 

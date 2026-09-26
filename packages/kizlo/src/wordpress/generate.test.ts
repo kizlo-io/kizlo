@@ -115,6 +115,51 @@ describe("generateWordPressClient", () => {
 		expect(first).toContain('"taxonomies.genre": WP_TaxonomiesGenreItem["kizlo"]["custom"]')
 	})
 
+	test("generates a prefixed nested API with an opaque response", () => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		document.apis["woocommerce.store.cart.extensions"] = {
+			namespace: "wc/store/v1",
+			paths: {
+				"/cart/extensions": {
+					create: {
+						method: "POST",
+						errors: [],
+						input: {},
+						responses: {
+							"200": {
+								content_type: "application/json",
+								body: { type: "object", additionalProperties: true },
+							},
+						},
+					},
+				},
+			},
+		}
+
+		const client = generateWordPressClient(document)
+
+		expect(client).toContain("woocommerce: {")
+		expect(client).toContain("store: {")
+		expect(client).toContain("cart: {")
+		expect(client).toContain("extensions: {")
+		expect(client).toContain(
+			"export type WP_WoocommerceStoreCartExtensionsCreateEndpointResult =\n\t| WP_Success<{\n\t[key: string]: unknown\n}, 200, Record<string, never>>",
+		)
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": client,
+				"usage.ts": `import type { WordPressClient } from "./wordpress"
+				declare const wordpress: WordPressClient
+				wordpress.woocommerce.store.cart.extensions.create().then((response) => {
+					if (response.error === null) {
+						const data: Record<string, unknown> = response.data
+					}
+				})`,
+			}),
+		).toEqual([])
+	})
+
 	test("skips a managed-content name that carries no kizlo envelope", () => {
 		// `post-types.` and `taxonomies.` are not reserved, so a third-party schema can
 		// take the shape of a name without the `kizlo.custom` block the entry indexes.
