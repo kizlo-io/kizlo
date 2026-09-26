@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { IntrospectionDocument } from "../../wordpress/introspection"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
-import { toJsonSchema } from "./schema"
+import { inputJsonSchema, toJsonSchema } from "./schema"
 
 const document = INTROSPECTION_FIXTURE
 
@@ -42,12 +42,14 @@ describe("toJsonSchema", () => {
 		expect(result.required).toEqual(expect.arrayContaining(["created_by", "id", "status"]))
 	})
 
-	it("resolves `$ref` and inlines what it names", () => {
+	it("points a `$ref` at a definition rather than copying what it names", () => {
 		const result = convert("acme.choice")
 		const [book, text] = result.oneOf as Record<string, unknown>[]
+		const defs = result.$defs as Record<string, Record<string, unknown>>
 
-		expect(book).not.toHaveProperty("$ref")
-		expect(Object.keys(book?.properties as Record<string, unknown>)).toContain("status")
+		expect(book).toEqual({ $ref: "#/$defs/acme.book" })
+		// The definition is the whole shape, `$extends` bases flattened into it as before.
+		expect(Object.keys(defs["acme.book"]?.properties as Record<string, unknown>)).toContain("status")
 		expect(text?.type).toEqual(["string", "null"])
 	})
 
@@ -85,16 +87,16 @@ describe("toJsonSchema", () => {
 		expect(properties.label).toEqual({ type: ["string", "null"], description: "Display label." })
 	})
 
-	it("widens a nullable $ref to the type it resolves to", () => {
+	it("unions a nullable `$ref`, which carries a pointer and no type to widen", () => {
 		const extended: IntrospectionDocument = {
 			...document,
 			schemas: { ...document.schemas, "acme.maybe-entity": { $ref: "acme.entity", nullable: true } },
 		}
 		const result = toJsonSchema(extended.schemas["acme.maybe-entity"] as never, extended)
+		const defs = result.$defs as Record<string, Record<string, unknown>>
 
-		// The reference resolves to an object, and that is the type that has to accept null.
-		expect(result.type).toEqual(["object", "null"])
-		expect(Object.keys(result.properties as Record<string, unknown>)).toEqual(["id", "label"])
+		expect(result.anyOf).toEqual([{ $ref: "#/$defs/acme.entity" }, { type: "null" }])
+		expect(Object.keys(defs["acme.entity"]?.properties as Record<string, unknown>)).toEqual(["id", "label"])
 	})
 
 	it("unions a nullable combinator, which has no type of its own to widen", () => {
@@ -134,7 +136,7 @@ describe("toJsonSchema", () => {
 		expect(result.required).toEqual(expect.arrayContaining(["id", "label"]))
 	})
 
-	it("stops at a schema that reaches itself instead of recursing forever", () => {
+	it("describes a schema that reaches itself as one definition pointing at itself", () => {
 		const cyclic: IntrospectionDocument = {
 			...document,
 			schemas: {
@@ -142,18 +144,121 @@ describe("toJsonSchema", () => {
 			},
 		}
 		const result = toJsonSchema(cyclic.schemas["acme.node"] as never, cyclic)
-		const child = (result.properties as Record<string, unknown>).child as Record<string, unknown>
+		const node = (result.$defs as Record<string, Record<string, unknown>>)["acme.node"] as Record<string, unknown>
 
 		expect(result.required).toEqual(["name"])
-		// The reference is followed once and then stops: the id is only marked seen as it is resolved,
-		// so the first hop expands and the one inside it closes the loop.
-		expect(child.required).toEqual(["name"])
-		expect((child.properties as Record<string, unknown>).child).toEqual({})
+		// A pointer at every depth, so the child contract stays complete however far it nests rather
+		// than bottoming out in an empty schema.
+		expect((result.properties as Record<string, unknown>).child).toEqual({ $ref: "#/$defs/acme.node" })
+		expect(node.required).toEqual(["name"])
+		expect((node.properties as Record<string, unknown>).child).toEqual({ $ref: "#/$defs/acme.node" })
 	})
 
-	it("returns an empty schema for a reference the document does not define", () => {
-		const dangling: IntrospectionDocument = { ...document, schemas: { "acme.dangling": { $ref: "acme.absent" } } }
+	it("describes mutually recursive definitions without inlining either", () => {
+		const mutual: IntrospectionDocument = {
+			...document,
+			schemas: {
+				"acme.parent": { type: "object", properties: { child: { $ref: "acme.child" } } },
+				"acme.child": { type: "object", properties: { parent: { $ref: "acme.parent" } } },
+			},
+		}
+		const result = toJsonSchema(mutual.schemas["acme.parent"] as never, mutual)
+		const defs = result.$defs as Record<string, Record<string, unknown>>
+		const child = defs["acme.child"] as Record<string, unknown>
+		const parent = defs["acme.parent"] as Record<string, unknown>
 
-		expect(toJsonSchema(dangling.schemas["acme.dangling"] as never, dangling)).toEqual({})
+		expect((result.properties as Record<string, unknown>).child).toEqual({ $ref: "#/$defs/acme.child" })
+		expect((child.properties as Record<string, unknown>).parent).toEqual({ $ref: "#/$defs/acme.parent" })
+		expect((parent.properties as Record<string, unknown>).child).toEqual({ $ref: "#/$defs/acme.child" })
+	})
+
+	it("keeps a recursive child contract complete at every nesting depth", () => {
+		const nested: IntrospectionDocument = {
+			...document,
+			schemas: {
+				"kizlo.custom-field": {
+					type: "object",
+					properties: {
+						name: { type: "string", required: true },
+						fields: { type: "array", items: { $ref: "kizlo.custom-field" } },
+					},
+				},
+			},
+		}
+		const result = toJsonSchema(nested.schemas["kizlo.custom-field"] as never, nested)
+		const defs = result.$defs as Record<string, Record<string, unknown>>
+		const field = defs["kizlo.custom-field"] as Record<string, unknown>
+		const fields = (field.properties as Record<string, Record<string, unknown>>).fields as Record<string, unknown>
+
+		// The group and repeater case: the items pointer resolves back to a definition that still
+		// declares `name`, where inlining used to hand back `{}` below the first level.
+		expect(fields.items).toEqual({ $ref: "#/$defs/kizlo.custom-field" })
+		expect(field.required).toEqual(["name"])
+	})
+
+	it("forwards every validation keyword the contract publishes", () => {
+		const bounded: IntrospectionDocument = {
+			...document,
+			schemas: {
+				"acme.bounded": {
+					type: "object",
+					properties: {
+						when: { type: "string", format: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$", minLength: 10, maxLength: 10 },
+						count: { type: "number", minimum: 1, maximum: 9, multipleOf: 0.5, exclusiveMinimum: true, exclusiveMaximum: false },
+						rows: { type: "array", minItems: 1, maxItems: 20, uniqueItems: true, items: { type: "string" } },
+						meta: { type: "object", minProperties: 1, maxProperties: 4 },
+					},
+				},
+			},
+		}
+		const converted = toJsonSchema(bounded.schemas["acme.bounded"] as never, bounded)
+		const properties = converted.properties as Record<string, Record<string, unknown>>
+
+		expect(properties.when).toMatchObject({ pattern: "^\\d{4}-\\d{2}-\\d{2}$", minLength: 10, maxLength: 10, format: "date" })
+		expect(properties.count).toMatchObject({ minimum: 1, maximum: 9, multipleOf: 0.5, exclusiveMinimum: true, exclusiveMaximum: false })
+		expect(properties.rows).toMatchObject({ minItems: 1, maxItems: 20, uniqueItems: true })
+		expect(properties.meta).toMatchObject({ minProperties: 1, maxProperties: 4 })
+	})
+
+	it("leaves a reference the document does not define inlined, with nothing to point at", () => {
+		const dangling: IntrospectionDocument = { ...document, schemas: { "acme.dangling": { $ref: "acme.absent" } } }
+		const result = toJsonSchema(dangling.schemas["acme.dangling"] as never, dangling)
+
+		expect(result).toEqual({})
+		expect(result).not.toHaveProperty("$defs")
+	})
+})
+
+describe("inputJsonSchema", () => {
+	it("emits a definition two request parts reach once, at the composed root", () => {
+		const shared: IntrospectionDocument = {
+			...document,
+			schemas: { ...document.schemas, "acme.filter": { type: "object", properties: { term: { type: "string" } } } },
+		}
+		const result = inputJsonSchema(
+			{
+				query: { type: "object", properties: { filter: { $ref: "acme.filter" } } },
+				body: { type: "object", properties: { filter: { $ref: "acme.filter" } } },
+			},
+			shared,
+		)
+		const properties = result.properties as Record<string, Record<string, unknown>>
+		const query = properties.query as Record<string, unknown>
+		const body = properties.body as Record<string, unknown>
+
+		expect((query.properties as Record<string, unknown>).filter).toEqual({ $ref: "#/$defs/acme.filter" })
+		expect((body.properties as Record<string, unknown>).filter).toEqual({ $ref: "#/$defs/acme.filter" })
+		expect(Object.keys(result.$defs as Record<string, unknown>)).toEqual(["acme.filter"])
+	})
+
+	it("demands a part whose requirements arrive through a reference", () => {
+		const referenced: IntrospectionDocument = {
+			...document,
+			schemas: { ...document.schemas, "acme.identified": { type: "object", properties: { id: { type: "string", required: true } } } },
+		}
+		const result = inputJsonSchema({ params: { type: "object", $ref: "acme.identified" } }, referenced)
+
+		// The part carries a pointer now, so its `required` list lives in `$defs` rather than on it.
+		expect(result.required).toEqual(["params"])
 	})
 })

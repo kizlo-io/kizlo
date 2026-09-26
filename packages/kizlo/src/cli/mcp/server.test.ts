@@ -1,7 +1,17 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import { isAllowedOrigin, MCP_HOST, MCP_PATH, type McpServerHandle, startMcpServer } from "./server"
 import type { McpState } from "./state"
+
+/** What a `tools/call` answers with, as far as these tests read it. */
+interface ToolCallPayload {
+	error?: { code: number; message: string }
+	result?: {
+		content?: { type: string; text: string }[]
+		structuredContent?: unknown
+		isError?: boolean
+	}
+}
 
 describe("isAllowedOrigin", () => {
 	it("allows a request that sends no Origin, which is what a native MCP client does", () => {
@@ -30,7 +40,23 @@ describe("startMcpServer", () => {
 	afterEach(async () => {
 		await handle?.stop()
 		handle = undefined
+		vi.unstubAllGlobals()
 	})
+
+	/** Answer WordPress, and let the loopback requests these tests make through untouched. */
+	function stubWordPress(body: unknown, status = 200): void {
+		const real = globalThis.fetch
+		vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+			const url = input instanceof Request ? input.url : String(input)
+			if (!url.includes("wp.example")) return real(input as never, init)
+			return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
+		})
+	}
+
+	async function callTool(url: string, id: number, name: string, args: Record<string, unknown> = {}): Promise<ToolCallPayload> {
+		const response = await post(url, { jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } })
+		return (await response.json()) as ToolCallPayload
+	}
 
 	const state: McpState = { document: INTROSPECTION_FIXTURE, credentials: { url: "https://wp.example", username: "a", password: "b" } }
 
@@ -122,24 +148,123 @@ describe("startMcpServer", () => {
 		await handshake(handle.url)
 
 		const response = await post(handle.url, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} })
-		const payload = (await response.json()) as { result: { tools: { name: string }[] } }
+		const payload = (await response.json()) as { result: { tools: { name: string; outputSchema?: unknown }[] } }
+		const tools = payload.result.tools
 
-		expect(payload.result.tools.map((tool) => tool.name).sort()).toEqual(["kizlo_call", "kizlo_describe_route", "kizlo_list_routes"])
+		expect(tools.map((tool) => tool.name).sort()).toEqual(["kizlo_call", "kizlo_describe_route", "kizlo_search_routes"])
+		// Every one declares what it answers with, which is what makes `structuredContent` readable.
+		expect(tools.every((tool) => tool.outputSchema !== undefined)).toBe(true)
 	})
 
 	it("runs a tool over the transport", async () => {
 		handle = await startMcpServer(state, { port: 0 })
 		await handshake(handle.url)
 
-		const response = await post(handle.url, {
-			jsonrpc: "2.0",
-			id: 3,
-			method: "tools/call",
-			params: { name: "kizlo_list_routes", arguments: { namespace: "kizlo/v1" } },
-		})
-		const payload = (await response.json()) as { result: { content: { text: string }[] } }
+		const payload = await callTool(handle.url, 3, "kizlo_search_routes", { namespace: "kizlo/v1" })
 
-		expect(JSON.parse(payload.result.content[0]?.text ?? "{}")).toMatchObject({ count: 4 })
+		expect(payload.result?.structuredContent).toMatchObject({ count: 4 })
+	})
+
+	it("answers a search as both structured content and a summary a reader can use", async () => {
+		handle = await startMcpServer(state, { port: 0 })
+		await handshake(handle.url)
+
+		const payload = await callTool(handle.url, 6, "kizlo_search_routes", { query: "replace" })
+		const text = payload.result?.content?.[0]?.text ?? ""
+
+		expect(payload.result?.structuredContent).toMatchObject({ count: 1 })
+		// The one result worth compressing: prose rather than the JSON the other two return.
+		expect(text).toContain("shipping.zoneLocations.update")
+		expect(() => JSON.parse(text)).toThrow()
+	})
+
+	it("returns a successful call as structured content and text, and the SDK accepts it", async () => {
+		stubWordPress({ id: 7, title: "A book" })
+		handle = await startMcpServer(state, { port: 0 })
+		await handshake(handle.url)
+
+		const payload = await callTool(handle.url, 7, "kizlo_call", {
+			route: "postTypes.book.retrieve",
+			input: { params: { identifier: "a-book" } },
+		})
+
+		expect(payload.error).toBeUndefined()
+		expect(payload.result?.isError).toBeFalsy()
+		expect(payload.result?.structuredContent).toMatchObject({ status: 200, data: { id: 7 } })
+		expect(JSON.parse(payload.result?.content?.[0]?.text ?? "{}")).toMatchObject({ status: 200 })
+	})
+
+	it("passes output validation for a route whose response is not an object", async () => {
+		// The declared output schema is deliberately permissive: an array body would otherwise turn a
+		// working route call into a protocol error rather than an answer.
+		stubWordPress([{ code: "GB" }, { code: "FR" }])
+		handle = await startMcpServer(state, { port: 0 })
+		await handshake(handle.url)
+
+		const payload = await callTool(handle.url, 8, "kizlo_call", {
+			route: "shipping.zoneLocations.update",
+			input: { params: { zone_id: 3 }, body: [{ code: "GB" }] },
+		})
+
+		expect(payload.error).toBeUndefined()
+		expect(payload.result?.structuredContent).toMatchObject({ status: 200, data: [{ code: "GB" }, { code: "FR" }] })
+	})
+
+	it("keeps a failed call an error, with what WordPress refused still readable", async () => {
+		stubWordPress({ code: "rest_not_found", message: "No book.", data: { status: 404 } }, 404)
+		handle = await startMcpServer(state, { port: 0 })
+		await handshake(handle.url)
+
+		const payload = await callTool(handle.url, 9, "kizlo_call", {
+			route: "postTypes.book.retrieve",
+			input: { params: { identifier: "gone" } },
+		})
+
+		expect(payload.result?.isError).toBe(true)
+		// A summary first, then the failure itself, so a reader and a parser both get what they need.
+		expect(payload.result?.content?.[0]?.text).toContain("rest_not_found")
+		expect(JSON.parse(payload.result?.content?.[1]?.text ?? "{}")).toMatchObject({
+			kind: "response",
+			route: "postTypes.book.retrieve",
+			method: "GET",
+			status: 404,
+			error: { code: "rest_not_found", message: "No book.", data: { status: 404 } },
+		})
+	})
+
+	/**
+	 * A client validates `structuredContent` against the tool's declared output schema whether or not
+	 * the result is an error, so a failure put there is rejected outright rather than read. Every tool
+	 * here declares an output schema, so none of them may answer a failure that way.
+	 */
+	it("leaves structuredContent off a failure, whichever tool failed", async () => {
+		stubWordPress({ code: "rest_not_found", message: "No book." }, 404)
+		handle = await startMcpServer(state, { port: 0 })
+		await handshake(handle.url)
+
+		const failures = [
+			await callTool(handle.url, 10, "kizlo_call", { route: "postTypes.book.nope" }),
+			await callTool(handle.url, 11, "kizlo_call", { route: "postTypes.book.retrieve", input: {} }),
+			await callTool(handle.url, 12, "kizlo_call", { route: "postTypes.book.retrieve", input: { params: { identifier: "gone" } } }),
+			await callTool(handle.url, 13, "kizlo_describe_route", { route: "postTypes.book.nope" }),
+		]
+
+		for (const failure of failures) {
+			expect(failure.result?.isError).toBe(true)
+			expect(failure.result?.structuredContent).toBeUndefined()
+			expect(JSON.parse(failure.result?.content?.[1]?.text ?? "{}").kind).toMatch(/^(request|response)$/)
+		}
+	})
+
+	it("reports a missing document as a failure from the search tool too", async () => {
+		handle = await startMcpServer({ credentials: { url: "https://wp.example", username: "a", password: "b" } }, { port: 0 })
+		await handshake(handle.url)
+
+		const payload = await callTool(handle.url, 14, "kizlo_search_routes", {})
+
+		expect(payload.result?.isError).toBe(true)
+		expect(payload.result?.structuredContent).toBeUndefined()
+		expect(JSON.parse(payload.result?.content?.[1]?.text ?? "{}")).toMatchObject({ kind: "request" })
 	})
 
 	it("keeps serving across a watcher reload, on the same socket and the current state", async () => {
@@ -153,12 +278,8 @@ describe("startMcpServer", () => {
 		const { url, port } = handle
 		await handshake(url)
 
-		const before = await post(url, { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "kizlo_list_routes", arguments: {} } })
-		expect(
-			JSON.parse(((await before.json()) as { result: { content: { text: string }[] } }).result.content[0]?.text ?? "{}"),
-		).toMatchObject({
-			count: 5,
-		})
+		const before = await callTool(url, 4, "kizlo_search_routes")
+		expect(before.result?.structuredContent).toMatchObject({ count: 5 })
 
 		reloadable.document = {
 			...INTROSPECTION_FIXTURE,
@@ -175,12 +296,12 @@ describe("startMcpServer", () => {
 		}
 
 		// Same URL, same port, no second handshake: the socket never moved.
-		const after = await post(url, { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "kizlo_list_routes", arguments: {} } })
-		const payload = JSON.parse(((await after.json()) as { result: { content: { text: string }[] } }).result.content[0]?.text ?? "{}")
+		const after = await callTool(url, 5, "kizlo_search_routes")
+		const structured = after.result?.structuredContent as { count: number; routes: { name: string }[] }
 
 		expect(handle.port).toBe(port)
-		expect(payload).toMatchObject({ count: 1 })
-		expect(payload.routes[0].name).toBe("postTypes.magazine.list")
+		expect(structured).toMatchObject({ count: 1 })
+		expect(structured.routes[0]?.name).toBe("postTypes.magazine.list")
 	})
 
 	it("stops listening once the session ends", async () => {
