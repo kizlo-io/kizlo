@@ -42,6 +42,20 @@ final class DefinitionSchemas
     }
 
     /**
+     * What supplying `custom_fields` does.
+     *
+     * Write-only advice, so it is stated here rather than on the shared custom-field schema: a read
+     * response has no use for it. That same sharing is why this wording covers every level itself.
+     * The nested `fields` arrays come from {@see SettingsSchemas::nestedFields()} inside
+     * `kizlo.custom-field`, which both the read responses and this input reference, so there is no
+     * separate place to describe them without putting write advice on reads.
+     */
+    private const CUSTOM_FIELDS_REPLACEMENT = 'When supplied, this array replaces the complete ordered '
+        . 'custom-field collection, at every level: a group\'s or repeater\'s `fields` array likewise '
+        . 'replaces that container\'s children. Existing fields omitted from the array are removed. '
+        . 'Omit `custom_fields` to leave the collection unchanged.';
+
+    /**
      * @param string[] $readOnly
      * @return array<string, mixed>
      */
@@ -51,6 +65,10 @@ final class DefinitionSchemas
 
         $definition = SettingsSchemas::optionalProperties($definitionId);
         unset($definition['key']);
+
+        if (isset($settings['custom_fields'])) {
+            $settings['custom_fields']['description'] = self::CUSTOM_FIELDS_REPLACEMENT;
+        }
 
         return [
             'type'       => 'object',

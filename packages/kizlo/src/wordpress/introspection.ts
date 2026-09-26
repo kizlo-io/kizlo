@@ -21,6 +21,24 @@ export interface IntrospectionSchema {
 	default?: unknown
 	enum?: unknown[]
 	format?: string
+	/**
+	 * The validation keywords the Kizlo schema standard carries, as `SchemaCoercer` accepts them on
+	 * the WordPress side. Declared rather than left to pass through the loose object, so a consumer
+	 * that forwards them is type-checked against what the contract can actually publish.
+	 */
+	pattern?: string
+	minLength?: number
+	maxLength?: number
+	minItems?: number
+	maxItems?: number
+	minProperties?: number
+	maxProperties?: number
+	minimum?: number
+	maximum?: number
+	multipleOf?: number
+	uniqueItems?: boolean
+	exclusiveMinimum?: boolean
+	exclusiveMaximum?: boolean
 	properties?: Record<string, IntrospectionSchema>
 	items?: IntrospectionSchema
 	$ref?: string
@@ -93,6 +111,19 @@ const schema: z.ZodType<IntrospectionSchema> = z.lazy(() =>
 			default: z.unknown().optional(),
 			enum: z.array(z.unknown()).optional(),
 			format: z.string().optional(),
+			pattern: z.string().optional(),
+			minLength: z.number().optional(),
+			maxLength: z.number().optional(),
+			minItems: z.number().optional(),
+			maxItems: z.number().optional(),
+			minProperties: z.number().optional(),
+			maxProperties: z.number().optional(),
+			minimum: z.number().optional(),
+			maximum: z.number().optional(),
+			multipleOf: z.number().optional(),
+			uniqueItems: z.boolean().optional(),
+			exclusiveMinimum: z.boolean().optional(),
+			exclusiveMaximum: z.boolean().optional(),
 			properties: z.record(z.string(), schema).optional(),
 			items: schema.optional(),
 			$ref: z.string().min(1).optional(),

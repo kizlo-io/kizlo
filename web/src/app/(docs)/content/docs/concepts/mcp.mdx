@@ -8,7 +8,7 @@ An AI agent working on your project can read your code, but it can't ask your Wo
 know which routes exist, what arguments they take, or what a real response looks like. So it guesses.
 
 `kizlo dev` serves an [MCP](https://modelcontextprotocol.io) endpoint that closes that gap. Point your agent at
-it and it can list every route your WordPress serves, read the JSON Schema for any of them, and call them.
+it and it can search every route your WordPress serves, read the full contract for any of them, and call them.
 
 ```package-install
 npx kizlo dev
@@ -38,16 +38,28 @@ routes, and their schemas would fill an agent's context before it did any work.
 
 | Tool | What it does |
 | --- | --- |
-| `kizlo_list_routes` | Lists every route, with its method and summary. Takes an optional `namespace` filter |
-| `kizlo_describe_route` | Returns the JSON Schema for one route's arguments |
+| `kizlo_search_routes` | Ranks routes against a query, or browses them all when you omit one. Filters by namespace, method, and read or write, and pages with a cursor |
+| `kizlo_describe_route` | Returns one route's full contract: argument schemas, response schemas per status, and declared error codes |
 | `kizlo_call` | Runs a route against your WordPress and returns the response |
+
+An agent works through them in that order: search for a route, describe it, call it.
+
+Search covers more than route names. It indexes paths, namespaces, summaries, descriptions, error codes, and the
+property names inside a route's arguments and responses, so "create product custom fields" finds
+`kizlo.settings.postTypes.update` without anyone knowing to look there. Each result names the evidence that
+selected it, so an agent can tell a route matched on its own name from one that matched on a field buried in a
+response.
 
 Route names match the [client](/docs/concepts/client) you write against, so `kizlo.postTypes.book.list` is the same
 route in a tool result and in your code.
 
 Routes come from the same [introspection](/docs/concepts/introspection) document the contract watcher already
 polls, refreshed every few seconds. Register a post type in WordPress while `kizlo dev` is running and its
-routes show up in the next listing, with no restart.
+routes show up in the next search, with no restart.
+
+Results come back as structured content as well as text, so a harness that parses tool output reads the ranked
+list, the schemas, and the response body directly. When WordPress refuses a call, its error code, message, and
+`data` are passed through unchanged rather than flattened into a sentence.
 
 ## Connecting your agent
 
