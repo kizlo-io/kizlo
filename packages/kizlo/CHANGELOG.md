@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.22.1
+
+### Patch Changes
+
+- [#253](https://github.com/kizlo-io/kizlo/pull/253) [`18a333f`](https://github.com/kizlo-io/kizlo/commit/18a333fb4cde3ce72b4297bbd6a8b1752abe7f01) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Boot local WordPress when Headless Mode's login rename is on, and print the login URL it serves.
+
 ## 0.22.0
 
 ### Minor Changes
