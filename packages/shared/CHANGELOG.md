@@ -1,5 +1,11 @@
 # @kizlo/shared
 
+## 0.10.0
+
+### Minor Changes
+
+- [#251](https://github.com/kizlo-io/kizlo/pull/251) [`d1dca79`](https://github.com/kizlo-io/kizlo/commit/d1dca79951361386ce207583a7efb6a1fdbe3a79) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Identify a custom field by its name and drop the generated key.
+
 ## 0.9.0
 
 ### Minor Changes
