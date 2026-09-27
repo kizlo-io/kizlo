@@ -9,7 +9,6 @@ function accepts(definition: CustomFieldDefinition, value: unknown): boolean {
 describe("custom field content constraints", () => {
 	it("enforces Number minimum, maximum, and step", () => {
 		const number: CustomFieldDefinition = {
-			key: "field_number",
 			name: "score",
 			label: "Score",
 			instructions: "",
@@ -29,7 +28,6 @@ describe("custom field content constraints", () => {
 
 	it("rejects impossible dates and accepts a real leap day", () => {
 		const date: CustomFieldDefinition = {
-			key: "field_date",
 			name: "launch",
 			label: "Launch",
 			instructions: "",
@@ -45,7 +43,6 @@ describe("custom field content constraints", () => {
 
 	it("requires one populated descendant in a required Group", () => {
 		const group: CustomFieldDefinition = {
-			key: "field_group",
 			name: "details",
 			label: "Details",
 			instructions: "",
@@ -53,7 +50,6 @@ describe("custom field content constraints", () => {
 			type: "group",
 			fields: [
 				{
-					key: "field_note",
 					name: "note",
 					label: "Note",
 					instructions: "",

@@ -13,7 +13,7 @@ import {
 } from "@/shared/components/fields"
 import { Button } from "@/shared/components/ui/button"
 import { cn } from "@/shared/lib/utils"
-import { changeDefinitionType, newDefinition, persistedDefinitionKeys } from "./definition"
+import { changeDefinitionType, newDefinition } from "./definition"
 
 const TYPE_OPTIONS: { value: CustomFieldType; label: string }[] = [
 	{ value: "text", label: "Text" },
@@ -48,10 +48,42 @@ export function CustomFieldsBuilder<TInput extends FieldValues, TContext, TOutpu
 }) {
 	const looseControl = control as unknown as Control<any>
 	const { defaultValues } = useFormState({ control: looseControl, name })
-	const persistedDefinitions = get(defaultValues, name) as CustomFieldDefinition[] | undefined
-	const persistedKeys = persistedDefinitionKeys(persistedDefinitions)
+	const persisted = get(defaultValues, name) as CustomFieldDefinition[] | undefined
 
-	return <BuilderList control={looseControl} name={name} persistedKeys={persistedKeys} />
+	return <BuilderList control={looseControl} name={name} persisted={persisted} />
+}
+
+/**
+ * The saved children of a container, looked up by the container's own name.
+ * Names are unique within a level and locked once saved, so the name is what
+ * survives reordering. A container with no saved match is newly added, so its
+ * children are all new too.
+ */
+function persistedChildrenOf(persisted: CustomFieldDefinition[] | undefined, name: string): CustomFieldDefinition[] | undefined {
+	if (name === "") return undefined
+	const match = persisted?.find((field) => field.name === name)
+	return match?.type === "group" || match?.type === "repeater" ? match.fields : undefined
+}
+
+/** Shift the open rows to follow a move, so a later remount reopens the right card. */
+function moveOpenRow(rows: ReadonlySet<number>, from: number, to: number): Set<number> {
+	return new Set(
+		[...rows].map((row) => {
+			if (row === from) return to
+			if (from < row && row <= to) return row - 1
+			if (to <= row && row < from) return row + 1
+			return row
+		}),
+	)
+}
+
+/** Drop a removed row from the open set and close the gap it leaves. */
+function removeOpenRow(rows: ReadonlySet<number>, index: number): Set<number> {
+	const next = new Set<number>()
+	for (const row of rows) {
+		if (row !== index) next.add(row > index ? row - 1 : row)
+	}
+	return next
 }
 
 /**
@@ -59,38 +91,58 @@ export function CustomFieldsBuilder<TInput extends FieldValues, TContext, TOutpu
  * children. Reordering uses the arrow convention shared with the breadcrumbs
  * builder; the server re-validates names, key length and safe type changes on save.
  */
-function BuilderList({ control, name, persistedKeys }: { control: Control<any>; name: string; persistedKeys: ReadonlySet<string> }) {
+function BuilderList({
+	control,
+	name,
+	persisted,
+}: {
+	control: Control<any>
+	name: string
+	persisted: CustomFieldDefinition[] | undefined
+}) {
 	const { fields, append, remove, move, update } = useFieldArray({ control, name })
 	const values = useWatch({ control, name }) as CustomFieldDefinition[] | undefined
-	const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set())
+
+	// Keyed by row index, not `field.id`: `update()` regenerates the id of the
+	// row it replaces, which is the remount this set exists to survive.
+	const [openRows, setOpenRows] = useState<ReadonlySet<number>>(() => new Set())
+
+	// Only this level's saved names. Names are unique per level, not globally.
+	const persistedNames = new Set((persisted ?? []).map((field) => field.name))
 
 	function addField() {
-		const definition = newDefinition()
-		setOpenKeys((keys) => new Set(keys).add(definition.key))
-		append(definition)
+		setOpenRows((rows) => new Set(rows).add(fields.length))
+		append(newDefinition())
 	}
 
 	return (
 		<div className="flex flex-col gap-3">
 			{fields.map((field, index) => {
-				const key = (field as unknown as { key: string }).key
 				const definition = values?.[index] ?? (field as unknown as CustomFieldDefinition)
-				const isNew = !persistedKeys.has(key)
 				return (
 					<FieldCard
 						key={field.id}
 						control={control}
 						base={`${name}.${index}`}
-						defaultOpen={openKeys.has(key)}
-						isNew={isNew}
-						persistedKeys={persistedKeys}
+						defaultOpen={openRows.has(index)}
+						isNew={!persistedNames.has(definition.name)}
+						persistedChildren={persistedChildrenOf(persisted, definition.name)}
 						isFirst={index === 0}
 						isLast={index === fields.length - 1}
-						onMoveUp={() => move(index, index - 1)}
-						onMoveDown={() => move(index, index + 1)}
-						onRemove={() => remove(index)}
+						onMoveUp={() => {
+							setOpenRows((rows) => moveOpenRow(rows, index, index - 1))
+							move(index, index - 1)
+						}}
+						onMoveDown={() => {
+							setOpenRows((rows) => moveOpenRow(rows, index, index + 1))
+							move(index, index + 1)
+						}}
+						onRemove={() => {
+							setOpenRows((rows) => removeOpenRow(rows, index))
+							remove(index)
+						}}
 						onTypeChange={(type) => {
-							setOpenKeys((keys) => new Set(keys).add(key))
+							setOpenRows((rows) => new Set(rows).add(index))
 							update(index, changeDefinitionType(definition, type))
 						}}
 					/>
@@ -113,7 +165,7 @@ interface FieldCardProps {
 	base: string
 	defaultOpen: boolean
 	isNew: boolean
-	persistedKeys: ReadonlySet<string>
+	persistedChildren: CustomFieldDefinition[] | undefined
 	isFirst: boolean
 	isLast: boolean
 	onMoveUp: () => void
@@ -127,7 +179,7 @@ function FieldCard({
 	base,
 	defaultOpen,
 	isNew,
-	persistedKeys,
+	persistedChildren,
 	isFirst,
 	isLast,
 	onMoveUp,
@@ -219,7 +271,7 @@ function FieldCard({
 
 					<TextInputField control={control} name={`${base}.instructions`} label="Instructions" />
 
-					<TypeConfig control={control} base={base} type={type} persistedKeys={persistedKeys} />
+					<TypeConfig control={control} base={base} type={type} persistedChildren={persistedChildren} />
 
 					<SwitchField control={control} name={`${base}.required`} label="Required" />
 				</div>
@@ -232,12 +284,12 @@ function TypeConfig({
 	control,
 	base,
 	type,
-	persistedKeys,
+	persistedChildren,
 }: {
 	control: Control<any>
 	base: string
 	type: CustomFieldType
-	persistedKeys: ReadonlySet<string>
+	persistedChildren: CustomFieldDefinition[] | undefined
 }) {
 	const rawChoices = useWatch({ control, name: `${base}.choices` }) as { value: string; label: string }[] | undefined
 	const min = useWatch({ control, name: `${base}.min` }) as number | null | undefined
@@ -278,11 +330,11 @@ function TypeConfig({
 						<NumberInputField control={control} name={`${base}.min`} label="Min rows" min={0} step={1} />
 						<NumberInputField control={control} name={`${base}.max`} label="Max rows" min={0} step={1} />
 					</div>
-					<NestedFields control={control} base={base} persistedKeys={persistedKeys} />
+					<NestedFields control={control} base={base} persistedChildren={persistedChildren} />
 				</>
 			) : null}
 
-			{type === "group" ? <NestedFields control={control} base={base} persistedKeys={persistedKeys} /> : null}
+			{type === "group" ? <NestedFields control={control} base={base} persistedChildren={persistedChildren} /> : null}
 
 			<DefaultValueField control={control} base={base} type={type} choiceOptions={choiceOptions} min={min} max={max} step={step} />
 		</div>
@@ -341,10 +393,18 @@ function DefaultValueField({
 	}
 }
 
-function NestedFields({ control, base, persistedKeys }: { control: Control<any>; base: string; persistedKeys: ReadonlySet<string> }) {
+function NestedFields({
+	control,
+	base,
+	persistedChildren,
+}: {
+	control: Control<any>
+	base: string
+	persistedChildren: CustomFieldDefinition[] | undefined
+}) {
 	return (
 		<div className="rounded-xs border border-neutral-200 border-dashed bg-neutral-50/50 p-3">
-			<BuilderList control={control} name={`${base}.fields`} persistedKeys={persistedKeys} />
+			<BuilderList control={control} name={`${base}.fields`} persisted={persistedChildren} />
 		</div>
 	)
 }

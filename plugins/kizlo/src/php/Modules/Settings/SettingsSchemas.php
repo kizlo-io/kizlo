@@ -628,8 +628,7 @@ final class SettingsSchemas
             'type'        => 'object',
             'description' => 'What every custom field definition carries, whatever its type.',
             'properties'  => [
-                'key'          => ['type' => 'string', 'required' => true, 'description' => 'Generated identifier, e.g. `field_a1b2c3`. Never changes once created.'],
-                'name'         => ['type' => 'string', 'required' => true, 'description' => 'Meta-key segment. Locked to its first saved value.'],
+                'name'         => ['type' => 'string', 'required' => true, 'description' => 'The field\'s identity, unique within its level and permanent once saved. Send an existing name to update that field, a new one to add it. Also the meta-key segment values are stored under (`kcf_<name>`).'],
                 'label'        => ['type' => 'string', 'required' => true],
                 'instructions' => ['type' => 'string', 'required' => true],
                 'required'     => ['type' => 'boolean', 'required' => true, 'description' => 'Whether a value must be supplied when writing an entry.'],

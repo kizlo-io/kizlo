@@ -24,7 +24,7 @@ class PostTypeSettingsCustomFieldsTest extends TestCase
 
         $this->assertCount(1, $fields);
         $this->assertSame('company_name', $fields[0]['name']);
-        $this->assertMatchesRegularExpression('/^field_[a-z0-9]+$/', $fields[0]['key']);
+        $this->assertArrayNotHasKey('key', $fields[0]);
     }
 
     public function test_an_unsafe_definition_rejects_the_update_and_preserves_the_previous(): void

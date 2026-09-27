@@ -22,11 +22,10 @@ import { ContentForm } from "./ContentForm"
 import { hasErrorAtPath, RepeaterRow, toFormValues } from "./render"
 
 function textField(name: string, label: string): CustomFieldDefinition {
-	return { key: `field_${name}`, name, label, instructions: "", required: false, type: "text", default: null }
+	return { name, label, instructions: "", required: false, type: "text", default: null }
 }
 
 const group: CustomFieldDefinition = {
-	key: "field_details",
 	name: "details",
 	label: "Details",
 	instructions: "Everything the front end needs.",
@@ -36,7 +35,6 @@ const group: CustomFieldDefinition = {
 }
 
 const repeater: Extract<CustomFieldDefinition, { type: "repeater" }> = {
-	key: "field_links",
 	name: "links",
 	label: "Link",
 	instructions: "",

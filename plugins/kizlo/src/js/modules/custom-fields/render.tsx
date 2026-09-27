@@ -31,7 +31,7 @@ export function CustomFieldsFields({ control, definitions, prefix }: FieldsProps
 	return (
 		<div className="flex flex-col gap-6">
 			{definitions.map((definition) => (
-				<CustomFieldInput key={definition.key} control={control} definition={definition} prefix={prefix} />
+				<CustomFieldInput key={definition.name} control={control} definition={definition} prefix={prefix} />
 			))}
 		</div>
 	)

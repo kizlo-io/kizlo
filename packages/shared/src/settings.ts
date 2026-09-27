@@ -246,9 +246,7 @@ export interface CustomFieldChoice {
 }
 
 interface CustomFieldBase {
-	/** Permanent generated identifier, e.g. `field_a1b2c3`. Never changes once created. */
-	key: string
-	/** Meta-key segment. Locked after first save; drives the generated `kcf_*` key. */
+	/** The field's identity, unique within its level and permanent once saved. Also the `kcf_*` meta-key segment. */
 	name: string
 	label: string
 	instructions: string

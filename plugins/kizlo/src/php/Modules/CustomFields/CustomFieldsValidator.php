@@ -9,7 +9,7 @@ use InvalidArgumentException;
  *
  * Rejects the whole update (by throwing) when sibling names collide, when an
  * existing field changes type outside the safe set, or when any generated
- * `kcf_*` / `_kcf_*` key would exceed WordPress's 255-character meta_key limit.
+ * `kcf_*` key would exceed WordPress's 255-character meta_key limit.
  */
 class CustomFieldsValidator
 {
@@ -352,14 +352,16 @@ class CustomFieldsValidator
 
     /**
      * @param array<int, array<string, mixed>> $definitions
-     * @param array<string, string>            $previous_types Field key => stored type.
+     * @param array<string, string>            $previous_types Full name path => stored type.
+     * @param string                           $prefix         Name path of the parent container.
      */
-    private static function assertSafeTypeChanges(array $definitions, array $previous_types): void
+    private static function assertSafeTypeChanges(array $definitions, array $previous_types, string $prefix = ''): void
     {
         foreach ($definitions as $definition) {
-            $key      = (string) $definition['key'];
+            $name     = (string) $definition['name'];
+            $path     = $prefix === '' ? $name : "{$prefix}_{$name}";
             $new_type = (string) $definition['type'];
-            $old_type = $previous_types[$key] ?? null;
+            $old_type = $previous_types[$path] ?? null;
 
             if ($old_type !== null && $old_type !== $new_type && !self::isSafeTypeChange($old_type, $new_type)) {
                 $label = $definition['label'] !== '' ? $definition['label'] : $definition['name'];
@@ -369,14 +371,13 @@ class CustomFieldsValidator
             }
 
             if (in_array($new_type, FieldDefinitions::CONTAINER_TYPES, true)) {
-                self::assertSafeTypeChanges($definition['fields'] ?? [], $previous_types);
+                self::assertSafeTypeChanges($definition['fields'] ?? [], $previous_types, $path);
             }
         }
     }
 
     /**
-     * Recursively assert every generated key stays within the length limit.
-     * The `_kcf_` reference key is the longest of the pair, so it bounds both.
+     * Recursively assert every generated `kcf_*` key stays within the length limit.
      *
      * @param array<int, array<string, mixed>> $definitions
      * @param string                           $prefix      Name path without the `kcf_` prefix.
@@ -393,7 +394,7 @@ class CustomFieldsValidator
 
             // Groups carry no meta of their own; only their children generate keys.
             if ($type !== 'group') {
-                $length = strlen('_kcf_' . $full_name);
+                $length = strlen('kcf_' . $full_name);
                 if ($length > self::MAX_KEY_LENGTH) {
                     $path = implode(' › ', $trail);
                     throw new InvalidArgumentException(
@@ -433,21 +434,25 @@ class CustomFieldsValidator
     }
 
     /**
-     * Flatten a definition tree into a field-key => type map (keys are globally unique).
+     * Flatten a definition tree into a full-name-path => type map. Names are
+     * unique only within a level, so the path is what makes the key unique.
+     * `assertUniqueStoragePaths()` separately rejects trees where two paths
+     * could collide.
      *
      * @param array<int, array<string, mixed>> $definitions
      * @return array<string, string>
      */
-    private static function flattenTypes(array $definitions): array
+    private static function flattenTypes(array $definitions, string $prefix = ''): array
     {
         $types = [];
         foreach ($definitions as $definition) {
-            if (empty($definition['key']) || empty($definition['type'])) {
+            if (empty($definition['name']) || empty($definition['type'])) {
                 continue;
             }
-            $types[(string) $definition['key']] = (string) $definition['type'];
+            $path         = $prefix === '' ? (string) $definition['name'] : "{$prefix}_{$definition['name']}";
+            $types[$path] = (string) $definition['type'];
             if (in_array($definition['type'], FieldDefinitions::CONTAINER_TYPES, true)) {
-                $types += self::flattenTypes($definition['fields'] ?? []);
+                $types += self::flattenTypes($definition['fields'] ?? [], $path);
             }
         }
         return $types;

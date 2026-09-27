@@ -8,10 +8,10 @@ use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
 
 /**
- * The ACF-style storage engine: nested input flattens into readable `kcf_*` meta
- * with `_kcf_*` definition references, repeaters store a row count and indexed
- * children (reindexing on shrink), and reads resolve back to the nested output
- * shape with media, defaults and orphan exclusion.
+ * The ACF-style storage engine: nested input flattens into readable `kcf_*` meta,
+ * one row per leaf value; repeaters store a row count and indexed children
+ * (reindexing on shrink), and reads resolve back to the nested output shape with
+ * media, defaults and orphan exclusion.
  */
 class CustomFieldsStoreTest extends TestCase
 {
@@ -42,14 +42,14 @@ class CustomFieldsStoreTest extends TestCase
         return CustomFieldsStore::read(CustomFieldsStore::META_POST, $this->post, $defs);
     }
 
-    public function test_simple_field_round_trips_and_stores_the_reference_key(): void
+    public function test_simple_field_round_trips_in_a_single_meta_row(): void
     {
         $defs = $this->defs([['type' => 'text', 'name' => 'company_name']]);
 
         $this->write($defs, ['company_name' => 'Acme Ltd']);
 
         $this->assertSame('Acme Ltd', get_post_meta($this->post, 'kcf_company_name', true));
-        $this->assertSame($defs[0]['key'], get_post_meta($this->post, '_kcf_company_name', true));
+        $this->assertSame([], get_post_meta($this->post, '_kcf_company_name'));
         $this->assertSame(['company_name' => 'Acme Ltd'], $this->read($defs));
     }
 
@@ -80,6 +80,58 @@ class CustomFieldsStoreTest extends TestCase
             ['features' => [['title' => 'Fast'], ['title' => 'Secure']]],
             $this->read($defs)
         );
+    }
+
+    public function test_writes_no_reference_row_at_any_depth(): void
+    {
+        $defs = $this->defs([
+            ['type' => 'group', 'name' => 'hero', 'fields' => [['type' => 'text', 'name' => 'title']]],
+            ['type' => 'repeater', 'name' => 'features', 'fields' => [['type' => 'text', 'name' => 'title']]],
+        ]);
+
+        $this->write($defs, ['hero' => ['title' => 'Welcome'], 'features' => [['title' => 'Fast']]]);
+
+        $written = array_keys(get_post_meta($this->post));
+        $this->assertSame([], array_values(array_filter($written, fn($key) => str_starts_with($key, '_kcf_'))));
+    }
+
+    public function test_a_field_dropped_from_the_definitions_orphans_both_of_its_rows(): void
+    {
+        $defs = $this->defs([['type' => 'text', 'name' => 'company_name']]);
+        $this->write($defs, ['company_name' => 'Acme Ltd']);
+        update_post_meta($this->post, '_kcf_company_name', 'field_legacy');
+
+        $this->write($this->defs([['type' => 'text', 'name' => 'other']]), ['other' => 'x']);
+
+        // Writes walk only the current definitions, so a removed field's rows are
+        // left behind exactly as before. Reads already exclude them.
+        $this->assertSame('Acme Ltd', get_post_meta($this->post, 'kcf_company_name', true));
+        $this->assertSame('field_legacy', get_post_meta($this->post, '_kcf_company_name', true));
+    }
+
+    public function test_shrinking_a_repeater_clears_reference_rows_left_by_an_earlier_version(): void
+    {
+        $defs = $this->defs([
+            ['type' => 'repeater', 'name' => 'features', 'fields' => [['type' => 'text', 'name' => 'title']]],
+        ]);
+
+        $this->write($defs, ['features' => [['title' => 'Fast'], ['title' => 'Secure']]]);
+        update_post_meta($this->post, '_kcf_features_1_title', 'field_legacy');
+
+        $this->write($defs, ['features' => [['title' => 'Only']]]);
+
+        $this->assertSame([], get_post_meta($this->post, '_kcf_features_1_title'));
+    }
+
+    public function test_reads_a_value_written_before_the_reference_row_was_dropped(): void
+    {
+        $defs = $this->defs([['type' => 'text', 'name' => 'company_name']]);
+
+        // Exactly what an earlier version left behind: value row plus reference row.
+        update_post_meta($this->post, 'kcf_company_name', 'Acme Ltd');
+        update_post_meta($this->post, '_kcf_company_name', 'field_legacy');
+
+        $this->assertSame(['company_name' => 'Acme Ltd'], $this->read($defs));
     }
 
     public function test_shrinking_a_repeater_reindexes_and_cleans_obsolete_rows(): void

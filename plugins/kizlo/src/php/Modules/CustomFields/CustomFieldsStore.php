@@ -7,12 +7,11 @@ use InvalidArgumentException;
 /**
  * Reads and writes ACF-style custom-field values as `kcf_*` post/term meta.
  *
- * Values are stored under readable, name-derived keys (`kcf_company_name`) with a
- * hidden `_kcf_*` reference pointing at the definition's `field_*` key. Repeaters
- * store a row count on the parent and flatten indexed children
- * (`kcf_features_0_title`); shrinking or reordering rows reindexes and cleans up
- * obsolete rows. Reads walk only the current definitions, so values left behind by
- * deleted definitions stay orphaned and never appear in output.
+ * Values are stored under readable, name-derived keys (`kcf_company_name`), one row
+ * per leaf value. Repeaters store a row count on the parent and flatten indexed
+ * children (`kcf_features_0_title`); shrinking or reordering rows reindexes and
+ * cleans up obsolete rows. Reads walk only the current definitions, so values left
+ * behind by deleted definitions stay orphaned and never appear in output.
  */
 class CustomFieldsStore
 {
@@ -20,7 +19,12 @@ class CustomFieldsStore
     public const META_TERM = 'term';
 
     private const VALUE_PREFIX = 'kcf_';
-    private const REF_PREFIX   = '_kcf_';
+
+    /**
+     * Reference rows written by earlier versions. Nothing writes or reads these
+     * any more; the deletes stay so a field's leftover row goes with the field.
+     */
+    private const REF_PREFIX = '_kcf_';
 
     /**
      * Resolve stored values into the nested `custom` output shape.
@@ -156,7 +160,6 @@ class CustomFieldsStore
             $old_count = (int) ($existing[self::VALUE_PREFIX . $full] ?? 0);
 
             $ops[] = ['set', self::VALUE_PREFIX . $full, $new_count];
-            $ops[] = ['set', self::REF_PREFIX . $full, $definition['key']];
 
             $rows_to_process = max($new_count, $old_count);
             for ($i = 0; $i < $rows_to_process; $i++) {
@@ -173,7 +176,6 @@ class CustomFieldsStore
         }
 
         $ops[] = ['set', self::VALUE_PREFIX . $full, self::sanitizeValue($definition, $value)];
-        $ops[] = ['set', self::REF_PREFIX . $full, $definition['key']];
     }
 
     /**
