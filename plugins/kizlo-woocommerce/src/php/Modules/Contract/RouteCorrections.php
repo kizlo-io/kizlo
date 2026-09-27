@@ -59,6 +59,23 @@ final class RouteCorrections
     ];
 
     /**
+     * The cart-items create, and the sibling its arguments are copied from.
+     *
+     * Keyed the way `rest_endpoints` is keyed, and public so the PHPUnit suite
+     * can compare both against the routes WooCommerce currently registers, which
+     * is the alarm for an upstream rename.
+     */
+    public const CART_ITEMS    = '/' . WooCommerceNamespaces::STORE . '/cart/items';
+    public const CART_ADD_ITEM = '/' . WooCommerceNamespaces::STORE . '/cart/add-item';
+
+    /**
+     * The arguments both cart-item handlers read, and only one of them registers.
+     *
+     * @var array<int, string>
+     */
+    public const CART_ITEM_ARGUMENTS = ['id', 'quantity', 'variation'];
+
+    /**
      * Fill in a type WooCommerce left off, for `rest_endpoints`.
      *
      * Corrected at the registration rather than in the derived contract, because
@@ -90,6 +107,103 @@ final class RouteCorrections
         }
 
         return $endpoints;
+    }
+
+    /**
+     * Make `POST /cart/items` the twin it already behaves like, for `rest_endpoints`.
+     *
+     * `CartItems::get_args()` hands `get_endpoint_args_for_item_schema()` a
+     * cart-item response schema instead of naming arguments, and the only
+     * writable property on that schema is `extensions`. So the route registers
+     * nothing a caller can use to say which product to add, while
+     * `get_route_post_response()` reads `id`, `quantity` and `variation` off the
+     * request and calls the same `CartController::add_to_cart()` as
+     * `CartAddItem`, which registers all three. They are copied off that route
+     * rather than written out here, so an upstream rename costs this correction
+     * instead of leaving a hand-written shape behind that no longer matches.
+     *
+     * The same helper breaks the route a second way.
+     * `AbstractSchema::get_extended_schema()` computes a default for
+     * `extensions` out of the registered extension schemas, and WP core copies
+     * it onto a `CREATABLE` argument. WordPress then injects that default into
+     * every request that omits `extensions` and validates it against the
+     * read-only schema it was computed from, so the route answers `400` naming
+     * an argument the caller never sent. Kizlo's own cart-item block is what
+     * makes the computed default non-empty enough to fail. Dropping it restores
+     * what the registration already says: absent is absent, and an `extensions`
+     * a caller does send is validated exactly as before.
+     *
+     * @param array<string, mixed> $endpoints
+     * @return array<string, mixed>
+     */
+    public static function completeCartItems(array $endpoints): array
+    {
+        $target = self::creatable($endpoints[self::CART_ITEMS] ?? null);
+
+        if ($target === null) {
+            return $endpoints;
+        }
+
+        $source  = self::creatable($endpoints[self::CART_ADD_ITEM] ?? null);
+        $sibling = $source === null ? [] : $endpoints[self::CART_ADD_ITEM][$source]['args'];
+
+        $args = $endpoints[self::CART_ITEMS][$target]['args'];
+
+        if (is_array($args['extensions'] ?? null)) {
+            unset($args['extensions']['default']);
+        }
+
+        foreach (self::CART_ITEM_ARGUMENTS as $name) {
+            if (is_array($sibling[$name] ?? null) && !isset($args[$name])) {
+                $args[$name] = $sibling[$name];
+            }
+        }
+
+        $endpoints[self::CART_ITEMS][$target]['args'] = $args;
+
+        return $endpoints;
+    }
+
+    /**
+     * Where a route registers the handler that takes a `POST`, if it has one.
+     *
+     * `rest_endpoints` keys handlers by position, so this is how the create is
+     * told apart from the read and the delete registered beside it.
+     */
+    private static function creatable(mixed $handlers): int|string|null
+    {
+        foreach (is_array($handlers) ? $handlers : [] as $index => $handler) {
+            if (!is_array($handler) || !is_array($handler['args'] ?? null)) {
+                continue;
+            }
+
+            if (self::takesPost($handler['methods'] ?? '')) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether a handler serves a `POST`, reading `methods` as this filter sees it.
+     *
+     * `WP_REST_Server::get_routes()` turns `methods` into a `['POST' => true]`
+     * lookup only after `rest_endpoints` has run, so here it is still whatever
+     * `register_rest_route()` was handed: the comma-separated string behind
+     * `WP_REST_Server::CREATABLE` and `EDITABLE`, or a list of verbs. Read the
+     * way core reads it, so a handler is matched on the same terms that decide
+     * which one actually serves the request.
+     */
+    private static function takesPost(mixed $methods): bool
+    {
+        foreach (is_array($methods) ? $methods : explode(',', (string) $methods) as $method) {
+            if (strtoupper(trim((string) $method)) === 'POST') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

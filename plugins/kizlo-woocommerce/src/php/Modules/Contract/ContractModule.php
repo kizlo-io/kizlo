@@ -51,8 +51,10 @@ class ContractModule
         add_filter('kizlo_introspection_core_route', [RouteCorrections::class, 'apply'], 10, 4);
         add_filter('kizlo_introspection_core_schema', [RestApiSchemas::class, 'contribute'], 10, 5);
 
-        // Not a Kizlo filter: this completes WooCommerce's own registration so
-        // the argument is describable in the first place.
+        // Not Kizlo filters: these complete WooCommerce's own registration, so
+        // the arguments are describable in the first place and the cart-items
+        // create stops rejecting an argument nobody sent.
         add_filter('rest_endpoints', [RouteCorrections::class, 'completeArguments']);
+        add_filter('rest_endpoints', [RouteCorrections::class, 'completeCartItems']);
     }
 }
