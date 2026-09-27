@@ -5,6 +5,7 @@ namespace Kizlo\Tests\Introspection;
 use Kizlo\Modules\Introspection\PathNormalizer;
 use Kizlo\Modules\Introspection\OperationErrors;
 use Kizlo\Modules\Introspection\Spec;
+use Kizlo\Modules\Settings\SettingsSchemas;
 
 /**
  * Every route this plugin serves is in the contract, and says something.
@@ -42,6 +43,68 @@ class PluginRouteTest extends IntrospectionTestCase
         }
 
         $this->assertSame([], $missing, 'These routes are registered but contribute nothing to /introspect.');
+    }
+
+    /**
+     * Supplying `custom_fields` replaces the whole collection, and the contract
+     * has to say so where a caller writing one will read it.
+     */
+    public function test_custom_field_update_inputs_state_replacement_semantics(): void
+    {
+        foreach (['/settings/post_types/{slug}', '/settings/taxonomies/{slug}'] as $path) {
+            $update = $this->operationAt($path, 'update');
+
+            $this->assertNotSame([], $update, sprintf('%s should describe an update operation.', $path));
+
+            $body         = (array) ($this->input($update)['body'] ?? []);
+            $properties   = (array) ($body['properties'] ?? []);
+            $customFields = (array) ($properties['custom_fields'] ?? []);
+
+            $this->assertArrayHasKey('description', $customFields, sprintf('%s should say what supplying custom_fields does.', $path));
+
+            $description = (string) $customFields['description'];
+            $this->assertStringContainsString('replaces the complete ordered custom-field collection', $description);
+            $this->assertStringContainsString('at every level', $description);
+            $this->assertStringContainsString('are removed', $description);
+            $this->assertStringContainsString('Omit `custom_fields` to leave the collection unchanged', $description);
+        }
+    }
+
+    /**
+     * The same wording must not reach a read. The update input and the read
+     * responses share `kizlo.custom-field`, so a description placed on the
+     * shared schema, or on the nested `fields` arrays inside it, would put
+     * write-only advice on every response that returns a definition.
+     */
+    public function test_custom_field_read_schemas_carry_no_write_advice(): void
+    {
+        $schemas = $this->document()['schemas'];
+
+        foreach ([SettingsSchemas::POST_TYPE, SettingsSchemas::TAXONOMY] as $id) {
+            $properties   = (array) (($schemas[$id]['properties']) ?? []);
+            $customFields = (array) ($properties['custom_fields'] ?? []);
+
+            $this->assertArrayNotHasKey(
+                'description',
+                $customFields,
+                sprintf('%s is a read schema and should carry no replacement advice.', $id)
+            );
+        }
+
+        $nested = 0;
+        foreach ((array) ($schemas[SettingsSchemas::CUSTOM_FIELD]['anyOf'] ?? []) as $member) {
+            $properties = (array) ($member['properties'] ?? []);
+            $fields     = (array) ($properties['fields'] ?? []);
+            if ($fields === []) {
+                continue;
+            }
+
+            $nested++;
+            $this->assertSame('Child definitions, nested to any depth.', $fields['description'] ?? null);
+        }
+
+        // Group and repeater, so the loop above cannot pass by finding nothing.
+        $this->assertSame(2, $nested);
     }
 
     public function test_every_described_operation_declares_a_success_response(): void
@@ -184,6 +247,24 @@ class PluginRouteTest extends IntrospectionTestCase
      *
      * @return array<string, array<string, mixed>>
      */
+    /**
+     * One named operation at a normalized path, or an empty array when the
+     * document has no such route.
+     *
+     * @return array<string, mixed>
+     */
+    private function operationAt(string $path, string $operation): array
+    {
+        foreach ($this->document()['apis'] as $api) {
+            $declaration = $api['paths'][$path][$operation] ?? null;
+            if (is_array($declaration)) {
+                return $declaration;
+            }
+        }
+
+        return [];
+    }
+
     private function operations(): array
     {
         $operations = [];
