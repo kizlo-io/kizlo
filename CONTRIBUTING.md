@@ -86,7 +86,7 @@ pnpm test:watch   # run Vitest in watch mode
 Run `pnpm kizlo test` for the complete test workflow. It starts and seeds the
 WordPress test stack when needed, runs the JavaScript and plugin PHPUnit suites,
 and leaves the stack running. After that, `pnpm test` provides a fast JavaScript
-test rerun using the credentials in `.kizlo/test-credentials.json`. `pnpm lint:ws`
+test rerun using the credentials in `.kizlo/test.json`. `pnpm lint:ws`
 also runs automatically on `postinstall`.
 
 ## Local WordPress stacks
@@ -138,7 +138,7 @@ Bare `pnpm kizlo test` is the full test workflow: it starts WordPress when
 needed, seeds it when needed, runs the project's test script followed by plugin
 PHPUnit tests, and leaves the stack running for fast reruns. Once the stack is
 seeded, `pnpm test` can rerun the JavaScript test suite using
-`.kizlo/test-credentials.json` without managing the stack.
+`.kizlo/test.json` without managing the stack.
 
 The credentials artifact is anchored to the directory containing `kizlo.config.ts`,
 so tests find it from any sub-directory with no configuration.
@@ -315,6 +315,15 @@ untouched:
 ```bash
 git fetch origin main
 git worktree add -b <type>/<issue-key>-<slug> .worktrees/<issue-key> origin/main
+```
+
+A worktree starts without the root `.env`, because that file is git-ignored and
+lives in the checkout it was written in. `pnpm test` and the plugin suites don't
+need it, but `web/` and the templates do, so copy it across before building
+either of them from a worktree:
+
+```bash
+cp ../../.env .env          # from inside .worktrees/<issue-key>
 ```
 
 `pnpm worktree:sweep` prunes merged or stale worktrees under `.worktrees/`
