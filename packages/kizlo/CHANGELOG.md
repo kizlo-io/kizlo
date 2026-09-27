@@ -1,5 +1,22 @@
 # kizlo
 
+## 0.22.0
+
+### Minor Changes
+
+- [#246](https://github.com/kizlo-io/kizlo/pull/246) [`5a384ed`](https://github.com/kizlo-io/kizlo/commit/5a384ed034368b7a6343c4bd8e9dc4dbe372db6c) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Adopt dynamically discovered WooCommerce route names across generated clients and WooCommerce procedures
+
+- [#237](https://github.com/kizlo-io/kizlo/pull/237) [`dae3a3a`](https://github.com/kizlo-io/kizlo/commit/dae3a3a404ad00561ffb5d28fa65faf700b6614d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Move every Kizlo-registered WordPress route under `client.kizlo.*`, leaving the described WordPress and WooCommerce routes where they are
+
+- [#249](https://github.com/kizlo-io/kizlo/pull/249) [`8b29d73`](https://github.com/kizlo-io/kizlo/commit/8b29d731039ae655d96ace64e7e5551dfdff7480) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Search WordPress routes through MCP, and get complete route contracts and structured results back
+
+- [#245](https://github.com/kizlo-io/kizlo/pull/245) [`685601b`](https://github.com/kizlo-io/kizlo/commit/685601bc388d9571c5c8bd957d4cf974ca271eff) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Separate `params`, `query`, and `body` in generated WordPress endpoint calls.
+
+### Patch Changes
+
+- Updated dependencies [[`d1dca79`](https://github.com/kizlo-io/kizlo/commit/d1dca79951361386ce207583a7efb6a1fdbe3a79)]:
+  - @kizlo/shared@0.10.0
+
 ## 0.21.0
 
 ### Minor Changes
