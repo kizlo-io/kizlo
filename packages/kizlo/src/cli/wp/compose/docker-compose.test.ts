@@ -7,6 +7,7 @@ interface Service {
 	environment?: Record<string, string>
 	ports?: string[]
 	volumes?: string[]
+	healthcheck?: { test: string[] }
 }
 
 const wordpress = (): Service => parse(fs.readFileSync(COMPOSE_FILE, "utf8")).services.wordpress
@@ -39,6 +40,26 @@ describe("base compose wordpress service", () => {
 		expect(wordpress().environment?.WP_PORT).toBe("${WP_PORT:-8080}")
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: literal Compose interpolation
 		expect(wordpress().ports).toContain("${WP_PORT:-8080}:80")
+	})
+
+	describe("healthcheck", () => {
+		const probe = (): string => wordpress().healthcheck?.test?.at(-1) ?? ""
+
+		test("requires the WordPress install wp-cli depends on", () => {
+			expect(probe()).toContain("test -f /var/www/html/wp-includes/version.php")
+		})
+
+		test("probes HTTP for liveness without asserting a successful status", () => {
+			expect(probe()).toContain("curl ")
+			expect(probe()).toContain("http://localhost/")
+			// `-f`/`--fail` turns any non-2xx into a probe failure, which is the bug being fixed:
+			// Headless Mode 404s pages by design, and a live server answering 404 is still live.
+			expect(probe().slice(probe().indexOf("curl "))).not.toMatch(/(?:^|\s)--?\S*f/)
+		})
+
+		test("references no WordPress application page, so a 404 from one can't fail it", () => {
+			expect(probe()).not.toMatch(/wp-login\.php|wp-admin|wp-json|feed|xmlrpc/)
+		})
 	})
 
 	test("mounts both local-only config assets read-only", () => {

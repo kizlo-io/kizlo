@@ -31,6 +31,12 @@ export interface DevStackInfo {
 	 * changed to invalidate them).
 	 */
 	appPassword?: string
+	/**
+	 * Path to the login screen, relative to `url`. `/wp-admin` normally, or the configured secret
+	 * slug while Headless Mode's login rename is on. That feature 404s both `wp-login.php` and a
+	 * logged-out `/wp-admin`, so printing the usual path would send you to a dead end.
+	 */
+	adminPath: string
 }
 
 const VIRTUAL_INTERFACE = /^(?:docker|br-|veth|utun|tun|tap)/i
@@ -57,6 +63,41 @@ export function lanAddress(interfaces: NodeJS.Dict<NetworkInterfaceInfo[]> = net
  */
 function devUrl(port: number): string {
 	return `http://${lanAddress() ?? "localhost"}:${port}`
+}
+
+/** The Headless Mode option, narrowed to the three fields the login rename depends on. */
+interface HeadlessOption {
+	enabled?: boolean
+	rename_login?: boolean
+	login_slug?: string | null
+}
+
+/**
+ * Where the login screen actually lives, read from the raw `kizlo_settings_headless` option. Mirrors
+ * the plugin's `HeadlessSettings::isLoginRenameActive()`: the master switch, the rename toggle and a
+ * non-empty slug must all hold, so a half-configured feature still points at `/wp-admin`. Anything
+ * unreadable (option unset, plugin absent, output not JSON) falls back the same way, which is what a
+ * project that never touches the setting gets.
+ */
+export function resolveAdminPath(option: string | undefined): string {
+	if (!option) return "/wp-admin"
+	let settings: HeadlessOption | null
+	try {
+		settings = JSON.parse(option)
+	} catch {
+		return "/wp-admin"
+	}
+	const slug = typeof settings?.login_slug === "string" ? settings.login_slug.trim() : ""
+	return settings?.enabled === true && settings.rename_login === true && slug !== "" ? `/${slug}` : "/wp-admin"
+}
+
+/** The Headless Mode option as wp-cli prints it; undefined when it's unset or wp-cli couldn't answer. */
+async function readHeadlessOption(): Promise<string | undefined> {
+	try {
+		return await wpCli(["option", "get", "kizlo_settings_headless", "--format=json"])
+	} catch {
+		return undefined
+	}
 }
 
 /**
@@ -132,12 +173,17 @@ export async function bootstrapDev(cfg: ResolvedDevConfig): Promise<DevStackInfo
 
 	const appPassword = !installed ? await createAdminAppPassword("kizlo-dev") : undefined
 
+	// Read every boot rather than cached, so toggling the rename in wp-admin and letting the config
+	// watcher reboot the stack prints the entry point that now works.
+	const adminPath = resolveAdminPath(await readHeadlessOption())
+
 	return {
 		url,
 		username: TEST_ADMIN.username,
 		dbPort: cfg.dbPort,
 		seeded,
 		appPassword,
+		adminPath,
 		adminPassword: !installed ? TEST_ADMIN.password : undefined,
 	}
 }
