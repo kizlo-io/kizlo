@@ -4,6 +4,13 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-27
+### Changed
+- Describe every registered wc/v3 and wc/store/v1 route instead of a fixed catalogue.
+
+### Fixed
+- Let POST wc/store/v1/cart/items add an item by naming the product, instead of rejecting a request that omits extensions.
+
 ## [0.8.1] - 2026-09-13
 ### Fixed
 - Preserve a checkout's cancel path when WooCommerce redirects an emptied cart to /cart after an order-pay exit
@@ -95,6 +102,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.9.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.8.1...kizlo-woocommerce-v0.9.0
 [0.8.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.8.0...kizlo-woocommerce-v0.8.1
 [0.8.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.7.1...kizlo-woocommerce-v0.8.0
 [0.7.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.7.0...kizlo-woocommerce-v0.7.1

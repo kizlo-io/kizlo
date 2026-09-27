@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Let POST wc/store/v1/cart/items add an item by naming the product, instead of rejecting a request that omits extensions.
