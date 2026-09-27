@@ -29,7 +29,6 @@ const baseSettings: Pick<
 
 function field(config: Partial<CustomFieldDefinition> & Pick<CustomFieldDefinition, "type">): CustomFieldDefinition {
 	return {
-		key: "field_test",
 		name: "test",
 		label: "Test",
 		instructions: "",
@@ -79,10 +78,7 @@ describe("custom field settings validation", () => {
 	it("reports duplicate nested names at the second Name input", () => {
 		const definition = field({
 			type: "group",
-			fields: [
-				field({ key: "field_one", name: "same", type: "text", default: null }),
-				field({ key: "field_two", name: "same", type: "toggle", default: false }),
-			],
+			fields: [field({ name: "same", type: "text", default: null }), field({ name: "same", type: "toggle", default: false })],
 		})
 
 		expect(issuesFor(definition).some((issue) => issue.path.join(".") === "custom_fields.0.fields.1.name")).toBe(true)

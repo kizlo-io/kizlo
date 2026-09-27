@@ -1,32 +1,12 @@
 import type { CustomFieldDefinition, CustomFieldType } from "@kizlo/shared"
 
-function fieldKey(): string {
-	return `field_${crypto.randomUUID().replace(/-/g, "").slice(0, 13)}`
-}
-
 export function newDefinition(): CustomFieldDefinition {
-	return { key: fieldKey(), name: "", label: "", instructions: "", required: false, type: "text", default: null }
-}
-
-/** Collect stable identities from the saved tree, independent of array positions. */
-export function persistedDefinitionKeys(definitions: CustomFieldDefinition[] | undefined): ReadonlySet<string> {
-	const keys = new Set<string>()
-
-	function visit(fields: CustomFieldDefinition[] | undefined) {
-		for (const field of fields ?? []) {
-			keys.add(field.key)
-			if (field.type === "group" || field.type === "repeater") visit(field.fields)
-		}
-	}
-
-	visit(definitions)
-	return keys
+	return { name: "", label: "", instructions: "", required: false, type: "text", default: null }
 }
 
 /** Shape every type change into a complete target configuration before render. */
 export function changeDefinitionType(definition: CustomFieldDefinition, type: CustomFieldType): CustomFieldDefinition {
 	const base = {
-		key: definition.key,
 		name: definition.name,
 		label: definition.label,
 		instructions: definition.instructions,

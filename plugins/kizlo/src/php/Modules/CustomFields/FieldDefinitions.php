@@ -5,9 +5,10 @@ namespace Kizlo\Modules\CustomFields;
 /**
  * Normalizes raw custom-field definition input into the stored shape.
  *
- * Every definition keeps a permanent generated `field_*` key and a meta-key
- * `name` that locks to its first-saved value (matched by key against the
- * previous definitions), so the generated `kcf_*` keys stay stable across edits.
+ * `name` is a definition's only identity. It is matched against the previous
+ * definitions at the same level, so sending an existing name updates that
+ * field and a new one adds it. It is also the `kcf_*` storage address, which
+ * is why it locks to its first-saved value.
  */
 class FieldDefinitions
 {
@@ -35,7 +36,7 @@ class FieldDefinitions
      * Normalize a raw, ordered definition list. Invalid entries are dropped.
      *
      * @param mixed                     $raw      Raw definitions from request input.
-     * @param array<int, array<mixed>>  $previous Previously stored definitions, for name-locking.
+     * @param array<int, array<mixed>>  $previous Previously stored definitions at this level, matched by name.
      * @return array<int, array<string, mixed>>
      */
     public static function normalize(mixed $raw, array $previous = []): array
@@ -44,7 +45,7 @@ class FieldDefinitions
             return [];
         }
 
-        $previous_by_key = self::indexByKey($previous);
+        $previous_by_name = self::indexByName($previous);
 
         $result = [];
         foreach ($raw as $entry) {
@@ -57,20 +58,15 @@ class FieldDefinitions
                 continue;
             }
 
-            $key  = self::normalizeKey($entry['key'] ?? null);
-            $prev = $previous_by_key[$key] ?? null;
-
-            // The name locks to its first-saved value once the definition exists.
-            $name = isset($prev['name'])
-                ? (string) $prev['name']
-                : self::normalizeName($entry['name'] ?? '');
-
+            $name = self::normalizeName($entry['name'] ?? '');
             if ($name === '') {
                 continue;
             }
 
+            // A matching name is the same field; anything else adds one.
+            $prev = $previous_by_name[$name] ?? null;
+
             $definition = [
-                'key'          => $key,
                 'name'         => $name,
                 'label'        => sanitize_text_field((string) ($entry['label'] ?? '')),
                 'instructions' => sanitize_text_field((string) ($entry['instructions'] ?? '')),
@@ -137,29 +133,21 @@ class FieldDefinitions
     }
 
     /**
-     * Index a definition list by its `field_*` key for previous-value lookups.
+     * Index a definition list by name for previous-value lookups. Names are
+     * unique within a level, which is the only level this ever indexes.
      *
      * @param array<int, array<mixed>> $definitions
      * @return array<string, array<mixed>>
      */
-    private static function indexByKey(array $definitions): array
+    private static function indexByName(array $definitions): array
     {
         $index = [];
         foreach ($definitions as $definition) {
-            if (!empty($definition['key'])) {
-                $index[(string) $definition['key']] = $definition;
+            if (!empty($definition['name'])) {
+                $index[(string) $definition['name']] = $definition;
             }
         }
         return $index;
-    }
-
-    /** Keep a valid `field_*` key or mint a fresh one. */
-    private static function normalizeKey(mixed $key): string
-    {
-        if (is_string($key) && preg_match('/^field_[a-z0-9]+$/', $key)) {
-            return $key;
-        }
-        return 'field_' . substr(bin2hex(random_bytes(8)), 0, 13);
     }
 
     /** Reduce a name to a lowercase meta-key segment (`a-z 0-9 _`). */

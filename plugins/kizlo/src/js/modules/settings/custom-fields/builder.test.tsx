@@ -28,7 +28,28 @@ vi.mock("@/shared/components/fields", async () => {
 			const { field } = useController({ control, name })
 			return React.createElement("input", { ...field, value: field.value ?? "", name, "aria-label": label ?? name, disabled })
 		},
-		ComboboxField: () => null,
+		ComboboxField: ({
+			control,
+			name,
+			label,
+			options,
+			onValueChange,
+		}: FieldProps & { options?: { value: string; label: string }[]; onValueChange?: (value: string) => void }) => {
+			const { field } = useController({ control, name })
+			return React.createElement(
+				"select",
+				{
+					name,
+					"aria-label": label ?? name,
+					value: typeof field.value === "string" ? field.value : "",
+					onChange: (event: React.ChangeEvent<HTMLSelectElement>) => {
+						field.onChange(event.target.value)
+						onValueChange?.(event.target.value)
+					},
+				},
+				(options ?? []).map((option) => React.createElement("option", { key: option.value, value: option.value }, option.label)),
+			)
+		},
 		NumberInputField: () => null,
 		RichTextField: () => null,
 		SelectField: () => null,
@@ -42,12 +63,12 @@ import { CustomFieldsBuilder } from "./builder"
 type FormValues = { custom_fields: CustomFieldDefinition[] }
 type ContainerType = "group" | "repeater"
 
-function textField(key: string, label: string): CustomFieldDefinition {
-	return { key, name: key, label, instructions: "", required: false, type: "text", default: `${key} value` }
+function textField(name: string, label: string): CustomFieldDefinition {
+	return { name, label, instructions: "", required: false, type: "text", default: `${name} value` }
 }
 
-function containerField(type: ContainerType, key: string, label: string, fields: CustomFieldDefinition[]): CustomFieldDefinition {
-	const base = { key, name: key, label, instructions: "", required: false, fields }
+function containerField(type: ContainerType, name: string, label: string, fields: CustomFieldDefinition[]): CustomFieldDefinition {
+	const base = { name, label, instructions: "", required: false, fields }
 	return type === "group" ? { ...base, type } : { ...base, type, min: null, max: null }
 }
 
@@ -98,6 +119,21 @@ function toggle(label: string): HTMLButtonElement {
 	const element = [...host.querySelectorAll<HTMLButtonElement>('button[aria-label="Expand"], button[aria-label="Collapse"]')].find(
 		(button) => button.textContent?.includes(label),
 	)
+	expect(element).toBeTruthy()
+	return element as HTMLButtonElement
+}
+
+/** Drive a controlled input the way React's own change handler expects. */
+function type(input: HTMLInputElement, value: string) {
+	const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set
+	act(() => {
+		setter?.call(input, value)
+		input.dispatchEvent(new Event("input", { bubbles: true }))
+	})
+}
+
+function addFieldButton(scope: ParentNode): HTMLButtonElement {
+	const element = [...scope.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.trim() === "Add Field")
 	expect(element).toBeTruthy()
 	return element as HTMLButtonElement
 }
@@ -173,4 +209,42 @@ describe("CustomFieldsBuilder persisted identities", () => {
 			expect(host.querySelector<HTMLInputElement>(childNameSelector)?.disabled).toBe(true)
 		},
 	)
+
+	it("keeps a new nested field editable when its name matches a persisted field at another level", () => {
+		// A flat, tree-wide name set would see "title" as already persisted and
+		// lock this child. Names are unique per level, so the group owns its own.
+		const parent = containerField("group", "details", "Details", [])
+		renderBuilder([textField("title", "Title"), parent])
+
+		click(toggle("Details"))
+		const parentCard = toggle("Details").parentElement?.parentElement as HTMLDivElement
+		click(addFieldButton(parentCard))
+
+		const childName = host.querySelector<HTMLInputElement>('input[name="custom_fields.1.fields.0.name"]') as HTMLInputElement
+		type(childName, "title")
+
+		// The new child keeps the name editable; the saved field of the same name stays locked.
+		expect(host.querySelector<HTMLInputElement>('input[name="custom_fields.1.fields.0.name"]')?.disabled).toBe(false)
+
+		click(toggle("Title"))
+		expect(host.querySelector<HTMLInputElement>('input[name="custom_fields.0.name"]')?.disabled).toBe(true)
+	})
+
+	it("opens a newly added row and keeps it open through a type change", () => {
+		renderBuilder([textField("title", "Title")])
+
+		click(addFieldButton(host))
+		expect(host.querySelector('input[name="custom_fields.1.name"]')).toBeTruthy()
+
+		// update() remounts the card, so the open state cannot live on field.id.
+		const types = [...host.querySelectorAll<HTMLSelectElement>('select[aria-label="Type"]')]
+		const select = types.at(-1) as HTMLSelectElement
+		act(() => {
+			select.value = "number"
+			select.dispatchEvent(new Event("change", { bubbles: true }))
+		})
+
+		expect(host.querySelector('input[name="custom_fields.1.name"]')).toBeTruthy()
+		expect(host.querySelector<HTMLSelectElement>('select[name="custom_fields.1.type"]')?.value).toBe("number")
+	})
 })

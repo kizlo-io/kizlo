@@ -37,22 +37,22 @@ class CustomFieldsValidatorTest extends TestCase
 
     public function test_rejects_a_name_that_overflows_the_key_limit(): void
     {
-        // '_kcf_' (5) + name must stay within 255, so a 251-char name overflows.
-        $this->assertRejected([['type' => 'text', 'name' => str_repeat('a', 251)]]);
+        // 'kcf_' (4) + name must stay within 255, so a 252-char name overflows.
+        $this->assertRejected([['type' => 'text', 'name' => str_repeat('a', 252)]]);
     }
 
     public function test_accepts_a_name_exactly_at_the_key_limit(): void
     {
-        $defs = FieldDefinitions::normalize([['type' => 'text', 'name' => str_repeat('a', 250)]]);
+        $defs = FieldDefinitions::normalize([['type' => 'text', 'name' => str_repeat('a', 251)]]);
 
         CustomFieldsValidator::assert($defs);
-        $this->assertSame(255, strlen('_kcf_' . $defs[0]['name']));
+        $this->assertSame(255, strlen('kcf_' . $defs[0]['name']));
     }
 
     public function test_reserves_ten_digits_for_unbounded_repeater_indexes(): void
     {
         // Parent 'r' + '_' + 10-digit index + '_' + child leaves no room for a long child name.
-        // _kcf_ (5) + r_ (2) + 9999999999_ (11) = 18, so a 240-char child name overflows.
+        // kcf_ (4) + r_ (2) + 9999999999_ (11) = 17, so a 240-char child name overflows.
         $this->assertRejected([
             [
                 'type'   => 'repeater',
@@ -195,8 +195,8 @@ class CustomFieldsValidatorTest extends TestCase
 
     public function test_allows_a_safe_type_change(): void
     {
-        $previous = FieldDefinitions::normalize([['key' => 'field_a1', 'type' => 'text', 'name' => 'body']]);
-        $next     = FieldDefinitions::normalize([['key' => 'field_a1', 'type' => 'richtext', 'name' => 'body']], $previous);
+        $previous = FieldDefinitions::normalize([['type' => 'text', 'name' => 'body']]);
+        $next     = FieldDefinitions::normalize([['type' => 'richtext', 'name' => 'body']], $previous);
 
         CustomFieldsValidator::assert($next, $previous);
         $this->assertSame('richtext', $next[0]['type']);
@@ -218,12 +218,49 @@ class CustomFieldsValidatorTest extends TestCase
 
     public function test_rejects_an_unsafe_type_change(): void
     {
-        $previous = FieldDefinitions::normalize([['key' => 'field_a1', 'type' => 'text', 'name' => 'body']]);
+        $previous = FieldDefinitions::normalize([['type' => 'text', 'name' => 'body']]);
 
         $this->expectException(InvalidArgumentException::class);
         CustomFieldsValidator::assert(
-            FieldDefinitions::normalize([['key' => 'field_a1', 'type' => 'number', 'name' => 'body']], $previous),
+            FieldDefinitions::normalize([['type' => 'number', 'name' => 'body']], $previous),
             $previous
         );
+    }
+
+    public function test_rejects_an_unsafe_type_change_on_a_nested_field(): void
+    {
+        $previous = FieldDefinitions::normalize([[
+            'type'   => 'group',
+            'name'   => 'features',
+            'fields' => [['type' => 'text', 'name' => 'body']],
+        ]]);
+
+        $this->expectException(InvalidArgumentException::class);
+        CustomFieldsValidator::assert(
+            FieldDefinitions::normalize([[
+                'type'   => 'group',
+                'name'   => 'features',
+                'fields' => [['type' => 'number', 'name' => 'body']],
+            ]], $previous),
+            $previous
+        );
+    }
+
+    public function test_a_nested_name_does_not_inherit_the_type_of_a_field_at_another_level(): void
+    {
+        // Both are named 'body'. Keyed by name alone the group child would be
+        // seen as the top-level text field and rejected for becoming a number.
+        $previous = FieldDefinitions::normalize([
+            ['type' => 'text', 'name' => 'body'],
+            ['type' => 'group', 'name' => 'features', 'fields' => []],
+        ]);
+
+        $next = FieldDefinitions::normalize([
+            ['type' => 'text', 'name' => 'body'],
+            ['type' => 'group', 'name' => 'features', 'fields' => [['type' => 'number', 'name' => 'body']]],
+        ], $previous);
+
+        CustomFieldsValidator::assert($next, $previous);
+        $this->assertSame('number', $next[1]['fields'][0]['type']);
     }
 }

@@ -53,7 +53,10 @@ final class DefinitionSchemas
     private const CUSTOM_FIELDS_REPLACEMENT = 'When supplied, this array replaces the complete ordered '
         . 'custom-field collection, at every level: a group\'s or repeater\'s `fields` array likewise '
         . 'replaces that container\'s children. Existing fields omitted from the array are removed. '
-        . 'Omit `custom_fields` to leave the collection unchanged.';
+        . 'Omit `custom_fields` to leave the collection unchanged. A field is identified by its `name`, '
+        . 'which is matched against the existing fields at the same level: an existing name updates that '
+        . 'field, a new one adds it. Names cannot be changed, so a field keeps the storage address its '
+        . 'values already live at.';
 
     /**
      * @param string[] $readOnly

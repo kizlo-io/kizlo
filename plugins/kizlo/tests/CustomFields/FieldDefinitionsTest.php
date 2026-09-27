@@ -6,34 +6,47 @@ use Kizlo\Tests\TestCase;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 
 /**
- * Normalization is the gate every raw definition passes through: it mints a
- * permanent `field_*` key, locks the name to its first-saved value, drops invalid
- * entries, and recurses into groups and repeaters.
+ * Normalization is the gate every raw definition passes through: it reconciles
+ * against the previous definitions by name, drops invalid entries, and recurses
+ * into groups and repeaters.
  */
 class FieldDefinitionsTest extends TestCase
 {
-    public function test_mints_a_field_key_and_normalizes_the_name(): void
+    public function test_normalizes_the_name_and_carries_no_other_identity(): void
     {
         $result = FieldDefinitions::normalize([
             ['type' => 'text', 'name' => 'Company Name', 'label' => 'Company'],
         ]);
 
         $this->assertCount(1, $result);
-        $this->assertMatchesRegularExpression('/^field_[a-z0-9]+$/', $result[0]['key']);
+        $this->assertArrayNotHasKey('key', $result[0]);
         $this->assertSame('company_name', $result[0]['name']);
         $this->assertSame('Company', $result[0]['label']);
         $this->assertFalse($result[0]['required']);
     }
 
-    public function test_name_locks_to_its_first_saved_value(): void
+    public function test_a_stale_key_in_the_payload_is_ignored(): void
     {
-        $previous = [['key' => 'field_abc123', 'name' => 'original', 'type' => 'text', 'label' => '', 'instructions' => '', 'required' => false, 'default' => null]];
+        $previous = [['name' => 'original', 'type' => 'text', 'label' => '', 'instructions' => '', 'required' => false, 'default' => null]];
 
         $result = FieldDefinitions::normalize([
-            ['key' => 'field_abc123', 'type' => 'text', 'name' => 'renamed_attempt'],
+            ['key' => 'field_abc123', 'type' => 'text', 'name' => 'original', 'label' => 'Kept'],
+            ['key' => 'field_abc123', 'type' => 'text', 'name' => 'added'],
         ], $previous);
 
-        $this->assertSame('original', $result[0]['name']);
+        $this->assertSame(['original', 'added'], array_column($result, 'name'));
+        $this->assertArrayNotHasKey('key', $result[0]);
+        $this->assertArrayNotHasKey('key', $result[1]);
+        $this->assertSame('Kept', $result[0]['label']);
+    }
+
+    public function test_an_unmatched_name_adds_a_field_rather_than_renaming_one(): void
+    {
+        $previous = FieldDefinitions::normalize([['type' => 'text', 'name' => 'original']]);
+
+        $result = FieldDefinitions::normalize([['type' => 'text', 'name' => 'renamed_attempt']], $previous);
+
+        $this->assertSame(['renamed_attempt'], array_column($result, 'name'));
     }
 
     public function test_drops_entries_with_unknown_types(): void
