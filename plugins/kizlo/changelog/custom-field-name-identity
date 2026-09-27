@@ -1,4 +1,0 @@
-Significance: minor
-Type: changed
-
-Identify a custom field by its name; the generated key is gone from the API.

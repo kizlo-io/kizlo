@@ -4,6 +4,26 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-09-27
+### Added
+- Allow sites and integrations to opt REST namespaces into automatic contract discovery.
+- Describe routes no WP_REST_Controller serves, and let a namespace name its own APIs.
+- Describe the WordPress core REST API in the generated contract, so wp/v2 and wp-site-health/v1 routes are typed alongside Kizlo's own
+
+### Changed
+- Collapse custom-field groups, repeaters, and repeater rows in the post and term editors, so a long field set opens as a compact list of headers
+- Describe an operation's request as separate params, query, and body schemas.
+- Describe what supplying custom_fields does on the post type and taxonomy update inputs
+- Identify a custom field by its name; the generated key is gone from the API.
+- Limit core WordPress route envelopes to custom fields, extensions, and enabled SEO for every included content type.
+- Namespace every API ID the plugin registers under `kizlo.`, so the generated client separates Kizlo's own routes from the WordPress and WooCommerce ones it only describes
+- Publish one operation for a handler whose callback core does not name, however many write verbs it registers.
+
+### Fixed
+- Allow integrations to register error codes for an introspected route without redeclaring its contract.
+- Apply configured custom fields and SEO to post types and taxonomies an integration contributes, such as WooCommerce products
+- Refresh managed post types and taxonomies after a plugin is activated or deactivated
+
 ## [0.18.0] - 2026-09-18
 ### Added
 - Author per-post and per-term SEO over the REST API through the kizlo.seo write property.
@@ -203,6 +223,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.19.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.18.0...kizlo-v0.19.0
 [0.18.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.17.1...kizlo-v0.18.0
 [0.17.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.17.0...kizlo-v0.17.1
 [0.17.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.16.0...kizlo-v0.17.0
