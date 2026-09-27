@@ -58,6 +58,7 @@ final class StoreApiSchemas
      */
     public const REQUIRED_ARGUMENTS = [
         '/cart/add-item'      => ['id'],
+        '/cart/items'         => ['id'],
         '/cart/update-item'   => ['key', 'quantity'],
         '/cart/remove-item'   => ['key'],
         '/cart/apply-coupon'  => ['code'],

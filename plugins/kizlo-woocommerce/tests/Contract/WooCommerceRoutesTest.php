@@ -269,7 +269,7 @@ class WooCommerceRoutesTest extends TestCase
      */
     public function test_every_required_argument_overlay_still_matches_a_live_route(): void
     {
-        $this->bootRestServer();
+        $this->bootDescribedRestServer();
 
         $stale = [];
 
@@ -464,6 +464,64 @@ class WooCommerceRoutesTest extends TestCase
     }
 
     /**
+     * `CartItems::get_args()` derives its arguments from a cart-item response
+     * schema whose only writable property is `extensions`, so the registration
+     * names nothing a caller could use to say which product to add. Its handler
+     * reads three arguments all the same, and the correction takes them off the
+     * sibling that registers them.
+     */
+    public function test_the_cart_items_create_names_the_product_it_adds(): void
+    {
+        $body = $this->document()['apis']['woocommerce.store.cart.items']
+            ['paths']['/cart/items']['create']['input']['body'];
+
+        $this->assertTrue($body['properties']['id']['required'] ?? false, 'The create cannot name a product.');
+        $this->assertSame('integer', $body['properties']['id']['type'] ?? null);
+        $this->assertSame('number', $body['properties']['quantity']['type'] ?? null);
+        $this->assertSame('array', $body['properties']['variation']['type'] ?? null);
+
+        // Registered optional, and now optional to call as well.
+        $this->assertArrayHasKey('extensions', $body['properties']);
+        $this->assertArrayNotHasKey('required', $body['properties']['extensions']);
+    }
+
+    /**
+     * The correction keys on two registered routes and copies three arguments
+     * between them. Comparing all of that against the live route table is the
+     * alarm for an upstream rename, the same way the overlay comparison is.
+     *
+     * A WooCommerce release that registers these on the create itself trips the
+     * comparison too, because the correction leaves an argument WooCommerce
+     * already registers alone. That reading is the correction having become
+     * redundant, so delete it rather than chase a rename.
+     */
+    public function test_the_cart_items_correction_still_matches_woocommerce(): void
+    {
+        $this->bootDescribedRestServer();
+
+        $routes = rest_get_server()->get_routes();
+
+        foreach ([RouteCorrections::CART_ITEMS, RouteCorrections::CART_ADD_ITEM] as $route) {
+            $this->assertIsArray($routes[$route] ?? null, sprintf('%s is not registered.', $route));
+        }
+
+        $source = $this->creatableArguments($routes[RouteCorrections::CART_ADD_ITEM]);
+        $target = $this->creatableArguments($routes[RouteCorrections::CART_ITEMS]);
+
+        foreach (RouteCorrections::CART_ITEM_ARGUMENTS as $name) {
+            $this->assertArrayHasKey($name, $source, sprintf('The add-item route no longer registers "%s" to copy.', $name));
+            $this->assertSame($source[$name], $target[$name], sprintf('The create did not take "%s" from its sibling.', $name));
+        }
+
+        $this->assertArrayHasKey('extensions', $target);
+        $this->assertArrayNotHasKey(
+            'default',
+            $target['extensions'],
+            'The computed extensions default is back, so the create rejects a request that leaves it out.',
+        );
+    }
+
+    /**
      * The status a handler answers with lives in a `set_status()` call inside its
      * body, and nothing publishes it, so discovery has to guess: a POST on a
      * literal path reads as a create, and a create is assumed to answer `201`.
@@ -481,7 +539,7 @@ class WooCommerceRoutesTest extends TestCase
      */
     public function test_a_cart_route_answers_what_it_declares(): void
     {
-        $this->bootRestServer();
+        $this->bootDescribedRestServer();
 
         add_filter('woocommerce_store_api_disable_nonce_check', '__return_true');
         wc_load_cart();
@@ -532,16 +590,14 @@ class WooCommerceRoutesTest extends TestCase
         $observed[] = ['/cart/coupons/{code}', 'DELETE', $this->dispatch('DELETE', '/cart/coupons/kizlo-probe')];
         $observed[] = ['/cart/coupons', 'DELETE', $this->dispatch('DELETE', '/cart/coupons')];
 
-        // `POST /cart/items` carries an explicit empty `extensions` because the
-        // default WooCommerce computes for that argument fails its own validation,
-        // so the route answers 400 to a request that leaves it out. KIZ-209 covers
-        // the described input; the status below is what this test is asserting.
-        $create = $add + ['extensions' => new \stdClass()];
-
+        // The create is driven twice: on `id` and `quantity` alone, which is what
+        // the contract describes, and then carrying an explicit `extensions`,
+        // which is what proves dropping that argument's computed default left a
+        // submitted one validated as before.
         $observed[] = ['/cart/remove-item', 'POST', $this->dispatch('POST', '/cart/remove-item', ['key' => $key])];
-        $observed[] = ['/cart/items', 'POST', $this->dispatch('POST', '/cart/items', $create)];
+        $observed[] = ['/cart/items', 'POST', $this->dispatch('POST', '/cart/items', $add)];
         $observed[] = ['/cart/items/{key}', 'DELETE', $this->dispatch('DELETE', '/cart/items/' . (string) array_key_first(WC()->cart->get_cart()))];
-        $observed[] = ['/cart/items', 'POST', $this->dispatch('POST', '/cart/items', $create)];
+        $observed[] = ['/cart/items', 'POST', $this->dispatch('POST', '/cart/items', $add + ['extensions' => new \stdClass()])];
         $observed[] = ['/cart/items', 'DELETE', $this->dispatch('DELETE', '/cart/items')];
 
         remove_filter('woocommerce_store_api_disable_nonce_check', '__return_true');
@@ -587,6 +643,27 @@ class WooCommerceRoutesTest extends TestCase
         preg_match_all('/\{(\w+)\}/', $path, $matches);
 
         return array_fill_keys($matches[1], true);
+    }
+
+    /**
+     * The arguments a route registers on the handler that takes a `POST`.
+     *
+     * Read off `get_routes()`, which has normalized `methods` into a lookup by
+     * the time it answers, so the create is told apart from the read and the
+     * delete registered beside it.
+     *
+     * @param array<int, mixed> $handlers
+     * @return array<string, mixed>
+     */
+    private function creatableArguments(array $handlers): array
+    {
+        foreach ($handlers as $handler) {
+            if (is_array($handler) && !empty($handler['methods']['POST']) && is_array($handler['args'] ?? null)) {
+                return $handler['args'];
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -763,6 +840,21 @@ class WooCommerceRoutesTest extends TestCase
         return $values;
     }
 
+    /**
+     * Boot the route table the way the plugin serves it.
+     *
+     * `ContractModule::describe()` is what registers Kizlo's corrections, the
+     * `rest_endpoints` pair included, and WordPress runs it at `init`.
+     * `WP_UnitTestCase` restores hooks between tests, so a test comparing
+     * against the live table, or dispatching against it, has to run it again or
+     * it reads a registration nothing serves.
+     */
+    private function bootDescribedRestServer(): void
+    {
+        (new ContractModule())->describe();
+        $this->bootRestServer();
+    }
+
     /** @return array<string, mixed> */
     private function document(): array
     {
@@ -781,8 +873,7 @@ class WooCommerceRoutesTest extends TestCase
      */
     private function rebuiltDocument(): array
     {
-        (new ContractModule())->describe();
-        $this->bootRestServer();
+        $this->bootDescribedRestServer();
         ManagedContent::flush();
 
         return Registry::build();
