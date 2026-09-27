@@ -39,18 +39,19 @@ function note(text: string): void {
 }
 
 /**
- * Print the connection summary as an aligned, Next.js-style block. Shows the wp-admin URL on
- * the loopback ("Local") and — when local WordPress is installed on a LAN address rather than
- * localhost — on the network, so it can be opened from other devices. On a fresh install, also
- * show the default wp-admin login. The MCP row is the address to paste into a harness's own
+ * Print the connection summary as an aligned, Next.js-style block. Shows the login URL on the
+ * loopback ("Local"), and on the network too when local WordPress is installed on a LAN address
+ * rather than localhost, so it can be opened from other devices. That path comes from the stack
+ * (`adminPath`), since Headless Mode's login rename moves it off `/wp-admin`. On a fresh install,
+ * also show the default wp-admin login. The MCP row is the address to paste into a harness's own
  * configuration: nothing writes one, because each harness reads a different file.
  */
 function printSummary(info: DevStackInfo, mcpUrl?: string): void {
 	const { cyan, dim, reset } = palette()
 	const { port, hostname } = new URL(info.url)
 
-	const rows: [string, string][] = [["WP Local", `http://localhost:${port}/wp-admin`]]
-	if (hostname !== "localhost") rows.push(["WP Network", `${info.url}/wp-admin`])
+	const rows: [string, string][] = [["WP Local", `http://localhost:${port}${info.adminPath}`]]
+	if (hostname !== "localhost") rows.push(["WP Network", `${info.url}${info.adminPath}`])
 	rows.push(["Database Connection", `127.0.0.1:${info.dbPort}`])
 	if (mcpUrl) rows.push(["MCP", mcpUrl])
 

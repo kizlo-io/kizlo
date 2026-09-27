@@ -1,6 +1,6 @@
 import type { NetworkInterfaceInfo } from "node:os"
 import { describe, expect, test } from "vitest"
-import { lanAddress } from "./dev"
+import { lanAddress, resolveAdminPath } from "./dev"
 
 function ipv4(address: string, internal = false): NetworkInterfaceInfo {
 	return {
@@ -31,5 +31,32 @@ describe("lanAddress", () => {
 
 	test("returns undefined without a usable physical IPv4 address", () => {
 		expect(lanAddress({ lo0: [ipv4("127.0.0.1", true)], docker0: [ipv4("172.17.0.1")] })).toBeUndefined()
+	})
+})
+
+describe("resolveAdminPath", () => {
+	const headless = (overrides: Record<string, unknown>): string =>
+		JSON.stringify({ enabled: true, rename_login: true, login_slug: "mylogin", ...overrides })
+
+	test("points at the secret slug while the login rename is fully configured", () => {
+		expect(resolveAdminPath(headless({}))).toBe("/mylogin")
+	})
+
+	test.each([
+		["the master switch is off", { enabled: false }],
+		["the rename toggle is off", { rename_login: false }],
+		["no slug is set", { login_slug: null }],
+		["the slug is empty", { login_slug: "" }],
+	])("falls back to wp-admin when %s", (_case, overrides) => {
+		expect(resolveAdminPath(headless(overrides))).toBe("/wp-admin")
+	})
+
+	test.each([
+		["the option is absent", undefined],
+		["the option is empty", ""],
+		["the output isn't JSON", "Error: could not get option."],
+		["the option holds no object", "null"],
+	])("falls back to wp-admin when %s", (_case, option) => {
+		expect(resolveAdminPath(option)).toBe("/wp-admin")
 	})
 })

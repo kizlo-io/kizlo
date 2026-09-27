@@ -141,6 +141,77 @@ export async function stackStatus(project: string): Promise<StackStatus> {
 	}
 }
 
+/**
+ * How long `composeUp` waits for every service to report healthy. The `wordpress` probe's own
+ * verdict lands anywhere from ~330s (a 30s start period, then 60 retries 5s apart) to ~630s when
+ * every attempt burns its full 5s timeout, so this cap sits inside that range on purpose: a stack
+ * that is still coming up is never cut off, while one that will never converge is reported at
+ * roughly six minutes rather than eleven. Past the cap the error names each service's state at that
+ * moment instead of the healthcheck's final verdict, which is the trade this bound accepts.
+ */
+const WAIT_TIMEOUT_SECONDS = 360
+
+/** Cap on a healthcheck's reported output; docker keeps up to 4 KB per probe, far more than reads. */
+const PROBE_OUTPUT_LIMIT = 500
+
+/** A container as `docker compose ps --format json` reports it. */
+interface ComposeContainer {
+	Name: string
+	Service: string
+	State: string
+	/** Empty for a service that declares no healthcheck, and optional because not every build prints it. */
+	Health?: string
+}
+
+/**
+ * Compose's per-resource progress chatter, which it writes to stderr even when the command works:
+ * `Container x Created`, `Volume y Removed`. A failed `up --wait` buries its real message under a
+ * dozen of these, so they are dropped and the lines that say what went wrong survive: `Container x
+ * Error …`, `dependency failed to start: …`, a denied mount. An unrecognised verb just costs one
+ * noise line, and anything carrying trailing text is kept, so this can only under-filter.
+ */
+const COMPOSE_PROGRESS_LINE =
+	/^(?:Container|Network|Volume|Image)\s+\S+\s+(?:Creating|Created|Recreate|Recreated|Starting|Started|Stopping|Stopped|Removing|Removed|Waiting|Healthy|Running|Pulling|Pulled|Building|Built|Skipped)$/
+
+/** Docker's own message for a failed command, with its progress chatter removed. */
+function dockerMessage(res: RunResult): string {
+	return (res.stderr || res.stdout)
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line !== "" && !COMPOSE_PROGRESS_LINE.test(line))
+		.join("\n")
+}
+
+/** The health docker keeps per container, including a rolling log of probe results. */
+interface ContainerHealth {
+	Status: string
+	FailingStreak: number
+	Log: { ExitCode: number; Output: string }[]
+}
+
+/**
+ * Whether compose reports a container's healthcheck as passing, or as having none to report. The
+ * field is empty for a service without a healthcheck and absent altogether on some compose builds,
+ * and neither is a failure, so both read as healthy here.
+ */
+function isHealthy(health: string | undefined): boolean {
+	return !health || health === "healthy"
+}
+
+/** Containers from `compose ps --format json`: one object per line, or a single array on older builds. */
+function parseComposePs(stdout: string): ComposeContainer[] {
+	const trimmed = stdout.trim()
+	if (!trimmed) return []
+	return (trimmed.startsWith("[") ? [trimmed] : trimmed.split("\n")).flatMap((chunk) => {
+		try {
+			const parsed: unknown = JSON.parse(chunk)
+			return (Array.isArray(parsed) ? parsed : [parsed]) as ComposeContainer[]
+		} catch {
+			return []
+		}
+	})
+}
+
 function bind(stack: Stack): DockerStack {
 	const base = ["compose", "-p", stack.project, ...stack.composeFiles.flatMap((file) => ["-f", file])]
 	const env = { ...process.env, WP_PORT: String(stack.port), WP_IMAGE_TAG: stack.wordpressTag }
@@ -149,9 +220,64 @@ function bind(stack: Stack): DockerStack {
 
 	const composePull: DockerStack["composePull"] = (services = []) => compose(["pull", ...services])
 
+	/**
+	 * The last line a container's healthcheck printed, as `exit <code>: <output>`. Undefined when
+	 * the container declares no healthcheck, has not run one yet, or docker could not answer. In all
+	 * of those the caller has nothing to add beyond the service's state.
+	 */
+	const lastProbe = async (container: string): Promise<string | undefined> => {
+		const res = await run("docker", ["inspect", "--format", "{{json .State.Health}}", container], env)
+		if (res.code !== 0) return undefined
+		let health: ContainerHealth | null
+		try {
+			health = JSON.parse(res.stdout.trim())
+		} catch {
+			return undefined
+		}
+		const last = health?.Log?.at(-1)
+		if (!last) return undefined
+		// Collapsed to one line: a probe's output is short, and the error reads as a list of services.
+		// Defaulted because a probe docker killed on its own timeout can record no output at all.
+		const output = (last.Output ?? "")
+			.trim()
+			.replace(/\s*\n\s*/g, " ")
+			.slice(0, PROBE_OUTPUT_LIMIT)
+		return output ? `exit ${last.ExitCode}: ${output}` : `exit ${last.ExitCode}`
+	}
+
+	const describe = async (container: ComposeContainer): Promise<string> => {
+		const state = container.Health ? `${container.State} (${container.Health})` : container.State
+		const probe = await lastProbe(container.Name)
+		return `  ${container.Service}: ${state}${probe ? `, healthcheck ${probe}` : ""}`
+	}
+
+	/**
+	 * Why the stack did not come up, in terms the user can act on: every service that isn't running
+	 * and healthy, with the last thing its healthcheck reported. `compose up --wait` only says that
+	 * waiting failed, and a probe failing quietly (a 404, a refused connection) leaves no trace in
+	 * its stderr, so the container's own health log is the only place that answer exists.
+	 *
+	 * Never throws. This runs while a failure is already being reported, so a second fault here
+	 * (docker gone, a health log shaped differently) must cost the explanation, not replace it.
+	 */
+	const diagnose = async (): Promise<string> => {
+		try {
+			const res = await compose(["ps", "--all", "--format", "json"])
+			const failing = parseComposePs(res.stdout).filter((container) => container.State !== "running" || !isHealthy(container.Health))
+			return (await Promise.all(failing.map(describe))).join("\n")
+		} catch {
+			return ""
+		}
+	}
+
 	const composeUp = async (): Promise<void> => {
-		const res = await compose(["up", "-d", "--wait"])
-		if (res.code !== 0) throw new Error(`docker compose up failed:\n${res.stderr}`)
+		const res = await compose(["up", "-d", "--wait", "--wait-timeout", String(WAIT_TIMEOUT_SECONDS)])
+		if (res.code === 0) return
+		// Both halves, docker's own message first. A failure with no unhealthy service behind it (a
+		// denied mount, a port already bound, a bad override) is only ever explained by docker's
+		// output, so the service list has to augment it rather than stand in for it.
+		const detail = [dockerMessage(res), await diagnose()].filter(Boolean).join("\n")
+		throw new Error(`docker compose up failed (waited up to ${WAIT_TIMEOUT_SECONDS}s for healthy services):\n${detail}`)
 	}
 
 	const composeDown = async (opts?: { volumes?: boolean }): Promise<void> => {

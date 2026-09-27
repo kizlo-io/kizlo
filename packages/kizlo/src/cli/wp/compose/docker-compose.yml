@@ -67,9 +67,14 @@ services:
       - ./uploads.ini:/usr/local/etc/php/conf.d/zz-kizlo-uploads.ini:ro
       - ./apache-listen.conf:/etc/apache2/conf-enabled/zz-kizlo-listen.conf:ro
     healthcheck:
-      # wp-login.php always returns 200 unauthenticated; /wp-json can be gated to 401
-      # by plugins, so it's not a reliable liveness probe.
-      test: ["CMD-SHELL", "curl -sf http://localhost/wp-login.php > /dev/null || exit 1"]
+      # Liveness, not a status assertion: the install is in place (what wp-cli needs before
+      # it can run anything) and the server answers HTTP at all. Deliberately status-agnostic,
+      # because Kizlo's own Headless Mode legitimately 404s the front page, the feeds and the
+      # login path. Requiring a 2xx from any WordPress page (`curl -f`) makes an install that is
+      # working as configured look dead, and every service gated on this one never starts.
+      # curl's own limit is a second under `timeout` below, so a server that accepts the connection
+      # and then stalls is reported by curl rather than killed by docker with nothing to show.
+      test: ["CMD-SHELL", "test -f /var/www/html/wp-includes/version.php && curl -s -o /dev/null -m 4 http://localhost/"]
       interval: 5s
       timeout: 5s
       retries: 60
