@@ -3,7 +3,7 @@ title: createKizloClient
 description: Create a typed client for calling your Kizlo procedures from the browser.
 ---
 
-`createKizloClient` builds a typed client from your generated contract. Each [procedure](/docs/reference/functions/create-procedure)
+`createKizloClient` builds a typed client for your procedures. Each [procedure](/docs/reference/functions/create-procedure)
 becomes a callable method, dispatched by its `scope`: `api` procedures over REST, `remote` procedures over RPC.
 It is the browser counterpart to the server-to-server `client` returned by [`createKizlo`](/docs/reference/functions/create-kizlo).
 
@@ -18,6 +18,9 @@ createKizloClient(contract, options?)
 The generated contract, the client's routing table. For each call, the client looks up the procedure in the
 contract and dispatches by its `scope`. `internal` procedures are omitted from the browser client.
 
+This argument is the routing table only. The client's *types* come from the registry your generated barrel
+augments, not from what you pass here, so nothing is asserted about the committed `contract.json`.
+
 ### `options.url`
 
 Base URL of your Kizlo server. Defaults to the current page origin (`window.location.origin`), which is correct when
@@ -25,9 +28,20 @@ the client and server share an origin. Set it to call a server on a different or
 
 ## Returns
 
-A typed client for your contract. Each procedure is callable as `client.<path>(...)` and resolves to a
+A typed client whose procedures come from `ActiveKizloClient`, your project's own tree resolved from the
+`KizloProcedureRegistry` that `kizlo generate` registers in the barrel. Each procedure is callable as `client.<path>(...)` and resolves to a
 `{ data, error, success }` result you branch on (check `error`, or the `success` discriminant). Append `.call(...)`
 for the throwing variant that returns the value directly.
+
+Because the type lives in the registry rather than in the value, `ActiveKizloClient` is importable from `kizlo`
+anywhere: a React context, a shared hook, a package that never receives the client itself.
+
+<Callout type="warn">
+  When nothing registers a barrel, `ActiveKizloClient` falls back to `any` and every call typechecks without
+  complaint. `kizlo init` writes the barrel, so a new project is registered from the start. What reaches the
+  fallback is a barrel from an earlier version of Kizlo, which registers nothing: run
+  [`kizlo generate`](/docs/concepts/cli#kizlo-generate) after upgrading, and commit the regenerated barrel.
+</Callout>
 
 ```ts
 const { data, error } = await client.posts.list({ query: { perPage: 10 } })

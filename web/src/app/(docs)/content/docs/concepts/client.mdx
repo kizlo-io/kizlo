@@ -128,25 +128,36 @@ The exported procedure tree is the only place your API is defined. The
 - **`contract.json`** is the contract itself. For every procedure it stores the endpoint configuration: the
   `scope` and the `route` it's reached by (`method` + `path`), nested to mirror the procedure tree. No handlers, no
   schemas, no secrets, just the call config the client needs to dispatch each request.
-- **`generated/index.ts`** is a small barrel that imports that JSON and re-types it as your server's
-  `typeof procedures`, so the client is typed end to end:
+- **`generated/index.ts`** is a small barrel that imports that JSON and registers your server's
+  `procedures` with Kizlo, so the client is typed end to end:
 
   ```ts title="src/lib/kizlo/server/generated/index.ts"
   import type { procedures } from ".."
   import contractJson from "./contract.json"
 
-  export const contract = contractJson as unknown as typeof procedures
+  export const contract = contractJson
+
+  declare module "kizlo" {
+    interface KizloProcedureRegistry {
+      procedures: typeof procedures
+    }
+  }
   ```
 
-The JSON is the real artifact; the cast only layers types on top. At **build time** that gives `contract` the
-full type of your procedure tree: every namespace, input, output, and error code flows into the browser client. At
-**runtime** it's just the small JSON object. The server code is never bundled, yet the client stays fully
-typed.
+The JSON is the real artifact; the registration only layers types on top. At **build time** it gives
+`ActiveKizloClient` the full type of your procedure tree: every namespace, input, output, and error code flows into
+the browser client. At **runtime** it's just the small JSON object. The server code is never bundled, yet the
+client stays fully typed.
+
+Because the types come from that registration rather than from the `contract` value, anything can name them.
+`import type { ActiveKizloClient } from "kizlo"` types a React context, a shared hook, or a package that never
+receives the client itself.
 
 <Callout>
   This is why you regenerate the contract when procedures change. `kizlo generate` does it once for builds and
   CI; `kizlo dev` does it on every save in development, so the client stays typed against the latest server.
-  See [CLI](/docs/concepts/cli#kizlo-generate).
+  See [CLI](/docs/concepts/cli#kizlo-generate). Regenerate after upgrading Kizlo too: a barrel that registers
+  nothing leaves the client at `any`, and nothing reports it.
 </Callout>
 
 ### A clean call surface
@@ -160,8 +171,9 @@ strings.
 const { data } = await client.featured.get({ params: { id: 42 } })
 ```
 
-You hand the contract to `createKizloClient` and it becomes the client's routing table. For each call, the
-client looks up the procedure in the contract and dispatches by its `scope`:
+You hand the contract to `createKizloClient` and it becomes the client's routing table. The types don't come
+from that argument, they come from the registration above, so passing the contract is purely what makes each call
+dispatch. For each call, the client looks up the procedure in the contract and dispatches by its `scope`:
 
 - **`api`** sends a REST request to the procedure's `method` + `path`.
 - **`remote`** sends an RPC request.

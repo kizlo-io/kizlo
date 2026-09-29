@@ -136,7 +136,10 @@ describe("generateOnce", () => {
 		expect(JSON.parse(fs.readFileSync(path.join(cfg.cwd, server.contractPath), "utf8"))).toHaveProperty("posts")
 		expect(fs.readFileSync(path.join(cfg.cwd, server.barrelPath), "utf8")).toBe(CONTRACT_BARREL)
 		expect(CONTRACT_BARREL).toContain('import type { procedures } from ".."')
-		expect(CONTRACT_BARREL).toContain("typeof procedures")
+		// The contract is registered, not cast onto: the cast asserted that the committed JSON and the
+		// exported tree agreed instead of establishing it.
+		expect(CONTRACT_BARREL).not.toContain("as unknown as")
+		expect(CONTRACT_BARREL).toContain('declare module "kizlo" {\n\tinterface KizloProcedureRegistry {\n\t\tprocedures: typeof procedures')
 		// The barrel re-exports from the introspection artifact, not the old wordpress.ts.
 		expect(CONTRACT_BARREL).toContain('from "./introspection"')
 		expect(CONTRACT_BARREL).toContain('export { introspection, type WordPressClient } from "./introspection"')

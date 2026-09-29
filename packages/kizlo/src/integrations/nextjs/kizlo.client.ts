@@ -1,12 +1,10 @@
-import { KizloClient } from "../../client"
-import type { AnyProcedureTree } from "../../shared/procedure"
+import { createKizloClient as createClient, type KizloBrowserClient } from "../../client"
 import { getServerBaseUrl } from "./utils"
 
 export interface KizloClientOptions {
 	url?: string
 }
 
-export function createKizloClient<T extends AnyProcedureTree>(contract: T, options?: KizloClientOptions): KizloClient<T> {
-	const url = options?.url ?? getServerBaseUrl()
-	return new KizloClient({ url, contract })
+export function createKizloClient(contract: unknown, options?: KizloClientOptions): KizloBrowserClient {
+	return createClient(contract, { url: options?.url ?? getServerBaseUrl() })
 }
