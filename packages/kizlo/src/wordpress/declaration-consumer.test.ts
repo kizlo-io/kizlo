@@ -4,7 +4,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import ts from "typescript"
 import { expect, test } from "vitest"
-import { INTROSPECTION_STUB } from "../cli/daemon/generate"
+import { CONTRACT_BARREL, INTROSPECTION_STUB } from "../cli/daemon/generate"
 import { generateWordPressClient } from "./generate"
 import type { IntrospectionDocument, IntrospectionSchema } from "./introspection"
 
@@ -228,7 +228,7 @@ const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProc
 	}
 `
 
-function compile(dir: string): string[] {
+function compile(dir: string, entries: readonly string[] = ["introspection.ts", "usage.ts"]): string[] {
 	const options: ts.CompilerOptions = {
 		baseUrl: dir,
 		lib: ["lib.es2022.d.ts", "lib.dom.d.ts"],
@@ -239,11 +239,12 @@ function compile(dir: string): string[] {
 			"@kizlo/woocommerce": [WOOCOMMERCE_TYPES],
 			kizlo: [KIZLO_TYPES],
 		},
+		resolveJsonModule: true,
 		skipLibCheck: true,
 		strict: true,
 		target: ts.ScriptTarget.ES2022,
 	}
-	const files = [path.join(dir, "introspection.ts"), path.join(dir, "usage.ts")]
+	const files = entries.map((entry) => path.join(dir, entry))
 	const program = ts.createProgram(files, options)
 	return ts
 		.getPreEmitDiagnostics(program)
@@ -269,6 +270,100 @@ test("published declarations retain generated registries across regeneration", (
 		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(introspection("updated")))
 		fs.writeFileSync(path.join(dir, "usage.ts"), usage("updated"))
 		expect(compile(dir)).toEqual([])
+	} finally {
+		fs.rmSync(dir, { force: true, recursive: true })
+	}
+}, 30_000)
+
+const SERVER_PROCEDURES = `import type { Procedure } from "kizlo"
+
+export const procedures = {} as {
+	billing: {
+		invoices: {
+			get: Procedure<"api", { params: { id: string } }, { total: number }, { INVOICE_MISSING: { status: 404 } }>
+		}
+	}
+	seo: {
+		robots: Procedure<"internal", void, { rules: string }>
+	}
+}
+`
+
+const REGISTERED_USAGE = `import { type CommonErrorCode, createKizloClient } from "kizlo"
+	import { contract } from "./generated"
+
+	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+	type Assert<T extends true> = T
+	type IsAny<T> = 0 extends 1 & T ? true : false
+
+	const client = createKizloClient(contract).client
+
+	type Invoice = typeof client.billing.invoices.get
+	type InvoiceData = NonNullable<Awaited<ReturnType<Invoice>>["data"]>
+
+	type ClientIsNotAny = Assert<Equal<IsAny<typeof client>, false>>
+	type InputIsExact = Assert<Equal<Parameters<Invoice>[0], { params: { id: string } }>>
+	type DataIsExact = Assert<Equal<InvoiceData, { total: number }>>
+	type ErrorIsExact = Assert<
+		Equal<NonNullable<Awaited<ReturnType<Invoice>>["error"]>["code"], CommonErrorCode | "INVOICE_MISSING">
+	>
+
+	// @ts-expect-error internal procedures never reach the browser client
+	const internalIsAbsent = client.seo
+	// @ts-expect-error a namespace the registered procedures do not declare
+	const unknownIsAbsent = client.reviews
+
+	export type { ClientIsNotAny, DataIsExact, ErrorIsExact, InputIsExact }
+	export { internalIsAbsent, unknownIsAbsent }
+	`
+
+const UNREGISTERED_USAGE = `import { createKizloClient } from "kizlo"
+
+	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+	type Assert<T extends true> = T
+	type IsAny<T> = 0 extends 1 & T ? true : false
+
+	const client = createKizloClient({}).client
+
+	type ClientIsAny = Assert<Equal<IsAny<typeof client>, true>>
+
+	// A second property access is what distributing \`any\` through the mapped types used to break.
+	const nested = client.woocommerce.cart.items.add
+
+	export type { ClientIsAny }
+	export { nested }
+	`
+
+/**
+ * The registry has to resolve against the app's own generated barrel, not the contract this repo
+ * happens to hold, so the proof has to be a separate program compiled against the built declarations.
+ * An unregistered app is a second program for the same reason: a module augmentation is global to the
+ * program it appears in, so one program cannot be both registered and unregistered.
+ */
+test("published declarations type the browser client from the app's own registered procedures", () => {
+	expect(fs.existsSync(KIZLO_TYPES)).toBe(true)
+
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-procedure-registry-"))
+	try {
+		fs.mkdirSync(path.join(dir, "generated"))
+		fs.writeFileSync(path.join(dir, "index.ts"), SERVER_PROCEDURES)
+		fs.writeFileSync(path.join(dir, "generated", "index.ts"), CONTRACT_BARREL)
+		fs.writeFileSync(path.join(dir, "generated", "contract.json"), "{}\n")
+		fs.writeFileSync(path.join(dir, "generated", "introspection.ts"), INTROSPECTION_STUB)
+		fs.writeFileSync(path.join(dir, "usage.ts"), REGISTERED_USAGE)
+		expect(compile(dir, ["usage.ts"])).toEqual([])
+	} finally {
+		fs.rmSync(dir, { force: true, recursive: true })
+	}
+}, 30_000)
+
+test("published declarations leave an app without a generated barrel compiling on `any`", () => {
+	expect(fs.existsSync(KIZLO_TYPES)).toBe(true)
+
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-procedure-registry-empty-"))
+	try {
+		fs.writeFileSync(path.join(dir, "usage.ts"), UNREGISTERED_USAGE)
+		expect(compile(dir, ["usage.ts"])).toEqual([])
 	} finally {
 		fs.rmSync(dir, { force: true, recursive: true })
 	}

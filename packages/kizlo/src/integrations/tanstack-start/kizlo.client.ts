@@ -1,5 +1,4 @@
-import { KizloClient } from "../../client"
-import type { AnyProcedureTree } from "../../shared/procedure"
+import { createKizloClient as createClient, type KizloBrowserClient } from "../../client"
 import { getServerBaseUrl } from "./utils"
 
 export interface KizloClientOptions {
@@ -16,7 +15,6 @@ export interface KizloClientOptions {
  * over HTTP, so it runs the same in the browser and during SSR. Server routes and server functions use
  * the server-to-server client from {@link createKizlo} instead.
  */
-export function createKizloClient<T extends AnyProcedureTree>(contract: T, options?: KizloClientOptions): KizloClient<T> {
-	const url = options?.url ?? getServerBaseUrl()
-	return new KizloClient({ url, contract })
+export function createKizloClient(contract: unknown, options?: KizloClientOptions): KizloBrowserClient {
+	return createClient(contract, { url: options?.url ?? getServerBaseUrl() })
 }

@@ -32,6 +32,15 @@ type Integrations = [typeof billing]
 
 declare const kizlo: Kizlo<Integrations>
 declare const rootProcedures: RootProcedures<Integrations>
+
+// What a generated barrel writes. `createKizloClient` reads the client type from here, not from its
+// argument, so this registration is what the browser assertions below are actually testing.
+declare module "./client" {
+	interface KizloProcedureRegistry {
+		procedures: RootProcedures<Integrations>
+	}
+}
+
 const browser = createKizloClient(rootProcedures)
 
 // ====================================================
@@ -100,6 +109,20 @@ describe("createKizloClient browser client", () => {
 	it("omits internal-only namespaces from the browser surface", () => {
 		// @ts-expect-error seo is not present on the browser client
 		browser.client.seo
+	})
+
+	it("rejects a namespace the registered procedures do not declare", () => {
+		// @ts-expect-error reviews is not a registered namespace
+		browser.client.reviews
+	})
+
+	it("carries the registered input, output and error types rather than `any`", () => {
+		type Get = typeof browser.client.billing.invoices.get
+
+		expectTypeOf<Get>().not.toBeAny()
+		expectTypeOf<Parameters<Get>[0]>().toEqualTypeOf<{ params: { id: string } }>()
+		expectTypeOf<DataOf<Get>>().toEqualTypeOf<{ total: number }>()
+		expectTypeOf<Exclude<ResultOf<Get>["error"], null>["code"]>().toEqualTypeOf<CommonErrorCode | "INVOICE_MISSING">()
 	})
 })
 

@@ -19,12 +19,23 @@ import { log } from "./logger"
  * The generated barrel is also written as a stub by `kizlo init`. It re-exports `introspection`
  * rather than pre-wrapping it: a server entry passes `createKizlo({ introspection })` itself, so the
  * rest of the options stay visible at the call site instead of hiding inside a generated object.
+ *
+ * `contract` is left with the JSON's own type and the project's `procedures` are registered instead.
+ * The old `as unknown as typeof procedures` asserted that the committed JSON and the exported tree
+ * agreed rather than establishing it, and left the client type reachable only by holding the value.
  */
 export const CONTRACT_BARREL = [
 	`import type { procedures } from ".."`,
 	`import contractJson from "./contract.json"`,
 	``,
-	`export const contract = contractJson as unknown as typeof procedures`,
+	`export const contract = contractJson`,
+	``,
+	`declare module "kizlo" {`,
+	`\tinterface KizloProcedureRegistry {`,
+	`\t\tprocedures: typeof procedures`,
+	`\t}`,
+	`}`,
+	``,
 	`export { introspection, type WordPressClient } from "./introspection"`,
 	``,
 ].join("\n")
