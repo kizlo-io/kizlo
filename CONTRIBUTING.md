@@ -55,6 +55,10 @@ cp web/.env.example .env   # then fill in the values, or let `kizlo dev` write t
 Each template keeps its own complete `.env.example`, because that file is what a
 scaffolded project starts from and a standalone project has no root to read.
 
+`web/` reads one optional variable beyond the connection: `NEXT_PUBLIC_GA_ID`,
+the Google Analytics measurement ID. Leave it unset and the site loads no
+analytics at all; the deployed one gets it from the Vercel project.
+
 CI doesn't build `web/` — the deployed site is built by Vercel on every PR.
 
 ## Repository layout

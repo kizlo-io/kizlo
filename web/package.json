@@ -13,6 +13,7 @@
 		"withEnv": "dotenv -e ../.env"
 	},
 	"dependencies": {
+		"@next/third-parties": "^16.3.7",
 		"@paper-design/shaders-react": "^0.0.76",
 		"@phosphor-icons/react": "^2.1.10",
 		"class-variance-authority": "^0.7.1",
@@ -21,7 +22,7 @@
 		"fumadocs-mdx": "15.0.12",
 		"fumadocs-typescript": "^5.2.6",
 		"fumadocs-ui": "16.10.4",
-		"kizlo": "0.21.0",
+		"kizlo": "0.23.0",
 		"lucide-react": "^1.20.0",
 		"next": "catalog:",
 		"radix-ui": "^1.6.0",

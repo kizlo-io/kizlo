@@ -43,6 +43,10 @@ catalogs:
     '@types/react': ^19.2.3
     '@types/react-dom': ^19.2.3
 
+minimumReleaseAgeExclude:
+  - '@next/third-parties@16.3.7'
+  - kizlo@0.23.0
+
 onlyBuiltDependencies:
   - sharp
   - esbuild
