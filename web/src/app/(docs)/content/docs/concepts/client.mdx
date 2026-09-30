@@ -45,6 +45,44 @@ export const client = createKizloClient(contract)
   *browser client*; in your code it's whichever of the two you imported.
 </Callout>
 
+### Reaching the browser client in React
+
+Importing `@/lib/kizlo/client` works in any Client Component. When you'd rather inject the client than import a
+singleton, `kizlo/react` ships a context for it: mount `KizloProvider` once with the browser client, and every
+component below it reads the same instance through `useKizloContext`.
+
+```tsx title="src/app/providers.tsx"
+"use client"
+
+import { KizloProvider } from "kizlo/react"
+import { client } from "@/lib/kizlo/client"
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <KizloProvider client={client}>{children}</KizloProvider>
+}
+```
+
+<Callout>
+  The `"use client"` there is doing real work. A Server Component can't pass the browser client down as a prop,
+  because props crossing the server boundary have to be serialisable and the client is a tree of functions. Import
+  it in the client module that mounts the provider.
+</Callout>
+
+```tsx title="src/app/latest-posts.tsx"
+"use client"
+
+import { useKizloContext } from "kizlo/react"
+
+export function LatestPosts() {
+  const { client } = useKizloContext()
+  // client.posts.list() here, typed from your procedures
+}
+```
+
+Server Components keep taking the client as a prop, because they can't read React context. See
+[`KizloProvider`](/docs/reference/functions/kizlo-provider) and
+[`useKizloContext`](/docs/reference/functions/use-kizlo-context).
+
 ## Calling a procedure
 
 Every call returns the same **result** object, a discriminated union you check instead of a value that might

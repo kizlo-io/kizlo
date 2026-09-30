@@ -1,0 +1,63 @@
+---
+title: KizloProvider
+description: Put the browser client in React context so client components can read it.
+---
+
+`KizloProvider` holds your [browser client](/docs/reference/functions/create-kizlo-client) in React context.
+Mount it once, above everything that reads the client, then call
+[`useKizloContext`](/docs/reference/functions/use-kizlo-context) in the components below it.
+
+It comes from `kizlo/react` and is a client component. Mount it from a module of your own marked `"use client"`,
+not straight from a Server Component.
+
+## Props
+
+```tsx
+<KizloProvider client={client}>{children}</KizloProvider>
+```
+
+### `client`
+
+The browser client, typed as `ActiveKizloClient`. The provider stores it under one memoised context value keyed
+on the client itself, so its identity survives re-renders of the surrounding tree.
+
+Import the client in the same client module that mounts the provider. A Server Component cannot hand it down as a
+prop: props crossing the server boundary have to be serialisable, and the client is a tree of functions.
+
+Mounting without a client throws. `ActiveKizloClient` falls back to `any` in a project whose barrel registers
+nothing, so a missing client is not always a type error, and it would otherwise surface as a `TypeError` inside
+the first request.
+
+### `children`
+
+The tree that can read the client. A server component nested inside it still takes the client as a prop, because
+server components cannot read context.
+
+## Examples
+
+Mount it in a client boundary and render it around the app:
+
+```tsx title="src/app/providers.tsx"
+"use client"
+
+import { KizloProvider } from "kizlo/react"
+import { client } from "@/lib/kizlo/client"
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <KizloProvider client={client}>{children}</KizloProvider>
+}
+```
+
+```tsx title="src/app/layout.tsx"
+import { Providers } from "./providers"
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  )
+}
+```

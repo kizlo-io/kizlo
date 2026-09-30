@@ -1,0 +1,41 @@
+---
+title: useKizloContext
+description: Read the browser client from React context inside a client component.
+---
+
+`useKizloContext` reads the context that [`KizloProvider`](/docs/reference/functions/kizlo-provider) mounted. It
+comes from `kizlo/react`, and it is the only way a client component more than one prop away from the provider
+gets the client.
+
+## Returns
+
+`{ client }`, where `client` is the browser client the provider was given, typed as `ActiveKizloClient`. Every
+namespace, input, output, and error code your procedures declare is on it, the same as
+[`createKizloClient`](/docs/reference/functions/create-kizlo-client) returns.
+
+The hook hands back an object rather than the client itself, so a second value can join the context later without
+changing any call site.
+
+Calling it with no provider above the component throws and names the mount you are missing.
+
+## Examples
+
+```tsx title="src/app/search-box.tsx"
+"use client"
+
+import { useKizloContext } from "kizlo/react"
+
+export function SearchBox({ onResults }: { onResults: (titles: string[]) => void }) {
+  const { client } = useKizloContext()
+
+  async function search(term: string) {
+    const { data, error } = await client.posts.list({ query: { search: term } })
+
+    if (error) return
+
+    onResults(data.items.map((post) => post.title ?? "Untitled"))
+  }
+
+  return <input onChange={(event) => search(event.target.value)} />
+}
+```

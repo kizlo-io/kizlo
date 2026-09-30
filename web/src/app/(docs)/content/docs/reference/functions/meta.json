@@ -4,6 +4,8 @@
 	"pages": [
 		"create-kizlo",
 		"create-kizlo-client",
+		"kizlo-provider",
+		"use-kizlo-context",
 		"define-config",
 		"define-fixture",
 		"get-kizlo-test-instance",

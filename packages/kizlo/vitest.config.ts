@@ -16,7 +16,7 @@ const WORKSPACE_ALIASES: Record<string, string> = {
 
 export default defineConfig({
 	test: {
-		include: ["src/**/*.test.ts"],
+		include: ["src/**/*.test.{ts,tsx}"],
 		testTimeout: 15_000,
 		// Seeding is an explicit CLI lifecycle now; tests only read the artifact
 		// written by `kizlo test up`, resolved relative to the root `kizlo.config.ts`.
