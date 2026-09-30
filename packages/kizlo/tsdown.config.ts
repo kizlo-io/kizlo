@@ -13,6 +13,7 @@ export default defineConfig({
 	plugins: [fixNextServerImport],
 	entry: {
 		index: "src/index.ts",
+		react: "src/react.tsx",
 		config: "src/config.ts",
 		test: "src/test/index.ts",
 		node: "src/integrations/node/index.ts",

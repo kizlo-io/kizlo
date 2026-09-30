@@ -40,6 +40,12 @@
 				"default": "./dist/index.js"
 			}
 		},
+		"./react": {
+			"import": {
+				"types": "./dist/react.d.ts",
+				"default": "./dist/react.js"
+			}
+		},
 		"./config": {
 			"import": {
 				"types": "./dist/config.d.ts",

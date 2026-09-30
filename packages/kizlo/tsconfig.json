@@ -1,4 +1,9 @@
 {
 	"extends": "@tooling/typescript/base.json",
-	"include": ["src/**/*", "*.ts", "../../introspection.ts"]
+	"include": ["src/**/*", "*.ts", "../../introspection.ts"],
+	"compilerOptions": {
+		// The shared base preserves JSX for Next and Astro to transform. Nothing transforms this
+		// package's own `react.tsx`, so tsdown and vitest, which both read this file, compile it here.
+		"jsx": "react-jsx"
+	}
 }
