@@ -13,6 +13,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\WooCommerce\Modules\Order\OrderRepository;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
+use Kizlo\WooCommerce\Support\StoreExtensions;
 use WC_Order;
 use WC_Order_Item;
 use WC_Order_Item_Product;
@@ -114,12 +115,18 @@ class OrderModule
     }
 
     /**
-     * Add the extensions OrderItemSchema declares but does not emit at runtime.
+     * Add the extensions OrderItemSchema declares but does not emit at runtime,
+     * and the order-level `extensions` OrderSchema does not have at all.
      *
      * ProductSchema is the extension identifier inherited by ItemSchema in
      * WooCommerce 11.0.1. Calling that same extension registry preserves every
      * third-party namespace already available on Store API products. Kizlo's
      * namespace is replaced with the order-specific identity block below.
+     *
+     * The order itself has no extension point to call: OrderSchema never invokes
+     * `get_extended_data()`, and `order` is absent from `ExtendSchema`'s list of
+     * extendable endpoints, so nothing can be registered against it. The
+     * `extensions` key is therefore created here, by {@see StoreExtensions::merge}.
      */
     public function extendStoreOrderItems(mixed $response, mixed $server, mixed $request): mixed
     {
@@ -133,21 +140,25 @@ class OrderModule
         $order = wc_get_order((int) $match['id']);
         $data  = $response->get_data();
 
-        if (! $order instanceof WC_Order || ! is_array($data) || ! is_array($data['items'] ?? null)) {
+        if (! $order instanceof WC_Order || ! is_array($data)) {
             return $response;
         }
 
-        $items = $order->get_items(OrderItemType::LINE_ITEM);
+        $data['extensions'] = StoreExtensions::merge($data['extensions'] ?? null, 'kizlo', ['is_paid' => $order->is_paid()]);
 
-        foreach ($data['items'] as &$item) {
-            if (! is_array($item)) continue;
+        if (is_array($data['items'] ?? null)) {
+            $items = $order->get_items(OrderItemType::LINE_ITEM);
 
-            $order_item = $items[(int) ($item['id'] ?? 0)] ?? null;
-            if (! $order_item instanceof WC_Order_Item_Product) continue;
+            foreach ($data['items'] as &$item) {
+                if (! is_array($item)) continue;
 
-            $item['extensions'] = $this->orderItemExtensions($order_item);
+                $order_item = $items[(int) ($item['id'] ?? 0)] ?? null;
+                if (! $order_item instanceof WC_Order_Item_Product) continue;
+
+                $item['extensions'] = $this->orderItemExtensions($order_item);
+            }
+            unset($item);
         }
-        unset($item);
 
         $response->set_data($data);
 

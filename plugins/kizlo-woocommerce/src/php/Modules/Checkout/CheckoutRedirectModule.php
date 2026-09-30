@@ -6,7 +6,9 @@ use Automattic\WooCommerce\StoreApi\Schemas\V1\CheckoutSchema;
 use Kizlo\Modules\Settings\Settings;
 use Kizlo\Support\Utils;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
+use Kizlo\WooCommerce\Support\StoreExtensions;
 use WC_Order;
+use WP_HTTP_Response;
 use WP_REST_Request;
 
 /**
@@ -23,6 +25,10 @@ use WP_REST_Request;
  * order id or key. To keep the order's `cancelPath` through that gap, the
  * order-pay page stamps a short-lived, one-time context in the WooCommerce
  * session, and the empty-cart redirect reads it back to reach the cancel path.
+ *
+ * Registering that transport makes this the owner of `extensions.kizlo` on the
+ * checkout endpoint, so the storefront's other need from that block, whether the
+ * order is paid, is answered here too.
  */
 class CheckoutRedirectModule
 {
@@ -44,6 +50,7 @@ class CheckoutRedirectModule
     {
         add_action('woocommerce_blocks_loaded', [$this, 'extendCheckoutSchema'], PHP_INT_MAX);
         add_action('woocommerce_store_api_checkout_update_order_from_request', [$this, 'captureRedirectPaths'], 10, 2);
+        add_filter('rest_post_dispatch', [$this, 'addCheckoutPaidState'], 10, 3);
         add_filter('woocommerce_get_checkout_order_received_url', [$this, 'redirectOrderReceivedUrl'], 10, 2);
         add_filter('woocommerce_get_cancel_order_url_raw', [$this, 'redirectCancelOrderUrl'], 10, 3);
         add_filter('woocommerce_get_cancel_order_url', [$this, 'redirectCancelOrderUrl'], 10, 3);
@@ -73,14 +80,62 @@ class CheckoutRedirectModule
      * write-only transport, so nothing is echoed back; registering the endpoint
      * data is what lets the request carry them for {@see captureRedirectPaths}.
      *
-     * @return array<string, string>
+     * `is_paid` is a real response field, but `CheckoutSchema` calls
+     * `get_extended_data()` with no arguments, so this callback cannot reach the
+     * order to answer it. The placeholder keeps the key present on every response
+     * and {@see addCheckoutPaidState} overwrites it with the order's answer.
+     *
+     * @return array<string, string|bool>
      */
     public function checkoutExtensionData(): array
     {
         return [
             'success_path' => '',
             'cancel_path'  => '',
+            'is_paid'      => false,
         ];
+    }
+
+    /**
+     * Report whether the checkout's order is paid, on every route that serializes
+     * through CheckoutSchema. `WC_Order::is_paid()` is the only answer that applies
+     * the store's own `woocommerce_order_is_paid_statuses` and
+     * `woocommerce_order_is_paid` filters, so a storefront cannot derive it from
+     * `status` without hardcoding WooCommerce's defaults, and `needs_payment` answers
+     * the narrower "payable right now" question instead.
+     *
+     * The draft response carries `order_id` of `0`, so there is no order and the
+     * placeholder stands. Anything else about the bag's shape is left to
+     * {@see StoreExtensions::merge}: once the route matches and the order resolves,
+     * the answer is known, and declining to write it would report a paid order as
+     * unpaid, which is the exact silence this field exists to remove.
+     */
+    public function addCheckoutPaidState(mixed $response, mixed $server, mixed $request): mixed
+    {
+        if (! $response instanceof WP_HTTP_Response) return $response;
+        if (! $request instanceof WP_REST_Request) return $response;
+        if (! self::isCheckoutRoute($request->get_route())) return $response;
+        if ($response->get_status() >= 400) return $response;
+
+        $data = $response->get_data();
+        if (! is_array($data)) return $response;
+
+        $order = wc_get_order(absint($data['order_id'] ?? 0));
+        if (! $order instanceof WC_Order) return $response;
+
+        $data['extensions'] = StoreExtensions::merge($data['extensions'] ?? null, 'kizlo', ['is_paid' => $order->is_paid()]);
+        $response->set_data($data);
+
+        return $response;
+    }
+
+    /**
+     * The Store API routes whose response is a CheckoutSchema payload: the checkout
+     * resource itself under every method it accepts, and the order-pay retry route.
+     */
+    private static function isCheckoutRoute(string $route): bool
+    {
+        return $route === '/wc/store/v1/checkout' || preg_match('#^/wc/store/v1/checkout/\d+$#', $route) === 1;
     }
 
     /**

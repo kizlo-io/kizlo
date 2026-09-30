@@ -28,6 +28,7 @@ export const Checkout = z.object({
 	orderNumber: z.string().nullable(),
 	orderKey: z.string().nullable(),
 	status: z.string(),
+	isPaid: z.boolean(),
 	customerId: z.number().nullable(),
 	customerNote: z.string(),
 	billingAddress: CartBillingAddress,

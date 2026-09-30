@@ -109,10 +109,16 @@ final class KizloBlocks
     /**
      * `extensions.kizlo` on the Store API checkout.
      *
-     * These are write-only transport for the headless storefront: the frontend
-     * sends where to send the shopper after checkout, and the plugin stamps them
-     * on the order to build the success and cancel redirects. They are relative
-     * paths on the configured Site URL, validated server-side before storage.
+     * The two paths are write-only transport for the headless storefront: the
+     * frontend sends where to send the shopper after checkout, and the plugin
+     * stamps them on the order to build the success and cancel redirects. They are
+     * relative paths on the configured Site URL, validated server-side before
+     * storage.
+     *
+     * `is_paid` goes the other way. `CheckoutSchema` calls `get_extended_data()`
+     * with no arguments, so the data callback cannot reach the order; the value is
+     * filled in by {@see \Kizlo\WooCommerce\Modules\Checkout\CheckoutRedirectModule::addCheckoutPaidState}
+     * and only declared here.
      *
      * @return array<string, mixed>
      */
@@ -129,6 +135,40 @@ final class KizloBlocks
                 'type'        => 'string',
                 'context'     => ['view', 'edit'],
             ],
+            'is_paid' => self::isPaid(),
+        ];
+    }
+
+    /**
+     * `extensions.kizlo` on a Store API order.
+     *
+     * `OrderSchema` publishes no extension block and never calls
+     * `get_extended_data()`, and `order` is not in `ExtendSchema`'s extendable
+     * endpoints either, so this namespace and the `extensions` key holding it are
+     * both added by {@see \Kizlo\WooCommerce\Modules\Order\OrderModule::extendStoreOrderItems}.
+     *
+     * @return array<string, mixed>
+     */
+    public static function storeOrder(): array
+    {
+        return [
+            'is_paid' => self::isPaid(),
+        ];
+    }
+
+    /**
+     * Shared so the checkout and the order cannot drift into answering the paid
+     * question differently.
+     *
+     * @return array<string, mixed>
+     */
+    private static function isPaid(): array
+    {
+        return [
+            'description' => 'Whether the order has been paid, from WC_Order::is_paid() with the store\'s own filters applied. False when there is no order yet.',
+            'type'        => 'boolean',
+            'context'     => ['view', 'edit'],
+            'readonly'    => true,
         ];
     }
 
