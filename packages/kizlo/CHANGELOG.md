@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.24.0
+
+### Minor Changes
+
+- [#258](https://github.com/kizlo-io/kizlo/pull/258) [`2c90491`](https://github.com/kizlo-io/kizlo/commit/2c904915d963525e621931d275b8fd1c674b9700) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a `kizlo/react` entry exporting `KizloProvider` and `useKizloContext`, so client components can read the browser client from React context.
+
 ## 0.23.0
 
 ### Minor Changes
