@@ -44,6 +44,47 @@ export type InferProcedureError<TProcedure extends AnyProcedure> =
 export type InferProcedureResult<TProcedure extends AnyProcedure> =
 	TProcedure extends Procedure<any, any, infer TOutput, infer TErrors> ? KizloResult<TOutput, TErrors> : never
 
+/**
+ * Matches `any` alone. A conditional type resolves `any` to both branches and infers `unknown` from
+ * it, so the client-level helpers guard on this to pass the unregistered-client fallback through
+ * intact instead of narrowing it to something a consumer can no longer index.
+ */
+type IsAny<T> = 0 extends 1 & T ? true : false
+
+/**
+ * The complete wrapped result returned by a normal call to one Kizlo client method.
+ *
+ * The client-level helpers read {@link ProcedureMethod}'s own call signature rather than re-deriving
+ * from `Procedure`, which is what lets them work on a client method alone, including the `any`
+ * short-circuit `ActiveKizloClient` falls back to while `KizloProcedureRegistry` is unaugmented.
+ */
+export type InferClientResult<TMethod> =
+	IsAny<TMethod> extends true ? any : TMethod extends (...args: never) => Promise<infer TResult> ? TResult : never
+
+/**
+ * Reads one key off a `KizloResult` branch. `never` is short-circuited rather than let through:
+ * every type is assignable to it, so a node that is not a client method leaves nothing for
+ * `Extract` to find and would otherwise infer `unknown`, turning a missing procedure into a loose
+ * type instead of a missing one.
+ */
+type BranchValue<TBranch, TKey extends "data" | "error"> = [TBranch] extends [never]
+	? never
+	: TBranch extends Record<TKey, infer TValue>
+		? TValue
+		: never
+
+/** The successful data returned by one Kizlo client method. */
+export type InferClientData<TMethod> =
+	IsAny<TMethod> extends true ? any : BranchValue<Extract<InferClientResult<TMethod>, { success: true }>, "data">
+
+/** The declared and common client-visible errors returned by one Kizlo client method. */
+export type InferClientError<TMethod> =
+	IsAny<TMethod> extends true ? any : BranchValue<Extract<InferClientResult<TMethod>, { success: false }>, "error">
+
+/** The input accepted by one Kizlo client method. */
+export type InferClientInput<TMethod> =
+	IsAny<TMethod> extends true ? any : TMethod extends (...args: infer TArgs) => unknown ? TArgs[0] : never
+
 export type ResultClient<T extends AnyProcedureTree> = {
 	[K in keyof T]: T[K] extends Procedure<infer _Scope, infer Input, infer Output, infer Errors>
 		? ProcedureMethod<Input, Output, Errors>
