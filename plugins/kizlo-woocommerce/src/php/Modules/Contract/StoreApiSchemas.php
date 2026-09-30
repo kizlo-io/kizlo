@@ -336,9 +336,10 @@ final class StoreApiSchemas
      * Correct the Store API order schema to match its executable response.
      *
      * WooCommerce 11.0.1 emits fees without declaring them, returns numeric fee
-     * keys, omits the declared item type, and does not emit the item extensions
-     * inherited from ProductSchema. OrderModule supplies the runtime extension
-     * data; this method describes that repaired response.
+     * keys, omits the declared item type, does not emit the item extensions
+     * inherited from ProductSchema, and gives the order no extension block at all.
+     * OrderModule supplies the runtime extension data for both levels; this method
+     * describes that repaired response.
      *
      * @param array<string, array<string, mixed>> $properties
      * @return array<string, array<string, mixed>>
@@ -388,6 +389,20 @@ final class StoreApiSchemas
                 ], WooCommerceSchemas::STORE_ORDER . '.items.extensions', required: true),
             ];
         }
+
+        $properties['extensions'] = [
+            'type'                 => 'object',
+            'required'             => true,
+            'additionalProperties' => true,
+            'description'          => 'Store API order extension namespaces. OrderSchema declares none and cannot be extended, so OrderModule creates the block and it is named here.',
+            'properties'           => kizlo_translate_spec_properties([
+                'kizlo' => [
+                    'description' => 'Order state registered by Kizlo.',
+                    'type'        => ['object', 'null'],
+                    'properties'  => KizloBlocks::storeOrder(),
+                ],
+            ], WooCommerceSchemas::STORE_ORDER . '.extensions', required: true),
+        ];
 
         $address_value = ['anyOf' => [['type' => 'string'], ['type' => 'boolean']]];
         self::correct($properties, ['billing_address', 'additionalProperties'], $address_value);

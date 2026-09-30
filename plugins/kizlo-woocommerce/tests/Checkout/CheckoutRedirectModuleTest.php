@@ -7,6 +7,7 @@ use Kizlo\WooCommerce\Modules\Checkout\CheckoutRedirectModule;
 use Kizlo\WooCommerce\Tests\TestCase;
 use WC_Order;
 use WP_REST_Request;
+use WP_REST_Response;
 
 class CheckoutRedirectModuleTest extends TestCase
 {
@@ -37,6 +38,107 @@ class CheckoutRedirectModuleTest extends TestCase
         WC()->session = null;
 
         parent::tearDown();
+    }
+
+    public function test_checkout_reports_a_paid_order_on_every_checkout_route(): void
+    {
+        $order = $this->orderWithStatus('processing');
+
+        foreach (['/wc/store/v1/checkout', sprintf('/wc/store/v1/checkout/%d', $order->get_id())] as $route) {
+            $this->assertTrue($this->kizloBlock($this->checkoutResponse($order->get_id()), $route)['is_paid'], $route);
+        }
+    }
+
+    public function test_checkout_reports_an_on_hold_bank_transfer_order_as_unpaid(): void
+    {
+        $order = $this->orderWithStatus('on-hold', 'bacs');
+
+        $block = $this->kizloBlock($this->checkoutResponse($order->get_id()), '/wc/store/v1/checkout');
+
+        $this->assertFalse($block['is_paid']);
+        $this->assertFalse($order->needs_payment(), 'needs_payment answers a different question, which is why is_paid exists');
+    }
+
+    public function test_checkout_believes_a_store_that_filters_the_paid_statuses(): void
+    {
+        add_filter('woocommerce_order_is_paid_statuses', static fn(array $statuses): array => [...$statuses, 'on-hold']);
+
+        $order = $this->orderWithStatus('on-hold');
+
+        $this->assertTrue($this->kizloBlock($this->checkoutResponse($order->get_id()), '/wc/store/v1/checkout')['is_paid']);
+    }
+
+    /**
+     * The answer must survive the shape of the bag it is written into. WooCommerce
+     * builds an object, a response filter would leave an array, and a bag missing
+     * the namespace entirely must still be answered rather than skipped: reporting
+     * a paid order as unpaid is the silence this field exists to remove.
+     *
+     * @dataProvider extensionBags
+     */
+    public function test_checkout_reports_the_paid_state_whatever_shape_the_bag_is(mixed $extensions): void
+    {
+        $order = $this->orderWithStatus('processing');
+
+        $response = new WP_REST_Response(['order_id' => $order->get_id(), 'extensions' => $extensions]);
+
+        $this->assertTrue($this->kizloBlock($response, '/wc/store/v1/checkout')['is_paid']);
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function extensionBags(): array
+    {
+        $kizlo = ['success_path' => '', 'cancel_path' => '', 'is_paid' => false];
+
+        return [
+            'object WooCommerce built'   => [(object) ['kizlo' => $kizlo]],
+            'array a filter wrote'       => [['kizlo' => $kizlo]],
+            'namespace absent'           => [(object) []],
+            'bag absent'                 => [null],
+        ];
+    }
+
+    public function test_checkout_keeps_the_redirect_placeholders_and_foreign_namespaces(): void
+    {
+        $order = $this->orderWithStatus('processing');
+
+        $response = new WP_REST_Response([
+            'order_id'   => $order->get_id(),
+            'extensions' => (object) [
+                'kizlo' => ['success_path' => '/thanks', 'cancel_path' => '/basket', 'is_paid' => false],
+                'acme'  => ['opaque' => true],
+            ],
+        ]);
+
+        $result     = $this->module->addCheckoutPaidState($response, null, new WP_REST_Request('GET', '/wc/store/v1/checkout'));
+        $extensions = (array) $result->get_data()['extensions'];
+
+        $this->assertSame(['opaque' => true], (array) $extensions['acme']);
+        $this->assertSame(
+            ['success_path' => '/thanks', 'cancel_path' => '/basket', 'is_paid' => true],
+            (array) $extensions['kizlo'],
+        );
+    }
+
+    public function test_the_checkout_draft_response_has_no_order_to_report(): void
+    {
+        $result = $this->module->addCheckoutPaidState(
+            $this->checkoutResponse(0),
+            null,
+            new WP_REST_Request('GET', '/wc/store/v1/checkout'),
+        );
+
+        $this->assertSame(0, $result->get_data()['order_id']);
+        $this->assertFalse($this->kizloBlock($this->checkoutResponse(0), '/wc/store/v1/checkout')['is_paid']);
+    }
+
+    public function test_a_non_checkout_route_keeps_the_placeholder(): void
+    {
+        $order = $this->orderWithStatus('processing');
+
+        $this->assertFalse($this->kizloBlock($this->checkoutResponse($order->get_id()), '/wc/store/v1/cart')['is_paid']);
     }
 
     public function test_captures_relative_paths_from_the_request_extension(): void
@@ -358,6 +460,44 @@ class CheckoutRedirectModuleTest extends TestCase
     private function filteredCartUrl(string $original = self::CART_URL): string
     {
         return (string) apply_filters('woocommerce_get_cart_url', $original);
+    }
+
+    /**
+     * A checkout response shaped the way WooCommerce builds it: an array carrying
+     * `order_id`, with the extension namespaces cast to an object by
+     * `ExtendSchema::get_endpoint_data()` and `kizlo` holding the real data
+     * callback's placeholders.
+     */
+    private function checkoutResponse(int $orderId): WP_REST_Response
+    {
+        return new WP_REST_Response([
+            'order_id'   => $orderId,
+            'extensions' => (object) ['kizlo' => $this->module->checkoutExtensionData()],
+        ]);
+    }
+
+    /**
+     * The `kizlo` block the filter leaves behind, read shape-agnostically so the
+     * assertions describe the answer rather than how the bag happens to be encoded.
+     *
+     * @return array<string, mixed>
+     */
+    private function kizloBlock(WP_REST_Response $response, string $route, string $method = 'GET'): array
+    {
+        $result = $this->module->addCheckoutPaidState($response, null, new WP_REST_Request($method, $route));
+        $data   = (array) $result->get_data();
+
+        return (array) ((array) $data['extensions'])['kizlo'];
+    }
+
+    private function orderWithStatus(string $status, string $paymentMethod = ''): WC_Order
+    {
+        $order = wc_create_order();
+        if ($paymentMethod !== '') $order->set_payment_method($paymentMethod);
+        $order->set_status($status);
+        $order->save();
+
+        return $order;
     }
 
     /**

@@ -83,7 +83,7 @@ export function gateway(method: string | undefined): Gateway | undefined {
 }
 
 export function deserializeCheckout(data: WCK_Checkout | WCK_CheckoutOrder): Checkout {
-	const { extensions } = deserializeExtensions(data.extensions)
+	const { extensions, kizlo } = deserializeExtensions(data.extensions)
 	const paymentResult = data.payment_result
 
 	return {
@@ -91,6 +91,7 @@ export function deserializeCheckout(data: WCK_Checkout | WCK_CheckoutOrder): Che
 		orderNumber: data.order_number === "" || data.order_number === "0" ? null : data.order_number,
 		orderKey: data.order_key === "" ? null : data.order_key,
 		status: data.status,
+		isPaid: kizlo.is_paid === true,
 		customerId: data.customer_id === 0 ? null : data.customer_id,
 		customerNote: data.customer_note,
 		billingAddress: deserializeCartBillingAddress(data.billing_address as WCK_Cart["billing_address"]),

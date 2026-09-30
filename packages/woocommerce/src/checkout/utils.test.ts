@@ -92,6 +92,16 @@ test("preserves custom payment statuses and normalizes empty redirects", () => {
 	})
 })
 
+test("reports the order's paid state from extensions.kizlo", () => {
+	const kizlo = (value: unknown) => rawCheckout({ extensions: { kizlo: value } as unknown as WCK_Checkout["extensions"] })
+
+	expect(deserializeCheckout(kizlo({ is_paid: true })).isPaid).toBe(true)
+	expect(deserializeCheckout(kizlo({ is_paid: false })).isPaid).toBe(false)
+	expect(deserializeCheckout(kizlo(null)).isPaid).toBe(false)
+	expect(deserializeCheckout(rawCheckout()).isPaid).toBe(false)
+	expect(deserializeCheckout(rawCheckout({ extensions: undefined as unknown as WCK_Checkout["extensions"] })).isPaid).toBe(false)
+})
+
 test("folds only the defined redirect paths into extensions.kizlo", () => {
 	expect(withKizloRedirectPaths(undefined, { successPath: "/thanks", cancelPath: "/cart" })).toEqual({
 		kizlo: { success_path: "/thanks", cancel_path: "/cart" },

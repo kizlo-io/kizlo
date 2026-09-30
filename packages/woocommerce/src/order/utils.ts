@@ -8,6 +8,7 @@ const ORDER_KEYS = [
 	"billing_address",
 	"coupons",
 	"errors",
+	"extensions",
 	"fees",
 	"id",
 	"items",
@@ -166,9 +167,12 @@ assertNoMissing<Exclude<keyof WCSK_OrderTotals, (typeof ORDER_TOTAL_KEYS)[number
 assertNoMissing<Exclude<keyof WCSK_OrderTotals["tax_lines"][number], (typeof ORDER_TAX_LINE_KEYS)[number]>>()
 
 export function deserializeOrder(data: WCSK_Order): Order {
+	const { kizlo } = deserializeExtensions(data.extensions)
+
 	return {
 		id: data.id,
 		status: data.status,
+		isPaid: kizlo.is_paid === true,
 		items: data.items.map(deserializeOrderItem),
 		coupons: data.coupons.map((coupon) => ({
 			code: coupon.code,

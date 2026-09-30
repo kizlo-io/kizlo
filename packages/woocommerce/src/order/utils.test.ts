@@ -118,6 +118,7 @@ function rawOrder(): WCSK_Order {
 			phone: "",
 			delivery_note: "",
 		},
+		extensions: { kizlo: { is_paid: false } },
 		needs_payment: false,
 		needs_shipping: true,
 		payment_requirements: ["products", "future-requirement"],
@@ -148,6 +149,7 @@ describe("deserializeOrder", () => {
 		expect(result).toMatchObject({
 			id: 42,
 			status: "wc-awaiting-pickup",
+			isPaid: false,
 			needsPayment: false,
 			needsShipping: true,
 			paymentRequirements: ["products", "future-requirement"],
@@ -219,6 +221,20 @@ describe("deserializeOrder", () => {
 			product: null,
 			extensions: { "third-party": { opaque: true, zero: 0 } },
 		})
+	})
+
+	test("reports the paid state from extensions.kizlo", () => {
+		const withKizlo = (value: unknown) => {
+			const raw = rawOrder()
+			raw.extensions = { kizlo: value } as unknown as WCSK_Order["extensions"]
+
+			return deserializeOrder(raw).isPaid
+		}
+
+		expect(withKizlo({ is_paid: true })).toBe(true)
+		expect(withKizlo({ is_paid: false })).toBe(false)
+		expect(withKizlo(null)).toBe(false)
+		expect(deserializeOrder({ ...rawOrder(), extensions: undefined as unknown as WCSK_Order["extensions"] }).isPaid).toBe(false)
 	})
 
 	test("preserves zero and empty collections", () => {

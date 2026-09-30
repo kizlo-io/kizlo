@@ -67,6 +67,7 @@ export type OrderTotals = z.infer<typeof OrderTotals>
 export const Order = z.object({
 	id: z.number(),
 	status: z.string(),
+	isPaid: z.boolean(),
 	items: z.array(OrderItem),
 	coupons: z.array(CartCoupon),
 	fees: z.array(OrderFee),
