@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.25.0
+
+### Minor Changes
+
+- [#260](https://github.com/kizlo-io/kizlo/pull/260) [`571a9f1`](https://github.com/kizlo-io/kizlo/commit/571a9f18d25567b29d68d3084d34640acd2fbe99) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Infer a procedure's input, data, error and result types from a client method with `InferClientInput`, `InferClientData`, `InferClientError` and `InferClientResult`.
+
 ## 0.24.0
 
 ### Minor Changes

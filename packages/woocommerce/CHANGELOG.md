@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.9.0
+
+### Minor Changes
+
+- [#261](https://github.com/kizlo-io/kizlo/pull/261) [`b8e5fe4`](https://github.com/kizlo-io/kizlo/commit/b8e5fe40c2424cb918015bc8eab29cd69e09dda0) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Report whether an order is paid on `Checkout.isPaid` and `Order.isPaid`.
+
 ## 0.8.0
 
 ### Minor Changes
