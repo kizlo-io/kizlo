@@ -155,6 +155,89 @@ class CheckoutRedirectModuleTest extends TestCase
         $this->assertSame('/basket', $saved->get_meta(self::META_CANCEL));
     }
 
+    /**
+     * WooCommerce validates every extension property on the request, `readonly`
+     * or not, and reads an omitted one as `null`. Run the real route arguments so
+     * a storefront that sends only the redirect paths is accepted on both the
+     * checkout and the order-pay retry.
+     */
+    public function test_checkout_accepts_redirect_paths_without_is_paid(): void
+    {
+        $value = ['kizlo' => ['success_path' => '/thanks', 'cancel_path' => '/basket']];
+
+        foreach ($this->checkoutExtensionsArgs() as $route => $arg) {
+            $request = new WP_REST_Request('POST', $route);
+
+            $this->assertTrue($arg['validate_callback']($value, $request, 'extensions'), $route);
+            $this->assertSame(
+                ['success_path' => '/thanks', 'cancel_path' => '/basket', 'is_paid' => null],
+                $arg['sanitize_callback']($value, $request, 'extensions')['kizlo'],
+                $route,
+            );
+        }
+    }
+
+    /**
+     * Paid is the order's answer, never the client's, so a claim is accepted and
+     * thrown away.
+     *
+     * @dataProvider paidClaims
+     */
+    public function test_checkout_discards_a_client_paid_claim(bool $claim): void
+    {
+        $value = ['kizlo' => ['success_path' => '/thanks', 'cancel_path' => '/basket', 'is_paid' => $claim]];
+
+        foreach ($this->checkoutExtensionsArgs() as $route => $arg) {
+            $request = new WP_REST_Request('POST', $route);
+
+            $this->assertTrue($arg['validate_callback']($value, $request, 'extensions'), $route);
+            $this->assertNull($arg['sanitize_callback']($value, $request, 'extensions')['kizlo']['is_paid'], $route);
+        }
+
+        $order = $this->orderWithStatus('pending');
+        $this->assertFalse($this->kizloBlock($this->checkoutResponse($order->get_id()), '/wc/store/v1/checkout')['is_paid']);
+    }
+
+    /**
+     * @return array<string, array{0: bool}>
+     */
+    public static function paidClaims(): array
+    {
+        return [
+            'true'  => [true],
+            'false' => [false],
+        ];
+    }
+
+    /**
+     * WooCommerce type-checks the whole `kizlo` object against its schema before
+     * any per-property callback runs, so a supplied value must still be a boolean.
+     *
+     * @dataProvider malformedPaidClaims
+     */
+    public function test_checkout_rejects_a_non_boolean_paid_claim(mixed $claim): void
+    {
+        $value = ['kizlo' => ['success_path' => '/thanks', 'cancel_path' => '/basket', 'is_paid' => $claim]];
+
+        foreach ($this->checkoutExtensionsArgs() as $route => $arg) {
+            $result = $arg['validate_callback']($value, new WP_REST_Request('POST', $route), 'extensions');
+
+            $this->assertWPError($result, $route);
+            $this->assertSame('rest_invalid_type', $result->get_error_code(), $route);
+        }
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function malformedPaidClaims(): array
+    {
+        return [
+            'string' => ['yes'],
+            'array'  => [['paid' => true]],
+        ];
+    }
+
     public function test_success_redirect_uses_the_stored_path(): void
     {
         SiteSettings::load()->setUrl('https://frontend.example')->save();
@@ -498,6 +581,31 @@ class CheckoutRedirectModuleTest extends TestCase
         $order->save();
 
         return $order;
+    }
+
+    /**
+     * The `extensions` argument WooCommerce registers on each POST checkout route,
+     * keyed by route, carrying its recursive validate and sanitize callbacks.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function checkoutExtensionsArgs(): array
+    {
+        $this->module->extendCheckoutSchema();
+        $this->bootRestServer();
+
+        $args = [];
+        foreach (rest_get_server()->get_routes() as $route => $handlers) {
+            if (! str_starts_with($route, '/wc/store/v1/checkout')) continue;
+
+            foreach ($handlers as $handler) {
+                if (isset($handler['methods']['POST'], $handler['args']['extensions'])) $args[$route] = $handler['args']['extensions'];
+            }
+        }
+
+        $this->assertCount(2, $args, 'the checkout and the order-pay retry');
+
+        return $args;
     }
 
     /**
