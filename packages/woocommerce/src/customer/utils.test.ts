@@ -19,7 +19,7 @@ function customer(overrides: Record<string, unknown> = {}): WCK_Customer {
 	return {
 		id: 1,
 		avatar_url: "",
-		billing: { ...address, email: "ada@example.com" },
+		billing: { ...address, email: "ada@example.com", tax_id: "GB-42" },
 		shipping: address,
 		email: "ada@example.com",
 		first_name: "Ada",
@@ -53,4 +53,13 @@ test("registeredAt reads date_created_gmt in every host timezone", () => {
 
 test("an invalid GMT customer date normalizes to the non-null timestamp sentinel", () => {
 	expect(deserializeCustomer(customer({ date_created_gmt: "invalid" })).registeredAt).toBe(0)
+})
+
+test("deserializes the canonical billing Tax ID and normalizes an absent value", () => {
+	expect(deserializeCustomer(customer()).billing.taxId).toBe("GB-42")
+
+	const withoutTaxId = customer()
+	delete (withoutTaxId.billing as unknown as { tax_id?: string }).tax_id
+	expect(deserializeCustomer(withoutTaxId).billing.taxId).toBe("")
+	expect(deserializeCustomer(withoutTaxId).shipping).not.toHaveProperty("taxId")
 })

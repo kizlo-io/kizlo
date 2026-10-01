@@ -25,8 +25,13 @@ export function rawCheckout(overrides: Partial<WCK_Checkout> = {}): WCK_Checkout
 		status: "checkout-draft",
 		customer_id: 0,
 		customer_note: "",
-		billing_address: { ...shippingAddress, email: "ada@example.com", tax_exempt: false } as unknown as WCK_Checkout["billing_address"],
-		shipping_address: shippingAddress,
+		billing_address: {
+			...shippingAddress,
+			email: "ada@example.com",
+			tax_exempt: false,
+			"kizlo/tax-id": "GB-42",
+		} as unknown as WCK_Checkout["billing_address"],
+		shipping_address: { ...shippingAddress, "kizlo/tax-id": "must-not-leak" } as unknown as WCK_Checkout["shipping_address"],
 		payment_method: "",
 		payment_result: null,
 		additional_fields: {
@@ -54,7 +59,7 @@ test("deserializes draft sentinels, dynamic fields, and opaque extensions", () =
 		customerId: null,
 		paymentMethod: null,
 		paymentResult: null,
-		billingAddress: { additionalFields: { tax_exempt: false } },
+		billingAddress: { taxId: "GB-42", additionalFields: { tax_exempt: false } },
 		shippingAddress: { additionalFields: { delivery_note: "Leave at reception" } },
 		additionalFields: { gift_message: "", marketing_opt_in: false },
 		extensions: { acme: { checkout: true } },
@@ -145,9 +150,10 @@ test("reuses cart address serialization and preserves merchant fields", () => {
 		delivery_note: "Reception",
 		fragile: false,
 	})
-	expect(serializeCheckoutBillingAddress({ ...publicShipping, email: "ada@example.com" })).toMatchObject({
+	expect(serializeCheckoutBillingAddress({ ...publicShipping, email: "ada@example.com", taxId: "GB-42" })).toMatchObject({
 		first_name: "Ada",
 		email: "ada@example.com",
+		"kizlo/tax-id": "GB-42",
 		delivery_note: "Reception",
 	})
 })

@@ -3,6 +3,7 @@
 namespace Kizlo\WooCommerce\Modules\Contract;
 
 use WC_REST_Products_Controller;
+use WC_REST_Customers_Controller;
 use WP_REST_Controller;
 
 /**
@@ -51,6 +52,14 @@ final class RestApiSchemas
         // of their own and a filter of their own, and are left alone.
         if ($controller instanceof WC_REST_Products_Controller) {
             $properties['kizlo'] = KizloBlocks::restProduct();
+        }
+
+        if ($controller instanceof WC_REST_Customers_Controller && is_array($properties['billing']['properties'] ?? null)) {
+            $properties['billing']['properties']['tax_id'] = [
+                'type'        => 'string',
+                'required'    => true,
+                'description' => 'The customer billing Tax ID. Empty when no value is saved.',
+            ];
         }
 
         if (str_ends_with($path, RouteCorrections::BATCH)) {

@@ -31,6 +31,7 @@ class WooCommerceModule
         add_filter('rest_post_dispatch', [$this, 'addCheckoutDraftCart'], 10, 3);
         add_filter('rest_post_dispatch', [$this, 'addCartTokenHeader'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this, 'maybeSwitchStoreApiUser'], 10, 3);
+        add_filter('rest_request_before_callbacks', [$this, 'maybeApplyGeoDefaults'], 30, 3);
 
         // Global (not headless-request-scoped) so an off-session gateway
         // webhook/IPN that completes payment can still reach the owning cart.
@@ -234,6 +235,18 @@ class WooCommerceModule
         }
     }
 
+    /** Apply customer geo defaults only after other pre-callback validation succeeds. */
+    public function maybeApplyGeoDefaults(mixed $response, mixed $handler, mixed $request): mixed
+    {
+        if (is_wp_error($response)) return $response;
+        if (! $request instanceof WP_REST_Request) return $response;
+        if ($this->initializedRequestId !== spl_object_id($request)) return $response;
+
+        $this->applyGeoDefaults($request);
+
+        return $response;
+    }
+
     /** Surface the guest token only for successful headless Store API responses. */
     public function addCartTokenHeader(mixed $response, mixed $server, mixed $request): mixed
     {
@@ -289,7 +302,6 @@ class WooCommerceModule
         }
 
         wc_load_cart();
-        $this->applyGeoDefaults($request);
 
         return true;
     }

@@ -37,5 +37,6 @@ export type ShippingAddress = z.infer<typeof ShippingAddress>
 
 export const BillingAddress = ShippingAddress.extend({
 	email: z.string(),
+	taxId: z.string().default(""),
 })
 export type BillingAddress = z.infer<typeof BillingAddress>

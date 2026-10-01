@@ -42,6 +42,7 @@ class WooCommerceModuleTest extends TestCase
         add_filter('woocommerce_session_handler', [$this->module, 'maybeUseHeadlessSession']);
         add_filter('woocommerce_store_api_disable_nonce_check', [$this->module, 'maybeDisableNonceCheck']);
         add_filter('rest_request_before_callbacks', [$this->module, 'maybeSwitchStoreApiUser'], 10, 3);
+        add_filter('rest_request_before_callbacks', [$this->module, 'maybeApplyGeoDefaults'], 30, 3);
 
         global $wp_rest_server;
         $wp_rest_server = new WP_REST_Server();
@@ -61,6 +62,7 @@ class WooCommerceModuleTest extends TestCase
         remove_filter('woocommerce_session_handler', [$this->module, 'maybeUseHeadlessSession']);
         remove_filter('woocommerce_store_api_disable_nonce_check', [$this->module, 'maybeDisableNonceCheck']);
         remove_filter('rest_request_before_callbacks', [$this->module, 'maybeSwitchStoreApiUser'], 10);
+        remove_filter('rest_request_before_callbacks', [$this->module, 'maybeApplyGeoDefaults'], 30);
         SessionHandler::clearPreparedIdentity();
 
         parent::tearDown();
@@ -143,6 +145,68 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame($this->customerId, $first->get_data()['user_id']);
         $this->assertSame($session, WC()->session);
         $this->assertTrue(apply_filters('woocommerce_store_api_disable_nonce_check', false));
+    }
+
+    public function test_failed_pre_callback_validation_does_not_apply_customer_geo_defaults(): void
+    {
+        $this->clearCustomerAddress();
+        $request = $this->request('/wc/store/v1/checkout/42', [
+            SessionHandler::HEADER_USER_EMAIL   => $this->customerEmail,
+            SessionHandler::HEADER_GEO_COUNTRY  => 'US',
+            SessionHandler::HEADER_GEO_STATE    => 'CA',
+            SessionHandler::HEADER_GEO_POSTCODE => '90210',
+            SessionHandler::HEADER_GEO_CITY     => 'Los Angeles',
+        ]);
+        $request->set_method('POST');
+        $this->authenticateAs($this->adminId, true);
+
+        $this->module->maybeSwitchStoreApiUser(null, null, $request);
+        $error = new WP_Error('rest_invalid_param', 'Tax ID is required.', ['status' => 400]);
+
+        $this->assertInstanceOf(SessionHandler::class, WC()->session);
+        WC()->session->set('kizlo_geo_applied', null);
+        $this->assertSame($this->customerId, WC()->customer->get_id());
+        $this->assertSame('', WC()->customer->get_billing_first_name());
+        $this->assertSame('', WC()->customer->get_billing_postcode());
+        $this->assertSame($error, $this->module->maybeApplyGeoDefaults($error, null, $request));
+
+        $customer = new \WC_Customer($this->customerId);
+        $this->assertSame('', $customer->get_billing_country());
+        $this->assertSame('', $customer->get_billing_state());
+        $this->assertSame('', $customer->get_billing_postcode());
+        $this->assertSame('', $customer->get_billing_city());
+        $this->assertSame('', $customer->get_shipping_country());
+    }
+
+    public function test_successful_pre_callback_validation_applies_customer_geo_defaults(): void
+    {
+        $this->clearCustomerAddress();
+        $request = $this->request('/wc/store/v1/checkout/42', [
+            SessionHandler::HEADER_USER_EMAIL   => $this->customerEmail,
+            SessionHandler::HEADER_GEO_COUNTRY  => 'US',
+            SessionHandler::HEADER_GEO_STATE    => 'CA',
+            SessionHandler::HEADER_GEO_POSTCODE => '90210',
+            SessionHandler::HEADER_GEO_CITY     => 'Los Angeles',
+        ]);
+        $request->set_method('POST');
+        $this->authenticateAs($this->adminId, true);
+
+        $this->module->maybeSwitchStoreApiUser(null, null, $request);
+        $response = new WP_REST_Response();
+
+        $this->assertInstanceOf(SessionHandler::class, WC()->session);
+        WC()->session->set('kizlo_geo_applied', null);
+        $this->assertSame($this->customerId, WC()->customer->get_id());
+        $this->assertSame('', WC()->customer->get_billing_first_name());
+        $this->assertSame('', WC()->customer->get_billing_postcode());
+        $this->assertSame($response, $this->module->maybeApplyGeoDefaults($response, null, $request));
+
+        $customer = WC()->customer;
+        $this->assertSame('US', $customer->get_billing_country());
+        $this->assertSame('CA', $customer->get_billing_state());
+        $this->assertSame('90210', $customer->get_billing_postcode());
+        $this->assertSame('Los Angeles', $customer->get_billing_city());
+        $this->assertSame('US', $customer->get_shipping_country());
     }
 
     public function test_guest_cart_merges_during_the_original_cart_request(): void
@@ -600,6 +664,28 @@ class WooCommerceModuleTest extends TestCase
             ],
             ['%s', '%s', '%d']
         );
+    }
+
+    private function clearCustomerAddress(): void
+    {
+        global $wpdb;
+
+        $wpdb->delete(
+            $wpdb->prefix . 'woocommerce_sessions',
+            ['session_key' => (string) $this->customerId],
+            ['%s']
+        );
+        update_user_meta($this->customerId, 'first_name', '');
+
+        $customer = new \WC_Customer($this->customerId);
+        $customer->set_billing_first_name('');
+        $customer->set_billing_address_1('');
+        $customer->set_billing_postcode('');
+        $customer->set_billing_country('');
+        $customer->set_billing_state('');
+        $customer->set_billing_city('');
+        $customer->set_shipping_country('');
+        $customer->save();
     }
 
     /** @return array<string, mixed> */

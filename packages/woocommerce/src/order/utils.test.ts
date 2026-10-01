@@ -104,6 +104,7 @@ function rawOrder(): WCSK_Order {
 			phone: "",
 			vat_number: "GB123",
 			leave_at_door: false,
+			"kizlo/tax-id": "GB-42",
 		},
 		shipping_address: {
 			first_name: "Ada",
@@ -117,6 +118,7 @@ function rawOrder(): WCSK_Order {
 			country: "GB",
 			phone: "",
 			delivery_note: "",
+			"kizlo/tax-id": "must-not-leak",
 		},
 		extensions: { kizlo: { is_paid: false } },
 		needs_payment: false,
@@ -175,6 +177,7 @@ describe("deserializeOrder", () => {
 		expect(result.billingAddress).toMatchObject({
 			company: "",
 			phone: "",
+			taxId: "GB-42",
 			additionalFields: { vat_number: "GB123", leave_at_door: false },
 		})
 		expect(result.shippingAddress.additionalFields).toEqual({ delivery_note: "" })

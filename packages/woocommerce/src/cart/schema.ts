@@ -24,7 +24,7 @@ const CartAddressFields = {
 export const CartShippingAddress = z.object(CartAddressFields)
 export type CartShippingAddress = z.infer<typeof CartShippingAddress>
 
-export const CartBillingAddress = z.object({ ...CartAddressFields, email: z.string() })
+export const CartBillingAddress = z.object({ ...CartAddressFields, email: z.string(), taxId: z.string().default("") })
 export type CartBillingAddress = z.infer<typeof CartBillingAddress>
 
 export const CartShippingDestination = z.object({
@@ -207,7 +207,7 @@ export const SelectCartShippingRateInput = z.object({
 export type SelectCartShippingRateInput = z.infer<typeof SelectCartShippingRateInput>
 
 const CartShippingAddressInput = z.object(CartAddressFields).partial()
-const CartBillingAddressInput = z.object({ ...CartAddressFields, email: z.string() }).partial()
+const CartBillingAddressInput = CartBillingAddress.partial()
 
 export const UpdateCartInput = z.object({
 	shippingAddress: CartShippingAddressInput.optional(),

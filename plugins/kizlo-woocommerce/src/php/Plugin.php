@@ -11,6 +11,7 @@ use Kizlo\WooCommerce\Modules\Customer\CustomerModule;
 use Kizlo\WooCommerce\Modules\Integration\CoreIntegration;
 use Kizlo\WooCommerce\Modules\Order\OrderModule;
 use Kizlo\WooCommerce\Modules\Product\ProductModule;
+use Kizlo\WooCommerce\Modules\TaxId\TaxIdModule;
 use Kizlo\WooCommerce\Modules\Variation\VariationListener;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceModule;
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
@@ -29,6 +30,7 @@ class Plugin
         ProductModule::class,
         OrderModule::class,
         CustomerModule::class,
+        TaxIdModule::class,
         CartModule::class,
         AttributeSwatch::class,
         VariationListener::class,
