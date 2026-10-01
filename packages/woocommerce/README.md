@@ -42,6 +42,18 @@ pnpm add @kizlo/woocommerce
 
 See the [docs](https://kizlo.io/docs) for setup and usage.
 
+## Billing Tax IDs
+
+Billing addresses expose `taxId` on customers, carts, checkout responses, and orders. The field is always a string on output and defaults to `""` when it has not been set. Billing address inputs accept an optional `taxId`; shipping addresses never expose or persist one.
+
+```ts
+await kizlo.woocommerce.cart.update.call({
+  body: { billingAddress: { taxId: "GB123456789" } },
+})
+```
+
+Store administrators can make the field mandatory from **WooCommerce → Settings → Accounts & Privacy → Checkout → Require Tax ID at checkout**. It remains optional by default.
+
 ## License
 
 [Apache 2.0](./LICENSE) © Kizlo

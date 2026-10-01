@@ -15,6 +15,7 @@ const billingAddress = {
 	country: "GB",
 	phone: "0123456789",
 	email: "ada@example.com",
+	taxId: "GB-42",
 	additionalFields: { tax_id: "GB-42" },
 }
 
@@ -73,7 +74,7 @@ test("confirm submits caller-owned checkout data directly without a hidden read"
 	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledWith(
 		{
 			body: expect.objectContaining({
-				billing_address: expect.objectContaining({ first_name: "Ada", tax_id: "GB-42" }),
+				billing_address: expect.objectContaining({ first_name: "Ada", tax_id: "GB-42", "kizlo/tax-id": "GB-42" }),
 				shipping_address: undefined,
 				payment_method: "custom_gateway",
 				customer_note: "Call first",
@@ -161,10 +162,36 @@ test("retry forwards the per-checkout redirect paths as extensions.kizlo", async
 	expect(context.wordpress.woocommerce.store.checkout.updateById).toHaveBeenCalledWith(
 		expect.objectContaining({
 			params: { id: "42" },
-			body: expect.objectContaining({ extensions: { kizlo: { success_path: "/thanks", cancel_path: "/cart" } } }),
+			body: expect.objectContaining({
+				billing_address: expect.objectContaining({ "kizlo/tax-id": "GB-42" }),
+				extensions: { kizlo: { success_path: "/thanks", cancel_path: "/cart" } },
+			}),
 		}),
 		expect.anything(),
 	)
+})
+
+test("retry maps billing Tax ID validation details", async () => {
+	const context = retryContext({
+		status: 400,
+		data: null,
+		error: {
+			code: "rest_invalid_param",
+			message: "Invalid parameter(s): billing_address",
+			data: { details: { billing_address: { code: "required", message: "Tax ID is required." } } },
+		},
+	})
+	const promise = CHECKOUT_PROCEDURES.retry["~kizlo"].handler({
+		context: context as never,
+		input: { params: { orderId: 42 }, body: { key: "key", paymentMethod: "bacs", billingAddress } } as never,
+		errors: createThrowableErrorMap(RETRY_CHECKOUT_ERROR_MAP),
+	})
+
+	await expect(promise).rejects.toMatchObject({
+		code: "CHECKOUT_VALIDATION_FAILED",
+		status: 400,
+		data: { fields: { billing_address: "Tax ID is required." } },
+	})
 })
 
 test("confirm maps an invalid WooCommerce shipping option", async () => {

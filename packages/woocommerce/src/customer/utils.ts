@@ -3,21 +3,24 @@ import type { Customer } from "./schema"
 import type { WCK_Customer } from "./types"
 
 export function deserializeCustomer(data: WCK_Customer): Customer {
+	const billing = data.billing
+
 	return {
 		id: data.id,
 		avatarUrl: data.avatar_url.length ? data.avatar_url : null,
 		billing: {
-			firstName: data.billing.first_name,
-			lastName: data.billing.last_name,
-			address1: data.billing.address_1,
-			city: data.billing.city,
-			country: data.billing.country,
-			email: data.billing.email,
-			phone: data.billing.phone,
-			postcode: data.billing.postcode,
-			state: data.billing.state,
-			address2: data.billing.address_2,
-			company: data.billing.company,
+			firstName: billing.first_name,
+			lastName: billing.last_name,
+			address1: billing.address_1,
+			city: billing.city,
+			country: billing.country,
+			email: billing.email,
+			phone: billing.phone,
+			postcode: billing.postcode,
+			state: billing.state,
+			address2: billing.address_2,
+			company: billing.company,
+			taxId: typeof billing.tax_id === "string" ? billing.tax_id : "",
 		},
 		shipping: {
 			firstName: data.shipping.first_name,

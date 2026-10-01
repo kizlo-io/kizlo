@@ -29,6 +29,12 @@ describe("Cart resource schemas", () => {
 		expect(schemas.CartPaymentMethod.safeParse({ ...method, order: "1" }).success).toBe(false)
 	})
 
+	test("keeps Tax ID billing-only and optional for address inputs", () => {
+		expect(schemas.CartBillingAddress.shape.taxId.parse(undefined)).toBe("")
+		expect(schemas.CartBillingAddress.shape).toHaveProperty("taxId")
+		expect(schemas.CartShippingAddress.shape).not.toHaveProperty("taxId")
+	})
+
 	test("exports only the redesigned field names", () => {
 		for (const name of ["CartLineItemStatus", "CartPackageLine", "CartPackageRate", "CartCouponLine", "CartShippingLine"]) {
 			expect(schemas).not.toHaveProperty(name)

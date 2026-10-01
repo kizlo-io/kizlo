@@ -145,7 +145,8 @@ function rawCart(): WCK_Cart {
 			phone: "",
 			email: "",
 			billing_vat_id: "VAT-42",
-		},
+			"kizlo/tax-id": "GB-42",
+		} as WCK_Cart["billing_address"],
 		shipping_address: {
 			first_name: "",
 			last_name: "",
@@ -158,7 +159,8 @@ function rawCart(): WCK_Cart {
 			country: "US",
 			phone: "",
 			leave_at_door: true,
-		},
+			"kizlo/tax-id": "must-not-leak",
+		} as WCK_Cart["shipping_address"],
 		payment_methods: ["bacs", "cod"],
 		payment_requirements: ["products"],
 		errors: [
@@ -198,7 +200,7 @@ test("deserializes complete cart data without legacy derivations", () => {
 	expect(result).toMatchObject({
 		itemCount: 2.5,
 		itemsWeight: 375,
-		billingAddress: { address1: "", state: "CA", additionalFields: { billing_vat_id: "VAT-42" } },
+		billingAddress: { address1: "", state: "CA", taxId: "GB-42", additionalFields: { billing_vat_id: "VAT-42" } },
 		shippingAddress: { address1: "", additionalFields: { leave_at_door: true } },
 		fees: [{ id: "handling", totals: { total: 25, tax: 5 } }],
 		totals: { shippingTotal: null, shippingTaxTotal: null },
@@ -342,11 +344,25 @@ test("reuses ProductSummary serialization for cart cross-sells", () => {
 test("serializes only supplied customer fields and flattens merchant fields", () => {
 	expect(
 		serializeCartUpdateInput({
-			billingAddress: { address1: "", additionalFields: { billing_vat_id: "VAT-7", marketing_opt_in: false } },
-			shippingAddress: { postcode: "90210" },
+			billingAddress: {
+				address1: "",
+				taxId: "GB-7",
+				additionalFields: { billing_vat_id: "VAT-7", marketing_opt_in: false, "kizlo/tax-id": "duplicate" },
+			},
+			shippingAddress: { postcode: "90210", additionalFields: { "kizlo/tax-id": "shipping" } },
 		}),
 	).toEqual({
-		billing_address: { address_1: "", billing_vat_id: "VAT-7", marketing_opt_in: false },
+		billing_address: { address_1: "", billing_vat_id: "VAT-7", marketing_opt_in: false, "kizlo/tax-id": "GB-7" },
 		shipping_address: { postcode: "90210" },
 	})
+})
+
+test("normalizes an absent billing Tax ID without exposing the raw key twice", () => {
+	const cart = rawCart()
+	delete (cart.billing_address as WCK_Cart["billing_address"] & { "kizlo/tax-id"?: string })["kizlo/tax-id"]
+
+	const result = deserializeCart(cart)
+	expect(result.billingAddress.taxId).toBe("")
+	expect(result.billingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
+	expect(result.shippingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
 })

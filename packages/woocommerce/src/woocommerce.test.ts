@@ -334,10 +334,11 @@ test("cart.items.update changes quantity through the shared cart serializer", as
 	expect(result.items[0]).toMatchObject({ key, productId, quantity: 2 })
 })
 
-test("cart.update preserves omitted address fields and clears explicit empty values", async () => {
+test("cart.update preserves omitted address fields and set, replaces, and clears a billing Tax ID", async () => {
 	await emptyCart()
 	await client().cart.update.call({
 		body: {
+			billingAddress: { taxId: "GB-CART-1" },
 			shippingAddress: {
 				firstName: "Stored",
 				city: "Los Angeles",
@@ -348,9 +349,17 @@ test("cart.update preserves omitted address fields and clears explicit empty val
 		},
 	})
 
-	const updated = await client().cart.update.call({ body: { shippingAddress: { postcode: "10001", firstName: "" } } })
+	const updated = await client().cart.update.call({
+		body: { billingAddress: { taxId: "GB-CART-2" }, shippingAddress: { postcode: "10001", firstName: "" } },
+	})
 
 	expect(updated.shippingAddress).toMatchObject({ firstName: "", city: "Los Angeles", state: "CA", postcode: "10001", country: "US" })
+	expect(updated.shippingAddress).not.toHaveProperty("taxId")
+	expect(updated.billingAddress.taxId).toBe("GB-CART-2")
+	expect(updated.billingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
+
+	const cleared = await client().cart.update.call({ body: { billingAddress: { taxId: "" } } })
+	expect(cleared.billingAddress.taxId).toBe("")
 })
 
 test("cart.selectShippingRate accepts and returns the package identifier", async () => {
@@ -538,6 +547,7 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 				country: "US",
 				phone: "0123456789",
 				email: "ada@example.com",
+				taxId: "GB-CHECKOUT-42",
 				additionalFields: {},
 			},
 			shippingAddress: {
@@ -567,6 +577,13 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 		paymentMethod: "bacs",
 		paymentResult: { status: "success", details: expect.any(Array), redirectUrl: expect.any(String) },
 	})
+	expect(result.billingAddress.taxId).toBe("GB-CHECKOUT-42")
+	expect(result.shippingAddress).not.toHaveProperty("taxId")
+	if (result.orderId === null) throw new Error("WooCommerce returned no order ID for the successful checkout.")
+
+	const stored = await client().orders.get.call({ params: { orderId: result.orderId } })
+	expect(stored.billingAddress.taxId).toBe("GB-CHECKOUT-42")
+	expect(stored.shippingAddress).not.toHaveProperty("taxId")
 })
 
 test("a failed shipping selection keeps the checkout cart available", async () => {
@@ -659,6 +676,7 @@ const RETRY_BILLING: CartBillingAddress = {
 	postcode: "M1 1AA",
 	state: "",
 	country: "GB",
+	taxId: "GB-42",
 	additionalFields: {},
 }
 
@@ -690,16 +708,49 @@ async function storedOrder(id: number): Promise<SeededOrder> {
 	return order.data
 }
 
+async function requireTaxId(value: "yes" | "no"): Promise<void> {
+	const result = await admin().post(`${WC_CORE_BASE}/settings/account/kizlo_woocommerce_require_tax_id`, { body: { value } })
+	if (result.error) throw result.error
+}
+
 test("checkout.retry pays an order owned by the headless customer", async () => {
 	const order = await createPendingOrder(getTestCredentials().users.user.id)
 
-	await client().checkout.retry.call({
+	const result = await client().checkout.retry.call({
 		params: { orderId: order.id },
 		body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress: RETRY_BILLING },
 	})
 
+	expect(result.billingAddress.taxId).toBe(RETRY_BILLING.taxId)
+	expect(result.shippingAddress).not.toHaveProperty("taxId")
 	const stored = await storedOrder(order.id)
 	expect(stored.status).toBe("on-hold")
+})
+
+test("checkout.retry requires a billing Tax ID only while the setting is enabled", async () => {
+	const order = await createPendingOrder()
+	const billingAddress = { ...RETRY_BILLING, taxId: "" }
+
+	await requireTaxId("yes")
+	try {
+		await expect(
+			client().checkout.retry.call({
+				params: { orderId: order.id },
+				body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress },
+			}),
+		).rejects.toMatchObject({ code: "CHECKOUT_VALIDATION_FAILED", status: 400 })
+
+		const stored = await storedOrder(order.id)
+		expect(stored.status).toBe("pending")
+	} finally {
+		await requireTaxId("no")
+	}
+
+	const result = await client().checkout.retry.call({
+		params: { orderId: order.id },
+		body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress },
+	})
+	expect(result.billingAddress.taxId).toBe("")
 })
 
 test("checkout.retry refuses an order owned by another registered user", async () => {

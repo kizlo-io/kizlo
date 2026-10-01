@@ -7,6 +7,8 @@ use Automattic\WooCommerce\StoreApi\SchemaController;
 use Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema;
 use Automattic\WooCommerce\StoreApi\Schemas\V1\AbstractSchema;
 use Automattic\WooCommerce\StoreApi\StoreApi;
+use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields;
+use Automattic\WooCommerce\Blocks\Package;
 use Kizlo\Modules\Introspection\ManagedContent;
 use Kizlo\Modules\Introspection\PathNormalizer;
 use Kizlo\Modules\Introspection\Registry;
@@ -14,6 +16,7 @@ use Kizlo\WooCommerce\Modules\Contract\ContractModule;
 use Kizlo\WooCommerce\Modules\Contract\RouteCorrections;
 use Kizlo\WooCommerce\Modules\Contract\StoreApiSchemas;
 use Kizlo\WooCommerce\Modules\Contract\WooCommerceNamespaces;
+use Kizlo\WooCommerce\Modules\TaxId\TaxIdModule;
 use Kizlo\WooCommerce\Tests\TestCase;
 
 /**
@@ -100,6 +103,16 @@ class ProbeRoute extends AbstractRoute
  */
 class WooCommerceRoutesTest extends TestCase
 {
+    public function setUp(): void
+    {
+        parent::setUp();
+
+        $fields = Package::container()->get(CheckoutFields::class);
+        if (! isset($fields->get_additional_fields()[TaxIdModule::FIELD_ID])) {
+            (new TaxIdModule())->registerCheckoutField();
+        }
+    }
+
     public function test_the_suite_boots_with_woocommerce_and_its_store_api(): void
     {
         $this->assertTrue(defined('KIZLO_WOOCOMMERCE_VERSION'));
@@ -346,6 +359,30 @@ class WooCommerceRoutesTest extends TestCase
         $this->assertArrayHasKey('kizlo', $schemas['woocommerce.products']['properties']);
         $this->assertArrayHasKey('kizlo', $schemas['woocommerce.store.products-collection-data']['properties']);
         $this->assertArrayHasKey('__experimentalCart', $schemas['woocommerce.store.checkout']['properties']);
+    }
+
+    public function test_tax_id_is_described_on_customer_and_store_billing_schemas(): void
+    {
+        $document = $this->document();
+        $customer = $this->publishedProperties($document, WooCommerceNamespaces::REST, '/customers/{id}');
+
+        $this->assertArrayHasKey('tax_id', $customer['billing']['properties'] ?? []);
+
+        foreach (['woocommerce.store.cart', 'woocommerce.store.checkout', 'woocommerce.store.order'] as $schema) {
+            $billing = $document['schemas'][$schema]['properties']['billing_address']['properties'] ?? [];
+            $this->assertArrayHasKey(TaxIdModule::FIELD_ID, $billing, sprintf('%s billing response has no Tax ID.', $schema));
+        }
+
+        $apis = $document['apis'];
+        $inputs = [
+            $apis['woocommerce.store.cart.updateCustomer']['paths']['/cart/update-customer']['create']['input']['body'],
+            $apis['woocommerce.store.checkout']['paths']['/checkout']['create']['input']['body'],
+            $apis['woocommerce.store.checkout']['paths']['/checkout/{id}']['update_by_id']['input']['body'],
+        ];
+
+        foreach ($inputs as $input) {
+            $this->assertArrayHasKey(TaxIdModule::FIELD_ID, $input['properties']['billing_address']['properties'] ?? []);
+        }
     }
 
     /** WooCommerce wraps product reads in closures bound to their REST controller. */
