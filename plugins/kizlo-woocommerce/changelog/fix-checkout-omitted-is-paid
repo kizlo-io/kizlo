@@ -1,4 +1,0 @@
-Significance: patch
-Type: fixed
-
-Accept checkout requests that omit the response-only is_paid field.
