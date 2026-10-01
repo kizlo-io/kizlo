@@ -4,6 +4,12 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-10-01
+### Added
+- Add billing Tax ID support across customer, checkout, and order administration.
+- Add editable product HS codes and immutable order-item snapshots.
+- Report whether the order is paid on the Store API checkout and order responses, as extensions.kizlo.is_paid.
+
 ## [0.9.0] - 2026-09-27
 ### Changed
 - Describe every registered wc/v3 and wc/store/v1 route instead of a fixed catalogue.
@@ -102,6 +108,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.10.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.9.0...kizlo-woocommerce-v0.10.0
 [0.9.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.8.1...kizlo-woocommerce-v0.9.0
 [0.8.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.8.0...kizlo-woocommerce-v0.8.1
 [0.8.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.7.1...kizlo-woocommerce-v0.8.0

@@ -4,7 +4,7 @@ Tags: kizlo, woocommerce, headless, javascript, ai
 Requires at least: 6.5
 Tested up to: 6.7
 Requires PHP: 8.2
-Stable tag: 0.9.0
+Stable tag: 0.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,8 +18,9 @@ Requires the Kizlo core plugin and WooCommerce to be active.
 
 == Changelog ==
 
-= 0.9.0 =
-* Changed: Describe every registered wc/v3 and wc/store/v1 route instead of a fixed catalogue.
-* Fixed: Let POST wc/store/v1/cart/items add an item by naming the product, instead of rejecting a request that omits extensions.
+= 0.10.0 =
+* Added: Add billing Tax ID support across customer, checkout, and order administration.
+* Added: Add editable product HS codes and immutable order-item snapshots.
+* Added: Report whether the order is paid on the Store API checkout and order responses, as extensions.kizlo.is_paid.
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo-woocommerce/CHANGELOG.md).

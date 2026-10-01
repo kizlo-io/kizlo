@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Report whether the order is paid on the Store API checkout and order responses, as extensions.kizlo.is_paid.
