@@ -118,7 +118,10 @@ final class KizloBlocks
      * `is_paid` goes the other way. `CheckoutSchema` calls `get_extended_data()`
      * with no arguments, so the data callback cannot reach the order; the value is
      * filled in by {@see \Kizlo\WooCommerce\Modules\Checkout\CheckoutRedirectModule::addCheckoutPaidState}
-     * and only declared here.
+     * and only declared here. WooCommerce validates every extension property on
+     * the request regardless of `readonly`, reading an omitted one as `null`, so
+     * the checkout copy accepts it absent or as any boolean and discards it: the
+     * storefront need not send it, and cannot claim a paid order by sending one.
      *
      * @return array<string, mixed>
      */
@@ -135,7 +138,12 @@ final class KizloBlocks
                 'type'        => 'string',
                 'context'     => ['view', 'edit'],
             ],
-            'is_paid' => self::isPaid(),
+            'is_paid' => array_merge(self::isPaid(), [
+                'arg_options' => [
+                    'validate_callback' => static fn(): bool => true,
+                    'sanitize_callback' => static fn(): mixed => null,
+                ],
+            ]),
         ];
     }
 
