@@ -24,9 +24,43 @@ class ProductModule
     public function register(): void
     {
         add_action('woocommerce_blocks_loaded', [$this, 'extendStoreApiProductSchema']);
+        add_action('woocommerce_product_options_shipping', [$this, 'renderHsCodeField']);
+        add_action('woocommerce_admin_process_product_object', [$this, 'saveHsCode']);
         add_filter('wp_insert_comment', [$this, 'injectReviewUserIdBeforeInsert'], PHP_INT_MAX, 2);
 
         (new ProductController($this))->register();
+    }
+
+    public function renderHsCodeField(): void
+    {
+        global $product_object;
+
+        woocommerce_wp_text_input([
+            'id'          => HsCode::PRODUCT_META,
+            'label'       => __('HS code', 'kizlo-woocommerce'),
+            'description' => __('Harmonized System customs classification code.', 'kizlo-woocommerce'),
+            'desc_tip'    => true,
+            'value'       => $product_object instanceof WC_Product
+                ? HsCode::forProduct($product_object) ?? ''
+                : '',
+        ]);
+    }
+
+    public function saveHsCode(WC_Product $product): void
+    {
+        if (! array_key_exists(HsCode::PRODUCT_META, $_POST)) return;
+
+        $submitted = wp_unslash($_POST[HsCode::PRODUCT_META]);
+        if (! is_string($submitted)) return;
+
+        $value = trim(sanitize_text_field($submitted));
+
+        if ($value === '') {
+            $product->delete_meta_data(HsCode::PRODUCT_META);
+            return;
+        }
+
+        $product->update_meta_data(HsCode::PRODUCT_META, $value);
     }
 
     public function extendProduct(array $data, WC_Product $product): array
@@ -283,6 +317,7 @@ class ProductModule
             'stock'        => $product->get_stock_quantity(),
             'on_sale_from' => $this->qualifiedDate($product->get_date_on_sale_from()),
             'on_sale_to'   => $this->qualifiedDate($product->get_date_on_sale_to()),
+            'hs_code'      => HsCode::forProduct($product),
             'seo'          => $post_data['seo'],
             'custom'       => (object) $post_data['custom'],
         ];

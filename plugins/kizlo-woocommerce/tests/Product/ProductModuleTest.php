@@ -8,6 +8,7 @@ use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\WooCommerce\Modules\Contract\KizloBlocks;
 use Kizlo\Support\Utils;
+use Kizlo\WooCommerce\Modules\Product\HsCode;
 use Kizlo\WooCommerce\Modules\Product\ProductModule;
 use Kizlo\WooCommerce\Tests\TestCase;
 use WC_DateTime;
@@ -17,9 +18,64 @@ class ProductModuleTest extends TestCase
 {
     protected function tearDown(): void
     {
+        global $product_object;
+
         remove_all_filters('kizlo_post_type_custom_values');
+        unset($_POST[HsCode::PRODUCT_META]);
+        $product_object = null;
 
         parent::tearDown();
+    }
+
+    public function test_the_shipping_field_loads_sanitizes_and_clears_the_product_hs_code(): void
+    {
+        global $product_object;
+
+        if (! function_exists('woocommerce_wp_text_input')) {
+            require_once WC_ABSPATH . 'includes/admin/wc-meta-box-functions.php';
+        }
+
+        $product = new WC_Product_Simple();
+        $product->set_name('Customs product');
+        $product->set_regular_price('10');
+        $product->update_meta_data(HsCode::PRODUCT_META, '6204.42');
+        $product->save();
+
+        $module = new ProductModule();
+        $module->register();
+
+        $product_object = $product;
+        ob_start();
+        do_action('woocommerce_product_options_shipping');
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('id="kizlo_hs_code"', $html);
+        $this->assertStringContainsString('value="6204.42"', $html);
+
+        $_POST[HsCode::PRODUCT_META] = "  6109.10\n";
+        do_action('woocommerce_admin_process_product_object', $product);
+        $product->save();
+
+        $this->assertSame('6109.10', $product->get_meta(HsCode::PRODUCT_META, true));
+
+        $_POST[HsCode::PRODUCT_META] = '   ';
+        do_action('woocommerce_admin_process_product_object', $product);
+        $product->save();
+
+        $this->assertSame('', $product->get_meta(HsCode::PRODUCT_META, true));
+    }
+
+    public function test_store_products_expose_a_nullable_hs_code_and_its_schema(): void
+    {
+        $product = new WC_Product_Simple();
+        $module  = new ProductModule();
+
+        $this->assertNull($module->storeProductExtensionData($product)['hs_code']);
+
+        $product->update_meta_data(HsCode::PRODUCT_META, '6109.10');
+
+        $this->assertSame('6109.10', $module->storeProductExtensionData($product)['hs_code']);
+        $this->assertSame(['string', 'null'], KizloBlocks::storeProduct()['hs_code']['type']);
     }
 
     public function test_store_sale_dates_are_qualified_utc_values(): void
@@ -209,7 +265,7 @@ class ProductModuleTest extends TestCase
 
         $this->assertSame($expected, $urls['product_cat']['url']);
         $this->assertSame($term_id, $urls['product_cat']['id']);
-        $this->assertArrayNotHasKey('hs_code', $result);
+        $this->assertNull($result['hs_code']);
         $this->assertArrayNotHasKey('extend', $result);
     }
 }

@@ -30,6 +30,7 @@ export const OrderItem = z.object({
 	id: z.number(),
 	productId: z.number().nullable(),
 	variationId: z.number().nullable(),
+	hsCode: z.string().nullable(),
 	name: z.string(),
 	quantity: z.number(),
 	selectedAttributes: z.array(CartSelectedAttribute),

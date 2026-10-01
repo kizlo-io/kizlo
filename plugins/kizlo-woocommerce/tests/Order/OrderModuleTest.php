@@ -7,9 +7,12 @@ use Kizlo\Modules\CustomFields\CustomFieldsStore;
 use Kizlo\Modules\CustomFields\FieldDefinitions;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
 use Kizlo\WooCommerce\Modules\Order\OrderModule;
+use Kizlo\WooCommerce\Modules\Product\HsCode;
 use Kizlo\WooCommerce\Tests\TestCase;
 use WC_Order_Item_Product;
 use WC_Product_Simple;
+use WC_Product_Variable;
+use WC_Product_Variation;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -76,6 +79,7 @@ class OrderModuleTest extends TestCase
         $product = new WC_Product_Simple();
         $product->set_name('Disposable product');
         $product->set_regular_price('12');
+        $product->update_meta_data(HsCode::PRODUCT_META, '6109.10');
         $product->save();
 
         $order = wc_create_order();
@@ -89,12 +93,16 @@ class OrderModuleTest extends TestCase
         $product_id = $product->get_id();
         $module->rememberOrderItemProductIds($line->get_id(), $line);
         $this->assertSame($product_id, (int) $line->get_meta('_kizlo_product_id', true));
+        $this->assertSame('6109.10', $line->get_meta(HsCode::ORDER_ITEM_META, true));
         $formatted_meta_keys = array_map(
             static fn(object $meta): string => $meta->key,
             $line->get_all_formatted_meta_data(),
         );
         $this->assertNotContains('_kizlo_product_id', $formatted_meta_keys);
         $this->assertNotContains('_kizlo_variation_id', $formatted_meta_keys);
+        $this->assertNotContains(HsCode::ORDER_ITEM_META, $formatted_meta_keys);
+        $product->update_meta_data(HsCode::PRODUCT_META, '6109.90');
+        $product->save();
         $product->delete(true);
         $this->assertSame($product_id, (int) $line->get_meta('_kizlo_product_id', true));
 
@@ -105,9 +113,61 @@ class OrderModuleTest extends TestCase
         $kizlo  = $result->get_data()['items'][0]['extensions']['kizlo'];
 
         $this->assertSame($product_id, $kizlo['product_id']);
+        $this->assertSame('6109.10', $kizlo['hs_code']);
         $this->assertFalse($kizlo['product_exists']);
         $this->assertSame('', $kizlo['slug']);
         $this->assertNull($kizlo['url']);
+    }
+
+    public function test_variation_lines_snapshot_the_base_product_hs_code(): void
+    {
+        $product = new WC_Product_Variable();
+        $product->set_name('Variable customs product');
+        $product->update_meta_data(HsCode::PRODUCT_META, '6204.62');
+        $product->save();
+
+        $variation = new WC_Product_Variation();
+        $variation->set_parent_id($product->get_id());
+        $variation->set_regular_price('15');
+        $variation->update_meta_data(HsCode::PRODUCT_META, 'must-not-win');
+        $variation->save();
+
+        $order = wc_create_order();
+        $line  = new WC_Order_Item_Product();
+        $line->set_product($variation);
+        $line->set_quantity(1);
+        $order->add_item($line);
+        $order->save();
+
+        (new OrderModule())->rememberOrderItemProductIds($line->get_id(), $line);
+
+        $this->assertSame($product->get_id(), (int) $line->get_meta('_kizlo_product_id', true));
+        $this->assertSame($variation->get_id(), (int) $line->get_meta('_kizlo_variation_id', true));
+        $this->assertSame('6204.62', $line->get_meta(HsCode::ORDER_ITEM_META, true));
+    }
+
+    public function test_older_unsnapshotted_lines_do_not_fall_back_to_the_current_product_hs_code(): void
+    {
+        $product = new WC_Product_Simple();
+        $product->set_name('Older order product');
+        $product->set_regular_price('12');
+        $product->save();
+
+        $order = wc_create_order();
+        $line  = new WC_Order_Item_Product();
+        $line->set_product($product);
+        $line->set_quantity(1);
+        $order->add_item($line);
+        $order->save();
+
+        $product->update_meta_data(HsCode::PRODUCT_META, '6109.90');
+        $product->save();
+
+        $response = new WP_REST_Response(['items' => [['id' => $line->get_id()]]]);
+        $request  = new WP_REST_Request('GET', sprintf('/wc/store/v1/order/%d', $order->get_id()));
+        $result   = (new OrderModule())->extendStoreOrderItems($response, null, $request);
+
+        $this->assertNull($result->get_data()['items'][0]['extensions']['kizlo']['hs_code']);
     }
 
     public function test_the_order_reports_its_paid_state(): void

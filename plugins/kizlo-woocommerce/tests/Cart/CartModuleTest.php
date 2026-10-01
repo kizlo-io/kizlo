@@ -108,7 +108,7 @@ class CartModuleTest extends TestCase
         $properties = KizloBlocks::storeOrderItem();
 
         $this->assertSame(
-            ['product_id', 'variation_id', 'product_exists', 'slug', 'url', 'custom'],
+            ['product_id', 'variation_id', 'hs_code', 'product_exists', 'slug', 'url', 'custom'],
             array_keys($properties),
         );
         $this->assertSame('boolean', $properties['product_exists']['type']);

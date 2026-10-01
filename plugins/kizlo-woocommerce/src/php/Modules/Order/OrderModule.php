@@ -12,6 +12,7 @@ use Kizlo\Support\Utils;
 use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\WooCommerce\Modules\Order\OrderRepository;
+use Kizlo\WooCommerce\Modules\Product\HsCode;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 use Kizlo\WooCommerce\Support\StoreExtensions;
 use WC_Order;
@@ -83,15 +84,21 @@ class OrderModule
         ]);
     }
 
-    /**
-     * Preserve product references before WooCommerce clears them on deletion.
-     */
+    /** Preserve product identity and customs data as order-time snapshots. */
     public function rememberOrderItemProductIds(int $item_id, WC_Order_Item $item): void
     {
         if (! $item instanceof WC_Order_Item_Product) return;
 
         $item->add_meta_data(self::PRODUCT_ID_META, (string) $item->get_product_id(), true);
         $item->add_meta_data(self::VARIATION_ID_META, (string) $item->get_variation_id(), true);
+
+        $base_product = wc_get_product($item->get_product_id());
+        $hs_code      = $base_product instanceof WC_Product ? HsCode::forProduct($base_product) : null;
+
+        if ($hs_code !== null) {
+            $item->add_meta_data(HsCode::ORDER_ITEM_META, $hs_code, true);
+        }
+
         $item->save_meta_data();
     }
 
@@ -185,6 +192,7 @@ class OrderModule
         $extensions['kizlo'] = [
             'product_id'     => $product_id,
             'variation_id'   => $variation_id,
+            'hs_code'        => HsCode::forOrderItem($order_item),
             'product_exists' => $product instanceof WC_Product,
             'slug'           => $base_product instanceof WC_Product ? $base_product->get_slug() : '',
             'url'            => $post instanceof WP_Post

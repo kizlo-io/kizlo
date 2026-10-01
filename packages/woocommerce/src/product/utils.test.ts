@@ -94,6 +94,7 @@ function rawProduct(): WCSK_Product {
 					{ id: 4, taxonomy: "product_brand", url: "https://frontend.example/brands/acme" },
 				],
 				stock: 4,
+				hs_code: "6109.10",
 				on_sale_from: "2026-01-02T03:04:05Z",
 				on_sale_to: "2026-02-03T04:05:06Z",
 				seo: null,
@@ -115,6 +116,7 @@ test("Store products normalize the complete public model without losing custom p
 		averageRating: 4.5,
 		prices: { price: 100, regularPrice: 200, salePrice: null, priceRange: { minAmount: 100, maxAmount: 300 } },
 		stockQuantity: 4,
+		hsCode: "6109.10",
 		custom: { product_note: "Monthly plan" },
 		extensions: { acme: { retained: true } },
 		recommendations: null,
@@ -182,6 +184,17 @@ test("missing Kizlo URLs stay null instead of falling back to WooCommerce links"
 	expect(result.categories[0]?.url).toBeNull()
 	expect(result.tags[0]?.url).toBeNull()
 	expect(result.brands[0]?.url).toBeNull()
+	expect(result.hsCode).toBeNull()
+})
+
+test("Store products normalize an empty HS code to null", () => {
+	const product = rawProduct()
+	const kizlo = product.extensions.kizlo
+	if (!kizlo) throw new Error("Expected the Kizlo product extension")
+
+	kizlo.hs_code = ""
+
+	expect(deserializeStoreProduct(product, null).hsCode).toBeNull()
 })
 
 test("embedded recommendations flatten their collection wrapper and default missing relations to empty lists", () => {

@@ -196,6 +196,12 @@ final class KizloBlocks
                 'context'     => ['view', 'edit'],
                 'readonly'    => true,
             ],
+            'hs_code' => [
+                'description' => 'The Harmonized System code captured when the order line was created, or null when none was set.',
+                'type'        => ['string', 'null'],
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
             'product_exists' => [
                 'description' => 'Whether the exact product or variation behind this order line still exists.',
                 'type'        => 'boolean',
@@ -266,6 +272,12 @@ final class KizloBlocks
                 'description' => 'When the sale price stops applying, as RFC 3339 UTC.',
                 'type'        => ['string', 'null'],
                 'format'      => 'date-time',
+                'context'     => ['view', 'edit'],
+                'readonly'    => true,
+            ],
+            'hs_code' => [
+                'description' => 'The product Harmonized System customs code, or null when none is set.',
+                'type'        => ['string', 'null'],
                 'context'     => ['view', 'edit'],
                 'readonly'    => true,
             ],

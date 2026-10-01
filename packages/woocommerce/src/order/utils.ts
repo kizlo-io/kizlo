@@ -221,6 +221,7 @@ function deserializeOrderItem(item: WCSK_OrderItem): OrderItem {
 		id: item.id,
 		productId,
 		variationId,
+		hsCode: typeof kizlo.hs_code === "string" && kizlo.hs_code !== "" ? kizlo.hs_code : null,
 		name: item.name,
 		quantity: item.quantity,
 		selectedAttributes: item.variation.map((attribute) => ({
