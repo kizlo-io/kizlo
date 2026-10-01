@@ -1,5 +1,13 @@
 # @kizlo/woocommerce
 
+## 0.10.0
+
+### Minor Changes
+
+- [#265](https://github.com/kizlo-io/kizlo/pull/265) [`6d0d2d8`](https://github.com/kizlo-io/kizlo/commit/6d0d2d839cf6b96b8de8c1285d90b7b106d55e19) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose product HS codes and preserve order-time values on order items.
+
+- [#263](https://github.com/kizlo-io/kizlo/pull/263) [`7b03820`](https://github.com/kizlo-io/kizlo/commit/7b03820847ab3eeea24f8fe6da876f5aecb71538) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose billing Tax IDs across customers, carts, checkout, and orders.
+
 ## 0.9.0
 
 ### Minor Changes
