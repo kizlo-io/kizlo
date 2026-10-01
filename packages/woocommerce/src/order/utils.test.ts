@@ -12,7 +12,14 @@ const currency = {
 	currency_suffix: "",
 }
 
-function orderItem(options: { id: number; productId: number; variationId?: number; exists?: boolean; onSale?: boolean }): WCSK_OrderItem {
+function orderItem(options: {
+	id: number
+	productId: number
+	variationId?: number
+	exists?: boolean
+	onSale?: boolean
+	hsCode?: string | null
+}): WCSK_OrderItem {
 	const variationId = options.variationId ?? 0
 	const exists = options.exists ?? true
 
@@ -68,6 +75,7 @@ function orderItem(options: { id: number; productId: number; variationId?: numbe
 			kizlo: {
 				product_id: options.productId,
 				variation_id: variationId,
+				hs_code: options.hsCode === undefined ? "6109.10" : options.hsCode,
 				product_exists: exists,
 				slug: exists ? "current-product" : "",
 				url: exists ? "https://shop.test/products/current-product" : null,
@@ -185,6 +193,7 @@ describe("deserializeOrder", () => {
 			id: 101,
 			productId: 7,
 			variationId: null,
+			hsCode: "6109.10",
 			quantity: 1.5,
 			selectedAttributes: [],
 			itemData: [{ name: "Gift message", value: "Happy birthday", display: null }],
@@ -218,12 +227,20 @@ describe("deserializeOrder", () => {
 			id: 103,
 			productId: 44,
 			variationId: 45,
+			hsCode: "6109.10",
 			name: "Snapshot variation",
 			quantity: 2,
 			itemData: [{ name: "Gift message", value: "Happy birthday", display: null }],
 			product: null,
 			extensions: { "third-party": { opaque: true, zero: 0 } },
 		})
+	})
+
+	test("keeps older unsnapshotted order items null instead of reading the current product", () => {
+		const raw = rawOrder()
+		raw.items = [orderItem({ id: 104, productId: 7, hsCode: null })]
+
+		expect(deserializeOrder(raw).items[0]).toMatchObject({ productId: 7, hsCode: null })
 	})
 
 	test("reports the paid state from extensions.kizlo", () => {

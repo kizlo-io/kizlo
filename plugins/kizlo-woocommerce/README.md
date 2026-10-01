@@ -39,6 +39,12 @@ WordPress 6.5+'s `Requires Plugins:` header enforces both dependencies. This com
 
 See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `CONTRIBUTING.md`. `pnpm kizlo dev` bind-mounts this directory into your local WP install, so PHP edits show up live without a build or symlink step.
 
+## Product HS codes
+
+Set a product's Harmonized System code under **Product data → Shipping → HS code**. The value is exposed as `Product.hsCode`; variable-product order lines inherit it from their parent product.
+
+When an order line is created, the plugin stores the HS code on that line. `OrderItem.hsCode` therefore keeps the value used at order time even if the product is later edited or deleted. Orders created before this field was available return `null` instead of using the product's current value.
+
 ## Auth
 
 The companion plugin uses Kizlo core's administrator Application Password guard for identity-sensitive routes. Missing or invalid Application Password authentication returns `401`; valid non-administrator credentials return `403`.

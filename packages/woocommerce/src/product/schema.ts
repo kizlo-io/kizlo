@@ -149,6 +149,7 @@ export const Product = ProductSummary.extend({
 	formattedWeight: z.string(),
 	formattedDimensions: z.string(),
 	stockQuantity: z.number().nullable(),
+	hsCode: z.string().nullable(),
 	saleStartsAt: z.number().nullable(),
 	saleEndsAt: z.number().nullable(),
 	seo: Seo.nullable(),

@@ -114,7 +114,7 @@ test("products.get optionally resolves recommendations by slug through the Store
 	)
 	expect(result.images.every((image) => !("thumbnail" in image))).toBe(true)
 	expect(result.addToCart).not.toHaveProperty("url")
-	expect(result).not.toHaveProperty("hsCode")
+	expect(result.hsCode).toBeNull()
 	expect(result).not.toHaveProperty("extend")
 	expect(result).not.toHaveProperty("customFields")
 	expect(result.custom).toEqual(expect.any(Object))
@@ -905,6 +905,55 @@ test("orders.get keeps the transaction after its product is deleted", async () =
 		quantity: 1,
 		product: null,
 	})
+})
+
+test("orders keep the HS code captured before the product changes", async () => {
+	const createdProduct = await admin().post<{
+		id: number
+		slug: string
+		meta_data: Array<{ id: number; key: string; value: unknown }>
+	}>(`${WC_CORE_BASE}/products`, {
+		body: {
+			name: "HS code snapshot product",
+			type: "simple",
+			status: "publish",
+			regular_price: "12",
+			meta_data: [{ key: "kizlo_hs_code", value: "6109.10" }],
+		},
+	})
+	if (createdProduct.error) throw createdProduct.error
+
+	try {
+		const current = await client().products.get.call({ params: { identifier: createdProduct.data.slug } })
+		expect(current.hsCode).toBe("6109.10")
+
+		const createdOrder = await admin().post<SeededOrder>(`${WC_CORE_BASE}/orders`, {
+			body: {
+				status: "pending",
+				customer_id: getTestCredentials().users.user.id,
+				billing: { ...STORED_SHIPPING, email: ORDER_EMAIL },
+				shipping: STORED_SHIPPING,
+				line_items: [{ product_id: createdProduct.data.id, quantity: 1 }],
+			},
+		})
+		if (createdOrder.error) throw createdOrder.error
+
+		const meta = createdProduct.data.meta_data.find((item) => item.key === "kizlo_hs_code")
+		if (!meta) throw new Error("WooCommerce did not persist the product HS code metadata.")
+
+		const updated = await admin().put(`${WC_CORE_BASE}/products/${createdProduct.data.id}`, {
+			body: { meta_data: [{ id: meta.id, key: meta.key, value: "6109.90" }] },
+		})
+		if (updated.error) throw updated.error
+
+		const changed = await client().products.get.call({ params: { identifier: createdProduct.data.id } })
+		const order = await client().orders.get.call({ params: { orderId: createdOrder.data.id } })
+
+		expect(changed.hsCode).toBe("6109.90")
+		expect(order.items[0]?.hsCode).toBe("6109.10")
+	} finally {
+		await admin().delete(`${WC_CORE_BASE}/products/${createdProduct.data.id}`, { searchParams: { force: true } })
+	}
 })
 
 // ==================================================

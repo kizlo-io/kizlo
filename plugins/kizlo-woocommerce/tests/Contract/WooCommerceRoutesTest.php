@@ -17,6 +17,7 @@ use Kizlo\WooCommerce\Modules\Contract\RouteCorrections;
 use Kizlo\WooCommerce\Modules\Contract\StoreApiSchemas;
 use Kizlo\WooCommerce\Modules\Contract\WooCommerceNamespaces;
 use Kizlo\WooCommerce\Modules\TaxId\TaxIdModule;
+use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 use Kizlo\WooCommerce\Tests\TestCase;
 
 /**
@@ -359,6 +360,21 @@ class WooCommerceRoutesTest extends TestCase
         $this->assertArrayHasKey('kizlo', $schemas['woocommerce.products']['properties']);
         $this->assertArrayHasKey('kizlo', $schemas['woocommerce.store.products-collection-data']['properties']);
         $this->assertArrayHasKey('__experimentalCart', $schemas['woocommerce.store.checkout']['properties']);
+    }
+
+    public function test_hs_codes_are_described_on_products_and_order_items(): void
+    {
+        $schemas = $this->document()['schemas'];
+        $product = $schemas[WooCommerceSchemas::STORE_PRODUCT]['properties'];
+        $order   = $schemas[WooCommerceSchemas::STORE_ORDER]['properties'];
+
+        $product_hs_code = $product['extensions']['properties']['kizlo']['properties']['hs_code'] ?? [];
+        $order_hs_code   = $order['items']['items']['properties']['extensions']['properties']['kizlo']['properties']['hs_code'] ?? [];
+
+        $this->assertSame('string', $product_hs_code['type'] ?? null);
+        $this->assertTrue($product_hs_code['nullable'] ?? false);
+        $this->assertSame('string', $order_hs_code['type'] ?? null);
+        $this->assertTrue($order_hs_code['nullable'] ?? false);
     }
 
     public function test_tax_id_is_described_on_customer_and_store_billing_schemas(): void

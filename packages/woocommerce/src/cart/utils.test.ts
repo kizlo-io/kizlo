@@ -323,6 +323,7 @@ test("reuses ProductSummary serialization for cart cross-sells", () => {
 					url: "https://frontend.example/products/cross-sell",
 					term_urls: [],
 					stock: null,
+					hs_code: null,
 					on_sale_from: null,
 					on_sale_to: null,
 					seo: null,
