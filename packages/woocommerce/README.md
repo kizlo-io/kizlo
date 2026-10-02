@@ -54,6 +54,27 @@ await kizlo.woocommerce.cart.update.call({
 
 Store administrators can make the field mandatory from **WooCommerce → Settings → Accounts & Privacy → Checkout → Require Tax ID at checkout**. It remains optional by default.
 
+## Storefront settings
+
+`storefront.get` returns the store-wide settings a storefront renders with, so nothing has to be hardcoded:
+
+- `address`: the countries the store sells and ships to, their states, the per-country field rules, and every checkout field including ones plugins register
+- `checkout`: guest checkout, coupons, tax display, shipping and local pickup
+- `pricing`: the currency format, plus how prices show tax
+- `catalog`: units, review rules and stock display
+
+A field's rules for a country are its default merged with that country's override, the way WooCommerce's Checkout block builds them:
+
+```ts
+const store = await kizlo.woocommerce.storefront.get.call()
+
+const country = store.address.countries.find((entry) => entry.code === "AE")
+const postcode = { ...store.address.fields.postcode, ...country?.locale.postcode }
+// { label: "Postal code", required: false, hidden: true, ... }
+```
+
+The response is cached in WordPress per locale. Changing a WooCommerce setting clears it and sends the `settings.woocommerce.updated` webhook event.
+
 ## License
 
 [Apache 2.0](./LICENSE) © Kizlo

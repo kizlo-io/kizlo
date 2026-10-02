@@ -21,7 +21,7 @@ function server(endpoints: object) {
 
 test("refuses to start against a WordPress that does not serve the integration routes", () => {
 	expect(server({})).toThrow(/woocommerce\.store\.cart/)
-	expect(server({})).toThrow(/kizlo-woocommerce to 0\.10\.0 or newer/)
+	expect(server({})).toThrow(/kizlo-woocommerce to 0\.11\.0 or newer/)
 })
 
 test("names only the subtrees that are missing", () => {

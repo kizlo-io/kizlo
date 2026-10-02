@@ -15,6 +15,7 @@ export const SETTINGS_SIMPLE_EVENT_TYPES = [
 	"settings.authors.updated",
 	"settings.crawling.updated",
 	"settings.integration.updated",
+	"settings.woocommerce.updated",
 ] as const
 export const SettingsSimpleEventType = z.enum(SETTINGS_SIMPLE_EVENT_TYPES)
 export type SettingsSimpleEventType = z.infer<typeof SettingsSimpleEventType>
