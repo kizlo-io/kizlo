@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Add a storefront settings route returning the store's countries, address field rules, and checkout, pricing and catalog settings, cached and announced on change.

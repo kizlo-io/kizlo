@@ -4,7 +4,7 @@ Tags: kizlo, woocommerce, headless, javascript, ai
 Requires at least: 6.5
 Tested up to: 6.7
 Requires PHP: 8.2
-Stable tag: 0.10.1
+Stable tag: 0.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,7 +18,7 @@ Requires the Kizlo core plugin and WooCommerce to be active.
 
 == Changelog ==
 
-= 0.10.1 =
-* Fixed: Accept checkout requests that omit the response-only is_paid field.
+= 0.11.0 =
+* Added: Add a storefront settings route returning the store's countries, address field rules, and checkout, pricing and catalog settings, cached and announced on change.
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo-woocommerce/CHANGELOG.md).
