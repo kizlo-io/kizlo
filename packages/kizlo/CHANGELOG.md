@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.25.1
+
+### Patch Changes
+
+- [#267](https://github.com/kizlo-io/kizlo/pull/267) [`45482c5`](https://github.com/kizlo-io/kizlo/commit/45482c53992022fc34e21eb02dea690ae7b9888d) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add the `settings.woocommerce.updated` webhook event, which revalidates the Next.js layout.
+
 ## 0.25.0
 
 ### Minor Changes
