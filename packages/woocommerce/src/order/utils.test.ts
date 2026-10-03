@@ -87,6 +87,7 @@ function orderItem(options: {
 
 function rawOrder(): WCSK_Order {
 	return {
+		additional_fields: {},
 		id: 42,
 		status: "wc-awaiting-pickup",
 		items: [orderItem({ id: 101, productId: 7 }), orderItem({ id: 102, productId: 7, variationId: 8, onSale: true })],
@@ -275,4 +276,12 @@ describe("deserializeOrder", () => {
 		expect(result.paymentRequirements).toEqual([])
 		expect(result.totals.total).toBe(0)
 	})
+})
+
+test("reads the declared order contact/order adapter and defaults old plugin responses to empty", () => {
+	const data = rawOrder()
+	data.additional_fields = { "qa/opt-in": false, "qa/slot": "", "qa/message": "" }
+	expect(deserializeOrder(data).additionalFields).toEqual(data.additional_fields)
+	delete (data as unknown as { additional_fields?: unknown }).additional_fields
+	expect(deserializeOrder(data).additionalFields).toEqual({})
 })

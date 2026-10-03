@@ -1,4 +1,5 @@
 import { expect, test } from "vitest"
+import { Customer } from "./schema"
 import type { WCK_Customer } from "./types"
 import { deserializeCustomer } from "./utils"
 
@@ -19,8 +20,9 @@ function customer(overrides: Record<string, unknown> = {}): WCK_Customer {
 	return {
 		id: 1,
 		avatar_url: "",
-		billing: { ...address, email: "ada@example.com", tax_id: "GB-42" },
-		shipping: address,
+		additional_fields: {},
+		billing: { ...address, additional_fields: {}, email: "ada@example.com", tax_id: "GB-42" },
+		shipping: { ...address, additional_fields: {} },
 		email: "ada@example.com",
 		first_name: "Ada",
 		last_name: "Lovelace",
@@ -62,4 +64,31 @@ test("deserializes the canonical billing Tax ID and normalizes an absent value",
 	delete (withoutTaxId.billing as unknown as { tax_id?: string }).tax_id
 	expect(deserializeCustomer(withoutTaxId).billing.taxId).toBe("")
 	expect(deserializeCustomer(withoutTaxId).shipping).not.toHaveProperty("taxId")
+})
+
+test("reads customer address and contact adapters with false, empty and missing values", () => {
+	const data = customer()
+	data.billing.additional_fields = { "qa/reference": "BILL", "qa/address-flag": false }
+	data.shipping.additional_fields = { "qa/reference": "SHIP" }
+	data.additional_fields = { "qa/opt-in": false }
+	const result = deserializeCustomer(data)
+	expect(result.billing.additionalFields).toEqual({ "qa/reference": "BILL", "qa/address-flag": false })
+	expect(result.shipping.additionalFields).toEqual({ "qa/reference": "SHIP" })
+	expect(result.additionalFields).toEqual({ "qa/opt-in": false })
+	expect(deserializeCustomer(customer()).additionalFields).toEqual({})
+})
+
+test("customer responses require normalized address buckets even with an older plugin", () => {
+	const data = customer()
+	delete (data.billing as unknown as Record<string, unknown>).additional_fields
+	delete (data.shipping as unknown as Record<string, unknown>).additional_fields
+	delete (data as unknown as Record<string, unknown>).additional_fields
+	const result = deserializeCustomer(data)
+	expect(result.billing.additionalFields).toEqual({})
+	expect(result.shipping.additionalFields).toEqual({})
+	expect(result.additionalFields).toEqual({})
+	expect(Customer.parse(result)).toEqual(result)
+	for (const group of ["billing", "shipping"] as const) {
+		expect(Customer.safeParse({ ...result, [group]: { ...result[group], additionalFields: undefined } }).success).toBe(false)
+	}
 })

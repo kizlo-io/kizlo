@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Expose registered additional-field schemas and grouped customer and order read values.

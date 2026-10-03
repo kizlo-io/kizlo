@@ -16,7 +16,7 @@ const billingAddress = {
 	phone: "0123456789",
 	email: "ada@example.com",
 	taxId: "GB-42",
-	additionalFields: { tax_id: "GB-42" },
+	additionalFields: { "qa/reference": "GB-42" },
 }
 
 function confirmContext(response: unknown) {
@@ -74,7 +74,7 @@ test("confirm submits caller-owned checkout data directly without a hidden read"
 	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledWith(
 		{
 			body: expect.objectContaining({
-				billing_address: expect.objectContaining({ first_name: "Ada", tax_id: "GB-42", "kizlo/tax-id": "GB-42" }),
+				billing_address: expect.objectContaining({ first_name: "Ada", "qa/reference": "GB-42", "kizlo/tax-id": "GB-42" }),
 				shipping_address: undefined,
 				payment_method: "custom_gateway",
 				customer_note: "Call first",

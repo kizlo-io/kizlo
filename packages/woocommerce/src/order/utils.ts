@@ -1,10 +1,12 @@
 import { deserializeCurrencyFormat } from "kizlo"
+import { additionalFieldValues, type CheckoutAdditionalFields } from "../additional-fields"
 import { deserializeCartBillingAddress, deserializeCartShippingAddress } from "../cart/utils"
 import { deserializeExtensions, productCustomFields } from "../product/utils"
 import type { Order, OrderItem, OrderItemProduct } from "./schema"
 import type { WCSK_Order, WCSK_OrderCoupon, WCSK_OrderFee, WCSK_OrderItem, WCSK_OrderTotals } from "./types"
 
 const ORDER_KEYS = [
+	"additional_fields",
 	"billing_address",
 	"coupons",
 	"errors",
@@ -170,6 +172,7 @@ export function deserializeOrder(data: WCSK_Order): Order {
 	const { kizlo } = deserializeExtensions(data.extensions)
 
 	return {
+		additionalFields: additionalFieldValues<CheckoutAdditionalFields>(data.additional_fields),
 		id: data.id,
 		status: data.status,
 		isPaid: kizlo.is_paid === true,

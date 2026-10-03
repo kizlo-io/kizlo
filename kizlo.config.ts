@@ -49,6 +49,10 @@ const introspectionFixtures = [
 	woocommerce({
 		plugins: [{ name: "woocommerce", source: "woocommerce", version: "11.0.1" }, { path: "plugins/kizlo-woocommerce" }],
 	}),
+	defineFixture({
+		name: "woocommerce-additional-fields",
+		plugins: [{ path: "plugins/kizlo-woocommerce/tests/fixtures/woocommerce-additional-fields" }],
+	}),
 	cf7({
 		plugins: [{ name: "contact-form-7", source: "contact-form-7", version: "6.1.7" }, { path: "plugins/kizlo-cf7" }],
 	}),

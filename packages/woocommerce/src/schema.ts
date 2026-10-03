@@ -1,4 +1,5 @@
 import z from "zod/v4"
+import { type AddressAdditionalFields, AddressAdditionalFieldsSchema } from "./additional-fields"
 
 export const Totals = z.object({
 	discountTotal: z.number(),
@@ -22,6 +23,7 @@ export const ItemTotals = z.object({
 })
 
 export const ShippingAddress = z.object({
+	additionalFields: AddressAdditionalFieldsSchema.optional(),
 	firstName: z.string(),
 	lastName: z.string(),
 	phone: z.string(),
@@ -33,10 +35,10 @@ export const ShippingAddress = z.object({
 	state: z.string(),
 	country: z.string(),
 })
-export type ShippingAddress = z.infer<typeof ShippingAddress>
+export type ShippingAddress = Omit<z.infer<typeof ShippingAddress>, "additionalFields"> & { additionalFields?: AddressAdditionalFields }
 
 export const BillingAddress = ShippingAddress.extend({
 	email: z.string(),
 	taxId: z.string().default(""),
 })
-export type BillingAddress = z.infer<typeof BillingAddress>
+export type BillingAddress = Omit<z.infer<typeof BillingAddress>, "additionalFields"> & { additionalFields?: AddressAdditionalFields }

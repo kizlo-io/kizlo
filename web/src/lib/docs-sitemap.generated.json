@@ -3,6 +3,7 @@
 	"paths": [
 		"/docs",
 		"/docs/concepts/adapter",
+		"/docs/concepts/additional-checkout-fields",
 		"/docs/concepts/cli",
 		"/docs/concepts/client",
 		"/docs/concepts/custom-fields",

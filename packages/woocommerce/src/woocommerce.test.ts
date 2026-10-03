@@ -548,7 +548,7 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 				phone: "0123456789",
 				email: "ada@example.com",
 				taxId: "GB-CHECKOUT-42",
-				additionalFields: {},
+				additionalFields: { "qa/reference": "BILL", "qa/address-flag": false },
 			},
 			shippingAddress: {
 				firstName: "Ada",
@@ -561,10 +561,11 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 				postcode: "90210",
 				country: "US",
 				phone: "0123456789",
-				additionalFields: {},
+				additionalFields: { "qa/reference": "SHIP", "qa/address-flag": true },
 			},
 			paymentMethod: "bacs",
 			customerNote: "Created through Kizlo",
+			additionalFields: { "qa/opt-in": false, "qa/message": "", "qa/slot": "morning" },
 		},
 	})
 
@@ -582,6 +583,14 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 	if (result.orderId === null) throw new Error("WooCommerce returned no order ID for the successful checkout.")
 
 	const stored = await client().orders.get.call({ params: { orderId: result.orderId } })
+	expect(stored.billingAddress.additionalFields).toMatchObject({ "qa/reference": "BILL", "qa/address-flag": false })
+	expect(stored.shippingAddress.additionalFields).toMatchObject({ "qa/reference": "SHIP", "qa/address-flag": true })
+	expect(stored.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/message": "", "qa/slot": "morning" })
+	const customer = await client().customers.get.call()
+	expect(customer.billing.additionalFields).toMatchObject({ "qa/reference": "BILL", "qa/address-flag": false })
+	expect(customer.additionalFields).toMatchObject({ "qa/opt-in": false })
+	expect(customer.additionalFields).not.toHaveProperty("qa/message")
+	expect(customer.additionalFields).not.toHaveProperty("qa/slot")
 	expect(stored.billingAddress.taxId).toBe("GB-CHECKOUT-42")
 	expect(stored.shippingAddress).not.toHaveProperty("taxId")
 })
@@ -718,11 +727,22 @@ test("checkout.retry pays an order owned by the headless customer", async () => 
 
 	const result = await client().checkout.retry.call({
 		params: { orderId: order.id },
-		body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress: RETRY_BILLING },
+		body: {
+			key: order.order_key,
+			billingEmail: ORDER_EMAIL,
+			paymentMethod: "bacs",
+			billingAddress: { ...RETRY_BILLING, additionalFields: { "qa/reference": "RETRY", "qa/address-flag": false } },
+			additionalFields: { "qa/opt-in": false, "qa/slot": "afternoon", "qa/message": "retry note" },
+		},
 	})
 
 	expect(result.billingAddress.taxId).toBe(RETRY_BILLING.taxId)
 	expect(result.shippingAddress).not.toHaveProperty("taxId")
+	const normalized = await client().orders.get.call({ params: { orderId: order.id } })
+	expect(normalized.billingAddress.additionalFields).toMatchObject({ "qa/reference": "RETRY", "qa/address-flag": false })
+	expect(normalized.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/slot": "afternoon", "qa/message": "retry note" })
+	const customer = await client().customers.get.call()
+	expect(customer.additionalFields).not.toHaveProperty("qa/message")
 	const stored = await storedOrder(order.id)
 	expect(stored.status).toBe("on-hold")
 })
@@ -983,4 +1003,48 @@ test("an email-authenticated cart add operates on the matching WordPress custome
 	const cart = await client().cart.get.call()
 	expect(cart.items).toEqual(expect.arrayContaining([expect.objectContaining({ productId, quantity: 1 })]))
 	await emptyCart()
+})
+
+test("registered fields round-trip cart and checkout partial updates, omission and explicit clearing", async () => {
+	await emptyCart()
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+	await client().cart.update.call({
+		body: {
+			billingAddress: { city: "London", additionalFields: { "qa/reference": "BILL", "qa/address-flag": false } },
+			shippingAddress: {
+				city: "Manchester",
+				postcode: "M1 1AA",
+				address1: "Separate Shipping",
+				additionalFields: { "qa/reference": "SHIP", "qa/address-flag": true },
+			},
+		},
+	})
+	const cart = await client().cart.update.call({ body: { billingAddress: { city: "London" } } })
+	expect(cart.billingAddress.additionalFields).toMatchObject({ "qa/reference": "BILL", "qa/address-flag": false })
+	expect(cart.shippingAddress.additionalFields).toMatchObject({ "qa/reference": "SHIP", "qa/address-flag": true })
+	await client().checkout.update.call({ body: { additionalFields: { "qa/opt-in": false, "qa/slot": "afternoon", "qa/message": "keep" } } })
+	const unchanged = await client().checkout.update.call({ body: { customerNote: "note only" } })
+	expect(unchanged.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/slot": "afternoon", "qa/message": "keep" })
+	const cleared = await client().checkout.update.call({ body: { additionalFields: { "qa/slot": "", "qa/message": "" } } })
+	expect(cleared.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/slot": "", "qa/message": "" })
+	const clearedAddress = await client().cart.update.call({ body: { billingAddress: { additionalFields: { "qa/reference": "" } } } })
+	expect(clearedAddress.billingAddress.additionalFields["qa/reference"]).toBe("")
+	expect(clearedAddress.shippingAddress.additionalFields["qa/reference"]).toBe("SHIP")
+})
+
+test("WooCommerce rejects an invalid registered select before retry payment", async () => {
+	const order = await createPendingOrder(getTestCredentials().users.user.id)
+	await expect(
+		client().checkout.retry.call({
+			params: { orderId: order.id },
+			body: {
+				key: order.order_key,
+				billingEmail: ORDER_EMAIL,
+				paymentMethod: "bacs",
+				billingAddress: RETRY_BILLING,
+				additionalFields: { "qa/slot": "evening" },
+			},
+		} as never),
+	).rejects.toMatchObject({ code: "CHECKOUT_VALIDATION_FAILED" })
+	expect((await storedOrder(order.id)).status).toBe("pending")
 })

@@ -1,4 +1,5 @@
 import { deserializeCurrencyFormat, type WP_EndpointInput } from "kizlo"
+import { type AddressAdditionalFields, additionalFieldValues } from "../additional-fields"
 import { deserializeExtensions, deserializeProductSummary, productCustomFields } from "../product/utils"
 import type { Cart, CartBillingAddress, CartShippingAddress, UpdateCartInput } from "./schema"
 import type {
@@ -438,11 +439,13 @@ const SHIPPING_ADDRESS_KEYS = new Set([
 ])
 const BILLING_ADDRESS_KEYS = new Set([...SHIPPING_ADDRESS_KEYS, "email"])
 
-function additionalAddressFields(address: Record<string, unknown>, standardKeys: Set<string>): Record<string, string | boolean> {
-	return Object.fromEntries(
-		Object.entries(address).filter(
-			(entry): entry is [string, string | boolean] =>
-				!standardKeys.has(entry[0]) && (typeof entry[1] === "string" || typeof entry[1] === "boolean"),
+function additionalAddressFields(address: Record<string, unknown>, standardKeys: Set<string>): AddressAdditionalFields {
+	return additionalFieldValues<AddressAdditionalFields>(
+		Object.fromEntries(
+			Object.entries(address).filter(
+				(entry): entry is [string, string | boolean] =>
+					!standardKeys.has(entry[0]) && (typeof entry[1] === "string" || typeof entry[1] === "boolean"),
+			),
 		),
 	)
 }
@@ -463,7 +466,9 @@ export function serializeCartShippingAddress(address: NonNullable<UpdateCartInpu
 export function serializeCartShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress {
 	// A field the caller left out is dropped rather than sent empty, because the
 	// cart merges whatever arrives and an empty string is a value.
-	const additionalFields = Object.fromEntries(Object.entries(address.additionalFields ?? {}).filter(([key]) => key !== TAX_ID_KEY))
+	const additionalFields = Object.fromEntries(
+		Object.entries(address.additionalFields ?? {}).filter(([key]) => !BILLING_ADDRESS_KEYS.has(key)),
+	)
 
 	return compactAddress({
 		...additionalFields,

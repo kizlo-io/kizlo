@@ -144,7 +144,7 @@ function rawCart(): WCK_Cart {
 			country: "US",
 			phone: "",
 			email: "",
-			billing_vat_id: "VAT-42",
+			"qa/reference": "VAT-42",
 			"kizlo/tax-id": "GB-42",
 		} as WCK_Cart["billing_address"],
 		shipping_address: {
@@ -158,7 +158,7 @@ function rawCart(): WCK_Cart {
 			postcode: "",
 			country: "US",
 			phone: "",
-			leave_at_door: true,
+			"qa/address-flag": true,
 			"kizlo/tax-id": "must-not-leak",
 		} as WCK_Cart["shipping_address"],
 		payment_methods: ["bacs", "cod"],
@@ -200,8 +200,8 @@ test("deserializes complete cart data without legacy derivations", () => {
 	expect(result).toMatchObject({
 		itemCount: 2.5,
 		itemsWeight: 375,
-		billingAddress: { address1: "", state: "CA", taxId: "GB-42", additionalFields: { billing_vat_id: "VAT-42" } },
-		shippingAddress: { address1: "", additionalFields: { leave_at_door: true } },
+		billingAddress: { address1: "", state: "CA", taxId: "GB-42", additionalFields: { "qa/reference": "VAT-42" } },
+		shippingAddress: { address1: "", additionalFields: { "qa/address-flag": true } },
 		fees: [{ id: "handling", totals: { total: 25, tax: 5 } }],
 		totals: { shippingTotal: null, shippingTaxTotal: null },
 		paymentMethods: [
@@ -348,12 +348,12 @@ test("serializes only supplied customer fields and flattens merchant fields", ()
 			billingAddress: {
 				address1: "",
 				taxId: "GB-7",
-				additionalFields: { billing_vat_id: "VAT-7", marketing_opt_in: false, "kizlo/tax-id": "duplicate" },
+				additionalFields: { "qa/reference": "VAT-7", "qa/address-flag": false, "kizlo/tax-id": "duplicate" },
 			},
 			shippingAddress: { postcode: "90210", additionalFields: { "kizlo/tax-id": "shipping" } },
 		}),
 	).toEqual({
-		billing_address: { address_1: "", billing_vat_id: "VAT-7", marketing_opt_in: false, "kizlo/tax-id": "GB-7" },
+		billing_address: { address_1: "", "qa/reference": "VAT-7", "qa/address-flag": false, "kizlo/tax-id": "GB-7" },
 		shipping_address: { postcode: "90210" },
 	})
 })
@@ -366,4 +366,16 @@ test("normalizes an absent billing Tax ID without exposing the raw key twice", (
 	expect(result.billingAddress.taxId).toBe("")
 	expect(result.billingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
 	expect(result.shippingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
+})
+
+test("address extras cannot inject core fields, including fields omitted from a partial update", () => {
+	const extras: Record<string, string | boolean> = {
+		first_name: "injected",
+		email: "injected@example.com",
+		"qa/reference": "",
+		"qa/address-flag": false,
+	}
+	expect(serializeCartUpdateInput({ shippingAddress: { additionalFields: extras } })).toEqual({
+		shipping_address: { "qa/reference": "", "qa/address-flag": false },
+	})
 })

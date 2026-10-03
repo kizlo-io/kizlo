@@ -100,6 +100,35 @@ function inheritedPropertyTypes(
  */
 const UNDESCRIBED_OBJECT = "Record<string, unknown>"
 
+/** Empty closed parents contribute no members; their never index must not constrain a child's fields. */
+function isEmptyClosedSchema(schema: IntrospectionSchema | undefined, context: RenderContext, seen = new Set<string>()): boolean {
+	if (!schema || schema.anyOf || schema.oneOf) return false
+	if (schema.$ref) {
+		if (seen.has(schema.$ref)) return false
+		seen.add(schema.$ref)
+		return isEmptyClosedSchema(context.schemas.get(schema.$ref), context, seen)
+	}
+	if (
+		schema.type !== "object" ||
+		schema.additionalProperties !== false ||
+		Object.keys(schema.properties ?? {}).length ||
+		Object.keys(schema.patternProperties ?? {}).length
+	)
+		return false
+	const parents = schema.$extends ? (Array.isArray(schema.$extends) ? schema.$extends : [schema.$extends]) : []
+	return parents.every((id) => {
+		if (seen.has(id)) return false
+		const ancestors = new Set(seen)
+		ancestors.add(id)
+		return isEmptyClosedSchema(context.schemas.get(id), context, ancestors)
+	})
+}
+
+function schemaParents(schema: IntrospectionSchema, context: RenderContext): string[] {
+	const parents = schema.$extends ? (Array.isArray(schema.$extends) ? schema.$extends : [schema.$extends]) : []
+	return parents.filter((id) => !isEmptyClosedSchema(context.schemas.get(id), context, new Set([id])))
+}
+
 function renderObject(schema: IntrospectionSchema, context: RenderContext, indent = ""): string {
 	const members: string[] = []
 	const propertyTypes: string[] = []
@@ -126,7 +155,8 @@ function renderObject(schema: IntrospectionSchema, context: RenderContext, inden
 		members.push(`${indent}\t[key: string]: ${[...new Set(patterns)].join(" | ")}`)
 	}
 
-	if (!members.length) return UNDESCRIBED_OBJECT
+	if (!members.length)
+		return schema.additionalProperties === false && !schemaParents(schema, context).length ? "Record<string, never>" : UNDESCRIBED_OBJECT
 	return `{\n${members.join("\n")}\n${indent}}`
 }
 
@@ -157,11 +187,13 @@ function renderType(schema: IntrospectionSchema, context: RenderContext, indent 
 		}
 	}
 
-	const parents = schema.$extends ? (Array.isArray(schema.$extends) ? schema.$extends : [schema.$extends]) : []
+	const parents = schemaParents(schema, context)
 	if (parents.length) {
 		const inherited = parents.map((id) => context.names.get(id) ?? schemaName(id))
 		const own = schema.type === "object" ? renderObject(schema, context, indent) : type
-		type = [...inherited, ...(own === UNDESCRIBED_OBJECT ? [] : [own])].join(" & ")
+		const ownTypes =
+			own === UNDESCRIBED_OBJECT ? (parents.every((id) => rendersAsInterface(context.schemas.get(id), context)) ? [] : ["{}"]) : [own]
+		type = [...inherited, ...ownTypes].join(" & ")
 	}
 
 	return withNullable(type || "unknown", schema)
@@ -172,13 +204,21 @@ function renderType(schema: IntrospectionSchema, context: RenderContext, indent 
  * question of whether a child can name it in an `extends` clause. TypeScript extends an object
  * type with statically known members and nothing else.
  */
-function rendersAsInterface(schema: IntrospectionSchema | undefined): boolean {
-	return schema !== undefined && schema.type === "object" && !schema.nullable && !schema.anyOf && !schema.oneOf && !schema.$ref
+function rendersAsInterface(schema: IntrospectionSchema | undefined, context: RenderContext): boolean {
+	return (
+		schema !== undefined &&
+		schema.type === "object" &&
+		!schema.nullable &&
+		!schema.anyOf &&
+		!schema.oneOf &&
+		!schema.$ref &&
+		!isEmptyClosedSchema(schema, context)
+	)
 }
 
 function renderNamedSchema(id: string, schema: IntrospectionSchema, context: RenderContext): string {
 	const name = context.names.get(id) ?? schemaName(id)
-	const parents = schema.$extends ? (Array.isArray(schema.$extends) ? schema.$extends : [schema.$extends]) : []
+	const parents = schemaParents(schema, context)
 	const documentation = jsdoc(schema.description, schema.deprecated)
 	if (schema.type === "object" && !schema.anyOf && !schema.oneOf && !schema.$ref) {
 		if (schema.nullable) {
@@ -187,13 +227,14 @@ function renderNamedSchema(id: string, schema: IntrospectionSchema, context: Ren
 		}
 		const inherited = parents.map((parent) => context.names.get(parent) ?? schemaName(parent))
 		const body = renderObject({ ...schema, nullable: undefined }, context)
+		if (body === "Record<string, never>" && !inherited.length) return `${documentation}export type ${name} = ${body}`
 
 		// A parent that generated as an alias, because it is nullable or a reference or a union, is
 		// still inheritable: an intersection states the same fields. `(T | null) & { own }` drops the
 		// null branch to `never`, leaving T's members beside this schema's own, which is what a child
 		// that did not declare itself nullable means. `extends` would be a compile error instead.
-		if (inherited.length && !parents.every((parent) => rendersAsInterface(context.schemas.get(parent)))) {
-			const own = body === UNDESCRIBED_OBJECT ? [] : [body]
+		if (inherited.length && !parents.every((parent) => rendersAsInterface(context.schemas.get(parent), context))) {
+			const own = [body === UNDESCRIBED_OBJECT ? "{}" : body]
 			return `${documentation}export type ${name} = ${[...inherited, ...own].join(" & ")}`
 		}
 
@@ -563,6 +604,9 @@ function renderRegistries(tree: WordPressEndpointNode, document: IntrospectionDo
 		`\t}`,
 		`\tinterface WordPressEndpointRegistry {`,
 		...endpoints,
+		`\t}`,
+		`\tinterface WordPressSchemaRegistry {`,
+		...sortedEntries(document.schemas).map(([id]) => `\t\t${JSON.stringify(id)}: ${schemaName(id)}`),
 		`\t}`,
 		`\tinterface WordPressCustomFieldsRegistry {`,
 		...customFields,

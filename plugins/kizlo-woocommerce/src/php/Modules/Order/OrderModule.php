@@ -16,6 +16,7 @@ use Kizlo\WooCommerce\Modules\Product\HsCode;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
 use Kizlo\WooCommerce\Support\StoreExtensions;
 use WC_Order;
+use Kizlo\WooCommerce\Modules\Contract\AdditionalFields;
 use WC_Order_Item;
 use WC_Order_Item_Product;
 use WC_Product;
@@ -150,6 +151,8 @@ class OrderModule
         if (! $order instanceof WC_Order || ! is_array($data)) {
             return $response;
         }
+
+        $data['additional_fields'] = (object) AdditionalFields::values($order, 'other');
 
         $data['extensions'] = StoreExtensions::merge($data['extensions'] ?? null, 'kizlo', ['is_paid' => $order->is_paid()]);
 

@@ -1,6 +1,7 @@
 import { MediaImage, NumberLike } from "@kizlo/shared"
 import { CurrencyFormat } from "kizlo"
 import { z } from "zod/v4"
+import { type CheckoutAdditionalFields, CheckoutAdditionalFieldsSchema } from "../additional-fields"
 import {
 	CartBillingAddress,
 	CartCoupon,
@@ -66,6 +67,7 @@ export const OrderTotals = z.object({
 export type OrderTotals = z.infer<typeof OrderTotals>
 
 export const Order = z.object({
+	additionalFields: CheckoutAdditionalFieldsSchema,
 	id: z.number(),
 	status: z.string(),
 	isPaid: z.boolean(),
@@ -81,7 +83,12 @@ export const Order = z.object({
 	totals: OrderTotals,
 	currencyFormat: CurrencyFormat,
 })
-export type Order = Omit<z.infer<typeof Order>, "items"> & { items: OrderItem[] }
+export type Order = Omit<z.infer<typeof Order>, "items" | "additionalFields" | "billingAddress" | "shippingAddress"> & {
+	items: OrderItem[]
+	additionalFields: CheckoutAdditionalFields
+	billingAddress: CartBillingAddress
+	shippingAddress: CartShippingAddress
+}
 
 export const GetOrderInput = z.object({
 	orderId: NumberLike,

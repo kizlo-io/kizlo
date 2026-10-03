@@ -1,0 +1,98 @@
+---
+title: Additional checkout fields
+icon: ListChecks
+description: Use WooCommerce's registered address, contact, and order fields with generated SDK types.
+---
+
+Register fields through WooCommerce's official `woocommerce_register_additional_checkout_field` API.
+Kizlo reads every active registration, including third-party plugins, and derives the value definitions
+from the installed WooCommerce public Store API schemas. The supported WooCommerce 11.0.1 field types
+are text, checkbox, and select. IDs remain unchanged; checkboxes are booleans and selects retain their
+option values, including `""` when WooCommerce allows an optional empty selection.
+
+## Locations and value buckets
+
+| Registration location | SDK bucket | Store API payload |
+| --- | --- | --- |
+| `address` | `billingAddress.additionalFields[id]` | `billing_address[id]` |
+| `address` | `shippingAddress.additionalFields[id]` | `shipping_address[id]` |
+| `contact` | `checkout.additionalFields[id]` | `additional_fields[id]` |
+| `order` | `checkout.additionalFields[id]` | `additional_fields[id]` |
+
+An address registration applies to both addresses. A conditional shipping visibility rule does not
+remove that field from its schema. Contact and order have separate registration metadata and named
+schemas, but share one flat checkout value object. Use storefront metadata for presentation and
+contextual visibility; those rules are evaluated by WooCommerce at runtime.
+
+After registration and generation, the SDK and Kit aliases resolve your field names and types:
+
+```ts
+const checkout = await client.woocommerce.checkout.get.call()
+checkout.billingAddress.additionalFields["business/reference"] // string | undefined
+checkout.shippingAddress.additionalFields["business/reference"] // string | undefined
+checkout.additionalFields["marketing/opt-in"] // boolean | undefined
+checkout.additionalFields["delivery/slot"] // "" | "morning" | "afternoon" | undefined
+
+await client.woocommerce.cart.update.call({
+  body: {
+    billingAddress: { additionalFields: { "business/reference": "PO-42" } },
+    shippingAddress: { additionalFields: { "business/reference": "SHIP-42" } },
+  },
+})
+await client.woocommerce.checkout.update.call({
+  body: { additionalFields: { "marketing/opt-in": false, "delivery/slot": "" } },
+})
+```
+
+The examples assume those fields were registered on your store. Update writes are partial. Omitted
+keys retain their existing values; `false` and an allowed empty string are explicit values. Confirm
+and retry also submit fields in these buckets. Core address fields keep their existing requirements.
+Extras cannot overwrite core wire properties. WooCommerce mirrors billing into shipping when a cart
+needs no shipping and a billing update omits the shipping address. Send an explicit shipping patch
+when preserving a separate address in that situation.
+
+## Customer and order reads
+
+Orders expose saved address values plus `additionalFields` for contact and order fields. The Store API
+order endpoint omits its other group in WooCommerce 11.0.1, so Kizlo supplies a declared read adapter.
+Customer profiles expose address values under `billing.additionalFields` and `shipping.additionalFields`,
+and contact values under `additionalFields`. Order-only fields never appear in the customer adapter,
+even if legacy metadata contains them. These adapters use public CheckoutFields helpers and do not
+add a grouped write operation to `wc/v3`. Address and checkout writes use the official Store API. Kizlo completes registered address persistence
+on the retry route through WooCommerce's checkout update hook; contact/order persistence remains native.
+Customer address buckets are always objects; individual saved fields may be absent.
+Older deployed plugins without the adapters produce empty objects for these reads.
+
+The existing native `billingAddress.taxId` (customer `billing.taxId`) remains supported and backed by
+the official billing `kizlo/tax-id` value. The registered schema includes that address field for both
+addresses; current cart/checkout/order normalization continues its native billing projection and
+shipping cleanup policy. Read the native property for tax ID. This foundation does not introduce a
+second stored tax ID or change its required setting, editor behavior, or retry guard.
+
+## Regenerate when the registry changes
+
+Deploy the plugin update and run `kizlo generate` against that WordPress site after installing,
+removing, or changing a field registration. Commit the generated contract and rebuild. Local
+`kizlo dev` watches the contract. Empty locations still publish schemas, so stores without third-party
+fields compile. A contract generated from an older Kizlo plugin keeps the broad scalar fallback until
+regeneration against the updated plugin. Remote contracts follow the deployed plugin version;
+generating a local fixture is not a deployment.
+
+`WP_Schema<"woocommerce.additional-fields.address.read">` resolves a named schema from the consumer's
+generated registry. Each of `address`, `contact`, `order`, and `checkout` has `.read` and `.write`
+schemas; write schemas preserve submission requirements, while read fields may be absent from saved
+metadata. This registry is separate from managed-content `WP_CustomFields`.
+
+## Static typing and runtime validation
+
+Generated TypeScript types reject wrong known value types, unsupported select literals, and misplaced
+keys in literal inputs. They are not executable field validators. SDK schemas check that the bucket
+is a non-array object of string, boolean, or omitted values; WooCommerce performs enum, required-field,
+conditional-rule, and custom validation against the live registry. Regenerate stale contracts rather
+than treating them as runtime truth.
+
+Reads preserve compatible unknown scalar keys from newer plugins. Narrow a dynamic lookup before
+using it; its type is `string | boolean | undefined`. For dynamic writes, build a scalar record from
+trusted registration metadata and submit it in the appropriate bucket. Such a record does not provide
+per-key static guarantees and is still subject to WooCommerce's live validation. Number, array,
+and object values are not additional checkout field values.
