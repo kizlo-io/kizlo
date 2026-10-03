@@ -93,6 +93,40 @@ and leaves the stack running. After that, `pnpm test` provides a fast JavaScript
 test rerun using the credentials in `.kizlo/test.json`. `pnpm lint:ws`
 also runs automatically on `postinstall`.
 
+## Tests
+
+Choose coverage by the behaviour or contract that changes:
+
+- **Package runtime behaviour** — colocate Vitest tests with the source as
+  `*.test.ts` (or `*.test.tsx` where the package's `vitest.config.ts` includes
+  TSX). Use fixtures for mapping and serialization regressions; use the seeded
+  WordPress stack when the assertion depends on a real endpoint or persistence.
+- **Compile-time inference** — colocate `*.test-d.ts` with the source. Where
+  Vitest type checking is enabled, verify that its configuration includes the
+  file. Otherwise verify that the package's `tsconfig.json` includes it for
+  `pnpm typecheck`; these files are not runtime Vitest tests. Include rejected
+  assignments as well as valid inferred types.
+- **Generated and published declarations** — extend the generator tests and
+  `packages/kizlo/src/wordpress/declaration-consumer.test.ts` when registry or
+  declaration changes must resolve against a consumer's generated contract.
+  The declaration-consumer suite reads built package declarations, so run
+  `pnpm build` before it; source-only inference checks do not replace it.
+- **Plugin behaviour and contracts** — put PHPUnit tests under the affected
+  plugin's `tests/` directory, following its existing module subdirectories and
+  `*Test.php` names. Add contract assertions in its Contract tests and persistence
+  or validation assertions in the module tests. Run them through `pnpm kizlo test`
+  with the Docker and Composer prerequisites described below.
+
+Run the narrowest package suite first, from the repository root:
+
+```bash
+pnpm test:only kizlo                # generator and declaration-consumer tests
+pnpm test:only @kizlo/woocommerce    # WooCommerce SDK tests
+```
+
+Tests that use WordPress require the seeded stack described below. Before a PR,
+run the broader checks in [Commit messages & pull requests](#commit-messages--pull-requests).
+
 ## Local WordPress stacks
 
 Both stacks ship inside the `kizlo` CLI and run on Docker — no Local/Valet setup
@@ -360,6 +394,10 @@ reuse one issue's worktree for a different issue.
   sections must still describe the PR as it now stands.
 - Reference an issue with `Closes #123` only when a GitHub issue actually
   exists. Otherwise leave the issue line out.
+- No PR labels, reviewers, milestones, or PR template are required. Use the
+  description sections above.
+- Tool attribution is not required in commit messages, PR metadata, or
+  repository files.
 - Make sure the following pass locally before opening a PR — they're the same
   checks CI runs:
 
