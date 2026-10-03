@@ -10,7 +10,6 @@ use WP_Error;
 use WP_HTTP_Response;
 use WP_REST_Request;
 use WP_REST_Response;
-use WP_User;
 
 /** Owns the canonical billing-only Tax ID field across WooCommerce surfaces. */
 class TaxIdModule
@@ -27,13 +26,13 @@ class TaxIdModule
         add_action('woocommerce_init', [$this, 'registerCheckoutField']);
         add_filter('woocommerce_account_settings', [$this, 'addRequirementSetting']);
         add_filter('woocommerce_customer_meta_fields', [$this, 'addCustomerBillingField']);
-        add_filter('woocommerce_rest_prepare_customer', [$this, 'prepareCustomer'], PHP_INT_MAX, 2);
 
         // WooCommerce injects registered address fields at priority 10, but only
         // for Store API orders with a non-empty value. Replace that conditional
         // field with one canonical billing field for every order type.
         add_filter('woocommerce_admin_billing_fields', [$this, 'addOrderBillingField'], 20, 3);
         add_filter('woocommerce_admin_shipping_fields', [$this, 'removeOrderShippingField'], 20, 3);
+        add_action('woocommerce_store_api_cart_update_customer_from_request', [$this, 'persistCartTaxId'], 20, 2);
 
         add_filter('rest_request_before_callbacks', [$this, 'validateRetryTaxId'], 20, 3);
         add_action('woocommerce_store_api_checkout_update_order_from_request', [$this, 'persistRetryTaxId'], 20, 2);
@@ -131,23 +130,6 @@ class TaxIdModule
         return $fields;
     }
 
-    public function prepareCustomer(WP_REST_Response|WP_Error $response, WP_User $customer): WP_REST_Response|WP_Error
-    {
-        if (is_wp_error($response)) return $response;
-
-        $data = $response->get_data();
-        if (! is_array($data) || ! is_array($data['billing'] ?? null)) return $response;
-
-        $data['billing']['tax_id'] = (string) $this->checkoutFields()->get_field_from_object(
-            self::FIELD_ID,
-            new WC_Customer($customer->ID),
-            'billing'
-        );
-        $response->set_data($data);
-
-        return $response;
-    }
-
     /** @param array<string, array<string, mixed>> $fields */
     public function addOrderBillingField(array $fields, mixed $order = null, string $context = 'edit'): array
     {
@@ -189,6 +171,27 @@ class TaxIdModule
             false
         );
         $order->delete_meta_data(self::SHIPPING_META_KEY);
+    }
+
+    /** The cart route has already validated, sanitized and persisted the managed session value. */
+    public function persistCartTaxId(WC_Customer $customer, WP_REST_Request $request): void
+    {
+        $billing = $request->get_param('billing_address');
+        if (!is_array($billing) || !array_key_exists(self::FIELD_ID, $billing)) return;
+        $customer->delete_meta_data(self::SHIPPING_META_KEY);
+        $this->persistBillingProfile($customer);
+    }
+
+    /** A session-backed WC_Customer saves its metadata to the session, not the user's profile. */
+    private function persistBillingProfile(WC_Customer $customer): void
+    {
+        if ($customer->get_id() === 0) return;
+        $profile = new WC_Customer($customer->get_id());
+        $value = $this->checkoutFields()->get_field_from_object(self::FIELD_ID, $customer, 'billing');
+        $this->checkoutFields()->persist_field_for_customer(self::FIELD_ID, $value, $profile, 'billing');
+        $profile->delete_meta_data(self::SHIPPING_META_KEY);
+        // Save only metadata, so a cart edit does not invalidate its core-address session snapshot.
+        $profile->save_meta_data();
     }
 
     public function validateRetryTaxId(mixed $response, mixed $handler, mixed $request): mixed
@@ -237,6 +240,7 @@ class TaxIdModule
         $this->checkoutFields()->persist_field_for_customer(self::FIELD_ID, $value, $customer, 'billing');
         $customer->delete_meta_data(self::SHIPPING_META_KEY);
         $customer->save();
+        $this->persistBillingProfile($customer);
     }
 
     public function removeStoreApiShippingCopies(mixed $response, mixed $server, mixed $request): mixed

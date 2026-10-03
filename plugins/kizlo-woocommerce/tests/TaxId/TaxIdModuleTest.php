@@ -4,7 +4,10 @@ namespace Kizlo\WooCommerce\Tests\TaxId;
 
 use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields;
 use Automattic\WooCommerce\Blocks\Package;
+use Automattic\WooCommerce\StoreApi\SchemaController;
+use Automattic\WooCommerce\StoreApi\StoreApi;
 use Kizlo\WooCommerce\Modules\TaxId\TaxIdModule;
+use Kizlo\WooCommerce\Modules\Customer\CustomerModule;
 use Kizlo\WooCommerce\Tests\TestCase;
 use WC_Customer;
 use WC_Order;
@@ -101,12 +104,13 @@ class TaxIdModuleTest extends TestCase
         $fields = $this->module->addCustomerBillingField(['billing' => ['fields' => []]]);
         $this->assertArrayHasKey(TaxIdModule::BILLING_META_KEY, $fields['billing']['fields']);
 
-        $response = $this->module->prepareCustomer(
-            new WP_REST_Response(['billing' => []]),
+        $response = (new CustomerModule())->prepareCustomerCallback(
+            new WP_REST_Response(['billing' => [], 'shipping' => []]),
             get_userdata($userId)
         );
         $this->assertInstanceOf(WP_REST_Response::class, $response);
-        $this->assertSame('GB-42', $response->get_data()['billing']['tax_id']);
+        $this->assertSame('GB-42', ((array) $response->get_data()['billing']['additional_fields'])[TaxIdModule::FIELD_ID]);
+        $this->assertArrayNotHasKey('tax_id', $response->get_data()['billing']);
 
         $this->module->removeCustomerShippingCopy($userId);
         $this->assertSame('', get_user_meta($userId, TaxIdModule::SHIPPING_META_KEY, true));
@@ -233,6 +237,125 @@ class TaxIdModuleTest extends TestCase
         $customer = new WC_Customer($userId);
         $this->assertSame('GB-42', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, $customer, 'billing'));
         $this->assertSame('', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, $customer, 'shipping'));
+    }
+
+    public function test_profile_edits_and_retry_omission_and_clearing_read_the_same_managed_value(): void
+    {
+        $userId = self::factory()->user->create(['role' => 'customer']);
+        // The WordPress customer editor saves the managed meta control before its update action.
+        update_user_meta($userId, TaxIdModule::BILLING_META_KEY, 'PROFILE-EDIT');
+        update_user_meta($userId, TaxIdModule::SHIPPING_META_KEY, 'shipping-copy');
+        $this->module->removeCustomerShippingCopy($userId);
+        $customer = new WC_Customer($userId);
+        WC()->customer = $customer;
+        $order = new WC_Order();
+        $order->set_customer_id($userId);
+        $order->save();
+        $this->checkoutFields->persist_field_for_order(TaxIdModule::FIELD_ID, 'ORDER-SNAPSHOT', $order, 'billing', false);
+        $order->save();
+        $request = new WP_REST_Request('POST', '/wc/store/v1/checkout/' . $order->get_id());
+        $request->set_param('billing_address', ['city' => 'London']);
+        $this->module->persistRetryTaxId($order, $request);
+        $this->assertSame('ORDER-SNAPSHOT', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, $order, 'billing'));
+        $this->assertSame('PROFILE-EDIT', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, new WC_Customer($userId), 'billing'));
+        $request->set_param('billing_address', [TaxIdModule::FIELD_ID => '']);
+        $this->module->persistRetryTaxId($order, $request);
+        $order->save();
+        $this->assertSame('', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, wc_get_order($order->get_id()), 'billing'));
+        $response = (new CustomerModule())->prepareCustomerCallback(new WP_REST_Response(['billing' => [], 'shipping' => []]), get_userdata($userId));
+        $this->assertSame('', ((array) $response->get_data()['billing']['additional_fields'])[TaxIdModule::FIELD_ID]);
+        $this->assertArrayNotHasKey('tax_id', $response->get_data()['billing']);
+    }
+
+    public function test_shipping_copy_cleanup_preserves_billing_and_does_not_run_after_failed_requests(): void
+    {
+        $userId = self::factory()->user->create(['role' => 'customer']);
+        $customer = new WC_Customer($userId);
+        WC()->customer = $customer;
+        $order = new WC_Order();
+        $order->set_customer_id($userId);
+        $order->save();
+        $this->checkoutFields->persist_field_for_customer(TaxIdModule::FIELD_ID, 'PROFILE', $customer, 'billing');
+        $this->checkoutFields->persist_field_for_customer(TaxIdModule::FIELD_ID, 'COPY', $customer, 'shipping');
+        $customer->save();
+        $this->checkoutFields->persist_field_for_order(TaxIdModule::FIELD_ID, 'ORDER', $order, 'billing', false);
+        $this->checkoutFields->persist_field_for_order(TaxIdModule::FIELD_ID, 'COPY', $order, 'shipping', false);
+        $order->save();
+        $request = new WP_REST_Request('POST', '/wc/store/v1/checkout/' . $order->get_id());
+        $failed = new WP_REST_Response(['order_id' => $order->get_id()], 400);
+        $this->module->removeStoreApiShippingCopies($failed, null, $request);
+        $this->assertSame('COPY', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, new WC_Customer($userId), 'shipping'));
+        $success = new WP_REST_Response(['order_id' => $order->get_id()]);
+        $this->module->removeStoreApiShippingCopies($success, null, $request);
+        $this->assertSame('', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, new WC_Customer($userId), 'shipping'));
+        $this->assertSame('', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, wc_get_order($order->get_id()), 'shipping'));
+        $this->assertSame('PROFILE', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, new WC_Customer($userId), 'billing'));
+        $this->assertSame('ORDER', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, wc_get_order($order->get_id()), 'billing'));
+    }
+
+    public function test_profile_editor_value_preloads_the_public_cart_billing_schema_and_order_stays_independent(): void
+    {
+        $userId = self::factory()->user->create(['role' => 'customer']);
+        update_user_meta($userId, TaxIdModule::BILLING_META_KEY, 'PROFILE-EDIT');
+        $schema = StoreApi::container()->get(SchemaController::class)->get('billing-address');
+        $this->assertSame('PROFILE-EDIT', $schema->get_item_response(new WC_Customer($userId))[TaxIdModule::FIELD_ID]);
+        $order = new WC_Order();
+        $order->set_customer_id($userId);
+        $order->save();
+        foreach (['ORDER-1', 'ORDER-2', ''] as $value) {
+            $this->module->updateOrderTaxId(TaxIdModule::BILLING_META_KEY, $value, $order);
+            $order->save();
+            $this->assertSame($value, $schema->get_item_response(wc_get_order($order->get_id()))[TaxIdModule::FIELD_ID]);
+            $this->assertSame('PROFILE-EDIT', $schema->get_item_response(new WC_Customer($userId))[TaxIdModule::FIELD_ID]);
+        }
+    }
+
+    public function test_invalid_retry_dispatch_stops_before_mutation_or_payment(): void
+    {
+        $userId = self::factory()->user->create(['role' => 'customer']);
+        $customer = new WC_Customer($userId);
+        $this->checkoutFields->persist_field_for_customer(TaxIdModule::FIELD_ID, 'PROFILE-BEFORE', $customer, 'billing');
+        $customer->save();
+        $order = new WC_Order();
+        $order->set_customer_id($userId);
+        $order->set_status('pending');
+        $order->save();
+        $this->checkoutFields->persist_field_for_order(TaxIdModule::FIELD_ID, 'ORDER-BEFORE', $order, 'billing', false);
+        $order->save();
+        update_option(TaxIdModule::SETTING_ID, 'yes');
+        $paymentCalls = 0;
+        $this->bootRestServer();
+        // Replace the retry callback only: the real REST pre-callback filters still run.
+        register_rest_route('wc/store/v1', '/checkout/(?P<id>[\\d]+)', [
+            'methods' => 'POST',
+            'permission_callback' => '__return_true',
+            'callback' => function (WP_REST_Request $request) use ($order, &$paymentCalls): WP_REST_Response {
+                $this->module->persistRetryTaxId($order, $request);
+                $order->save();
+                ++$paymentCalls;
+                return new WP_REST_Response();
+            },
+        ], true);
+        $adminId = self::factory()->user->create(['role' => 'administrator']);
+        $originalUser = get_current_user_id();
+        wp_set_current_user($adminId);
+        $GLOBALS['wp_rest_application_password_uuid'] = 'test-application-password';
+        add_filter('rest_request_before_callbacks', [$this->module, 'validateRetryTaxId'], 20, 3);
+        try {
+            $request = new WP_REST_Request('POST', '/wc/store/v1/checkout/' . $order->get_id());
+            $request->set_param('billing_address', [TaxIdModule::FIELD_ID => '']);
+            $response = rest_get_server()->dispatch($request);
+            $this->assertSame(400, $response->get_status());
+            $this->assertSame('rest_invalid_param', $response->get_data()['code']);
+            $this->assertSame(0, $paymentCalls);
+            $this->assertSame('pending', wc_get_order($order->get_id())->get_status());
+            $this->assertSame('ORDER-BEFORE', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, wc_get_order($order->get_id()), 'billing'));
+            $this->assertSame('PROFILE-BEFORE', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, new WC_Customer($userId), 'billing'));
+        } finally {
+            remove_filter('rest_request_before_callbacks', [$this->module, 'validateRetryTaxId'], 20);
+            unset($GLOBALS['wp_rest_application_password_uuid']);
+            wp_set_current_user($originalUser);
+        }
     }
 
     private function reregisterField(): void

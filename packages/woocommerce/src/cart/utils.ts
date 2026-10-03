@@ -1,5 +1,11 @@
 import { deserializeCurrencyFormat, type WP_EndpointInput } from "kizlo"
-import { type AddressAdditionalFields, additionalFieldValues } from "../additional-fields"
+import {
+	type AddressAdditionalFields,
+	additionalFieldValues,
+	billingAdditionalFieldValues,
+	shippingAdditionalFieldValues,
+} from "../additional-fields"
+import { deserializeBillingFields, isExcludedRegisteredField, serializeBillingFields } from "../field-projections"
 import { deserializeExtensions, deserializeProductSummary, productCustomFields } from "../product/utils"
 import type { Cart, CartBillingAddress, CartShippingAddress, UpdateCartInput } from "./schema"
 import type {
@@ -11,8 +17,6 @@ import type {
 	WCK_CartShippingRate,
 	WCK_CartTotals,
 } from "./types"
-
-const TAX_ID_KEY = "kizlo/tax-id"
 
 type UpdateCustomerInput = NonNullable<WP_EndpointInput<"woocommerce.store.cart.updateCustomer.create">["body"]>
 type SerializedBillingAddress = NonNullable<UpdateCustomerInput["billing_address"]>
@@ -411,7 +415,7 @@ export function deserializeCartShippingAddress(address: WCK_Cart["shipping_addre
 		postcode: address.postcode,
 		country: address.country,
 		phone: address.phone,
-		additionalFields: additionalAddressFields(address, SHIPPING_ADDRESS_KEYS),
+		additionalFields: shippingAdditionalFieldValues(additionalAddressFields(address, SHIPPING_ADDRESS_KEYS)),
 	}
 }
 
@@ -419,8 +423,8 @@ export function deserializeCartBillingAddress(address: WCK_Cart["billing_address
 	return {
 		...deserializeCartShippingAddress(address),
 		email: address.email,
-		taxId: taxId(address),
-		additionalFields: additionalAddressFields(address, BILLING_ADDRESS_KEYS),
+		...deserializeBillingFields(address),
+		additionalFields: billingAdditionalFieldValues(additionalAddressFields(address, BILLING_ADDRESS_KEYS)),
 	}
 }
 
@@ -435,7 +439,6 @@ const SHIPPING_ADDRESS_KEYS = new Set([
 	"postcode",
 	"country",
 	"phone",
-	TAX_ID_KEY,
 ])
 const BILLING_ADDRESS_KEYS = new Set([...SHIPPING_ADDRESS_KEYS, "email"])
 
@@ -448,10 +451,6 @@ function additionalAddressFields(address: Record<string, unknown>, standardKeys:
 			),
 		),
 	)
-}
-
-function taxId(address: Record<string, unknown>): string {
-	return typeof address[TAX_ID_KEY] === "string" ? address[TAX_ID_KEY] : ""
 }
 
 export function serializeCartUpdateInput(input: UpdateCartInput): UpdateCustomerInput {
@@ -467,7 +466,9 @@ export function serializeCartShippingAddress(address: NonNullable<UpdateCartInpu
 	// A field the caller left out is dropped rather than sent empty, because the
 	// cart merges whatever arrives and an empty string is a value.
 	const additionalFields = Object.fromEntries(
-		Object.entries(address.additionalFields ?? {}).filter(([key]) => !BILLING_ADDRESS_KEYS.has(key)),
+		Object.entries(address.additionalFields ?? {}).filter(
+			([key]) => !BILLING_ADDRESS_KEYS.has(key) && !isExcludedRegisteredField(key, "shipping"),
+		),
 	)
 
 	return compactAddress({
@@ -491,7 +492,7 @@ export function serializeCartBillingAddress(address: NonNullable<UpdateCartInput
 	return compactAddress({
 		...serializeCartShippingAddress(address),
 		email: address.email,
-		[TAX_ID_KEY]: address.taxId,
+		...serializeBillingFields(address),
 	})
 }
 
