@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.12.0
+
+### Minor Changes
+
+- [#270](https://github.com/kizlo-io/kizlo/pull/270) [`83ee7c0`](https://github.com/kizlo-io/kizlo/commit/83ee7c03e3f1f0fdeb9843ca2a3df2ad46ea51c1) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose registered WooCommerce additional fields with consumer-generated bucket types and grouped customer and order reads.
+
 ## 0.11.0
 
 ### Minor Changes
