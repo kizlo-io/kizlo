@@ -35,6 +35,39 @@ function introspection(prefix: string): IntrospectionDocument {
 		version: "1.1",
 		hash: `sha256:${prefix.padEnd(64, "0")}`,
 		schemas: {
+			"woocommerce.additional-fields.address.read": {
+				type: "object",
+				properties: { [`${prefix}/reference`]: { type: "string" } },
+				additionalProperties: false,
+			},
+			"woocommerce.additional-fields.address.write": {
+				type: "object",
+				properties: { [`${prefix}/reference`]: { type: "string", required: true } },
+				additionalProperties: false,
+			},
+			"woocommerce.additional-fields.contact.read": {
+				type: "object",
+				properties: { [`${prefix}/opt-in`]: { type: "boolean" } },
+				additionalProperties: false,
+			},
+			"woocommerce.additional-fields.checkout.read": {
+				type: "object",
+				properties: {
+					[`${prefix}/opt-in`]: { type: "boolean" },
+					[`${prefix}/slot`]: { type: "string", enum: ["", "morning", "afternoon"] },
+				},
+				additionalProperties: false,
+			},
+			"woocommerce.additional-fields.checkout.write": {
+				type: "object",
+				properties: {
+					[`${prefix}/opt-in`]: { type: "boolean" },
+					[`${prefix}/slot`]: { type: "string", enum: ["", "morning", "afternoon"] },
+				},
+				additionalProperties: false,
+			},
+			"acme.empty": { type: "object", additionalProperties: false },
+			"acme.reference": { $ref: "woocommerce.additional-fields.contact.read" },
 			"kizlo.post-types.page.item": itemSchema(`${prefix}Page`),
 			"kizlo.post-types.post.item": itemSchema(`${prefix}Post`),
 			"kizlo.post-types.product.item": itemSchema(`${prefix}Product`),
@@ -89,7 +122,8 @@ function usage(prefix: string): string {
 		WP_EndpointPath,
 		WP_EndpointResult,
 	} from "kizlo"
-	import { type Product, woocommerce } from "@kizlo/woocommerce"
+	import { type Product, type Cart, type Checkout, type UpdateCartInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
+	import type { WP_Schema } from "kizlo"
 	import "./wordpress"
 
 	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
@@ -103,9 +137,36 @@ function usage(prefix: string): string {
 	type CategoryFields = Category["custom"]
 	type TagFields = Tag["custom"]
 	type ProductFields = Product["custom"]
+	type NamedSchema = Assert<Equal<WP_Schema<"acme.reference">, { "${prefix}/opt-in"?: boolean }>>
+	const emptySchema: WP_Schema<"acme.empty"> = {}
+	// @ts-expect-error an empty registered schema rejects invented fields
+	const badEmpty: WP_Schema<"acme.empty"> = { invented: true }
+	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
+	type AddressField = Assert<Equal<Cart["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	type ShippingField = Assert<Equal<Cart["shippingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	type CustomerBillingField = Assert<Equal<Customer["billing"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	type CustomerShippingField = Assert<Equal<Customer["shipping"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	type ContactField = Assert<Equal<Checkout["additionalFields"]["${prefix}/opt-in"], boolean | undefined>>
+	type SlotField = Assert<Equal<Order["additionalFields"]["${prefix}/slot"], "" | "morning" | "afternoon" | undefined>>
+	type NestedField = Assert<Equal<NonNullable<Checkout["cart"]>["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	const updateAddress: UpdateCartInput = { shippingAddress: { additionalFields: { "${prefix}/reference": "" } } }
+	const updateFields: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": false, "${prefix}/slot": "" } }
+	// @ts-expect-error contact fields cannot be assigned to an address bucket
+	const wrongLocation: UpdateCartInput = { billingAddress: { additionalFields: { "${prefix}/opt-in": true } } }
+	// @ts-expect-error known checkbox fields reject string values
+	const wrongType: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": "false" } }
+	// @ts-expect-error registered select fields retain their enum
+	const wrongSlot: UpdateCheckoutInput = { additionalFields: { "${prefix}/slot": "evening" } }
+	const confirmFields: ConfirmCheckoutInput["additionalFields"] = { "${prefix}/opt-in": false }
+	const retryFields: RetryCheckoutInput["additionalFields"] = { "${prefix}/slot": "morning" }
+
 	type WooCommerceProcedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
+	type Customer = InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>
 	type WooCommerceClient = ResultClient<WooCommerceProcedures>
 	type ProductGetResult = Awaited<ReturnType<WooCommerceClient["woocommerce"]["products"]["get"]>>
+	type CustomerProcedureField = Assert<Equal<InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>["billing"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	type ProcedureContactField = Assert<Equal<InferProcedureData<WooCommerceProcedures["woocommerce"]["checkout"]["get"]>["additionalFields"]["${prefix}/opt-in"], boolean | undefined>>
+	type ProcedureInputField = Assert<Equal<NonNullable<InferProcedureInput<WooCommerceProcedures["woocommerce"]["checkout"]["update"]>["body"]["additionalFields"]>["${prefix}/opt-in"], boolean | undefined>>
 	type ProductGetFields = NonNullable<ProductGetResult["data"]>["custom"]
 	type ProductListFields = InferProcedureData<
 		WooCommerceProcedures["woocommerce"]["products"]["list"]
@@ -188,7 +249,8 @@ function usage(prefix: string): string {
 }
 
 const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProcedures, InferProcedureData, Page, Post, ResultClient, Tag } from "kizlo"
-	import { type Product, woocommerce } from "@kizlo/woocommerce"
+	import { type Product, type Cart, type Checkout, type UpdateCartInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
+	import type { WP_Schema } from "kizlo"
 	import "./wordpress"
 
 	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
@@ -198,7 +260,11 @@ const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProc
 	type CategoryCompiles = Assert<Equal<Category["custom"], Record<string, unknown>>>
 	type TagCompiles = Assert<Equal<Tag["custom"], Record<string, unknown>>>
 	type ProductCompiles = Assert<Equal<Product["custom"], Record<string, unknown>>>
+	type StubAddressFields = Assert<Equal<Cart["billingAddress"]["additionalFields"], Record<string, string | boolean | undefined>>>
+	type StubCheckoutFields = Assert<Equal<Checkout["additionalFields"], Record<string, string | boolean | undefined>>>
+	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
 	type WooCommerceProcedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
+	type Customer = InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>
 	type WooCommerceClient = ResultClient<WooCommerceProcedures>
 	type ProductGetResult = Awaited<ReturnType<WooCommerceClient["woocommerce"]["products"]["get"]>>
 	type ProductGetCompiles = Assert<Equal<NonNullable<ProductGetResult["data"]>["custom"], Record<string, unknown>>>
@@ -364,6 +430,35 @@ test("published declarations leave an app without a generated barrel compiling o
 	try {
 		fs.writeFileSync(path.join(dir, "usage.ts"), UNREGISTERED_USAGE)
 		expect(compile(dir, ["usage.ts"])).toEqual([])
+	} finally {
+		fs.rmSync(dir, { force: true, recursive: true })
+	}
+}, 30_000)
+
+test("empty registered buckets keep scalar reads and reject invented literal writes", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-empty-fields-consumer-"))
+	try {
+		const document = introspection("empty")
+		for (const id of Object.keys(document.schemas)) {
+			if (id.startsWith("woocommerce.additional-fields."))
+				document.schemas[id] = { type: "object", properties: {}, additionalProperties: false }
+		}
+		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(document))
+		fs.writeFileSync(
+			path.join(dir, "usage.ts"),
+			`import type { Cart, UpdateCartInput, UpdateCheckoutInput } from "@kizlo/woocommerce"
+		import type { WP_Schema } from "kizlo"
+		import "./wordpress"
+		const empty: WP_Schema<"woocommerce.additional-fields.address.read"> = {}
+		const update: UpdateCartInput = { billingAddress: { additionalFields: {} } }
+		const checkout: UpdateCheckoutInput = { additionalFields: {} }
+		declare const cart: Cart
+		const dynamic: string | boolean | undefined = cart.billingAddress.additionalFields["future/field"]
+		// @ts-expect-error a present empty registry has no registered write keys
+		const invented: UpdateCartInput = { shippingAddress: { additionalFields: { "future/field": true } } }
+		export { empty, update, checkout, dynamic, invented }`,
+		)
+		expect(compile(dir)).toEqual([])
 	} finally {
 		fs.rmSync(dir, { force: true, recursive: true })
 	}

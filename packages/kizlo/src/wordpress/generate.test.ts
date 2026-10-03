@@ -30,6 +30,7 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export interface WordPressClientRegistry {}
 	export interface WordPressEndpointRegistry {}
 	export interface WordPressCustomFieldsRegistry {}
+	export interface WordPressSchemaRegistry {}
 	export type ActiveWordPressClient = WordPressClientRegistry extends { introspection: infer O } ? (O extends object ? WP_Client<O> & WordPressTransport : WordPressTransport) : WordPressTransport
 	export type WP_EndpointPath = Extract<keyof WordPressEndpointRegistry, string>
 	type RegisteredEndpoint<P extends WP_EndpointPath> = WordPressEndpointRegistry[P]
@@ -494,6 +495,71 @@ describe("generateWordPressClient", () => {
 				// @ts-expect-error the child never declared itself nullable
 				const nothing: WP_AcmeBilling = null
 				export { city, vat, nothing }`,
+			}),
+		).toEqual([])
+	})
+
+	test.each(["object", "nullable", "reference", "multiple"])("closed schemas retain %s inherited fields without adding members", (kind) => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		document.schemas["acme.source"] = { type: "object", properties: { city: { type: "string", required: true } } }
+		document.schemas["acme.address"] =
+			kind === "reference" ? { $ref: "acme.source" } : { ...document.schemas["acme.source"], nullable: kind === "nullable" }
+		document.schemas["acme.audit"] = { type: "object", properties: { verified: { type: "boolean", required: true } } }
+		const inherited = {
+			type: "object" as const,
+			$extends: kind === "multiple" ? ["acme.address", "acme.audit"] : "acme.address",
+			properties: {},
+			additionalProperties: false,
+		}
+		document.schemas["acme.billing"] = inherited
+		document.schemas["acme.holder"] = { type: "object", properties: { address: { ...inherited, required: true } } }
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": generateWordPressClient(document),
+				"usage.ts": `import type { WP_AcmeBilling, WP_AcmeHolder } from "./wordpress"
+			const billing: WP_AcmeBilling = { city: "London"${kind === "multiple" ? ", verified: false" : ""} }
+			const holder: WP_AcmeHolder = { address: billing }
+			// @ts-expect-error required inherited fields remain required
+			const missing: WP_AcmeBilling = {}
+			// @ts-expect-error a non-null child does not inherit its parent's nullability
+			const nothing: WP_AcmeBilling = null
+			export { billing, holder, missing, nothing }`,
+			}),
+		).toEqual([])
+	})
+
+	test.each(["direct", "reference", "inherited"])("extends a %s empty closed parent without inheriting a never index", (kind) => {
+		const document = structuredClone(INTROSPECTION_FIXTURE)
+		document.schemas["acme.empty"] = { type: "object", properties: {}, additionalProperties: false }
+		document.schemas["acme.parent"] =
+			kind === "reference"
+				? { $ref: "acme.empty" }
+				: kind === "inherited"
+					? { type: "object", $extends: "acme.empty", additionalProperties: false }
+					: { type: "object", properties: {}, additionalProperties: false }
+		const child = {
+			type: "object" as const,
+			$extends: "acme.parent",
+			properties: { city: { type: "string" as const, required: true } },
+			additionalProperties: false,
+		}
+		document.schemas["acme.billing"] = child
+		document.schemas["acme.holder"] = { type: "object", properties: { address: { ...child, required: true } } }
+		expect(
+			compile({
+				"kizlo.d.ts": KIZLO_MODULE,
+				"wordpress.ts": generateWordPressClient(document),
+				"usage.ts": `import type { WP_AcmeEmpty, WP_AcmeParent, WP_AcmeBilling, WP_AcmeHolder } from "./wordpress"
+			const empty: WP_AcmeEmpty = {}
+			const parent: WP_AcmeParent = {}
+			const billing: WP_AcmeBilling = { city: "London" }
+			const holder: WP_AcmeHolder = { address: billing }
+			// @ts-expect-error standalone empty closed schemas still reject extra keys
+			const invented: WP_AcmeParent = { city: "London" }
+			// @ts-expect-error required child fields remain required
+			const missing: WP_AcmeBilling = {}
+			export { empty, parent, billing, holder, invented, missing }`,
 			}),
 		).toEqual([])
 	})

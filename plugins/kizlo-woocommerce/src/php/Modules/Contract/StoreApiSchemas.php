@@ -74,6 +74,7 @@ final class StoreApiSchemas
      */
     public static function registerSchemas(): void
     {
+        AdditionalFields::registerSchemas();
         kizlo_register_route_schema(
             WooCommerceSchemas::STORE_PRODUCT_SUMMARY,
             static fn(): array => self::summary(),
@@ -389,6 +390,11 @@ final class StoreApiSchemas
                 ], WooCommerceSchemas::STORE_ORDER . '.items.extensions', required: true),
             ];
         }
+
+        $properties['additional_fields'] = [
+            '$ref' => AdditionalFields::id('checkout'),
+            'required' => true,
+        ];
 
         $properties['extensions'] = [
             'type'                 => 'object',

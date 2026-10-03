@@ -55,6 +55,17 @@ final class RestApiSchemas
         }
 
         if ($controller instanceof WC_REST_Customers_Controller && is_array($properties['billing']['properties'] ?? null)) {
+            // Response adapters only: wc/v3 has no official grouped-field write input.
+            foreach (['billing', 'shipping'] as $group) {
+                $properties[$group]['properties']['additional_fields'] = [
+                    '$ref' => AdditionalFields::id('address'),
+                    'required' => true,
+                ];
+            }
+            $properties['additional_fields'] = [
+                '$ref' => AdditionalFields::id('contact'),
+                'required' => true,
+            ];
             $properties['billing']['properties']['tax_id'] = [
                 'type'        => 'string',
                 'required'    => true,

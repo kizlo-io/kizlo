@@ -6,6 +6,12 @@ import { ORDER_PROCEDURES } from "./order"
 import { PRODUCT_PROCEDURES } from "./product"
 import { STOREFRONT_PROCEDURES } from "./storefront"
 
+export type {
+	AddressAdditionalFields,
+	AddressAdditionalFieldsInput,
+	CheckoutAdditionalFieldsInput,
+	ContactAdditionalFields,
+} from "./additional-fields"
 export * from "./cart/schema"
 export * from "./checkout/schema"
 export * from "./order/schema"

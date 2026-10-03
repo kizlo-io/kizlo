@@ -5,6 +5,7 @@ namespace Kizlo\WooCommerce;
 use Kizlo\WooCommerce\Modules\Admin\AttributeSwatch;
 use Kizlo\WooCommerce\Modules\Cart\CartModule;
 use Kizlo\WooCommerce\Modules\Checkout\CheckoutRedirectModule;
+use Kizlo\WooCommerce\Modules\Checkout\AdditionalFieldsModule;
 use Kizlo\WooCommerce\Modules\Checkout\PayPageModule;
 use Kizlo\WooCommerce\Modules\Contract\ContractModule;
 use Kizlo\WooCommerce\Modules\Customer\CustomerModule;
@@ -32,6 +33,7 @@ class Plugin
         OrderModule::class,
         CustomerModule::class,
         TaxIdModule::class,
+        AdditionalFieldsModule::class,
         CartModule::class,
         StorefrontModule::class,
         AttributeSwatch::class,

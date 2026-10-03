@@ -1,4 +1,5 @@
 import type { WP_EndpointInput } from "kizlo"
+import { additionalFieldValues } from "../additional-fields"
 import type { CartBillingAddress, CartShippingAddress } from "../cart/schema"
 import type { WCK_Cart } from "../cart/types"
 import {
@@ -141,10 +142,6 @@ export function serializeCheckoutBillingAddress(address: CartBillingAddress) {
 	return serializeCartBillingAddress(address)
 }
 
-function checkoutAdditionalFields(fields: Record<string, unknown> | undefined): CheckoutAdditionalFields {
-	return Object.fromEntries(
-		Object.entries(fields ?? {}).filter(
-			(entry): entry is [string, string | boolean] => typeof entry[1] === "string" || typeof entry[1] === "boolean",
-		),
-	)
+export function checkoutAdditionalFields(fields: unknown): CheckoutAdditionalFields {
+	return additionalFieldValues<CheckoutAdditionalFields>(fields)
 }

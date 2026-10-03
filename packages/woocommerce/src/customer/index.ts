@@ -1,4 +1,4 @@
-import { createProcedure } from "kizlo"
+import { createProcedure, schemaType } from "kizlo"
 import { Customer } from "./schema"
 import { deserializeCustomer } from "./utils"
 
@@ -8,7 +8,7 @@ export const CUSTOMER_PROCEDURES = {
 			scope: "api",
 			method: "GET",
 			path: "/customers",
-			output: Customer,
+			output: schemaType<Customer>(Customer),
 		},
 		async ({ context, errors }) => {
 			const session = await context.getSession()

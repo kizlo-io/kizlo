@@ -1,4 +1,5 @@
-import { createProcedure } from "kizlo"
+import { createProcedure, schemaType } from "kizlo"
+import type z from "zod/v4"
 import type { WCK_Cart } from "../cart/types"
 import { deserializeCart } from "../cart/utils"
 import { sessionMiddleware } from "../session"
@@ -18,7 +19,7 @@ export const CHECKOUT_PROCEDURES = {
 			scope: "api",
 			method: "GET",
 			path: "/checkout",
-			output: Checkout,
+			output: schemaType<Checkout>(Checkout),
 			errors: GET_CHECKOUT_ERROR_MAP,
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
@@ -45,8 +46,8 @@ export const CHECKOUT_PROCEDURES = {
 			scope: "api",
 			method: "PUT",
 			path: "/checkout",
-			body: UpdateCheckoutInput,
-			output: Checkout,
+			body: schemaType<UpdateCheckoutInput, z.output<typeof UpdateCheckoutInput>>(UpdateCheckoutInput),
+			output: schemaType<Checkout>(Checkout),
 			errors: UPDATE_CHECKOUT_ERROR_MAP,
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
@@ -102,8 +103,8 @@ export const CHECKOUT_PROCEDURES = {
 			scope: "api",
 			method: "POST",
 			path: "/checkout",
-			body: ConfirmCheckoutInput,
-			output: Checkout,
+			body: schemaType<ConfirmCheckoutInput, z.output<typeof ConfirmCheckoutInput>>(ConfirmCheckoutInput),
+			output: schemaType<Checkout>(Checkout),
 			errors: CONFIRM_CHECKOUT_ERROR_MAP,
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
@@ -195,8 +196,10 @@ export const CHECKOUT_PROCEDURES = {
 			method: "POST",
 			path: "/checkout/{orderId}",
 			params: RetryCheckoutInput.pick({ orderId: true }),
-			body: RetryCheckoutInput.omit({ orderId: true }),
-			output: Checkout,
+			body: schemaType<Omit<RetryCheckoutInput, "orderId">, Omit<z.output<typeof RetryCheckoutInput>, "orderId">>(
+				RetryCheckoutInput.omit({ orderId: true }),
+			),
+			output: schemaType<Checkout>(Checkout),
 			errors: RETRY_CHECKOUT_ERROR_MAP,
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},

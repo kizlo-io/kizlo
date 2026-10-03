@@ -59,6 +59,14 @@ export interface WordPressEndpointRegistry {}
 /** Generated WordPress modules augment this registry from managed-content item schemas. */
 export interface WordPressCustomFieldsRegistry {}
 
+/** Generated modules register every named schema, independently of endpoints and managed content. */
+export interface WordPressSchemaRegistry {}
+
+/** Resolve a consumer's named schema, retaining an explicit fallback for older plugin contracts. */
+export type WP_Schema<TName extends string, TFallback = unknown> = TName extends keyof WordPressSchemaRegistry
+	? WordPressSchemaRegistry[TName]
+	: TFallback
+
 /**
  * The WordPress client this project compiles against: its generated endpoints bound to the
  * transport, or the bare transport. The stub written before the first generation registers `any`,

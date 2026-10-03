@@ -1,11 +1,18 @@
 import { MediaImage } from "@kizlo/shared"
 import { CurrencyFormat } from "kizlo"
 import z from "zod/v4"
+import {
+	type AddressAdditionalFields,
+	type AddressAdditionalFieldsInput,
+	AddressAdditionalFieldsSchema,
+	type AddressAdditionalFieldsSubmission,
+	AddressAdditionalFieldsSubmissionSchema,
+} from "../additional-fields"
 import { ProductCustomFieldsSchema, ProductPrices, ProductSummary } from "../product/schema"
 import type { ProductCustomFields } from "../product/types"
 
-export const CartAdditionalFields = z.record(z.string(), z.union([z.string(), z.boolean()]))
-export type CartAdditionalFields = z.infer<typeof CartAdditionalFields>
+export const CartAdditionalFields: typeof AddressAdditionalFieldsSchema = AddressAdditionalFieldsSchema
+export type CartAdditionalFields = AddressAdditionalFields
 
 const CartAddressFields = {
 	firstName: z.string(),
@@ -22,10 +29,18 @@ const CartAddressFields = {
 }
 
 export const CartShippingAddress = z.object(CartAddressFields)
-export type CartShippingAddress = z.infer<typeof CartShippingAddress>
+export type CartShippingAddress = Omit<z.infer<typeof CartShippingAddress>, "additionalFields"> & {
+	additionalFields: AddressAdditionalFields
+}
 
 export const CartBillingAddress = z.object({ ...CartAddressFields, email: z.string(), taxId: z.string().default("") })
-export type CartBillingAddress = z.infer<typeof CartBillingAddress>
+export type CartBillingAddress = Omit<z.infer<typeof CartBillingAddress>, "additionalFields"> & {
+	additionalFields: AddressAdditionalFields
+}
+
+/** Full submissions retain registered requirements; cart mutations use the partial schemas below. */
+export const CartShippingAddressSubmission = CartShippingAddress.extend({ additionalFields: AddressAdditionalFieldsSubmissionSchema })
+export const CartBillingAddressSubmission = CartBillingAddress.extend({ additionalFields: AddressAdditionalFieldsSubmissionSchema })
 
 export const CartShippingDestination = z.object({
 	address1: z.string(),
@@ -178,7 +193,11 @@ export const Cart = z.object({
 	currencyFormat: CurrencyFormat,
 	extensions: z.record(z.string(), z.unknown()),
 })
-export type Cart = Omit<z.infer<typeof Cart>, "items"> & { items: CartItem[] }
+export type Cart = Omit<z.infer<typeof Cart>, "items" | "billingAddress" | "shippingAddress"> & {
+	items: CartItem[]
+	billingAddress: CartBillingAddress
+	shippingAddress: CartShippingAddress
+}
 
 export const AddCartItemInput = z.object({
 	productId: z.number(),
@@ -213,4 +232,13 @@ export const UpdateCartInput = z.object({
 	shippingAddress: CartShippingAddressInput.optional(),
 	billingAddress: CartBillingAddressInput.optional(),
 })
-export type UpdateCartInput = z.input<typeof UpdateCartInput>
+export type CartBillingAddressInput = Omit<z.input<typeof CartBillingAddress>, "additionalFields"> & {
+	additionalFields: AddressAdditionalFieldsSubmission
+}
+export type CartShippingAddressInput = Omit<z.input<typeof CartShippingAddress>, "additionalFields"> & {
+	additionalFields: AddressAdditionalFieldsSubmission
+}
+export type UpdateCartInput = {
+	billingAddress?: Partial<Omit<CartBillingAddressInput, "additionalFields">> & { additionalFields?: AddressAdditionalFieldsInput }
+	shippingAddress?: Partial<Omit<CartShippingAddressInput, "additionalFields">> & { additionalFields?: AddressAdditionalFieldsInput }
+}

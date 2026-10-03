@@ -1,3 +1,14 @@
 {
-	"pages": ["cli", "mcp", "plugin", "integration", "introspection", "custom-fields", "client", "adapter", "development-and-testing"]
+	"pages": [
+		"cli",
+		"mcp",
+		"plugin",
+		"integration",
+		"introspection",
+		"custom-fields",
+		"additional-checkout-fields",
+		"client",
+		"adapter",
+		"development-and-testing"
+	]
 }
