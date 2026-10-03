@@ -1,5 +1,11 @@
 import z from "zod/v4"
-import { type AddressAdditionalFields, AddressAdditionalFieldsSchema } from "./additional-fields"
+import {
+	type AddressAdditionalFields,
+	AddressAdditionalFieldsSchema,
+	type BillingAdditionalFields,
+	BillingAdditionalFieldsSchema,
+} from "./additional-fields"
+import { BillingNativeFields } from "./field-projections"
 
 export const Totals = z.object({
 	discountTotal: z.number(),
@@ -39,6 +45,7 @@ export type ShippingAddress = Omit<z.infer<typeof ShippingAddress>, "additionalF
 
 export const BillingAddress = ShippingAddress.extend({
 	email: z.string(),
-	taxId: z.string().default(""),
+	...BillingNativeFields,
+	additionalFields: BillingAdditionalFieldsSchema.optional(),
 })
-export type BillingAddress = Omit<z.infer<typeof BillingAddress>, "additionalFields"> & { additionalFields?: AddressAdditionalFields }
+export type BillingAddress = Omit<z.infer<typeof BillingAddress>, "additionalFields"> & { additionalFields?: BillingAdditionalFields }

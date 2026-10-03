@@ -9,11 +9,15 @@ import { STOREFRONT_PROCEDURES } from "./storefront"
 export type {
 	AddressAdditionalFields,
 	AddressAdditionalFieldsInput,
+	BillingAdditionalFields,
+	BillingAdditionalFieldsInput,
 	CheckoutAdditionalFieldsInput,
 	ContactAdditionalFields,
 } from "./additional-fields"
 export * from "./cart/schema"
 export * from "./checkout/schema"
+export type { RegisteredFieldGroup, RegisteredFieldLocations, RegisteredFieldTarget } from "./field-projections"
+export { BillingFieldProjections, resolveRegisteredFieldTarget } from "./field-projections"
 export * from "./order/schema"
 export * from "./product/schema"
 export * from "./storefront/schema"

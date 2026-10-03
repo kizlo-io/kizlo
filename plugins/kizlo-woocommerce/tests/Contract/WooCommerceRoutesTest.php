@@ -382,7 +382,8 @@ class WooCommerceRoutesTest extends TestCase
         $document = $this->document();
         $customer = $this->publishedProperties($document, WooCommerceNamespaces::REST, '/customers/{id}');
 
-        $this->assertArrayHasKey('tax_id', $customer['billing']['properties'] ?? []);
+        $this->assertArrayNotHasKey('tax_id', $customer['billing']['properties'] ?? []);
+        $this->assertSame('woocommerce.additional-fields.address.read', $customer['billing']['properties']['additional_fields']['$ref']);
 
         foreach (['woocommerce.store.cart', 'woocommerce.store.checkout', 'woocommerce.store.order'] as $schema) {
             $billing = $document['schemas'][$schema]['properties']['billing_address']['properties'] ?? [];

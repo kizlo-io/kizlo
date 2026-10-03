@@ -3,14 +3,16 @@ import z from "zod"
 import {
 	type AddressAdditionalFields,
 	AddressAdditionalFieldsSchema,
+	type BillingAdditionalFields,
+	BillingAdditionalFieldsSchema,
 	type ContactAdditionalFields,
 	ContactAdditionalFieldsSchema,
 } from "../additional-fields"
 import { BillingAddress, ShippingAddress } from "../schema"
 
 // Reads always normalize the buckets to objects, including responses from older plugins.
-const CustomerBillingAddress = BillingAddress.extend({ additionalFields: AddressAdditionalFieldsSchema })
-type CustomerBillingAddress = Omit<BillingAddress, "additionalFields"> & { additionalFields: AddressAdditionalFields }
+const CustomerBillingAddress = BillingAddress.extend({ additionalFields: BillingAdditionalFieldsSchema })
+type CustomerBillingAddress = Omit<BillingAddress, "additionalFields"> & { additionalFields: BillingAdditionalFields }
 const CustomerShippingAddress = ShippingAddress.extend({ additionalFields: AddressAdditionalFieldsSchema })
 type CustomerShippingAddress = Omit<ShippingAddress, "additionalFields"> & { additionalFields: AddressAdditionalFields }
 
