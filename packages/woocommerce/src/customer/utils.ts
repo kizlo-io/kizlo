@@ -1,5 +1,11 @@
 import { timestampFromWpGmt, toPublicMetadata } from "@kizlo/shared"
-import { type AddressAdditionalFields, additionalFieldValues, type ContactAdditionalFields } from "../additional-fields"
+import {
+	additionalFieldValues,
+	billingAdditionalFieldValues,
+	type ContactAdditionalFields,
+	shippingAdditionalFieldValues,
+} from "../additional-fields"
+import { deserializeBillingFields } from "../field-projections"
 import type { Customer } from "./schema"
 import type { WCK_Customer } from "./types"
 
@@ -21,11 +27,11 @@ export function deserializeCustomer(data: WCK_Customer): Customer {
 			state: billing.state,
 			address2: billing.address_2,
 			company: billing.company,
-			taxId: typeof billing.tax_id === "string" ? billing.tax_id : "",
-			additionalFields: additionalFieldValues<AddressAdditionalFields>(billing.additional_fields),
+			...deserializeBillingFields(additionalFieldValues(billing.additional_fields)),
+			additionalFields: billingAdditionalFieldValues(billing.additional_fields),
 		},
 		shipping: {
-			additionalFields: additionalFieldValues<AddressAdditionalFields>(data.shipping.additional_fields),
+			additionalFields: shippingAdditionalFieldValues(data.shipping.additional_fields),
 			firstName: data.shipping.first_name,
 			lastName: data.shipping.last_name,
 			address1: data.shipping.address_1,

@@ -348,7 +348,7 @@ test("serializes only supplied customer fields and flattens merchant fields", ()
 			billingAddress: {
 				address1: "",
 				taxId: "GB-7",
-				additionalFields: { "qa/reference": "VAT-7", "qa/address-flag": false, "kizlo/tax-id": "duplicate" },
+				additionalFields: { "qa/reference": "VAT-7", "qa/address-flag": false },
 			},
 			shippingAddress: { postcode: "90210", additionalFields: { "kizlo/tax-id": "shipping" } },
 		}),

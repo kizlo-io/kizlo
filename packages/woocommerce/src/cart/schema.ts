@@ -7,7 +7,13 @@ import {
 	AddressAdditionalFieldsSchema,
 	type AddressAdditionalFieldsSubmission,
 	AddressAdditionalFieldsSubmissionSchema,
+	type BillingAdditionalFields,
+	type BillingAdditionalFieldsInput,
+	BillingAdditionalFieldsSchema,
+	type BillingAdditionalFieldsSubmission,
+	BillingAdditionalFieldsSubmissionSchema,
 } from "../additional-fields"
+import { BillingNativeFields, BillingNativeInputFields } from "../field-projections"
 import { ProductCustomFieldsSchema, ProductPrices, ProductSummary } from "../product/schema"
 import type { ProductCustomFields } from "../product/types"
 
@@ -33,14 +39,19 @@ export type CartShippingAddress = Omit<z.infer<typeof CartShippingAddress>, "add
 	additionalFields: AddressAdditionalFields
 }
 
-export const CartBillingAddress = z.object({ ...CartAddressFields, email: z.string(), taxId: z.string().default("") })
+export const CartBillingAddress = z.object({
+	...CartAddressFields,
+	email: z.string(),
+	...BillingNativeFields,
+	additionalFields: BillingAdditionalFieldsSchema,
+})
 export type CartBillingAddress = Omit<z.infer<typeof CartBillingAddress>, "additionalFields"> & {
-	additionalFields: AddressAdditionalFields
+	additionalFields: BillingAdditionalFields
 }
 
 /** Full submissions retain registered requirements; cart mutations use the partial schemas below. */
 export const CartShippingAddressSubmission = CartShippingAddress.extend({ additionalFields: AddressAdditionalFieldsSubmissionSchema })
-export const CartBillingAddressSubmission = CartBillingAddress.extend({ additionalFields: AddressAdditionalFieldsSubmissionSchema })
+export const CartBillingAddressSubmission = CartBillingAddress.extend({ additionalFields: BillingAdditionalFieldsSubmissionSchema })
 
 export const CartShippingDestination = z.object({
 	address1: z.string(),
@@ -226,19 +237,19 @@ export const SelectCartShippingRateInput = z.object({
 export type SelectCartShippingRateInput = z.infer<typeof SelectCartShippingRateInput>
 
 const CartShippingAddressInput = z.object(CartAddressFields).partial()
-const CartBillingAddressInput = CartBillingAddress.partial()
+const CartBillingAddressInput = CartBillingAddress.partial().extend(BillingNativeInputFields)
 
 export const UpdateCartInput = z.object({
 	shippingAddress: CartShippingAddressInput.optional(),
 	billingAddress: CartBillingAddressInput.optional(),
 })
 export type CartBillingAddressInput = Omit<z.input<typeof CartBillingAddress>, "additionalFields"> & {
-	additionalFields: AddressAdditionalFieldsSubmission
+	additionalFields: BillingAdditionalFieldsSubmission
 }
 export type CartShippingAddressInput = Omit<z.input<typeof CartShippingAddress>, "additionalFields"> & {
 	additionalFields: AddressAdditionalFieldsSubmission
 }
 export type UpdateCartInput = {
-	billingAddress?: Partial<Omit<CartBillingAddressInput, "additionalFields">> & { additionalFields?: AddressAdditionalFieldsInput }
+	billingAddress?: Partial<Omit<CartBillingAddressInput, "additionalFields">> & { additionalFields?: BillingAdditionalFieldsInput }
 	shippingAddress?: Partial<Omit<CartShippingAddressInput, "additionalFields">> & { additionalFields?: AddressAdditionalFieldsInput }
 }
