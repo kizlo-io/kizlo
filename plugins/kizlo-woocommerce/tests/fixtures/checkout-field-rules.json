@@ -1,0 +1,540 @@
+[
+	{
+		"name": "boolean optional",
+		"required": false,
+		"hidden": false,
+		"document": {},
+		"expected": {
+			"required": false,
+			"hidden": false
+		}
+	},
+	{
+		"name": "empty rule is inactive",
+		"required": {},
+		"hidden": {},
+		"document": {},
+		"expected": {
+			"required": false,
+			"hidden": false
+		}
+	},
+	{
+		"name": "billing email presence ''",
+		"required": {
+			"customer": {
+				"properties": {
+					"address": {
+						"required": ["email"]
+					}
+				}
+			}
+		},
+		"hidden": {
+			"customer": {
+				"properties": {
+					"address": {
+						"not": {
+							"required": ["email"]
+						}
+					}
+				}
+			}
+		},
+		"document": {
+			"customer": {
+				"address": {
+					"email": "",
+					"kizlo/tax-id": "GB"
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "billing email presence 'buyer@example.com'",
+		"required": {
+			"customer": {
+				"properties": {
+					"address": {
+						"required": ["email"]
+					}
+				}
+			}
+		},
+		"hidden": {
+			"customer": {
+				"properties": {
+					"address": {
+						"not": {
+							"required": ["email"]
+						}
+					}
+				}
+			}
+		},
+		"document": {
+			"customer": {
+				"address": {
+					"email": "buyer@example.com",
+					"kizlo/tax-id": "GB"
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "shipping is hidden and cannot be required",
+		"required": {
+			"customer": {
+				"properties": {
+					"address": {
+						"required": ["email"]
+					}
+				}
+			}
+		},
+		"hidden": {
+			"customer": {
+				"properties": {
+					"address": {
+						"not": {
+							"required": ["email"]
+						}
+					}
+				}
+			}
+		},
+		"document": {
+			"customer": {
+				"address": {
+					"kizlo/tax-id": ""
+				}
+			}
+		},
+		"expected": {
+			"required": false,
+			"hidden": true
+		}
+	},
+	{
+		"name": "required setting disabled",
+		"required": false,
+		"hidden": {
+			"customer": {
+				"properties": {
+					"address": {
+						"not": {
+							"required": ["email"]
+						}
+					}
+				}
+			}
+		},
+		"document": {
+			"customer": {
+				"address": {
+					"email": ""
+				}
+			}
+		},
+		"expected": {
+			"required": false,
+			"hidden": false
+		}
+	},
+	{
+		"name": "registered native reverse key",
+		"required": {
+			"customer": {
+				"properties": {
+					"address": {
+						"properties": {
+							"kizlo/tax-id": {
+								"pattern": "^GB"
+							}
+						}
+					}
+				}
+			}
+		},
+		"hidden": false,
+		"document": {
+			"customer": {
+				"address": {
+					"email": "",
+					"kizlo/tax-id": "GB-42"
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "contains enum and minimum cart total",
+		"required": {
+			"allOf": [
+				{
+					"properties": {
+						"cart": {
+							"properties": {
+								"items": {
+									"contains": {
+										"enum": [42]
+									}
+								}
+							}
+						}
+					}
+				},
+				{
+					"properties": {
+						"cart": {
+							"properties": {
+								"totals": {
+									"properties": {
+										"total_price": {
+											"minimum": 10000
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			]
+		},
+		"hidden": false,
+		"document": {
+			"cart": {
+				"items": [42, 42, 7],
+				"needs_shipping": true,
+				"totals": {
+					"total_price": 12000
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "anyOf and not reject cart",
+		"required": {
+			"anyOf": [
+				{
+					"properties": {
+						"cart": {
+							"properties": {
+								"needs_shipping": {
+									"const": false
+								}
+							}
+						}
+					}
+				},
+				{
+					"properties": {
+						"cart": {
+							"properties": {
+								"items": {
+									"not": {
+										"contains": {
+											"const": 42
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			]
+		},
+		"hidden": false,
+		"document": {
+			"cart": {
+				"items": [42, 42, 7],
+				"needs_shipping": true,
+				"totals": {
+					"total_price": 12000
+				}
+			}
+		},
+		"expected": {
+			"required": false,
+			"hidden": false
+		}
+	},
+	{
+		"name": "if then else draft07",
+		"required": {
+			"if": {
+				"properties": {
+					"cart": {
+						"properties": {
+							"needs_shipping": {
+								"const": true
+							}
+						}
+					}
+				}
+			},
+			"then": {
+				"properties": {
+					"cart": {
+						"properties": {
+							"items": {
+								"minItems": 2
+							}
+						}
+					}
+				}
+			},
+			"else": false
+		},
+		"hidden": false,
+		"document": {
+			"cart": {
+				"items": [42, 42, 7],
+				"needs_shipping": true,
+				"totals": {
+					"total_price": 12000
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "contact and order locations stay separate",
+		"required": {
+			"allOf": [
+				{
+					"properties": {
+						"customer": {
+							"properties": {
+								"additional_fields": {
+									"properties": {
+										"plug/contact": {
+											"const": false
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				{
+					"properties": {
+						"checkout": {
+							"properties": {
+								"additional_fields": {
+									"properties": {
+										"plug/order": {
+											"const": "gift"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			]
+		},
+		"hidden": false,
+		"document": {
+			"customer": {
+				"additional_fields": {
+					"plug/contact": false
+				}
+			},
+			"checkout": {
+				"additional_fields": {
+					"plug/order": "gift"
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "wrapped properties and oneOf",
+		"required": {
+			"$schema": "http://json-schema.org/draft-07/schema#",
+			"properties": {
+				"checkout": {
+					"properties": {
+						"payment_method": {
+							"oneOf": [
+								{
+									"const": "bacs"
+								},
+								{
+									"const": "cod"
+								}
+							]
+						}
+					}
+				}
+			}
+		},
+		"hidden": false,
+		"document": {
+			"checkout": {
+				"payment_method": "bacs"
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "draft07 email format buyer@example.com",
+		"required": {
+			"customer": {
+				"properties": {
+					"billing_address": {
+						"properties": {
+							"email": {
+								"type": "string",
+								"format": "email"
+							}
+						}
+					}
+				}
+			}
+		},
+		"hidden": false,
+		"document": {
+			"customer": {
+				"billing_address": {
+					"email": "buyer@example.com"
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "draft07 email format invalid",
+		"required": {
+			"customer": {
+				"properties": {
+					"billing_address": {
+						"properties": {
+							"email": {
+								"type": "string",
+								"format": "email"
+							}
+						}
+					}
+				}
+			}
+		},
+		"hidden": false,
+		"document": {
+			"customer": {
+				"billing_address": {
+					"email": "invalid"
+				}
+			}
+		},
+		"expected": {
+			"required": false,
+			"hidden": false
+		}
+	},
+	{
+		"name": "unused conditional branch needs no context",
+		"required": {
+			"if": {
+				"properties": {
+					"checkout": {
+						"properties": {
+							"create_account": {
+								"const": false
+							}
+						}
+					}
+				}
+			},
+			"then": true,
+			"else": {
+				"properties": {
+					"customer": {
+						"properties": {
+							"id": {
+								"minimum": 1
+							}
+						}
+					}
+				}
+			}
+		},
+		"hidden": false,
+		"document": {
+			"checkout": {
+				"create_account": false
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	},
+	{
+		"name": "dependencies and pattern properties",
+		"required": {
+			"customer": {
+				"properties": {
+					"additional_fields": {
+						"type": "object",
+						"patternProperties": {
+							"^plug/": {
+								"type": "string"
+							}
+						},
+						"dependencies": {
+							"plug/source": {
+								"properties": {
+									"plug/target": {
+										"enum": ["gift", "express"]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"hidden": false,
+		"document": {
+			"customer": {
+				"additional_fields": {
+					"plug/source": "yes",
+					"plug/target": "gift"
+				}
+			}
+		},
+		"expected": {
+			"required": true,
+			"hidden": false
+		}
+	}
+]

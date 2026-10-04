@@ -5,6 +5,7 @@ import {
 	billingAdditionalFieldValues,
 	shippingAdditionalFieldValues,
 } from "../additional-fields"
+import { CoreAddressFieldKeys, deserializeCoreAddress, serializeCoreAddress } from "../checkout-fields"
 import { deserializeBillingFields, isExcludedRegisteredField, serializeBillingFields } from "../field-projections"
 import { deserializeExtensions, deserializeProductSummary, productCustomFields } from "../product/utils"
 import type { Cart, CartBillingAddress, CartShippingAddress, UpdateCartInput } from "./schema"
@@ -405,16 +406,7 @@ function deserializePaymentMethods(value: unknown): Cart["paymentMethods"] {
 
 export function deserializeCartShippingAddress(address: WCK_Cart["shipping_address"]): CartShippingAddress {
 	return {
-		firstName: address.first_name,
-		lastName: address.last_name,
-		company: address.company,
-		address1: address.address_1,
-		address2: address.address_2,
-		city: address.city,
-		state: address.state,
-		postcode: address.postcode,
-		country: address.country,
-		phone: address.phone,
+		...deserializeCoreAddress(address),
 		additionalFields: shippingAdditionalFieldValues(additionalAddressFields(address, SHIPPING_ADDRESS_KEYS)),
 	}
 }
@@ -428,18 +420,7 @@ export function deserializeCartBillingAddress(address: WCK_Cart["billing_address
 	}
 }
 
-const SHIPPING_ADDRESS_KEYS = new Set([
-	"first_name",
-	"last_name",
-	"company",
-	"address_1",
-	"address_2",
-	"city",
-	"state",
-	"postcode",
-	"country",
-	"phone",
-])
+const SHIPPING_ADDRESS_KEYS = new Set(Object.keys(CoreAddressFieldKeys))
 const BILLING_ADDRESS_KEYS = new Set([...SHIPPING_ADDRESS_KEYS, "email"])
 
 function additionalAddressFields(address: Record<string, unknown>, standardKeys: Set<string>): AddressAdditionalFields {
@@ -473,16 +454,7 @@ export function serializeCartShippingAddress(address: NonNullable<UpdateCartInpu
 
 	return compactAddress({
 		...additionalFields,
-		first_name: address.firstName,
-		last_name: address.lastName,
-		company: address.company,
-		address_1: address.address1,
-		address_2: address.address2,
-		city: address.city,
-		state: address.state,
-		postcode: address.postcode,
-		country: address.country,
-		phone: address.phone,
+		...serializeCoreAddress(address),
 	})
 }
 

@@ -16,6 +16,8 @@ export type {
 } from "./additional-fields"
 export * from "./cart/schema"
 export * from "./checkout/schema"
+export type { CheckoutFieldPath } from "./checkout-fields"
+export { CoreAddressFieldKeys, checkoutFieldAddress, resolveCheckoutFieldTarget } from "./checkout-fields"
 export type { RegisteredFieldGroup, RegisteredFieldLocations, RegisteredFieldTarget } from "./field-projections"
 export { BillingFieldProjections, resolveRegisteredFieldTarget } from "./field-projections"
 export * from "./order/schema"

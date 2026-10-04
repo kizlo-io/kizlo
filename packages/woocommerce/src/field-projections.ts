@@ -74,6 +74,17 @@ export function resolveRegisteredFieldTarget(
 	group?: RegisteredFieldGroup,
 	surface: "checkout" | "customer" = "checkout",
 ): RegisteredFieldTarget | null {
+	return registeredFieldTarget(locations, id, group, surface, false)
+}
+
+/** Metadata can name hidden/excluded identities without changing the write or error-target policy. */
+export function registeredFieldTarget(
+	locations: RegisteredFieldLocations,
+	id: string,
+	group: RegisteredFieldGroup | undefined,
+	surface: "checkout" | "customer",
+	includeExcluded: boolean,
+): RegisteredFieldTarget | null {
 	const matches = (Object.keys(locations) as (keyof RegisteredFieldLocations)[]).filter((location) => locations[location].includes(id))
 	const location = matches[0]
 	if (matches.length !== 1 || location === undefined) return null
@@ -82,7 +93,7 @@ export function resolveRegisteredFieldTarget(
 		return { id, location, group: "other", path: ["additionalFields", id], wirePath: ["additional_fields", id] }
 	}
 	if (group !== "billing" && group !== "shipping") return null
-	if (isExcludedRegisteredField(id, group)) return null
+	if (!includeExcluded && isExcludedRegisteredField(id, group)) return null
 	const address = surface === "customer" ? group : `${group}Address`
 	const wireAddress = surface === "customer" ? group : `${group}_address`
 	const projection = Object.entries(BillingFieldProjections).find(([, projection]) => projection.id === id && projection.group === group)

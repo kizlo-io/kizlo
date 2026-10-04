@@ -98,3 +98,31 @@ The response is cached in WordPress per locale. Changing a WooCommerce setting c
 ## License
 
 [Apache 2.0](./LICENSE) © Kizlo
+
+## Checkout field identity
+
+`resolveCheckoutFieldTarget(fieldLocations, id, group?)` resolves the storefront's core and registered identities to SDK
+segment paths. Address fields require a billing/shipping group; contact/order preserve their registration locations while
+sharing checkout's `additionalFields` bucket. Contact `email` targets `billingAddress.email`.
+
+```ts
+import { checkoutFieldAddress, resolveCheckoutFieldTarget } from "@kizlo/woocommerce"
+
+const target = resolveCheckoutFieldTarget(storefront.address.fieldLocations, "first_name", "shipping")
+// target.path: ["shippingAddress", "firstName"]
+const tax = resolveCheckoutFieldTarget(storefront.address.fieldLocations, "kizlo/tax-id", "billing")
+// tax.path: ["billingAddress", "taxId"] — still the original registered address/billing identity
+const document = checkoutFieldAddress(checkout.billingAddress, "billing")
+// document["kizlo/tax-id"] contains checkout.billingAddress.taxId, for Woo's rule document.
+```
+
+The core ID contract also drives cart/customer hydration and address serialization. Registered target resolution and native
+reverse projection share the existing billing projection contract. Plugin IDs are literal path segments: a key containing
+slashes, dots or brackets is never split or camelized. Unknown/ambiguous identities or missing address groups return `null`.
+Literal core IDs infer their normalized properties through `CheckoutFieldPath<Id, Group>`.
+
+Metadata can identify hidden fields, including shipping copies excluded by the persistence policy. That does not enable
+writes or assign validation errors to excluded fields: `resolveRegisteredFieldTarget` and the serializers retain those
+safeguards. `checkoutFieldAddress` copies supplied values without defaults or mutation; it flattens extras and reverses
+native projections. Supply current snapshots when building rule documents; this helper does not evaluate JSON Schema,
+fetch data, validate/sanitize values, clear inputs, or implement a form adapter. Kit's resolvers add effective rules/options.
