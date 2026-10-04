@@ -1,6 +1,6 @@
 import type { InferIntegrationProcedures, InferProcedureData, InferProcedureInput, WP_Schema } from "kizlo"
 import { expectTypeOf } from "vitest"
-import type { AddressAdditionalFields } from "./additional-fields"
+import type { AddressAdditionalFields, BillingAdditionalFields } from "./additional-fields"
 import type { Cart, UpdateCartInput } from "./cart/schema"
 import type { Checkout, ConfirmCheckoutInput, RetryCheckoutInput, UpdateCheckoutInput } from "./checkout/schema"
 import type { Customer } from "./customer/schema"
@@ -18,7 +18,7 @@ expectTypeOf<Customer["shipping"]["additionalFields"]["qa/address-flag"]>().toEq
 expectTypeOf<InferProcedureData<Procedures["customers"]["get"]>["billing"]["additionalFields"]["qa/reference"]>().toEqualTypeOf<
 	string | undefined
 >()
-expectTypeOf<BillingAddress["additionalFields"]>().toEqualTypeOf<AddressAdditionalFields | undefined>()
+expectTypeOf<BillingAddress["additionalFields"]>().toEqualTypeOf<BillingAdditionalFields | undefined>()
 expectTypeOf<ShippingAddress["additionalFields"]>().toEqualTypeOf<AddressAdditionalFields | undefined>()
 expectTypeOf<Customer["additionalFields"]["qa/opt-in"]>().toEqualTypeOf<boolean | undefined>()
 expectTypeOf<WP_Schema<"woocommerce.additional-fields.address.read">["kizlo/tax-id"]>().toEqualTypeOf<string | undefined>()
@@ -43,3 +43,17 @@ const wrongSelect: ConfirmCheckoutInput["additionalFields"] = { "qa/slot": "even
 // @ts-expect-error retry retains checkbox types
 const wrongRetry: RetryCheckoutInput["additionalFields"] = { "qa/opt-in": "true" }
 void [address, checkout, contactInAddress, addressInCheckout, wrongBoolean, wrongSelect, wrongRetry]
+
+expectTypeOf<Cart["billingAddress"]["taxId"]>().toEqualTypeOf<string>()
+expectTypeOf<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"]>().toEqualTypeOf<undefined>()
+expectTypeOf<Checkout["billingAddress"]["additionalFields"]["kizlo/tax-id"]>().toEqualTypeOf<undefined>()
+expectTypeOf<Order["billingAddress"]["additionalFields"]["kizlo/tax-id"]>().toEqualTypeOf<undefined>()
+expectTypeOf<Customer["billing"]["additionalFields"]["kizlo/tax-id"]>().toEqualTypeOf<undefined>()
+const native: UpdateCartInput = { billingAddress: { taxId: "", additionalFields: { "qa/address-flag": false } } }
+// @ts-expect-error the native projection is the only billing input
+const duplicate: UpdateCartInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
+// @ts-expect-error confirm must not expose two independently writable tax values
+const duplicateConfirm: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "kizlo/tax-id": "GB" }
+// @ts-expect-error retry uses the same billing projection
+const duplicateRetry: RetryCheckoutInput["billingAddress"]["additionalFields"] = { "kizlo/tax-id": "GB" }
+void [native, duplicate, duplicateConfirm, duplicateRetry]

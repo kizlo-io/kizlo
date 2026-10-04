@@ -588,6 +588,11 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 	expect(stored.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/message": "", "qa/slot": "morning" })
 	const customer = await client().customers.get.call()
 	expect(customer.billing.additionalFields).toMatchObject({ "qa/reference": "BILL", "qa/address-flag": false })
+	expect(customer.billing.taxId).toBe("GB-CHECKOUT-42")
+	expect(customer.billing.additionalFields).not.toHaveProperty("kizlo/tax-id")
+	await client().cart.update.call({ body: { billingAddress: { taxId: "PROFILE-AFTER-ORDER" } } })
+	expect((await client().customers.get.call()).billing.taxId).toBe("PROFILE-AFTER-ORDER")
+	expect((await client().orders.get.call({ params: { orderId: result.orderId } })).billingAddress.taxId).toBe("GB-CHECKOUT-42")
 	expect(customer.additionalFields).toMatchObject({ "qa/opt-in": false })
 	expect(customer.additionalFields).not.toHaveProperty("qa/message")
 	expect(customer.additionalFields).not.toHaveProperty("qa/slot")
@@ -743,13 +748,18 @@ test("checkout.retry pays an order owned by the headless customer", async () => 
 	expect(normalized.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/slot": "afternoon", "qa/message": "retry note" })
 	const customer = await client().customers.get.call()
 	expect(customer.additionalFields).not.toHaveProperty("qa/message")
+	expect(customer.billing.taxId).toBe(RETRY_BILLING.taxId)
+	expect(customer.billing.additionalFields).not.toHaveProperty("kizlo/tax-id")
 	const stored = await storedOrder(order.id)
 	expect(stored.status).toBe("on-hold")
 })
 
 test("checkout.retry requires a billing Tax ID only while the setting is enabled", async () => {
 	const order = await createPendingOrder()
-	const billingAddress = { ...RETRY_BILLING, taxId: "" }
+	const billingAddress = { ...RETRY_BILLING, taxId: "", city: "must not persist" }
+	await client().cart.update.call({ body: { billingAddress: { taxId: "PROFILE-BEFORE-FAILURE" } } })
+	const before = await client().customers.get.call()
+	const orderBefore = await storedOrder(order.id)
 
 	await requireTaxId("yes")
 	try {
@@ -761,7 +771,9 @@ test("checkout.retry requires a billing Tax ID only while the setting is enabled
 		).rejects.toMatchObject({ code: "CHECKOUT_VALIDATION_FAILED", status: 400 })
 
 		const stored = await storedOrder(order.id)
+		expect(stored).toEqual(orderBefore)
 		expect(stored.status).toBe("pending")
+		expect((await client().customers.get.call()).billing).toEqual(before.billing)
 	} finally {
 		await requireTaxId("no")
 	}
@@ -1047,4 +1059,91 @@ test("WooCommerce rejects an invalid registered select before retry payment", as
 		} as never),
 	).rejects.toMatchObject({ code: "CHECKOUT_VALIDATION_FAILED" })
 	expect((await storedOrder(order.id)).status).toBe("pending")
+})
+
+test("authenticated cart edits save the canonical billing profile and preserve omission", async () => {
+	const email = `projection-${Date.now()}@example.com`
+	const created = await admin().post<{ id: number }>(`${WC_CORE_BASE}/customers`, {
+		body: { email, username: `projection-${Date.now()}` },
+	})
+	if (created.error) throw created.error
+	try {
+		const auth = createAuthAdapter({ getSession: () => ({ id: String(created.data.id), email }) })
+		const customerClient = getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth } }).client.woocommerce
+		await customerClient.cart.update.call({ body: { billingAddress: { taxId: "SAVED-PROFILE" } } })
+		expect((await customerClient.customers.get.call()).billing.taxId).toBe("SAVED-PROFILE")
+		expect((await customerClient.cart.get.call()).billingAddress.taxId).toBe("SAVED-PROFILE")
+		for (const taxId of ["REPLACED", ""]) {
+			await customerClient.cart.update.call({ body: { billingAddress: { taxId } } })
+			expect((await customerClient.customers.get.call()).billing.taxId).toBe(taxId)
+			expect((await customerClient.cart.update.call({ body: { billingAddress: { city: "London" } } })).billingAddress.taxId).toBe(taxId)
+		}
+	} finally {
+		await admin().delete(`${WC_CORE_BASE}/customers/${created.data.id}`, { searchParams: { force: true } })
+	}
+})
+
+test("guest billing values survive session updates, confirmation, retry and order snapshot reads", async () => {
+	const guestBilling = { ...RETRY_BILLING, city: "Los Angeles", state: "CA", postcode: "90210", country: "US" }
+	const apiUrl = "http://test.local/api/kizlo"
+	const api = getKizloTestInstance({
+		baseUrl: apiUrl,
+		integrations: [woocommerce()],
+		adapters: { auth: createAuthAdapter({ getSession: () => null }) },
+	})
+	let cookie = ""
+	const browser = await getKizloClientTestInstance(api, {
+		url: apiUrl,
+		fetch: async (request) => {
+			if (cookie) request.headers.set("cookie", cookie)
+			const response = await api.handler(request)
+			const sessionCookie = response.headers.getSetCookie().find((header) => header.startsWith("guest-session="))
+			if (sessionCookie) cookie = sessionCookie.split(";", 1)[0] ?? ""
+			return response
+		},
+	})
+	const guest = browser.client.woocommerce
+	await guest.cart.items.add.call({ body: { productId, quantity: 1 } })
+	await guest.cart.update.call({
+		body: {
+			billingAddress: { ...guestBilling, taxId: "GUEST-CART" },
+			shippingAddress: { ...guestBilling },
+		},
+	})
+	expect((await guest.cart.get.call()).billingAddress.taxId).toBe("GUEST-CART")
+	expect((await guest.cart.update.call({ body: { billingAddress: { city: "Manchester" } } })).billingAddress.taxId).toBe("GUEST-CART")
+	await guest.cart.update.call({ body: { billingAddress: { taxId: "" } } })
+	expect((await guest.cart.get.call()).billingAddress.taxId).toBe("")
+	const cart = await guest.cart.get.call()
+	const pkg = cart.shippingPackages[0]
+	const rate = pkg?.rates[0]
+	if (!pkg || !rate) throw new Error("Guest checkout has no seeded shipping rate")
+	await guest.cart.selectShippingRate.call({ body: { packageId: pkg.id, rateId: rate.id } })
+	const confirmed = await guest.checkout.confirm.call({
+		body: { billingAddress: { ...guestBilling, taxId: "GUEST-CONFIRM" }, paymentMethod: "bacs" },
+	})
+	if (!confirmed.orderId || !confirmed.orderKey) throw new Error("Guest checkout returned no order identity")
+	const orderQuery = { key: confirmed.orderKey, billingEmail: RETRY_BILLING.email }
+	expect((await guest.orders.get.call({ params: { orderId: confirmed.orderId }, query: orderQuery })).billingAddress.taxId).toBe(
+		"GUEST-CONFIRM",
+	)
+	const pending = await createPendingOrder()
+	await guest.checkout.retry.call({
+		params: { orderId: pending.id },
+		body: {
+			key: pending.order_key,
+			billingEmail: ORDER_EMAIL,
+			billingAddress: { ...guestBilling, taxId: "GUEST-RETRY" },
+			paymentMethod: "bacs",
+		},
+	})
+	expect((await guest.cart.get.call()).billingAddress.taxId).toBe("GUEST-RETRY")
+	expect(
+		(await guest.orders.get.call({ params: { orderId: pending.id }, query: { key: pending.order_key, billingEmail: RETRY_BILLING.email } }))
+			.billingAddress.taxId,
+	).toBe("GUEST-RETRY")
+	expect((await guest.orders.get.call({ params: { orderId: confirmed.orderId }, query: orderQuery })).billingAddress.taxId).toBe(
+		"GUEST-CONFIRM",
+	)
+	for (const item of (await guest.cart.get.call()).items) await guest.cart.items.remove.call({ params: { key: item.key } })
 })

@@ -143,6 +143,10 @@ function usage(prefix: string): string {
 	const badEmpty: WP_Schema<"acme.empty"> = { invented: true }
 	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
 	type AddressField = Assert<Equal<Cart["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	type NativeTaxId = Assert<Equal<Cart["billingAddress"]["taxId"], string>>
+	type ProjectedBillingKey = Assert<Equal<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"], undefined>>
+	// @ts-expect-error published declarations retain the single-value billing projection
+	const duplicateTaxId: UpdateCartInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
 	type ShippingField = Assert<Equal<Cart["shippingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
 	type CustomerBillingField = Assert<Equal<Customer["billing"]["additionalFields"]["${prefix}/reference"], string | undefined>>
 	type CustomerShippingField = Assert<Equal<Customer["shipping"]["additionalFields"]["${prefix}/reference"], string | undefined>>
@@ -260,7 +264,8 @@ const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProc
 	type CategoryCompiles = Assert<Equal<Category["custom"], Record<string, unknown>>>
 	type TagCompiles = Assert<Equal<Tag["custom"], Record<string, unknown>>>
 	type ProductCompiles = Assert<Equal<Product["custom"], Record<string, unknown>>>
-	type StubAddressFields = Assert<Equal<Cart["billingAddress"]["additionalFields"], Record<string, string | boolean | undefined>>>
+	type StubAddressFields = Assert<Equal<Cart["billingAddress"]["additionalFields"]["future/field"], string | boolean | undefined>>
+	type StubProjectedField = Assert<Equal<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"], undefined>>
 	type StubCheckoutFields = Assert<Equal<Checkout["additionalFields"], Record<string, string | boolean | undefined>>>
 	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
 	type WooCommerceProcedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>

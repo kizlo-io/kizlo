@@ -21,7 +21,7 @@ function customer(overrides: Record<string, unknown> = {}): WCK_Customer {
 		id: 1,
 		avatar_url: "",
 		additional_fields: {},
-		billing: { ...address, additional_fields: {}, email: "ada@example.com", tax_id: "GB-42" },
+		billing: { ...address, additional_fields: { "kizlo/tax-id": "GB-42" }, email: "ada@example.com" },
 		shipping: { ...address, additional_fields: {} },
 		email: "ada@example.com",
 		first_name: "Ada",
@@ -61,7 +61,7 @@ test("deserializes the canonical billing Tax ID and normalizes an absent value",
 	expect(deserializeCustomer(customer()).billing.taxId).toBe("GB-42")
 
 	const withoutTaxId = customer()
-	delete (withoutTaxId.billing as unknown as { tax_id?: string }).tax_id
+	delete withoutTaxId.billing.additional_fields["kizlo/tax-id"]
 	expect(deserializeCustomer(withoutTaxId).billing.taxId).toBe("")
 	expect(deserializeCustomer(withoutTaxId).shipping).not.toHaveProperty("taxId")
 })
@@ -91,4 +91,11 @@ test("customer responses require normalized address buckets even with an older p
 	for (const group of ["billing", "shipping"] as const) {
 		expect(Customer.safeParse({ ...result, [group]: { ...result[group], additionalFields: undefined } }).success).toBe(false)
 	}
+})
+
+test("canonical grouped fields win over any legacy per-field response property", () => {
+	const data = customer()
+	Object.assign(data.billing, { tax_id: "stale" })
+	expect(deserializeCustomer(data).billing.taxId).toBe("GB-42")
+	expect(deserializeCustomer(data).billing.additionalFields).not.toHaveProperty("kizlo/tax-id")
 })
