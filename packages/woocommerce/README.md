@@ -62,17 +62,7 @@ Customer reads use the grouped `billing.additional_fields` adapter backed by pub
 
 Consumers should deploy the matching WooCommerce plugin and regenerate their contract after upgrading; the old per-field raw `billing.tax_id` response is removed. The native API remains `customer.billing.taxId` and `billingAddress.taxId`. This feature does not validate jurisdiction-specific identifiers or calculate tax exemptions.
 
-Metadata and future error consumers use the exported resolver rather than a tax-ID key table:
-
-```ts
-import { resolveRegisteredFieldTarget } from "@kizlo/woocommerce"
-
-const target = resolveRegisteredFieldTarget(store.address.fieldLocations, "kizlo/tax-id", "billing")
-// path: ["billingAddress", "taxId"]
-// wirePath: ["billing_address", "kizlo/tax-id"]
-```
-
-It retains registration location and value group, rejects unknown/ambiguous identities and address targets without a group, and returns no shipping tax-ID target under Kizlo's billing-only policy. Conditional rules still evaluate against the original Woo-shaped document. Error extraction and rule evaluation are separate consumers of this contract.
+Storefront field definitions include SDK binding paths derived from the same address identity and native projection contract. For billing Tax ID, `bindings.billing` is `["taxId"]`; there is no shipping binding. Registered-field error targeting remains a separate SDK helper.
 
 ## Storefront settings
 
@@ -89,9 +79,26 @@ A field's rules for a country are its default merged with that country's overrid
 const store = await kizlo.woocommerce.storefront.get.call()
 
 const country = store.address.countries.find((entry) => entry.code === "AE")
-const postcode = { ...store.address.fields.postcode, ...country?.locale.postcode }
+const postcode = { ...store.address.fields.find((field) => field.id === "postcode"), ...country?.locale.postcode }
 // { label: "Postal code", required: false, hidden: true, ... }
 ```
+
+`address.fields` is an array containing every core and registered address/contact/order definition. Each entry carries its original Woo `id`, `location`, labels, control `type`, `options`, `attributes`, boolean/JSON Schema `required` and `hidden`, and a value `schema` expressed as draft-07 JSON Schema. Woo shorthand conditions are wrapped into standard `properties`. Declarative validation and supported HTML constraints survive; PHP callbacks stay on the server.
+
+```ts
+// Example normalized definition; no shopper values are included.
+{
+  id: "first_name", location: "address", label: "First name",
+  required: true, hidden: false, type: null,
+  attributes: { autocomplete: "given-name" }, schema: { type: "string" },
+  bindings: { billing: ["firstName"], shipping: ["firstName"] },
+  // optionalLabel, index, placeholder, options, autocomplete also accompany it.
+}
+```
+
+Address `bindings.billing` and `bindings.shipping` are relative to the address object. Contact/order `bindings.other` follow Checkout: email uses `["billingAddress", "email"]`, extras use `["additionalFields", id]`. Address extras use `["additionalFields", id]`; the complete ID is one literal segment, even if it contains dots or brackets. No separate `fieldLocations` is needed. Kizlo API values and write serialization remain unchanged.
+
+Upgrade the matching plugin and SDK together and regenerate the consumer contract. The field-map/location-list response is replaced by the field array. Kit's group resolvers transform these definitions into form metadata and complete validation schemas; applications decide where and how to render them. Cart-dependent plugin rules remain a separate integration concern; this response does not contain a field document or shopper/session data.
 
 The response is cached in WordPress per locale. Changing a WooCommerce setting clears it and sends the `settings.woocommerce.updated` webhook event.
 

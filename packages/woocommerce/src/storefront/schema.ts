@@ -14,7 +14,20 @@ export const StorefrontFieldOption = z.object({
 })
 export type StorefrontFieldOption = z.infer<typeof StorefrontFieldOption>
 
+/** JSON Schema draft-07, retained as data for the consumer's validator. */
+export const StorefrontFieldSchema = z.union([z.boolean(), z.record(z.string(), z.unknown())])
+export type StorefrontFieldSchema = z.infer<typeof StorefrontFieldSchema>
 export const StorefrontField = z.object({
+	id: z.string(),
+	location: z.enum(["address", "contact", "order"]),
+	attributes: z.record(z.string(), z.unknown()),
+	schema: StorefrontFieldSchema,
+	/** SDK-owned paths; address paths are relative, contact/order paths follow Checkout. */
+	bindings: z.object({
+		billing: z.array(z.string()).optional(),
+		shipping: z.array(z.string()).optional(),
+		other: z.array(z.string()).optional(),
+	}),
 	label: z.string(),
 	optionalLabel: z.string(),
 	required: StorefrontFieldRule,
@@ -50,12 +63,7 @@ export type StorefrontCountry = z.infer<typeof StorefrontCountry>
 export const StorefrontAddress = z.object({
 	countries: z.array(StorefrontCountry),
 	defaultAddressFormat: z.string(),
-	fields: z.record(z.string(), StorefrontField),
-	fieldLocations: z.object({
-		address: z.array(z.string()),
-		contact: z.array(z.string()),
-		order: z.array(z.string()),
-	}),
+	fields: z.array(StorefrontField),
 	baseCountry: z.string(),
 	defaultCountry: z.string().nullable(),
 })

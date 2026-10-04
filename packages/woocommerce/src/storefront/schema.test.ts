@@ -3,6 +3,11 @@ import { expect, test } from "vitest"
 import { Storefront, StorefrontCountry, StorefrontField, StorefrontPricing } from "./schema"
 
 const field = {
+	id: "postcode",
+	location: "address",
+	attributes: {},
+	schema: { type: "string" },
+	bindings: { billing: ["postcode"], shipping: ["postcode"] },
 	label: "Postal code",
 	optionalLabel: "Postal code (optional)",
 	required: true,

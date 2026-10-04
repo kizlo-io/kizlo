@@ -47,20 +47,9 @@ final class StorefrontSchema
                 ],
                 'default_address_format' => ['type' => 'string', 'required' => true, 'description' => 'The address format for countries without their own.'],
                 'fields'                 => [
-                    'type'                 => 'object',
-                    'required'             => true,
-                    'description'          => 'The default definition of every checkout field, including fields plugins register, by key.',
-                    'additionalProperties' => self::field(),
-                ],
-                'field_locations'        => [
-                    'type'        => 'object',
-                    'required'    => true,
-                    'description' => 'Which field keys belong to the address, contact and order sections.',
-                    'properties'  => [
-                        'address' => ['type' => 'array', 'required' => true, 'items' => ['type' => 'string']],
-                        'contact' => ['type' => 'array', 'required' => true, 'items' => ['type' => 'string']],
-                        'order'   => ['type' => 'array', 'required' => true, 'items' => ['type' => 'string']],
-                    ],
+                    'type' => 'array', 'required' => true,
+                    'description' => 'Complete core and registered field definitions, with their location and JSON Schema.',
+                    'items' => self::field(),
                 ],
                 'base_country'           => ['type' => 'string', 'required' => true, 'description' => 'The country the store is based in.'],
                 'default_country'        => [
@@ -139,6 +128,9 @@ final class StorefrontSchema
             'type'                 => 'object',
             'additionalProperties' => true,
             'properties'           => [
+                'id'             => ['type' => 'string', 'required' => true],
+                'attributes'     => ['type' => 'object', 'required' => true, 'additionalProperties' => true],
+                'schema'         => ['required' => true] + self::rule(),
                 'label'          => ['type' => 'string', 'required' => true],
                 'optionalLabel'  => ['type' => 'string', 'required' => true],
                 'required'       => ['required' => true] + self::rule(),
@@ -147,7 +139,7 @@ final class StorefrontSchema
                 'autocomplete'   => ['type' => 'string'],
                 'autocapitalize' => ['type' => 'string'],
                 'index'          => ['type' => 'integer'],
-                'location'       => ['type' => 'string'],
+                'location'       => ['type' => 'string', 'required' => true, 'enum' => ['address', 'contact', 'order']],
                 'placeholder'    => ['type' => 'string'],
                 'options'        => [
                     'type'  => 'array',

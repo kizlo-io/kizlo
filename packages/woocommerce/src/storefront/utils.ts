@@ -1,9 +1,11 @@
 import { deserializeCurrencyFormat } from "kizlo"
+import { CoreAddressFieldKeys } from "../address-fields"
+import { BillingFieldProjections, isExcludedRegisteredField } from "../field-projections"
 import type { Storefront, StorefrontCountry, StorefrontField, StorefrontFieldOverride, StorefrontFieldRule } from "./schema"
 import type { WCK_Storefront } from "./types"
 
 type WCK_StorefrontCountry = WCK_Storefront["address"]["countries"][number]
-type WCK_StorefrontField = WCK_Storefront["address"]["fields"][string]
+type WCK_StorefrontField = WCK_Storefront["address"]["fields"][number]
 type WCK_StorefrontFieldOverride = WCK_StorefrontCountry["locale"][string]
 
 export function deserializeStorefront(data: WCK_Storefront): Storefront {
@@ -13,8 +15,7 @@ export function deserializeStorefront(data: WCK_Storefront): Storefront {
 		address: {
 			countries: address.countries.map(deserializeCountry),
 			defaultAddressFormat: address.default_address_format,
-			fields: Object.fromEntries(Object.entries(address.fields).map(([key, field]) => [key, deserializeField(field)])),
-			fieldLocations: address.field_locations,
+			fields: address.fields.map(deserializeField),
 			baseCountry: address.base_country,
 			defaultCountry: address.default_country ?? null,
 		},
@@ -72,6 +73,11 @@ function deserializeOverride(override: WCK_StorefrontFieldOverride): StorefrontF
 
 function deserializeField(field: WCK_StorefrontField): StorefrontField {
 	return {
+		id: field.id,
+		location: field.location,
+		attributes: field.attributes ?? {},
+		schema: field.schema,
+		bindings: fieldBindings(field.id, field.location),
 		label: field.label,
 		optionalLabel: field.optionalLabel,
 		required: deserializeRule(field.required),
@@ -87,4 +93,14 @@ function deserializeField(field: WCK_StorefrontField): StorefrontField {
 function deserializeRule(rule: unknown): StorefrontFieldRule {
 	if (typeof rule === "boolean") return rule
 	return typeof rule === "object" && rule !== null && !Array.isArray(rule) ? (rule as Record<string, unknown>) : false
+}
+
+function fieldBindings(id: string, location: StorefrontField["location"]): StorefrontField["bindings"] {
+	if (location !== "address") return { other: id === "email" ? ["billingAddress", "email"] : ["additionalFields", id] }
+	const core = Object.hasOwn(CoreAddressFieldKeys, id) ? CoreAddressFieldKeys[id as keyof typeof CoreAddressFieldKeys] : undefined
+	const projection = Object.entries(BillingFieldProjections).find(([, entry]) => entry.id === id)
+	return {
+		billing: core ? [core] : projection ? [projection[0]] : ["additionalFields", id],
+		...(!isExcludedRegisteredField(id, "shipping") && { shipping: core ? [core] : ["additionalFields", id] }),
+	}
 }

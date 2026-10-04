@@ -3,6 +3,7 @@
 namespace Kizlo\WooCommerce\Tests\Storefront;
 
 use Kizlo\WooCommerce\Modules\Storefront\Storefront;
+use Kizlo\WooCommerce\Modules\Contract\AdditionalFields;
 use Kizlo\WooCommerce\Modules\Storefront\StorefrontCache;
 use Kizlo\WooCommerce\Modules\Storefront\StorefrontModule;
 use Kizlo\WooCommerce\Modules\TaxId\TaxIdModule;
@@ -87,13 +88,82 @@ class StorefrontModuleTest extends TestCase
     {
         update_option('woocommerce_checkout_company_field', 'hidden');
 
-        $fields = (array) $this->payload()['address']['fields'];
+        $fields = array_column($this->payload()['address']['fields'], null, 'id');
 
         $this->assertTrue($fields['company']['hidden']);
         $this->assertArrayHasKey(TaxIdModule::FIELD_ID, $fields);
         $this->assertArrayNotHasKey('sanitize_callback', $fields[TaxIdModule::FIELD_ID]);
         $this->assertArrayNotHasKey('validate_callback', $fields[TaxIdModule::FIELD_ID]);
-        $this->assertContains(TaxIdModule::FIELD_ID, $this->payload()['address']['field_locations']['address']);
+        $this->assertSame('address', $fields[TaxIdModule::FIELD_ID]['location']);
+        $this->assertSame('contact', $fields['email']['location']);
+        $this->assertSame('string', ((array) $fields['first_name']['schema'])['type']);
+        $this->assertSame('email', ((array) $fields['email']['schema'])['format']);
+        $this->assertArrayHasKey('attributes', $fields['first_name']);
+        $this->assertArrayNotHasKey('field_locations', $this->payload()['address']);
+        $hidden = (array) $fields[TaxIdModule::FIELD_ID]['hidden'];
+        $this->assertArrayHasKey('properties', $hidden);
+    }
+
+    public function test_declarative_validation_and_attributes_survive_without_callbacks(): void
+    {
+        $builder = new Storefront();
+        $method = new \ReflectionMethod($builder, 'serializableField');
+        $field = $method->invoke($builder, [
+            'type' => 'text', 'attributes' => ['pattern' => '^[A-Z]+$', 'maxLength' => 30],
+            'validation' => ['minLength' => 2], 'required' => false, 'hidden' => false,
+            'sanitize_callback' => 'sanitize_text_field',
+        ], 'test/reference', 'order');
+        $schema = (array) $field['schema'];
+        $this->assertSame('^(?:^[A-Z]+$)$', ((array) $schema['allOf'][0])['pattern']);
+        $this->assertSame(30, ((array) $schema['allOf'][0])['maxLength']);
+        $this->assertSame(['minLength' => 2], (array) $schema['allOf'][1]);
+        $this->assertArrayNotHasKey('validation', $field);
+        $this->assertArrayNotHasKey('sanitize_callback', $field);
+    }
+
+    public function test_registered_html_constraints_keep_attributes_and_use_schema_semantics(): void
+    {
+        $registry = AdditionalFields::registry();
+        foreach (['30' => 30, '0' => 0, '003' => 3, '-1' => null, '1.5' => null, 'invalid' => null, '9007199254740992' => null] as $length => $expected) {
+            $id = 'test/html-constraints';
+            try {
+                woocommerce_register_additional_checkout_field([
+                    'id' => $id, 'label' => 'Reference', 'location' => 'order', 'type' => 'text', 'required' => true,
+                    'attributes' => ['maxLength' => (string) $length, 'pattern' => '[0-9]{4}'],
+                    'validation' => ['pattern' => '[0-9]{2}'],
+                ]);
+                $field = array_column($this->payload()['address']['fields'], null, 'id')[$id];
+                $attributes = (array) $field['attributes'];
+                $schema = (array) $field['schema'];
+                $html = (array) $schema['allOf'][0];
+                $this->assertSame((string) $length, $attributes['maxLength']);
+                $this->assertSame('[0-9]{4}', $attributes['pattern']);
+                $this->assertTrue($field['required']);
+                if ($expected === null) $this->assertArrayNotHasKey('maxLength', $html);
+                else $this->assertSame($expected, $html['maxLength']);
+                $this->assertSame('^(?:[0-9]{4})$', $html['pattern']);
+                $this->assertSame(['pattern' => '[0-9]{2}'], (array) $schema['allOf'][1]);
+            } finally {
+                $registry->deregister_checkout_field($id);
+            }
+        }
+    }
+
+    public function test_invalid_or_nonportable_html_patterns_do_not_create_schema_constraints(): void
+    {
+        $registry = AdditionalFields::registry();
+        foreach (['[', '[a-z&&[^aeiou]]', '[a-z--[x]]', '(?i)abc', '(?>abc)', 'a++', '\\Aabc', 'a{broken}'] as $pattern) {
+            try {
+                woocommerce_register_additional_checkout_field([
+                    'id' => 'test/pattern', 'label' => 'Reference', 'location' => 'order', 'type' => 'text',
+                    'attributes' => ['pattern' => $pattern],
+                ]);
+                $field = array_column($this->payload()['address']['fields'], null, 'id')['test/pattern'];
+                $this->assertArrayNotHasKey('pattern', (array) $field['schema']);
+            } finally {
+                $registry->deregister_checkout_field('test/pattern');
+            }
+        }
     }
 
     public function test_checkout_omits_the_sign_up_and_login_settings(): void
@@ -116,6 +186,13 @@ class StorefrontModuleTest extends TestCase
         $this->assertSame('INR', $currency['currency_code']);
         $this->assertSame('', $currency['currency_prefix']);
         $this->assertStringStartsWith(' ', $currency['currency_suffix']);
+    }
+
+    public function test_the_previous_field_map_cache_is_not_served_after_upgrade(): void
+    {
+        set_transient('kizlo_woocommerce_storefront', [determine_locale() => ['old_contract' => true]], DAY_IN_SECONDS);
+        $this->assertArrayHasKey('address', $this->module->retrieve()->get_data());
+        delete_transient('kizlo_woocommerce_storefront');
     }
 
     public function test_each_locale_is_cached_separately(): void

@@ -49,20 +49,19 @@ class Storefront
             ];
         }
 
-        $fields = Package::container()->get(CheckoutFields::class);
+        $service = Package::container()->get(CheckoutFields::class);
+        $definitions = array_merge($service->get_core_fields(), $service->get_additional_fields());
+        $fields = [];
+        foreach (['address' => $service->get_address_fields_keys(), 'contact' => $service->get_contact_fields_keys(), 'order' => $service->get_order_fields_keys()] as $location => $ids) {
+            foreach ($ids as $id) {
+                if (isset($definitions[$id])) $fields[] = $this->serializableField($definitions[$id], (string) $id, $location);
+            }
+        }
 
         return [
             'countries'              => $countries,
             'default_address_format' => $formats['default'],
-            'fields'                 => (object) array_map(
-                [$this, 'serializableField'],
-                array_merge($fields->get_core_fields(), $fields->get_additional_fields()),
-            ),
-            'field_locations'        => [
-                'address' => array_values($fields->get_address_fields_keys()),
-                'contact' => array_values($fields->get_contact_fields_keys()),
-                'order'   => array_values($fields->get_order_fields_keys()),
-            ],
+            'fields'                 => $fields,
             'base_country'           => WC()->countries->get_base_country(),
             // Geolocation resolves against the request, which here is the Kizlo
             // server rather than the shopper, so only a fixed default is reported.
@@ -99,11 +98,87 @@ class Storefront
      * @param array<string, mixed> $field
      * @return array<string, mixed>
      */
-    private function serializableField(array $field): array
+    private function serializableField(array $field, string $id, string $location): array
     {
-        unset($field['sanitize_callback'], $field['validate_callback']);
-
+        $attributes = is_array($field['attributes'] ?? null) ? $field['attributes'] : [];
+        foreach (['autocomplete', 'autocapitalize', 'placeholder'] as $attribute) {
+            if (isset($field[$attribute])) $attributes[$attribute] = $field[$attribute];
+        }
+        $schema = ['type' => ($field['type'] ?? 'text') === 'checkbox' ? 'boolean' : 'string'];
+        if ($id === 'email') $schema['format'] = 'email';
+        foreach (['maxLength', 'minLength'] as $constraint) {
+            $length = $attributes[$constraint] ?? null;
+            // Woo sanitizes HTML attributes to strings. Schema lengths must be nonnegative integers.
+            if ((is_int($length) || is_string($length)) && preg_match('/^[0-9]+$/D', (string) $length) && (float) $length <= 9007199254740991) {
+                $schema[$constraint] = (int) $length;
+            }
+        }
+        if (isset($attributes['pattern']) && is_string($attributes['pattern'])) {
+            $pattern = html_entity_decode($attributes['pattern'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            // HTML patterns match the entire value. Unicode set operations are not portable to draft-07.
+            if ($this->portableHtmlPattern($pattern)) {
+                $schema['pattern'] = '^(?:' . $pattern . ')$';
+            }
+        }
+        // Woo's validation describes this field value, not the whole checkout document.
+        if (!empty($field['validation']) && is_array($field['validation'])) {
+            $schema = ['allOf' => [(object) $schema, (object) $field['validation']]];
+        }
+        unset($field['sanitize_callback'], $field['validate_callback'], $field['validation']);
+        $field['id'] = $id;
+        $field['location'] = $location;
+        $field['attributes'] = (object) $attributes;
+        $field['schema'] = (object) $schema;
+        $field['required'] = $this->condition($field['required'] ?? false);
+        $field['hidden'] = $this->condition($field['hidden'] ?? false);
         return $field;
+    }
+
+    /** Only promote patterns whose syntax is shared by HTML, ECMAScript draft-07 and PHP. */
+    private function portableHtmlPattern(string $pattern): bool
+    {
+        $inClass = false;
+        for ($i = 0, $length = strlen($pattern); $i < $length; $i++) {
+            $char = $pattern[$i];
+            if ($char === '\\') {
+                $escaped = $pattern[++$i] ?? '';
+                if ($escaped === '' || !str_contains('dDsSwWbBfnrt\\^$.*+?()[]{}|/', $escaped) && !($inClass && $escaped === '-')) return false;
+                continue;
+            }
+            if ($char === '[') {
+                if ($inClass) return false;
+                $inClass = true;
+            } elseif ($char === ']') {
+                if (!$inClass) return false;
+                $inClass = false;
+            } elseif ($inClass) {
+                // Complex Unicode sets and reserved class punctuation need a different regex dialect.
+                if (ord($char) < 128 && !ctype_alnum($char) && !str_contains('^_- ', $char)) return false;
+                if ($char === '-' && ($pattern[$i + 1] ?? '') === '-') return false;
+            } elseif ($char === '(' && ($pattern[$i + 1] ?? '') === '?') {
+                if (($pattern[$i + 2] ?? '') !== ':') return false;
+                $i += 2;
+            } elseif ($char === '(' && ($pattern[$i + 1] ?? '') === '*') {
+                return false;
+            } elseif ($char === '{') {
+                if (!preg_match('/^\{[0-9]+(?:,[0-9]*)?\}/', substr($pattern, $i), $match)) return false;
+                $i += strlen($match[0]) - 1;
+                if (($pattern[$i + 1] ?? '') === '+') return false;
+            } elseif ($char === '}' || str_contains('*+?', $char) && ($pattern[$i + 1] ?? '') === '+') {
+                return false;
+            }
+        }
+        return !$inClass && @preg_match('~(?:' . str_replace('~', '\\~', $pattern) . ')~u', '') !== false;
+    }
+
+    private function condition(mixed $rule): mixed
+    {
+        if (!is_array($rule)) return is_bool($rule) ? $rule : false;
+        if (!$rule) return false;
+        if (isset($rule['cart']) || isset($rule['customer']) || isset($rule['checkout'])) {
+            return ['$schema' => 'http://json-schema.org/draft-07/schema#', 'type' => 'object', 'properties' => (object) $rule];
+        }
+        return (object) $rule;
     }
 
     /** @return array<string, mixed> */

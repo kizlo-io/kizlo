@@ -93,9 +93,10 @@ class AdditionalFieldsTest extends TestCase
         $this->assertSame(AdditionalFields::id('checkout'), $document['schemas']['woocommerce.store.order']['properties']['additional_fields']['$ref']);
         $this->assertSame(AdditionalFields::id('contact'), $document['schemas']['woocommerce.customers']['properties']['additional_fields']['$ref']);
         $metadata = (new Storefront())->build()['address'];
-        $this->assertContains('test/reference', $metadata['field_locations']['address']);
-        $this->assertContains('test/opt-in', $metadata['field_locations']['contact']);
-        $this->assertContains('test/message', $metadata['field_locations']['order']);
+        $definitions = array_column($metadata['fields'], null, 'id');
+        $this->assertSame('address', $definitions['test/reference']['location']);
+        $this->assertSame('contact', $definitions['test/opt-in']['location']);
+        $this->assertSame('order', $definitions['test/message']['location']);
     }
 
     public function test_empty_registry_and_registration_changes_are_rebuilt_without_cached_definitions(): void
