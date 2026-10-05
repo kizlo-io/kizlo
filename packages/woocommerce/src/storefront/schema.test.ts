@@ -1,6 +1,6 @@
 import { CurrencyFormat } from "kizlo"
 import { expect, test } from "vitest"
-import { Storefront, StorefrontCountry, StorefrontField, StorefrontPricing } from "./schema"
+import { Storefront, StorefrontCheckout, StorefrontCountry, StorefrontField, StorefrontPricing } from "./schema"
 
 const field = {
 	id: "postcode",
@@ -45,4 +45,10 @@ test("a field rule is a boolean or a conditional rule object, nothing else", () 
 
 test("every section is required", () => {
 	expect(Storefront.safeParse({ address: {}, checkout: {}, pricing: {} }).success).toBe(false)
+})
+
+test("collection classification is an explicit string list or unavailable", () => {
+	const schema = StorefrontCheckout.shape.localPickup.shape.methodIds
+	for (const value of [null, [], ["local_pickup", "acme_pickup"]]) expect(schema.safeParse(value).success).toBe(true)
+	for (const value of [undefined, "local_pickup", {}, ["local_pickup", 1]]) expect(schema.safeParse(value).success).toBe(false)
 })

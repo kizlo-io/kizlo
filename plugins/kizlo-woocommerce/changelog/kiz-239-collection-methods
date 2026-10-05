@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Expose WooCommerce local pickup method IDs in storefront settings.

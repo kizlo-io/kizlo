@@ -73,7 +73,7 @@ function storefront(): WCK_Storefront {
 			display_cart_prices_including_tax: true,
 			display_itemized_taxes: false,
 			shipping_enabled: true,
-			local_pickup: { enabled: false, title: "Pickup", cost: "" },
+			local_pickup: { enabled: false, title: "Pickup", cost: "", method_ids: ["local_pickup", "pickup_location"] },
 		},
 		pricing: {
 			currency: {
@@ -106,6 +106,27 @@ function storefront(): WCK_Storefront {
 
 test("the output parses against the storefront schema", () => {
 	expect(Storefront.safeParse(deserializeStorefront(storefront())).success).toBe(true)
+})
+
+test("collection classification preserves plugin method IDs independently of pickup settings", () => {
+	const raw = storefront()
+	const ids = ["local_pickup", "vendor/Pickup.method[1]"]
+	raw.checkout.local_pickup = { ...raw.checkout.local_pickup, method_ids: ids }
+	const result = deserializeStorefront(raw)
+	expect(result.checkout.localPickup).toEqual({ enabled: false, title: "Pickup", cost: "", methodIds: ids })
+	expect(result.checkout.localPickup.methodIds).not.toBe(ids)
+	expect(Storefront.safeParse(result).success).toBe(true)
+})
+
+test("collection classification distinguishes a known empty list from older or malformed responses", () => {
+	for (const value of [undefined, null, "local_pickup", {}, ["local_pickup", 7], Array(1), []]) {
+		const raw = storefront()
+		const pickup = { enabled: false, title: "Pickup", cost: "", ...(value !== undefined && { method_ids: value }) }
+		raw.checkout.local_pickup = pickup as WCK_Storefront["checkout"]["local_pickup"]
+		const result = deserializeStorefront(raw)
+		expect(result.checkout.localPickup.methodIds).toEqual(Array.isArray(value) && value.length === 0 ? [] : null)
+		expect(Storefront.safeParse(result).success).toBe(true)
+	}
 })
 
 test("countries keep WooCommerce's order and carry their states and label overrides", () => {

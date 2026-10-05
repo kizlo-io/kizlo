@@ -10,6 +10,8 @@ type WCK_StorefrontFieldOverride = WCK_StorefrontCountry["locale"][string]
 
 export function deserializeStorefront(data: WCK_Storefront): Storefront {
 	const { address, checkout, pricing, catalog } = data
+	// Consumers may still generate their contract from an older plugin.
+	const pickup: typeof checkout.local_pickup & { method_ids?: unknown } = checkout.local_pickup
 
 	return {
 		address: {
@@ -27,7 +29,12 @@ export function deserializeStorefront(data: WCK_Storefront): Storefront {
 			displayCartPricesIncludingTax: checkout.display_cart_prices_including_tax,
 			displayItemizedTaxes: checkout.display_itemized_taxes,
 			shippingEnabled: checkout.shipping_enabled,
-			localPickup: checkout.local_pickup,
+			localPickup: {
+				enabled: pickup.enabled,
+				title: pickup.title,
+				cost: pickup.cost,
+				methodIds: deserializeMethodIds(pickup.method_ids),
+			},
 		},
 		pricing: {
 			currency: deserializeCurrencyFormat(pricing.currency),
@@ -48,6 +55,10 @@ export function deserializeStorefront(data: WCK_Storefront): Storefront {
 			cartRedirectAfterAdd: catalog.cart_redirect_after_add,
 		},
 	}
+}
+
+function deserializeMethodIds(value: unknown): string[] | null {
+	return Array.isArray(value) && Array.from(value).every((id) => typeof id === "string") ? [...value] : null
 }
 
 function deserializeCountry(country: WCK_StorefrontCountry): StorefrontCountry {

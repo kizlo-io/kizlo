@@ -5,11 +5,13 @@ import { Cart, type CartBillingAddress } from "./cart/schema"
 import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
+import { resolveRegisteredFieldTarget } from "./field-projections"
 import { woocommerce } from "./index"
 import { Order } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
 import { BANK_TRANSFER_DESCRIPTION, BANK_TRANSFER_TITLE } from "./test"
+import conditionEvidence from "./test/fixtures/checkout-conditions.json"
 
 /**
  * The WooCommerce integration against a real WooCommerce, calling every route through the endpoints
@@ -1146,4 +1148,49 @@ test("guest billing values survive session updates, confirmation, retry and orde
 		"GUEST-CONFIRM",
 	)
 	for (const item of (await guest.cart.get.call()).items) await guest.cart.items.remove.call({ params: { key: item.key } })
+})
+
+test("pickup and opaque extension conditions preserve native submission, persistence, and error targets", async () => {
+	await emptyCart()
+	const evidence = conditionEvidence
+	const storefront = await client().storefront.get.call()
+	expect(storefront.checkout.localPickup.methodIds).toContain(evidence.methodId)
+	const definition = storefront.address.fields.find((field) => field.id === evidence.fieldId)
+	expect(definition).toMatchObject({ location: "order", required: evidence.requiredRule, bindings: { other: evidence.targetPath } })
+	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
+	const address = { ...RETRY_BILLING, city: "Los Angeles", state: "CA", postcode: "90210", country: "US" }
+	const addressed = await client().cart.update.call({ body: { billingAddress: address, shippingAddress: address } })
+	const pkg = addressed.shippingPackages[0]
+	if (!pkg) throw new Error("Pickup evidence has no shipping package")
+	const selected = await client().cart.selectShippingRate.call({ body: { packageId: pkg.id, rateId: evidence.rateId } })
+	expect(selected.shippingPackages[0]?.rates).toContainEqual(
+		expect.objectContaining({ id: evidence.rateId, methodId: evidence.methodId, selected: true }),
+	)
+	expect(selected.extensions).toMatchObject(evidence.cartExtensions)
+	const missing = await client().checkout.confirm({
+		body: { billingAddress: address, shippingAddress: address, paymentMethod: "bacs", additionalFields: { "qa/pickup-reference": "" } },
+	})
+	expect(missing.success).toBe(false)
+	if (missing.success) throw new Error("Woo accepted a missing required pickup reference")
+	expect(missing.error.code).toBe(evidence.errorCode)
+	expect(missing.error.data).toEqual({ fields: evidence.serverErrorFields })
+	// Woo reports this failure at the additional_fields parameter. Do not invent a leaf identity.
+	expect(Object.keys(evidence.serverErrorFields)).toEqual(["additional_fields"])
+	const locations = {
+		address: storefront.address.fields.filter((field) => field.location === "address").map((field) => field.id),
+		contact: storefront.address.fields.filter((field) => field.location === "contact").map((field) => field.id),
+		order: storefront.address.fields.filter((field) => field.location === "order").map((field) => field.id),
+	}
+	expect(resolveRegisteredFieldTarget(locations, evidence.fieldId)?.path).toEqual(evidence.targetPath)
+	const confirmed = await client().checkout.confirm.call({
+		body: {
+			billingAddress: address,
+			shippingAddress: address,
+			paymentMethod: "bacs",
+			additionalFields: { "qa/pickup-reference": evidence.submittedValue },
+		},
+	})
+	if (!confirmed.orderId) throw new Error("Pickup submission has no saved order")
+	const stored = await client().orders.get.call({ params: { orderId: confirmed.orderId } })
+	expect(stored.additionalFields["qa/pickup-reference"]).toBe(evidence.persistedValue)
 })

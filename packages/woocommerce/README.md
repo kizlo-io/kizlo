@@ -100,7 +100,9 @@ Address `bindings.billing` and `bindings.shipping` are relative to the address o
 
 Upgrade the matching plugin and SDK together and regenerate the consumer contract. The field-map/location-list response is replaced by the field array. Kit's group resolvers transform these definitions into form metadata and complete validation schemas; applications decide where and how to render them. Cart-dependent plugin rules remain a separate integration concern; this response does not contain a field document or shopper/session data.
 
-The response is cached in WordPress per locale. Changing a WooCommerce setting clears it and sends the `settings.woocommerce.updated` webhook event.
+`checkout.localPickup.methodIds` classifies shipping methods supporting local pickup, including plugin methods. An empty list is known empty; `null` means older or malformed producer metadata. See [checkout condition data](./docs/checkout-conditions.md) for the complete client document mapping and Kit handoff.
+
+The response is cached in WordPress per locale. Changing a WooCommerce setting clears it and sends the `settings.woocommerce.updated` webhook event; plugin activation/deactivation also invalidates it.
 
 ## License
 
