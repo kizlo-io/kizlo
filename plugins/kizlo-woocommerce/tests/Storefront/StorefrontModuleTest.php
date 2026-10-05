@@ -2,6 +2,7 @@
 
 namespace Kizlo\WooCommerce\Tests\Storefront;
 
+use Automattic\WooCommerce\StoreApi\Utilities\LocalPickupUtils;
 use Kizlo\WooCommerce\Modules\Storefront\Storefront;
 use Kizlo\WooCommerce\Modules\Contract\AdditionalFields;
 use Kizlo\WooCommerce\Modules\Storefront\StorefrontCache;
@@ -176,6 +177,54 @@ class StorefrontModuleTest extends TestCase
         $this->assertArrayHasKey('allows_guest', $checkout);
     }
 
+    public function test_collection_classification_uses_woo_and_refreshes_after_settings_or_plugin_changes(): void
+    {
+        $original = WC()->shipping();
+        WC()->shipping = new \WC_Shipping();
+        $method = new class extends \WC_Shipping_Method {
+            public function __construct()
+            {
+                $this->id = 'qa_pickup';
+                $this->supports = ['local-pickup'];
+            }
+        };
+        try {
+            WC()->shipping()->register_shipping_method($method);
+            $this->settle();
+            $ids = $this->module->retrieve()->get_data()['checkout']['local_pickup']['method_ids'];
+            $this->assertSame(LocalPickupUtils::get_local_pickup_method_ids(), $ids);
+            $this->assertContains('local_pickup', $ids);
+            $this->assertContains('qa_pickup', $ids);
+            $this->assertSame(array_values(array_unique($ids)), $ids);
+            foreach ($ids as $id) $this->assertIsString($id);
+
+            $method->supports = [];
+            update_option('woocommerce_qa_pickup_support', 'no');
+            $this->module->flush();
+            $this->assertNotContains('qa_pickup', $this->module->retrieve()->get_data()['checkout']['local_pickup']['method_ids']);
+
+            $method->supports = ['local-pickup'];
+            $this->module->markChanged();
+            $this->module->flush();
+            $this->assertContains('qa_pickup', $this->module->retrieve()->get_data()['checkout']['local_pickup']['method_ids']);
+        } finally {
+            WC()->shipping = $original;
+            StorefrontCache::invalidate();
+        }
+    }
+
+    public function test_cached_classification_contains_store_configuration_only(): void
+    {
+        $payload = $this->module->retrieve()->get_data();
+        wp_set_current_user(self::factory()->user->create());
+        $this->assertEquals($payload, $this->module->retrieve()->get_data());
+        $this->assertSame(['enabled', 'title', 'cost', 'method_ids'], array_keys($payload['checkout']['local_pickup']));
+        foreach (['customer', 'cart', 'field_document', 'prefers_collection'] as $key) {
+            $this->assertArrayNotHasKey($key, $payload);
+            $this->assertArrayNotHasKey($key, $payload['checkout']);
+        }
+    }
+
     public function test_pricing_uses_the_store_api_currency_format(): void
     {
         update_option('woocommerce_currency', 'INR');
@@ -195,6 +244,14 @@ class StorefrontModuleTest extends TestCase
         delete_transient('kizlo_woocommerce_storefront');
     }
 
+    public function test_the_previous_classification_cache_is_not_served_after_upgrade(): void
+    {
+        $old = $this->payload();
+        unset($old['checkout']['local_pickup']['method_ids']);
+        set_transient('kizlo_woocommerce_storefront_fields_v2', [determine_locale() => $old], DAY_IN_SECONDS);
+        $this->assertSame(LocalPickupUtils::get_local_pickup_method_ids(), $this->module->retrieve()->get_data()['checkout']['local_pickup']['method_ids']);
+        delete_transient('kizlo_woocommerce_storefront_fields_v2');
+    }
     public function test_each_locale_is_cached_separately(): void
     {
         $this->retrieveIn('en_US');

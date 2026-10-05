@@ -1,0 +1,33 @@
+{
+	"fieldId": "qa/pickup-reference",
+	"methodId": "qa_pickup",
+	"rateId": "qa_pickup:fixture",
+	"cartExtensions": { "qaConditions": { "reference.required": true } },
+	"requiredRule": {
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"cart": {
+				"properties": {
+					"prefers_collection": { "const": true },
+					"extensions": {
+						"properties": {
+							"qaConditions": {
+								"properties": { "reference.required": { "const": true } },
+								"required": ["reference.required"]
+							}
+						},
+						"required": ["qaConditions"]
+					}
+				},
+				"required": ["prefers_collection", "extensions"]
+			}
+		}
+	},
+	"submittedValue": "PICKUP-42",
+	"persistedValue": "PICKUP-42",
+	"errorCode": "CHECKOUT_VALIDATION_FAILED",
+	"serverErrorFields": { "additional_fields": "Pickup reference is required" },
+	"serverErrorTargetPath": ["additionalFields"],
+	"targetPath": ["additionalFields", "qa/pickup-reference"]
+}

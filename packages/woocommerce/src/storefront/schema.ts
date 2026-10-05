@@ -81,6 +81,8 @@ export const StorefrontCheckout = z.object({
 		enabled: z.boolean(),
 		title: z.string(),
 		cost: z.string(),
+		/** null means the producer did not supply usable collection classification. */
+		methodIds: z.array(z.string()).nullable(),
 	}),
 })
 export type StorefrontCheckout = z.infer<typeof StorefrontCheckout>

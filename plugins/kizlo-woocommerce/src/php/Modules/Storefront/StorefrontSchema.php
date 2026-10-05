@@ -172,9 +172,15 @@ final class StorefrontSchema
                     'type'       => 'object',
                     'required'   => true,
                     'properties' => [
-                        'enabled' => ['type' => 'boolean', 'required' => true],
-                        'title'   => ['type' => 'string', 'required' => true],
-                        'cost'    => ['type' => 'string', 'required' => true],
+                        'enabled'    => ['type' => 'boolean', 'required' => true],
+                        'title'      => ['type' => 'string', 'required' => true],
+                        'cost'       => ['type' => 'string', 'required' => true],
+                        'method_ids' => [
+                            'type'        => 'array',
+                            'required'    => true,
+                            'items'       => ['type' => 'string'],
+                            'description' => 'Shipping method IDs supporting local pickup, including plugin methods.',
+                        ],
                     ],
                 ],
             ],

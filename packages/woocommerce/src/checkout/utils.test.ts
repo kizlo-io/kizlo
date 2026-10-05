@@ -97,6 +97,21 @@ test("preserves custom payment statuses and normalizes empty redirects", () => {
 	})
 })
 
+test("keeps guest identity distinct from loading and retains literal plugin fields and namespaces", () => {
+	const namespace = { "Field.Name[0]": { keepCamelCase: false } }
+	for (const id of [0, 7]) {
+		const raw = rawCheckout({ customer_id: id, extensions: { "vendor/Conditions": namespace } as unknown as WCK_Checkout["extensions"] })
+		raw.additional_fields = { "qa/contact.name[0]": false, "qa/order.note": "" } as unknown as WCK_Checkout["additional_fields"]
+		const result = deserializeCheckout(raw)
+		expect(result.customerId).toBe(id === 0 ? null : id)
+		expect(result.additionalFields).toEqual({ "qa/contact.name[0]": false, "qa/order.note": "" })
+		expect(result.extensions["vendor/Conditions"]).toBe(namespace)
+		expect(result.billingAddress.taxId).toBe("GB-42")
+		expect(result.billingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
+		expect(result.shippingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
+	}
+})
+
 test("reports the order's paid state from extensions.kizlo", () => {
 	const kizlo = (value: unknown) => rawCheckout({ extensions: { kizlo: value } as unknown as WCK_Checkout["extensions"] })
 

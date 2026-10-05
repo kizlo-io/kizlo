@@ -182,6 +182,7 @@ function rawCart(): WCK_Cart {
 			tax_lines: [{ name: "Sales tax", price: "85", rate: "20%" }],
 		},
 		extensions: {
+			qaConditions: null,
 			kizlo: {
 				payment_methods: [
 					{ id: "bacs", title: "Direct bank transfer", description: "Pay into our bank account.", order: 0, enabled: true },
@@ -239,6 +240,7 @@ test("reads payment methods from the kizlo extension, preserving order and metad
 	const cart = rawCart()
 	cart.payment_methods = ["bacs", "cod", "stripe"]
 	cart.extensions = {
+		qaConditions: null,
 		kizlo: {
 			payment_methods: [
 				{ id: "stripe", title: "Credit card", description: "Pay by card.", order: 0, enabled: true },
@@ -254,6 +256,36 @@ test("reads payment methods from the kizlo extension, preserving order and metad
 		{ id: "acme_pay", title: "Acme Pay", description: "<strong>Third-party</strong> gateway.", order: 1, enabled: true },
 	])
 	expect(Cart.safeParse(result).success).toBe(true)
+})
+
+test("retains all cart facts for client checkout conditions without rounding or rewriting opaque keys", () => {
+	const raw = rawCart()
+	const namespace = { "Field.Name[0]": { keepCamelCase: true }, "vendor/key": ["a", "b"] }
+	raw.extensions = { ...raw.extensions, "vendor/Conditions": namespace }
+	raw.items_weight = 375.25
+	const pkg = raw.shipping_rates[0]
+	if (!pkg) throw new Error("Fixture has no shipping package")
+	raw.shipping_rates.push({
+		...pkg,
+		package_id: "vendor:beta",
+		shipping_rates: pkg.shipping_rates.map((rate) => ({ ...rate, rate_id: "qa_pickup:7", method_id: "qa_pickup" })),
+	})
+	const result = deserializeCart(raw)
+	expect(result.items.map((item) => [item.variationId ?? item.productId, item.quantity, item.type])).toEqual([
+		[42, 1, "simple"],
+		[77, 1.5, "simple"],
+	])
+	expect(result.itemCount).toBe(2.5)
+	expect(result.itemsWeight).toBe(375.25)
+	expect(result.totals).toMatchObject({ total: 510, taxTotal: 85 })
+	expect(result.coupons.map((coupon) => coupon.code)).toEqual(["SAVE10"])
+	expect(result.needsShipping).toBe(true)
+	expect(result.shippingPackages.map((entry) => entry.rates.map((rate) => [rate.id, rate.methodId, rate.selected]))).toEqual([
+		[["flat_rate:1", "flat_rate", true]],
+		[["qa_pickup:7", "qa_pickup", true]],
+	])
+	expect(result.extensions["vendor/Conditions"]).toBe(namespace)
+	expect(result.extensions).not.toHaveProperty("kizlo")
 })
 
 test("tolerates a kizlo extension whose runtime payload omits payment methods", () => {

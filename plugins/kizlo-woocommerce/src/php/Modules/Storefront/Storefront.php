@@ -195,9 +195,10 @@ class Storefront
             'display_itemized_taxes'            => get_option('woocommerce_tax_total_display') === 'itemized',
             'shipping_enabled'                  => wc_shipping_enabled(),
             'local_pickup'                      => [
-                'enabled' => (bool) $pickup['enabled'],
-                'title'   => (string) $pickup['title'],
-                'cost'    => (string) $pickup['cost'],
+                'enabled'    => (bool) $pickup['enabled'],
+                'title'      => (string) $pickup['title'],
+                'cost'       => (string) $pickup['cost'],
+                'method_ids' => LocalPickupUtils::get_local_pickup_method_ids(),
             ],
         ];
     }

@@ -10,7 +10,7 @@ namespace Kizlo\WooCommerce\Modules\Storefront;
 class StorefrontCache
 {
     // A contract revision must not reuse a cached payload from the previous plugin version.
-    public const KEY = 'kizlo_woocommerce_storefront_fields_v2';
+    public const KEY = 'kizlo_woocommerce_storefront_fields_v3';
 
     public const GENERATION_OPTION = 'kizlo_woocommerce_storefront_generation';
 
