@@ -1,5 +1,15 @@
 # @kizlo/woocommerce
 
+## 0.12.0
+
+### Minor Changes
+
+- [#274](https://github.com/kizlo-io/kizlo/pull/274) [`4ecd132`](https://github.com/kizlo-io/kizlo/commit/4ecd13272fa2d094382ea9d1db8fa13e8c0008e8) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose complete storefront field definitions with JSON Schema and SDK binding paths.
+
+- [#270](https://github.com/kizlo-io/kizlo/pull/270) [`83ee7c0`](https://github.com/kizlo-io/kizlo/commit/83ee7c03e3f1f0fdeb9843ca2a3df2ad46ea51c1) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose registered WooCommerce additional fields with consumer-generated bucket types and grouped customer and order reads.
+
+- [#272](https://github.com/kizlo-io/kizlo/pull/272) [`6a4bf77`](https://github.com/kizlo-io/kizlo/commit/6a4bf7749c56e4b9ca97c38b138a4989eeedcffc) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Project the official registered Tax ID into one native billing value across customer, cart, checkout, and order APIs.
+
 ## 0.11.0
 
 ### Minor Changes
