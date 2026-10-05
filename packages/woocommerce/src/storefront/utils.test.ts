@@ -1,4 +1,5 @@
 import { expect, test } from "vitest"
+import { deserializeCartBillingAddress, serializeCartBillingAddress } from "../cart/utils"
 import { Storefront } from "./schema"
 import type { WCK_Storefront } from "./types"
 import { deserializeStorefront } from "./utils"
@@ -43,7 +44,7 @@ function storefront(): WCK_Storefront {
 				},
 			],
 			default_address_format: "{name}\n{address_1}\n{city}\n{country}",
-			fields: {
+			fields: Object.entries({
 				postcode: {
 					label: "Postal code",
 					optionalLabel: "Postal code (optional)",
@@ -60,8 +61,7 @@ function storefront(): WCK_Storefront {
 					type: "text",
 					location: "address",
 				},
-			},
-			field_locations: { address: ["postcode", "kizlo/tax-id"], contact: ["email"], order: [] },
+			}).map(([id, field]) => ({ ...field, id, location: "address" as const, attributes: {}, schema: { type: "string" } })),
 			base_country: "IN",
 			default_country: null,
 		},
@@ -135,7 +135,7 @@ test("locale overrides keep only the keys a storefront reads", () => {
 })
 
 test("a plugin field keeps its conditional rule and gets defaults for missing keys", () => {
-	const taxId = deserializeStorefront(storefront()).address.fields["kizlo/tax-id"]
+	const taxId = deserializeStorefront(storefront()).address.fields.find((field) => field.id === "kizlo/tax-id")
 
 	expect(taxId?.required).toBe(false)
 	expect(taxId?.hidden).toEqual({ customer: { properties: { address: { not: { required: ["email"] } } } } })
@@ -149,4 +149,111 @@ test("pricing reuses the shared currency format", () => {
 	expect(pricing.currency.currencyCode).toBe("INR")
 	expect(pricing.currency.currencyPrefix).toBe("₹")
 	expect(pricing.priceSuffix).toBe("incl. GST")
+})
+
+test("SDK definitions own core, native and literal additional-field bindings", () => {
+	const raw = storefront()
+	raw.address.fields.push({
+		id: "plug/a.b[0]",
+		location: "address",
+		label: "Reference",
+		optionalLabel: "Reference",
+		required: false,
+		hidden: false,
+		attributes: { pattern: "^[A-Z]+$" },
+		schema: { type: "string", pattern: "^[A-Z]+$" },
+	})
+	const fields = deserializeStorefront(raw).address.fields
+	expect(fields.find((field) => field.id === "postcode")?.bindings).toEqual({ billing: ["postcode"], shipping: ["postcode"] })
+	expect(fields.find((field) => field.id === "kizlo/tax-id")?.bindings).toEqual({ billing: ["taxId"] })
+	expect(fields.at(-1)).toMatchObject({
+		attributes: { pattern: "^[A-Z]+$" },
+		schema: { type: "string", pattern: "^[A-Z]+$" },
+		bindings: { billing: ["additionalFields", "plug/a.b[0]"], shipping: ["additionalFields", "plug/a.b[0]"] },
+	})
+})
+test("contact and order bindings follow checkout values", () => {
+	const raw = storefront()
+	for (const [id, location] of [
+		["email", "contact"],
+		["plug/consent", "contact"],
+		["plug/note", "order"],
+	] as const)
+		raw.address.fields.push({
+			id,
+			location,
+			label: id,
+			optionalLabel: id,
+			required: false,
+			hidden: false,
+			attributes: {},
+			schema: { type: "string" },
+		})
+	expect(
+		deserializeStorefront(raw)
+			.address.fields.slice(-3)
+			.map((field) => field.bindings),
+	).toEqual([
+		{ other: ["billingAddress", "email"] },
+		{ other: ["additionalFields", "plug/consent"] },
+		{ other: ["additionalFields", "plug/note"] },
+	])
+})
+
+test("field bindings read exactly the values serialized back to Woo", () => {
+	const wire = {
+		first_name: "Ada",
+		last_name: "Lovelace",
+		company: "",
+		address_1: "12 Market Street",
+		address_2: "",
+		city: "Bengaluru",
+		state: "KA",
+		postcode: "560001",
+		country: "IN",
+		phone: "",
+		email: "ada@example.com",
+		"kizlo/tax-id": "GST123",
+		"plug/a.b[0]": "ABC",
+	}
+	const values = deserializeCartBillingAddress(wire)
+	const raw = storefront()
+	for (const id of ["first_name", "address_1", "plug/a.b[0]"])
+		raw.address.fields.push({
+			id,
+			location: "address",
+			label: id,
+			optionalLabel: id,
+			required: false,
+			hidden: false,
+			attributes: {},
+			schema: { type: "string" },
+		})
+	const serialized = serializeCartBillingAddress(values)
+	for (const field of deserializeStorefront(raw).address.fields) {
+		let value: unknown = values
+		for (const segment of field.bindings.billing ?? []) value = (value as Record<string, unknown>)[segment]
+		expect(value).toEqual(serialized[field.id])
+	}
+})
+
+test("registered HTML constraints retain rendering strings and numeric full-match schema constraints", () => {
+	const raw = storefront()
+	raw.address.fields.push({
+		id: "plug/reference",
+		location: "order",
+		label: "Reference",
+		optionalLabel: "Reference",
+		required: true,
+		hidden: false,
+		attributes: { maxLength: "30", pattern: "[0-9]{4}" },
+		schema: { allOf: [{ type: "string", maxLength: 30, pattern: "^(?:[0-9]{4})$" }, { pattern: "[0-9]{2}" }] },
+	})
+	const definition = deserializeStorefront(raw).address.fields.at(-1)
+	expect(definition).toMatchObject({
+		required: true,
+		attributes: { maxLength: "30", pattern: "[0-9]{4}" },
+		schema: { allOf: [{ type: "string", maxLength: 30, pattern: "^(?:[0-9]{4})$" }, { pattern: "[0-9]{2}" }] },
+		bindings: { other: ["additionalFields", "plug/reference"] },
+	})
 })
