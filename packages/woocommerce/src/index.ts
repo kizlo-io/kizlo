@@ -16,6 +16,7 @@ export type {
 } from "./additional-fields"
 export * from "./cart/schema"
 export * from "./checkout/schema"
+export { CheckoutValidationData, CheckoutValidationIssue, resolveCheckoutValidationIssues } from "./checkout/validation"
 export type { RegisteredFieldGroup, RegisteredFieldLocations, RegisteredFieldTarget } from "./field-projections"
 export { BillingFieldProjections, resolveRegisteredFieldTarget } from "./field-projections"
 export * from "./order/schema"

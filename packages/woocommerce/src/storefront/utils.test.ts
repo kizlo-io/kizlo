@@ -1,5 +1,6 @@
 import { expect, test } from "vitest"
 import { deserializeCartBillingAddress, serializeCartBillingAddress } from "../cart/utils"
+import { checkoutValidationData, resolveCheckoutValidationIssues } from "../checkout/validation"
 import { Storefront } from "./schema"
 import type { WCK_Storefront } from "./types"
 import { deserializeStorefront } from "./utils"
@@ -277,4 +278,37 @@ test("registered HTML constraints retain rendering strings and numeric full-matc
 		schema: { allOf: [{ type: "string", maxLength: 30, pattern: "^(?:[0-9]{4})$" }, { pattern: "[0-9]{2}" }] },
 		bindings: { other: ["additionalFields", "plug/reference"] },
 	})
+})
+
+test("server error targets agree with the SDK field definitions for both addresses and every location", () => {
+	const raw = storefront()
+	for (const [id, location] of [
+		["first_name", "address"],
+		["plug/a.b[0]", "address"],
+		["contact/consent", "contact"],
+		["order/note", "order"],
+	] as const)
+		raw.address.fields.push({
+			id,
+			location,
+			label: id,
+			optionalLabel: id,
+			required: false,
+			hidden: false,
+			attributes: {},
+			schema: { type: "string" },
+		})
+	const definitions = deserializeStorefront(raw).address.fields
+	for (const field of definitions)
+		for (const [group, binding] of Object.entries(field.bindings)) {
+			const bucket = group === "other" ? "additional_fields" : `${group}_address`
+			const data = checkoutValidationData({
+				code: "rest_invalid_param",
+				message: "Invalid checkout",
+				data: { details: { [bucket]: { code: "woocommerce_invalid_checkout_field", message: "Invalid field", data: { key: field.id } } } },
+			})
+			expect(resolveCheckoutValidationIssues(data, definitions)[0]?.target).toEqual(
+				group === "other" ? binding : [`${group}Address`, ...binding],
+			)
+		}
 })

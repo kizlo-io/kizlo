@@ -13,6 +13,8 @@ import {
 	withKizloRedirectPaths,
 } from "./utils"
 
+import { checkoutValidationData } from "./validation"
+
 export const CHECKOUT_PROCEDURES = {
 	get: createProcedure(
 		{
@@ -68,9 +70,10 @@ export const CHECKOUT_PROCEDURES = {
 				const conflict = conflictData(response.error.data)
 				switch (response.error.code as string) {
 					case "rest_invalid_param":
+					case "woocommerce_rest_checkout_custom_validation_error":
 						throw errors.CHECKOUT_VALIDATION_FAILED({
 							message: response.error.message,
-							data: { fields: validationFields(response.error.data) },
+							data: checkoutValidationData(response.error),
 						})
 					case "woocommerce_rest_cart_coupon_error":
 						throw errors.CHECKOUT_COUPON_INVALID({ message: response.error.message })
@@ -132,9 +135,10 @@ export const CHECKOUT_PROCEDURES = {
 				const conflict = conflictData(response.error.data)
 				switch (response.error.code as string) {
 					case "rest_invalid_param":
+					case "woocommerce_rest_checkout_custom_validation_error":
 						throw errors.CHECKOUT_VALIDATION_FAILED({
 							message: response.error.message,
-							data: { fields: validationFields(response.error.data) },
+							data: checkoutValidationData(response.error),
 						})
 					case "woocommerce_rest_invalid_address":
 						throw errors.CHECKOUT_ADDRESS_INVALID({ message: response.error.message })
@@ -154,8 +158,6 @@ export const CHECKOUT_PROCEDURES = {
 						throw errors.CHECKOUT_PAYMENT_METHOD_MISSING({ message: response.error.message })
 					case "woocommerce_rest_invalid_shipping_option":
 						throw errors.CHECKOUT_SHIPPING_OPTION_INVALID({ message: response.error.message })
-					case "woocommerce_rest_checkout_custom_validation_error":
-						throw errors.CHECKOUT_VALIDATION_FAILED({ message: response.error.message, data: { fields: {} } })
 					case "woocommerce_rest_checkout_invalid_payment_result":
 						throw errors.CHECKOUT_PAYMENT_RESULT_INVALID({ message: response.error.message })
 					case "woocommerce_rest_guest_checkout_disabled":
@@ -227,9 +229,10 @@ export const CHECKOUT_PROCEDURES = {
 			if (response.error) {
 				switch (response.error.code as string) {
 					case "rest_invalid_param":
+					case "woocommerce_rest_checkout_custom_validation_error":
 						throw errors.CHECKOUT_VALIDATION_FAILED({
 							message: response.error.message,
-							data: { fields: validationFields(response.error.data) },
+							data: checkoutValidationData(response.error),
 						})
 					case "woocommerce_rest_invalid_billing_email":
 						throw errors.CHECKOUT_EMAIL_INVALID({ message: response.error.message })
@@ -259,22 +262,6 @@ export const CHECKOUT_PROCEDURES = {
 			return deserializeCheckout(response.data)
 		},
 	),
-}
-
-function validationFields(data: unknown): Record<string, string> {
-	if (!isRecord(data)) return {}
-
-	const fields: Record<string, string> = {}
-	for (const source of [data.params, data.details]) {
-		if (!isRecord(source)) continue
-
-		for (const [name, value] of Object.entries(source)) {
-			if (typeof value === "string") fields[name] = value
-			else if (isRecord(value) && typeof value.message === "string") fields[name] = value.message
-		}
-	}
-
-	return fields
 }
 
 function conflictData(data: unknown): { cart: ReturnType<typeof deserializeCart> | null } {

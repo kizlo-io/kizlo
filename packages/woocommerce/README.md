@@ -62,7 +62,11 @@ Customer reads use the grouped `billing.additional_fields` adapter backed by pub
 
 Consumers should deploy the matching WooCommerce plugin and regenerate their contract after upgrading; the old per-field raw `billing.tax_id` response is removed. The native API remains `customer.billing.taxId` and `billingAddress.taxId`. This feature does not validate jurisdiction-specific identifiers or calculate tax exemptions.
 
-Storefront field definitions include SDK binding paths derived from the same address identity and native projection contract. For billing Tax ID, `bindings.billing` is `["taxId"]`; there is no shipping binding. Registered-field error targeting remains a separate SDK helper.
+Storefront field definitions include SDK binding paths derived from the same address identity and native projection contract. For billing Tax ID, `bindings.billing` is `["taxId"]`; there is no shipping binding. See [checkout validation](./docs/checkout-validation.md) to attach server errors through the shared field bindings.
+
+## Checkout validation
+
+Update, confirm, and retry expose `CHECKOUT_VALIDATION_FAILED.data = { issues }`. Import the resolver from `@kizlo/woocommerce/checkout-validation` and supply loaded storefront definitions. See [client handling and Kit requirements](./docs/checkout-validation.md) and the [breaking migration from data.fields](./docs/checkout-validation-migration.md).
 
 ## Storefront settings
 

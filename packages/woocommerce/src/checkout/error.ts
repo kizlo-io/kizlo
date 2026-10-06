@@ -2,7 +2,8 @@ import { defineErrorMap } from "kizlo"
 import z from "zod"
 import { Cart } from "../cart/schema"
 
-const CheckoutValidationData = z.object({ fields: z.record(z.string(), z.string()) })
+import { CheckoutValidationData } from "./validation"
+
 const CheckoutConflictData = z.object({ cart: Cart.nullable() })
 
 export const GET_CHECKOUT_ERROR_MAP = defineErrorMap({

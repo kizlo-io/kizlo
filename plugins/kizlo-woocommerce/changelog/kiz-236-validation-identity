@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Identify the registered billing Tax ID in checkout retry validation errors.
