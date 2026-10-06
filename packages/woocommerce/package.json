@@ -35,6 +35,12 @@
 				"default": "./dist/index.js"
 			}
 		},
+		"./checkout-validation": {
+			"import": {
+				"types": "./dist/checkout-validation.d.ts",
+				"default": "./dist/checkout-validation.js"
+			}
+		},
 		"./test": {
 			"import": {
 				"types": "./dist/test.d.ts",

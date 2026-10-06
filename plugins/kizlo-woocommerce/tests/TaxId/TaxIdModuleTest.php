@@ -189,6 +189,7 @@ class TaxIdModuleTest extends TestCase
         $this->assertSame(400, $result->get_error_data()['status']);
         $this->assertSame('Tax ID is required.', $result->get_error_data()['params']['billing_address']);
         $this->assertSame('Tax ID is required.', $result->get_error_data()['details']['billing_address']['message']);
+        $this->assertSame(['param' => 'billing_address', 'key' => TaxIdModule::FIELD_ID], $result->get_error_data()['details']['billing_address']['data']);
     }
 
     /** @return array<string, array{mixed}> */
@@ -416,6 +417,7 @@ class TaxIdModuleTest extends TestCase
             $response = rest_get_server()->dispatch($request);
             $this->assertSame(400, $response->get_status());
             $this->assertSame('rest_invalid_param', $response->get_data()['code']);
+            $this->assertSame(TaxIdModule::FIELD_ID, $response->get_data()['data']['details']['billing_address']['data']['key']);
             $this->assertSame(0, $paymentCalls);
             $this->assertSame('pending', wc_get_order($order->get_id())->get_status());
             $this->assertSame('ORDER-BEFORE', $this->checkoutFields->get_field_from_object(TaxIdModule::FIELD_ID, wc_get_order($order->get_id()), 'billing'));

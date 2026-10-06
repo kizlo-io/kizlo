@@ -220,7 +220,7 @@ class TaxIdModule
                     'billing_address' => [
                         'code'    => 'woocommerce_required_checkout_field',
                         'message' => $message,
-                        'data'    => ['param' => 'billing_address'],
+                        'data'    => ['param' => 'billing_address', 'key' => self::FIELD_ID],
                     ],
                 ],
             ]

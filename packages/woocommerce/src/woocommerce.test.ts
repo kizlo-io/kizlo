@@ -6,7 +6,7 @@ import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
 import { resolveRegisteredFieldTarget } from "./field-projections"
-import { woocommerce } from "./index"
+import { resolveCheckoutValidationIssues, woocommerce } from "./index"
 import { Order } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
@@ -770,7 +770,19 @@ test("checkout.retry requires a billing Tax ID only while the setting is enabled
 				params: { orderId: order.id },
 				body: { key: order.order_key, billingEmail: ORDER_EMAIL, paymentMethod: "bacs", billingAddress },
 			}),
-		).rejects.toMatchObject({ code: "CHECKOUT_VALIDATION_FAILED", status: 400 })
+		).rejects.toMatchObject({
+			code: "CHECKOUT_VALIDATION_FAILED",
+			status: 400,
+			data: {
+				issues: [
+					expect.objectContaining({
+						scope: "field",
+						target: ["billingAddress", "taxId"],
+						sourcePath: ["billing_address", "kizlo/tax-id"],
+					}),
+				],
+			},
+		})
 
 		const stored = await storedOrder(order.id)
 		expect(stored).toEqual(orderBefore)
@@ -1173,8 +1185,22 @@ test("pickup and opaque extension conditions preserve native submission, persist
 	expect(missing.success).toBe(false)
 	if (missing.success) throw new Error("Woo accepted a missing required pickup reference")
 	expect(missing.error.code).toBe(evidence.errorCode)
-	expect(missing.error.data).toEqual({ fields: evidence.serverErrorFields })
-	// Woo reports this failure at the additional_fields parameter. Do not invent a leaf identity.
+	if (missing.error.code !== "CHECKOUT_VALIDATION_FAILED") throw new Error("Unexpected pickup validation code")
+	expect(Object.keys(missing.error.data)).toEqual(["issues"])
+	expect(missing.error.data.issues).toContainEqual(
+		expect.objectContaining({
+			source: "additional_fields",
+			sourcePath: ["additional_fields", evidence.fieldId],
+			message: evidence.serverErrorFields.additional_fields,
+		}),
+	)
+	expect(resolveCheckoutValidationIssues(missing.error.data, storefront.address.fields)).toContainEqual(
+		expect.objectContaining({
+			scope: "field",
+			target: evidence.targetPath,
+		}),
+	)
+	// Woo's parameter summary is group-level; structured data supplies the exact registered key.
 	expect(Object.keys(evidence.serverErrorFields)).toEqual(["additional_fields"])
 	const locations = {
 		address: storefront.address.fields.filter((field) => field.location === "address").map((field) => field.id),
