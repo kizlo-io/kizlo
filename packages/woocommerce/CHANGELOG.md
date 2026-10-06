@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.13.0
+
+### Minor Changes
+
+- [#275](https://github.com/kizlo-io/kizlo/pull/275) [`2dc92ca`](https://github.com/kizlo-io/kizlo/commit/2dc92cadf1db983816340f113294d8cda165b983) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose WooCommerce collection method classification for checkout field conditions.
+
 ## 0.12.0
 
 ### Minor Changes
