@@ -1,5 +1,13 @@
 # @kizlo/woocommerce
 
+## 0.14.0
+
+### Minor Changes
+
+- [#279](https://github.com/kizlo-io/kizlo/pull/279) [`4b33b04`](https://github.com/kizlo-io/kizlo/commit/4b33b042dd3f4bc7572b6eb67e9ecdcbfb47eb30) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Emit normalized checkout registered-field references and remove the storefront-dependent validation resolver.
+
+- [#277](https://github.com/kizlo-io/kizlo/pull/277) [`0c6c1e6`](https://github.com/kizlo-io/kizlo/commit/0c6c1e6b04e83c1882e360a23d44f6d5d64cc455) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Remove checkout validation data.fields and data.upstream as a breaking change, exposing only issues and a client resolver for SDK value targets.
+
 ## 0.13.0
 
 ### Minor Changes
