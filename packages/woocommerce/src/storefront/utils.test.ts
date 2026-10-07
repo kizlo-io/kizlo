@@ -1,6 +1,6 @@
 import { expect, test } from "vitest"
 import { deserializeCartBillingAddress, serializeCartBillingAddress } from "../cart/utils"
-import { checkoutValidationData, resolveCheckoutValidationIssues } from "../checkout/validation"
+import { checkoutValidationData } from "../checkout/validation"
 import { Storefront } from "./schema"
 import type { WCK_Storefront } from "./types"
 import { deserializeStorefront } from "./utils"
@@ -307,8 +307,11 @@ test("server error targets agree with the SDK field definitions for both address
 				message: "Invalid checkout",
 				data: { details: { [bucket]: { code: "woocommerce_invalid_checkout_field", message: "Invalid field", data: { key: field.id } } } },
 			})
-			expect(resolveCheckoutValidationIssues(data, definitions)[0]?.target).toEqual(
-				group === "other" ? binding : [`${group}Address`, ...binding],
-			)
+			const issue = data.issues[0]
+			if (issue?.scope === "field") {
+				expect(issue.target).toEqual(group === "other" ? binding : [`${group}Address`, ...binding])
+			} else {
+				expect(issue?.registeredFields).toEqual([{ id: field.id, bucket: group === "other" ? "additionalFields" : `${group}Address` }])
+			}
 		}
 })

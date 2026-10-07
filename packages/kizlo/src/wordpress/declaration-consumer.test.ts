@@ -468,3 +468,59 @@ test("empty registered buckets keep scalar reads and reject invented literal wri
 		fs.rmSync(dir, { force: true, recursive: true })
 	}
 }, 30_000)
+
+test("registered browser checkout errors retain references through published declarations", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-checkout-registry-"))
+	try {
+		fs.mkdirSync(path.join(dir, "generated"))
+		fs.writeFileSync(
+			path.join(dir, "index.ts"),
+			`import type { InferIntegrationProcedures } from "kizlo"
+		import { woocommerce } from "@kizlo/woocommerce"
+		export declare const procedures: InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
+		`,
+		)
+		fs.writeFileSync(path.join(dir, "generated", "index.ts"), CONTRACT_BARREL)
+		fs.writeFileSync(path.join(dir, "generated", "contract.json"), "{}\n")
+		fs.writeFileSync(path.join(dir, "generated", "introspection.ts"), INTROSPECTION_STUB)
+		fs.writeFileSync(
+			path.join(dir, "usage.ts"),
+			`import { createKizloClient, type ActiveKizloClient } from "kizlo"
+		import type { CheckoutValidationIssue, CheckoutRegisteredFieldReference } from "@kizlo/woocommerce"
+		import { contract } from "./generated"
+		type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+		type Assert<T extends true> = T
+		const client = createKizloClient(contract).client
+		type Result = Awaited<ReturnType<typeof client.woocommerce.checkout.confirm>>
+		type Error = Extract<NonNullable<Result["error"]>, { code: "CHECKOUT_VALIDATION_FAILED" }>
+		type Issue = Error["data"]["issues"][number]
+		declare const issue: Issue
+		const sdkIssue: CheckoutValidationIssue = issue
+		declare const standalone: CheckoutValidationIssue
+		const clientIssue: Issue = standalone
+		if (issue.scope === "unresolved") {
+			const unresolved: null = issue.target
+		} else {
+			const target: string[] = issue.target
+		}
+		type SameBucket = Assert<Equal<Issue["registeredFields"][number]["bucket"], CheckoutRegisteredFieldReference["bucket"]>>
+		type LiteralId = Assert<Equal<Issue["registeredFields"][number]["id"], string>>
+		const clientReference: Issue["registeredFields"][number] = { id: "plugin/a.b[0]", bucket: "billingAddress" }
+		// @ts-expect-error consumer references reject WooCommerce bucket names
+		const wireReference: Issue["registeredFields"][number] = { id: "plugin/id", bucket: "billing_address" }
+		type SameActiveClient = Assert<Equal<typeof client, ActiveKizloClient>>
+		declare const error: Error
+		const references: CheckoutRegisteredFieldReference[] = error.data.issues[0]!.registeredFields
+		// @ts-expect-error the legacy dictionary is removed
+		const fields = error.data.fields
+		// @ts-expect-error raw WooCommerce payloads are private
+		const upstream = error.data.upstream
+		// @ts-expect-error target paths are literal segments
+		const dotted: string = error.data.issues[0]!.target
+		`,
+		)
+		expect(compile(dir, ["usage.ts"])).toEqual([])
+	} finally {
+		fs.rmSync(dir, { force: true, recursive: true })
+	}
+}, 30_000)

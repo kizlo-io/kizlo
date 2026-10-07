@@ -1,26 +1,26 @@
 # Migrate checkout validation handlers
 
-**Breaking change:** `CHECKOUT_VALIDATION_FAILED.data.fields` is removed. `data.upstream` from the initial draft is also removed; the raw WooCommerce payload is not public error data. The only data shape is `{ issues }`. The enclosing Kizlo `code`, `message` and `status` remain unchanged.
+**Breaking change:** `resolveCheckoutValidationIssues` is removed from both `@kizlo/woocommerce` and `@kizlo/woocommerce/checkout-validation`. Registered-field matching belongs to Kit or your standalone consumer. The SDK now emits `registeredFields` references during error extraction.
 
-## Replace dictionary reads
+## Replace resolver calls
 
-Remove `Object.entries(error.data.fields)` and reads of `error.data.upstream`. Consume each issue's `message`, `source`, `sourcePath`, `code`, `scope` and `target` instead. Preserve multiple messages even when they share a source or target; a source name alone is not a form control name.
+Remove the resolver import and match the [normalized references](./checkout-validation.md#match-registered-fields) against loaded storefront bindings. Keep reliable field targets and section messages from the SDK. For a standalone app, adapt the [type-checked handler](./checkout-validation-example.ts):
 
 ```ts
-import { resolveCheckoutValidationIssues } from "@kizlo/woocommerce/checkout-validation"
+import { applyCheckoutValidation } from "./checkout-validation-example"
 
 if (error.code === "CHECKOUT_VALIDATION_FAILED") {
-  const issues = resolveCheckoutValidationIssues(error.data, storefront.address.fields)
-  for (const issue of issues) {
-    myHandler.receiveIssue(issue)
-  }
+  applyCheckoutValidation(error.data, storefront.address.fields, {
+    field: (path, message) => myHandler.addFieldMessage(path, message),
+    summary: (message) => myHandler.addSummaryMessage(message),
+  })
 }
 ```
 
-Use `target` only for `scope === "field"`. Retain group and unresolved messages; `unresolved.target` is `null`. Pass literal path segments intact rather than splitting or joining plugin IDs. Source evidence is diagnostic identity, not a second public payload.
+Keep all messages when matching is ambiguous or no control exists. Existing source evidence remains diagnostic; consumers no longer parse WooCommerce names. The browser entry retains validation schemas/types, as described in [schema imports](./checkout-validation.md#import-validation-schemas).
 
-## Upgrade both ends of the contract
+## Upgrade the client contract
 
-Upgrade the server SDK and the consuming app together, register the updated generated client contract, and install the SDK runtime entry where resolution runs. There is no legacy dictionary fallback. Existing plugin responses without reliable field identity produce group or unresolved issues rather than guessed targets.
+Deploy the updated SDK server and register its generated client contract in your app. An older contract lacks reference data. Kit uses that inferred contract and owns the runtime work described in [Kit consumption](./checkout-validation.md#consume-errors-through-kit); consuming references does not require installing the SDK runtime in a Kit app.
 
-Follow the [client and Kit consumption requirements](./checkout-validation.md#consume-errors-through-kit). Application storage, projection and clearing behavior are owned by KIT-28.
+If you still use the pre-issues API, remove `Object.entries(error.data.fields)` and reads of `error.data.upstream`. Both properties remain unavailable. The data envelope stays `{ issues }`, and enclosing `code`, `message` and `status` are unchanged. There is no legacy dictionary fallback.

@@ -1,16 +1,6 @@
 import { expect, test } from "vitest"
-import { CheckoutValidationData, checkoutValidationData, resolveCheckoutValidationIssues } from "./validation"
+import { CheckoutValidationData, checkoutValidationData } from "./validation"
 
-const definitions = [
-	{
-		id: "plug/a.b[0]",
-		location: "address" as const,
-		bindings: { billing: ["additionalFields", "plug/a.b[0]"], shipping: ["additionalFields", "plug/a.b[0]"] },
-	},
-	{ id: "contact/opt-in", location: "contact" as const, bindings: { other: ["additionalFields", "contact/opt-in"] } },
-	{ id: "order/note", location: "order" as const, bindings: { other: ["additionalFields", "order/note"] } },
-	{ id: "kizlo/tax-id", location: "address" as const, bindings: { billing: ["taxId"] } },
-]
 function normalize(data: unknown) {
 	return checkoutValidationData({ code: "rest_invalid_param", message: "Invalid checkout", data })
 }
@@ -22,11 +12,18 @@ test.each([
 	["billingAddress.address1", ["billingAddress", "address1"]],
 	["billing_firstName", ["billingAddress", "firstName"]],
 	["shipping_postcode", ["shippingAddress", "postcode"]],
-	["billing_address[kizlo/tax-id]", ["billingAddress", "taxId"]],
 ])("normalizes core/native source %s without a consumer table", (source, target) => {
 	const data = normalize({ params: { [source]: "Required" } })
-	expect(resolveCheckoutValidationIssues(data, [])).toEqual([
-		{ source, sourcePath: expect.any(Array), code: "rest_invalid_param", message: "Required", scope: "field", target },
+	expect(data.issues).toEqual([
+		{
+			source,
+			sourcePath: expect.any(Array),
+			code: "rest_invalid_param",
+			message: "Required",
+			registeredFields: [],
+			scope: "field",
+			target,
+		},
 	])
 	expect(CheckoutValidationData.safeParse(data).success).toBe(true)
 })
@@ -90,7 +87,7 @@ test("nested details preserve separate messages, codes and sibling field identit
 	])
 })
 
-test("resolves all registered locations from data-only bindings and preserves literal IDs", () => {
+test("extraction supplies references in all SDK buckets without loaded definitions", () => {
 	const data = normalize({
 		details: {
 			billing_address: { "plug/a.b[0]": "Billing required" },
@@ -98,44 +95,53 @@ test("resolves all registered locations from data-only bindings and preserves li
 			additional_fields: { "contact/opt-in": "Consent required", "order/note": "Note required" },
 		},
 	})
-	const before = structuredClone(data)
-	expect(resolveCheckoutValidationIssues(data, definitions).map((issue) => issue.target)).toEqual([
-		["billingAddress", "additionalFields", "plug/a.b[0]"],
-		["shippingAddress", "additionalFields", "plug/a.b[0]"],
-		["additionalFields", "contact/opt-in"],
-		["additionalFields", "order/note"],
+	expect(data.issues.map(({ scope, target, registeredFields }) => ({ scope, target, registeredFields }))).toEqual([
+		{ scope: "unresolved", target: null, registeredFields: [{ id: "plug/a.b[0]", bucket: "billingAddress" }] },
+		{ scope: "unresolved", target: null, registeredFields: [{ id: "plug/a.b[0]", bucket: "shippingAddress" }] },
+		{ scope: "unresolved", target: null, registeredFields: [{ id: "contact/opt-in", bucket: "additionalFields" }] },
+		{ scope: "unresolved", target: null, registeredFields: [{ id: "order/note", bucket: "additionalFields" }] },
 	])
-	expect(data).toEqual(before)
-	expect(
-		resolveCheckoutValidationIssues(normalize({ params: { "billing_address[plug/a.b[0]]": "Required" } }), definitions)[0]?.target,
-	).toEqual(["billingAddress", "additionalFields", "plug/a.b[0]"])
+	expect(CheckoutValidationData.parse(data)).toEqual(data)
 })
 
-test.each([
-	"plug/a.b[0]",
-	"kizlo/tax-id",
-	"unknown/id",
-	"billing_address[unknown/id]",
-	"shipping_address[kizlo/tax-id]",
-	"shipping_address[email]",
-])("does not invent precision for %s", (source) => {
-	const issue = resolveCheckoutValidationIssues(normalize({ params: { [source]: "Required" } }), definitions)[0]
-	expect(issue).toMatchObject({ scope: "unresolved", target: null, message: "Required" })
-})
+test.each(["plug/a.b[0]", "kizlo/tax-id", "unknown/id", "contact/opt-in", "order/note", "billing_plugin/reference"])(
+	"bare identity %s retains an unspecified bucket without inventing a target",
+	(id) => {
+		expect(normalize({ params: { [id]: "Required" } }).issues[0]).toMatchObject({
+			scope: "unresolved",
+			target: null,
+			registeredFields: [{ id, bucket: null }],
+			message: "Required",
+		})
+	},
+)
 
-test("bare contact/order identities resolve; duplicate registry identity stays unresolved", () => {
-	const data = normalize({ params: { "contact/opt-in": "Required", "order/note": "Required" } })
-	expect(resolveCheckoutValidationIssues(data, definitions).every((issue) => issue.scope === "field")).toBe(true)
-	expect(
-		resolveCheckoutValidationIssues(data, [...definitions, ...definitions.filter((field) => field.id === "contact/opt-in")])[0]?.scope,
-	).toBe("unresolved")
+test("unknown address fields retain context; excluded native fields remain unresolved", () => {
+	expect(normalize({ details: { billing_address: { "unknown/id": "Required" } } }).issues[0]).toMatchObject({
+		scope: "unresolved",
+		target: null,
+		registeredFields: [{ id: "unknown/id", bucket: "billingAddress" }],
+	})
+	expect(normalize({ details: { shipping_address: { "kizlo/tax-id": "Required" } } }).issues[0]).toMatchObject({
+		scope: "unresolved",
+		target: null,
+		registeredFields: [],
+	})
 })
 
 test.each([undefined, null, false, 42, "invalid", [], { params: null, details: false }, { details: { broken: { message: 42 } } }])(
 	"keeps a summary for malformed or missing data %j",
 	(data) => {
 		expect(normalize(data).issues).toEqual([
-			{ source: null, sourcePath: [], code: "rest_invalid_param", message: "Invalid checkout", scope: "unresolved", target: null },
+			{
+				source: null,
+				sourcePath: [],
+				code: "rest_invalid_param",
+				message: "Invalid checkout",
+				scope: "unresolved",
+				target: null,
+				registeredFields: [],
+			},
 		])
 	},
 )
@@ -155,7 +161,7 @@ test("retains group, unknown and multiple string messages rather than interpreti
 	)
 })
 
-test("WooCommerce 11 field-key details resolve each group, including additional_errors", () => {
+test("WooCommerce 11 field-key details normalize each bucket, including additional_errors", () => {
 	const data = normalize({
 		params: { billing_address: "Required", additional_fields: "Consent required" },
 		details: {
@@ -177,11 +183,21 @@ test("WooCommerce 11 field-key details resolve each group, including additional_
 			},
 		},
 	})
-	expect(resolveCheckoutValidationIssues(data, definitions).map(({ target, scope, message }) => ({ target, scope, message }))).toEqual([
-		{ scope: "field", target: ["billingAddress", "taxId"], message: "Required" },
-		{ scope: "field", target: ["billingAddress", "additionalFields", "plug/a.b[0]"], message: "Invalid reference" },
-		{ scope: "field", target: ["additionalFields", "contact/opt-in"], message: "Consent required" },
-		{ scope: "field", target: ["additionalFields", "order/note"], message: "Note required" },
+	expect(data.issues.map(({ target, scope, message, registeredFields }) => ({ target, scope, message, registeredFields }))).toEqual([
+		{ scope: "field", target: ["billingAddress", "taxId"], message: "Required", registeredFields: [] },
+		{
+			scope: "unresolved",
+			target: null,
+			message: "Invalid reference",
+			registeredFields: [{ id: "plug/a.b[0]", bucket: "billingAddress" }],
+		},
+		{
+			scope: "unresolved",
+			target: null,
+			message: "Consent required",
+			registeredFields: [{ id: "contact/opt-in", bucket: "additionalFields" }],
+		},
+		{ scope: "unresolved", target: null, message: "Note required", registeredFields: [{ id: "order/note", bucket: "additionalFields" }] },
 	])
 })
 
@@ -258,6 +274,7 @@ test("deep additional_errors retain the leaf message instead of dropping it at a
 			message: "Deep failure",
 			scope: "field",
 			target: ["billingAddress", "taxId"],
+			registeredFields: [],
 		},
 	])
 })
@@ -279,57 +296,52 @@ test("top-level message envelopes and array errors survive without exposing thei
 	expect(normalize(cyclic).issues[0]).toMatchObject({ scope: "unresolved", message: "Invalid checkout", target: null })
 })
 
-test.each(["billing_plugin/reference", "shipping_plugin/reference"])("preserves the bare contact ID %s", (id) => {
-	const data = normalize({ params: { [id]: "Required" } })
-	expect(
-		resolveCheckoutValidationIssues(data, [{ id, location: "contact", bindings: { other: ["additionalFields", id] } }])[0],
-	).toMatchObject({
-		source: id,
-		sourcePath: [id],
-		scope: "field",
-		target: ["additionalFields", id],
-	})
+test.each([
+	"billing_address.foo/reference",
+	"billingAddress[foo/reference]",
+	"additional_fields[foo/reference]",
+	"billing_address.foo%2Fbar",
+])("qualified-looking source %s preserves literal and qualified alternatives", (id) => {
+	const issue = normalize({ params: { [id]: "Required" } }).issues[0]
+	expect(issue).toMatchObject({ scope: "unresolved", target: null, source: id, sourcePath: [id] })
+	expect(issue?.registeredFields).toEqual([
+		{ id, bucket: null },
+		{ id: id.includes("%") ? "foo%2Fbar" : "foo/reference", bucket: id.startsWith("additional") ? "additionalFields" : "billingAddress" },
+	])
 })
 
-test("literal and qualified interpretations stay unresolved when they identify different registered fields", () => {
-	const id = "billing_address.foo/reference"
-	const literal = { id, location: "contact" as const, bindings: { other: ["additionalFields", id] } }
-	const address = { id: "foo/reference", location: "address" as const, bindings: { billing: ["additionalFields", "foo/reference"] } }
-	const data = normalize({ params: { [id]: "Required" } })
-	expect(resolveCheckoutValidationIssues(data, [literal])[0]).toMatchObject({ target: ["additionalFields", id] })
-	expect(resolveCheckoutValidationIssues(data, [address])[0]).toMatchObject({
-		target: ["billingAddress", "additionalFields", "foo/reference"],
-	})
-	expect(resolveCheckoutValidationIssues(data, [literal, address])[0]).toMatchObject({
-		source: id,
-		sourcePath: [id],
-		scope: "unresolved",
-		target: null,
-		message: "Required",
-	})
-	const explicit = normalize({ details: { billing_address: { code: "required", message: "Required", data: { key: "foo/reference" } } } })
-	expect(resolveCheckoutValidationIssues(explicit, [literal, address])[0]).toMatchObject({
-		scope: "field",
-		target: ["billingAddress", "additionalFields", "foo/reference"],
-	})
-})
+test.each(["plugin/a.b[0]", 'plugin/a["quote"]', "plugin/a%2Fb", "plugin/a%252Fb", "billing_address.foo/reference"])(
+	"explicit structured key %s is literal and takes precedence",
+	(id) => {
+		const issue = normalize({
+			details: {
+				billing_address: {
+					message: "Required",
+					data: { key: id, group: "shipping", param: "billing_address[other/id]" },
+				},
+			},
+		}).issues[0]
+		expect(issue).toMatchObject({ scope: "unresolved", target: null, registeredFields: [{ id, bucket: "shippingAddress" }] })
+	},
+)
 
-test("explicit SDK path segments and literal relative params preserve their identity", () => {
-	const id = "billing_plugin/reference"
+test("explicit paths, relative params and parent buckets preserve their independent identity", () => {
 	const data = normalize({
 		details: {
 			billing_address: { message: "Tax ID required", data: { path: ["billingAddress", "taxId"] } },
-			additional_fields: { message: "Reference required", data: { param: id } },
+			additional_fields: { message: "Reference required", data: { param: "billing_plugin/reference" } },
+			shipping_address: { "billing_address.foo/reference": "Shipping reference" },
 		},
 	})
+	expect(data.issues[0]).toMatchObject({ scope: "field", target: ["billingAddress", "taxId"] })
+	expect(data.issues[1]?.registeredFields).toEqual([{ id: "billing_plugin/reference", bucket: "additionalFields" }])
+	expect(data.issues[2]?.registeredFields).toEqual([{ id: "billing_address.foo/reference", bucket: "shippingAddress" }])
+})
+
+test("explicit field identity without context stays literal and unspecified", () => {
 	expect(
-		resolveCheckoutValidationIssues(data, [{ id, location: "order", bindings: { other: ["additionalFields", id] } }]).map(
-			({ target }) => target,
-		),
-	).toEqual([
-		["billingAddress", "taxId"],
-		["additionalFields", id],
-	])
+		normalize({ errors: [{ message: "Required", data: { key: "billing_address.foo/reference", location: "address" } }] }).issues[0],
+	).toMatchObject({ registeredFields: [{ id: "billing_address.foo/reference", bucket: null }], scope: "unresolved", target: null })
 })
 
 test("root identity and nested data messages survive while unrelated payload values remain private", () => {
@@ -344,6 +356,7 @@ test("root identity and nested data messages survive while unrelated payload val
 			sourcePath: ["shipping_address"],
 			code: "required",
 			message: "Shipping required",
+			registeredFields: [],
 			scope: "group",
 			target: ["shippingAddress"],
 		},
@@ -368,5 +381,114 @@ test.each(["errors", "additional_errors"])("%s maps preserve known group and cor
 		sourcePath: ["shipping_address", "first_name"],
 		target: ["shippingAddress", "firstName"],
 		message: "Required",
+	})
+})
+
+test.each([
+	[["billingAddress", "plugin/a.b[0]"], { id: "plugin/a.b[0]", bucket: "billingAddress" }],
+	[["billingAddress", "additionalFields", "plugin/a.b[0]"], { id: "plugin/a.b[0]", bucket: "billingAddress" }],
+	[["additionalFields", "billing_address.first_name"], { id: "billing_address.first_name", bucket: "additionalFields" }],
+	[["billing_address.first_name"], { id: "billing_address.first_name", bucket: null }],
+])("explicit literal path %j is normalized without speculative parsing", (path, reference) => {
+	expect(normalize({ errors: [{ message: "Required", data: { path } }] }).issues[0]).toMatchObject({
+		registeredFields: [reference],
+		scope: "unresolved",
+		target: null,
+	})
+})
+
+test("ambiguous native qualified syntax retains both identities", () => {
+	expect(normalize({ params: { "billing_address[kizlo/tax-id]": "Required" } }).issues[0]).toMatchObject({
+		registeredFields: [
+			{ id: "billing_address[kizlo/tax-id]", bucket: null },
+			{ id: "kizlo/tax-id", bucket: "billingAddress" },
+		],
+		scope: "unresolved",
+		target: null,
+	})
+})
+
+test.each(["contact", "order"])("explicit %s location supplies the shared additional-fields bucket", (location) => {
+	expect(normalize({ errors: [{ message: "Required", data: { key: "plugin/reference", location } }] }).issues[0]).toMatchObject({
+		registeredFields: [{ id: "plugin/reference", bucket: "additionalFields" }],
+		scope: "unresolved",
+		target: null,
+	})
+})
+
+test("a nested error's new parameter does not inherit its parent's explicit literal identity", () => {
+	const data = normalize({
+		errors: [
+			{
+				message: "Parent",
+				data: { key: "plugin/parent" },
+				additional_errors: [{ message: "Child", data: { param: "billing_address.foo/reference" } }],
+			},
+		],
+	})
+	expect(data.issues.map(({ registeredFields }) => registeredFields)).toEqual([
+		[{ id: "plugin/parent", bucket: null }],
+		[
+			{ id: "billing_address.foo/reference", bucket: null },
+			{ id: "foo/reference", bucket: "billingAddress" },
+		],
+	])
+})
+
+test.each(["details", "params"])("%s messages retain their parent's explicit literal identity", (container) => {
+	const id = "billing_address.foo/reference"
+	const data = normalize({ errors: [{ data: { path: [id] }, [container]: ["First", "Second"] }] })
+	expect(data.issues.map(({ message, registeredFields }) => ({ message, registeredFields }))).toEqual([
+		{ message: "First", registeredFields: [{ id, bucket: null }] },
+		{ message: "Second", registeredFields: [{ id, bucket: null }] },
+	])
+})
+
+test("nested detail messages retain a complete explicit SDK address path", () => {
+	expect(
+		normalize({ errors: [{ data: { path: ["shippingAddress", "additionalFields", "plugin/reference"] }, details: "Required" }] }).issues[0],
+	).toMatchObject({ registeredFields: [{ id: "plugin/reference", bucket: "shippingAddress" }], message: "Required" })
+})
+
+test("a named detail entry's new parameter establishes its own ambiguous identity", () => {
+	const data = normalize({
+		errors: [
+			{
+				data: { path: ["billing_address.parent/reference"] },
+				details: { child: { message: "Required", data: { param: "shipping_address.foo/reference" } } },
+			},
+		],
+	})
+	expect(data.issues[0]).toMatchObject({
+		registeredFields: [
+			{ id: "shipping_address.foo/reference", bucket: null },
+			{ id: "foo/reference", bucket: "shippingAddress" },
+		],
+	})
+})
+
+test.each([
+	["billing", "billingAddress"],
+	["shipping", "shippingAddress"],
+	["other", "additionalFields"],
+] as const)("explicit %s context applies to relative parameter and path identities", (group, bucket) => {
+	for (const identity of [{ param: "plugin/reference" }, { path: ["plugin/reference"] }]) {
+		expect(normalize({ errors: [{ message: "Required", data: { ...identity, group } }] }).issues[0]).toMatchObject({
+			registeredFields: [{ id: "plugin/reference", bucket }],
+		})
+	}
+})
+
+test.each(["contact", "order"])("root %s context applies to a relative parameter", (location) => {
+	expect(normalize({ message: "Required", param: "plugin/reference", location }).issues[0]).toMatchObject({
+		registeredFields: [{ id: "plugin/reference", bucket: "additionalFields" }],
+	})
+})
+
+test("explicit context keeps qualified-looking relative identities literal", () => {
+	expect(
+		normalize({ errors: [{ message: "Required", data: { param: "billing_address.foo/reference", group: "shipping" } }] }).issues[0],
+	).toMatchObject({
+		registeredFields: [{ id: "billing_address.foo/reference", bucket: "shippingAddress" }],
 	})
 })
