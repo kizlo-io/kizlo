@@ -1,13 +1,19 @@
 import z from "zod/v4"
 import { CoreAddressFieldKeys } from "../address-fields"
 import { BillingFieldProjections, isExcludedRegisteredField } from "../field-projections"
-import type { StorefrontField } from "../storefront/schema"
+
+export const CheckoutRegisteredFieldReference = z.object({
+	id: z.string().min(1),
+	bucket: z.enum(["billingAddress", "shippingAddress", "additionalFields"]).nullable(),
+})
+export type CheckoutRegisteredFieldReference = z.infer<typeof CheckoutRegisteredFieldReference>
 
 const Evidence = z.object({
 	source: z.string().nullable(),
 	sourcePath: z.array(z.string()),
 	code: z.string().nullable(),
 	message: z.string(),
+	registeredFields: z.array(CheckoutRegisteredFieldReference),
 })
 export const CheckoutValidationIssue = z.discriminatedUnion("scope", [
 	Evidence.extend({ scope: z.literal("field"), target: z.array(z.string()).min(1) }),
@@ -19,16 +25,7 @@ export const CheckoutValidationData = z.strictObject({
 	issues: z.array(CheckoutValidationIssue),
 })
 export type CheckoutValidationData = z.infer<typeof CheckoutValidationData>
-type Definition = Pick<StorefrontField, "id" | "location" | "bindings">
 type Upstream = { code: string; message: string; data?: unknown }
-
-/** Resolve registered identities from the definitions already loaded by the storefront. No I/O. */
-export function resolveCheckoutValidationIssues(
-	data: Pick<CheckoutValidationData, "issues">,
-	fields: readonly Definition[],
-): CheckoutValidationIssue[] {
-	return data.issues.map((issue) => resolveIssue(issue, fields))
-}
 
 function record(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -60,57 +57,61 @@ function qualifiedPath(name: string): string[] | undefined {
 	return undefined
 }
 
+function sdkBucket(value: string | undefined): CheckoutRegisteredFieldReference["bucket"] {
+	if (value === "billing_address" || value === "billingAddress") return "billingAddress"
+	if (value === "shipping_address" || value === "shippingAddress") return "shippingAddress"
+	if (value === "additional_fields" || value === "additionalFields") return "additionalFields"
+	return null
+}
+
 function sourcePath(name: string): string[] {
-	// A namespaced ID can resemble a qualified path. Keep the literal until definitions disambiguate it.
-	return name.includes("/") ? [name] : (qualifiedPath(name) ?? [name])
+	// Qualified custom identities stay literal until normalization records both interpretations.
+	const qualified = qualifiedPath(name)
+	if (qualified?.length === 1) return qualified
+	if (!name.includes("/") && qualified && nativeTarget(qualified)) return qualified
+	return [name]
 }
 
 function childPath(path: string[], name: string): string[] {
+	// A key inside an explicit bucket is a literal ID, even when it resembles a qualified path.
+	if (path.length === 1 && sdkBucket(path[0])) return [...path, name]
 	const named = sourcePath(name)
-	return path.length && !["billing_address", "shipping_address", "additional_fields"].includes(named[0] ?? "") ? [...path, name] : named
+	return path.length && !sdkBucket(named[0]) ? [...path, name] : named
 }
 
-function resolveIssue(issue: CheckoutValidationIssue, fields: readonly Definition[]): CheckoutValidationIssue {
+function nativeTarget(path: string[]): string[] | undefined {
+	const bucket = sdkBucket(path[0])
+	const id = path[1]
+	if (path.length !== 2 || !id || (bucket !== "billingAddress" && bucket !== "shippingAddress")) return
+	const core = Object.entries(CoreAddressFieldKeys).find(([wire, sdk]) => id === wire || id === sdk)
+	if (core || (bucket === "billingAddress" && id === "email")) return [bucket, core?.[1] ?? "email"]
+	const projection = Object.entries(BillingFieldProjections).find(([key, entry]) => id === entry.id || id === key)
+	if (projection && bucket === "billingAddress") return [bucket, projection[0]]
+}
+
+function normalizeIssue(issue: CheckoutValidationIssue, explicit: boolean): CheckoutValidationIssue {
 	const path = issue.sourcePath
-	const literal = resolvePath(issue, path, fields)
-	const qualified = path.length === 1 ? qualifiedPath(path[0] ?? "") : undefined
-	if (!qualified || JSON.stringify(qualified) === JSON.stringify(path)) return literal
-	const parsed = resolvePath(issue, qualified, fields)
-	const registeredLiteral = fields.some((field) => field.id === path[0])
-	if (registeredLiteral && parsed.scope !== "unresolved") return { ...issue, scope: "unresolved", target: null }
-	return literal.scope !== "unresolved" ? literal : parsed
-}
-
-function resolvePath(issue: CheckoutValidationIssue, path: string[], fields: readonly Definition[]): CheckoutValidationIssue {
-	const bucket = path[0]
-	const group = bucket === "billing_address" ? "billing" : bucket === "shipping_address" ? "shipping" : undefined
-	const address = group ? `${group}Address` : undefined
-	if (path.length === 1 && (address || bucket === "additional_fields")) {
-		return { ...issue, scope: "group", target: [address ?? "additionalFields"] }
+	const bucket = sdkBucket(path[0])
+	if (path.length === 1 && bucket) return { ...issue, scope: "group", target: [bucket] }
+	const target = nativeTarget(path)
+	if (target) return { ...issue, scope: "field", target }
+	const id =
+		path.length === 1
+			? path[0]
+			: path.length === 2 && bucket
+				? path[1]
+				: explicit && path.length === 3 && (bucket === "billingAddress" || bucket === "shippingAddress") && path[1] === "additionalFields"
+					? path[2]
+					: undefined
+	if (!id) return issue
+	// Shipping Tax ID is excluded by the shared projection policy, independent of loaded definitions.
+	if (bucket === "shippingAddress" && isExcludedRegisteredField(id, "shipping")) return issue
+	const registeredFields: CheckoutRegisteredFieldReference[] = [{ id, bucket: path.length > 1 ? bucket : null }]
+	const qualified = !explicit && path.length === 1 ? qualifiedPath(id) : undefined
+	if (qualified?.length === 2 && qualified[1]) {
+		registeredFields.push({ id: qualified[1], bucket: sdkBucket(qualified[0]) })
 	}
-	const id = path.length === 1 ? bucket : path.length === 2 ? path[1] : undefined
-	if (path.length > 1 && !group && bucket !== "additional_fields") return { ...issue, scope: "unresolved", target: null }
-	if (id && group && address) {
-		const core = Object.entries(CoreAddressFieldKeys).find(([wire, sdk]) => id === wire || id === sdk)
-		if (core || (group === "billing" && id === "email")) return { ...issue, scope: "field", target: [address, core?.[1] ?? "email"] }
-		const projection = Object.entries(BillingFieldProjections).find(([key, entry]) => id === entry.id || id === key)
-		if (projection && group === projection[1].group) return { ...issue, scope: "field", target: [address, projection[0]] }
-		if (isExcludedRegisteredField(id, group)) return { ...issue, scope: "unresolved", target: null }
-	}
-	const candidates = fields.flatMap((field) => {
-		if (field.id !== id) return []
-		if (group) {
-			const binding = field.location === "address" ? field.bindings[group] : undefined
-			return binding ? [[address as string, ...binding]] : []
-		}
-		if (field.location === "address") return []
-		return Object.entries(field.bindings).flatMap(([key, binding]) =>
-			binding ? [key === "other" ? binding : [`${key}Address`, ...binding]] : [],
-		)
-	})
-	return candidates.length === 1
-		? { ...issue, scope: "field", target: candidates[0] as string[] }
-		: { ...issue, scope: "unresolved", target: null }
+	return { ...issue, registeredFields }
 }
 
 /** Extract messages and identity evidence before discarding the upstream envelope. */
@@ -118,29 +119,33 @@ export function checkoutValidationData(error: Upstream): CheckoutValidationData 
 	const issues: CheckoutValidationIssue[] = []
 	const data = record(error.data) ? error.data : {}
 	const ancestors = new Set<object>()
-	function visit(value: unknown, source: string | null, path: string[], code: string): void {
+	function visit(value: unknown, source: string | null, path: string[], code: string, explicit = false): void {
 		if (typeof value === "object" && value !== null) {
 			if (ancestors.has(value)) return
 			ancestors.add(value)
 		}
 		try {
-			visitValue(value, source, path, code)
+			visitValue(value, source, path, code, explicit)
 		} finally {
 			if (typeof value === "object" && value !== null) ancestors.delete(value)
 		}
 	}
-	function visitValue(value: unknown, source: string | null, path: string[], code: string): void {
+	function visitValue(value: unknown, source: string | null, path: string[], code: string, explicit: boolean): void {
 		if (Array.isArray(value)) {
-			for (const child of value) visit(child, source, path, code)
+			for (const child of value) visit(child, source, path, code, explicit)
 			return
 		}
 		const detail = record(value) ? value : undefined
 		const nextCode = typeof detail?.code === "string" ? detail.code : code
 		const identity = record(detail?.data) ? detail.data : detail
 		let nextPath = path
+		let nextExplicit = explicit
 		if (Array.isArray(identity?.path) && identity.path.length && identity.path.every((part) => typeof part === "string")) {
-			nextPath = [sourcePath(identity.path[0] as string)[0] as string, ...identity.path.slice(1)]
+			const first = identity.path[0] as string
+			nextPath = [sdkBucket(first) ? (qualifiedPath(first)?.[0] ?? first) : first, ...identity.path.slice(1)]
+			nextExplicit = true
 		} else if (typeof identity?.param === "string") {
+			nextExplicit = false
 			const explicit = sourcePath(identity.param)
 			nextPath =
 				explicit.length === 1 &&
@@ -150,17 +155,20 @@ export function checkoutValidationData(error: Upstream): CheckoutValidationData 
 					? [path[0] as string, ...explicit]
 					: explicit
 		}
+		const context =
+			identity?.group === "billing" || identity?.group === "shipping"
+				? `${identity.group}_address`
+				: identity?.group === "other" || identity?.location === "contact" || identity?.location === "order"
+					? "additional_fields"
+					: undefined
 		const field = typeof identity?.key === "string" ? identity.key : identity?.field
 		if (typeof field === "string") {
-			const bucket =
-				identity?.group === "billing" || identity?.group === "shipping"
-					? `${identity?.group}_address`
-					: identity?.group === "other"
-						? "additional_fields"
-						: ["billing_address", "shipping_address", "additional_fields"].includes(nextPath[0] ?? "")
-							? nextPath[0]
-							: undefined
+			nextExplicit = true
+			const bucket = context ?? (sdkBucket(nextPath[0]) ? nextPath[0] : undefined)
 			nextPath = bucket ? [bucket, field] : [field]
+		} else if (context && nextPath.length === 1 && !sdkBucket(nextPath[0])) {
+			// Relative identities use explicit context without reparsing their literal ID.
+			nextPath = [context, ...nextPath]
 		} else if (
 			nextPath.length === 1 &&
 			["billing_address", "shipping_address"].includes(nextPath[0] ?? "") &&
@@ -169,17 +177,13 @@ export function checkoutValidationData(error: Upstream): CheckoutValidationData 
 		) {
 			nextPath = [nextPath[0] as string, nextCode.slice("invalid_".length)]
 		}
-		if (!field && nextPath.length === 0) {
-			if (identity?.group === "billing" || identity?.group === "shipping") nextPath = [`${identity.group}_address`]
-			else if (identity?.group === "other") nextPath = ["additional_fields"]
-		}
+		if (!field && nextPath.length === 0 && context) nextPath = [context]
 		const nextSource = source ?? (typeof identity?.param === "string" ? identity.param : typeof field === "string" ? field : null)
 		const message = typeof value === "string" ? value : typeof detail?.message === "string" ? detail.message : undefined
 		if (message !== undefined) {
-			const issue = resolvePath(
-				{ source: nextSource, sourcePath: nextPath, code: nextCode, message, scope: "unresolved", target: null },
-				nextPath,
-				[],
+			const issue = normalizeIssue(
+				{ source: nextSource, sourcePath: nextPath, code: nextCode, message, scope: "unresolved", target: null, registeredFields: [] },
+				nextExplicit,
 			)
 			if (
 				!issues.some(
@@ -187,13 +191,15 @@ export function checkoutValidationData(error: Upstream): CheckoutValidationData 
 						other.source === nextSource &&
 						other.message === message &&
 						JSON.stringify(other.sourcePath) === JSON.stringify(nextPath) &&
-						other.code === nextCode,
+						other.code === nextCode &&
+						JSON.stringify(other.registeredFields) === JSON.stringify(issue.registeredFields) &&
+						JSON.stringify(other.target) === JSON.stringify(issue.target),
 				)
 			)
 				issues.push(issue)
 		}
-		if (Array.isArray(detail?.message)) visit(detail.message, nextSource, nextPath, nextCode)
-		if (Array.isArray(detail?.messages)) visit(detail.messages, nextSource, nextPath, nextCode)
+		if (Array.isArray(detail?.message)) visit(detail.message, nextSource, nextPath, nextCode, nextExplicit)
+		if (Array.isArray(detail?.messages)) visit(detail.messages, nextSource, nextPath, nextCode, nextExplicit)
 		if (!detail) return
 		for (const [key, child] of Object.entries(detail)) {
 			if (
@@ -221,19 +227,20 @@ export function checkoutValidationData(error: Upstream): CheckoutValidationData 
 		for (const container of identity === detail ? [detail] : [detail, identity]) {
 			if (!container) continue
 			for (const key of ["additional_errors", "errors"])
-				if (container[key] !== undefined) visit(container[key], nextSource, path.length ? path : nextPath, nextCode)
-			for (const key of ["details", "params"]) visitMap(container[key], nextSource, nextPath, nextCode, key === "params")
+				if (container[key] !== undefined)
+					visit(container[key], nextSource, path.length ? path : nextPath, nextCode, path.length ? explicit : nextExplicit)
+			for (const key of ["details", "params"]) visitMap(container[key], nextSource, nextPath, nextCode, key === "params", nextExplicit)
 		}
 		if (
 			identity !== detail &&
 			(typeof identity?.message === "string" || Array.isArray(identity?.message) || Array.isArray(identity?.messages))
 		) {
-			visit(identity, source, nextPath, nextCode)
+			visit(identity, source, nextPath, nextCode, nextExplicit)
 		}
 	}
-	function visitMap(value: unknown, source: string | null, path: string[], code: string, params = false): void {
+	function visitMap(value: unknown, source: string | null, path: string[], code: string, params = false, explicit = false): void {
 		if (!record(value)) {
-			if (typeof value === "string" || Array.isArray(value)) visit(value, source, path, code)
+			if (typeof value === "string" || Array.isArray(value)) visit(value, source, path, code, explicit)
 			return
 		}
 		for (const [name, child] of Object.entries(value)) {
@@ -269,6 +276,7 @@ export function checkoutValidationData(error: Upstream): CheckoutValidationData 
 			"key",
 			"field",
 			"group",
+			"location",
 			"data",
 		]
 		visit(Object.fromEntries(Object.entries(data).filter(([key]) => keys.includes(key))), null, [], error.code)

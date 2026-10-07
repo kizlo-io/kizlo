@@ -1,3 +1,3 @@
-/** Browser entry: validation facts and resolution, without server integration handlers. */
-export { CheckoutValidationData, CheckoutValidationIssue, resolveCheckoutValidationIssues } from "./checkout/validation"
+/** Browser entry: validation schemas and types, without server integration handlers. */
+export { CheckoutRegisteredFieldReference, CheckoutValidationData, CheckoutValidationIssue } from "./checkout/validation"
 export type { StorefrontField } from "./storefront/schema"

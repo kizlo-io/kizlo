@@ -331,3 +331,46 @@ test.each(["confirm", "retry"] as const)("%s retains payment failure semantics",
 		}),
 	).rejects.toMatchObject({ code: "CHECKOUT_PAYMENT_FAILED", message: "Payment declined" })
 })
+
+test.each(["update", "confirm", "retry"] as const)("%s extracts registered references without a storefront read", async (operation) => {
+	const callback = vi.fn().mockResolvedValue({
+		status: 400,
+		data: null,
+		error: {
+			code: "rest_invalid_param",
+			message: "Invalid checkout",
+			data: {
+				details: {
+					billing_address: { code: "required", message: ["Missing reference", "Invalid reference"], data: { key: "plugin/a.b[0]" } },
+					additional_fields: { code: "required", message: "Consent required", data: { key: "contact/consent" } },
+				},
+			},
+		},
+	})
+	const context = {
+		wordpress: { woocommerce: { store: { checkout: { update: callback, create: callback, updateById: callback } } } },
+		sessionHeaders: {},
+		logger: { error: vi.fn() },
+	}
+	const errors =
+		operation === "update" ? UPDATE_CHECKOUT_ERROR_MAP : operation === "confirm" ? CONFIRM_CHECKOUT_ERROR_MAP : RETRY_CHECKOUT_ERROR_MAP
+	const error = await Promise.resolve(
+		CHECKOUT_PROCEDURES[operation]["~kizlo"].handler({
+			context: context as never,
+			input: { params: { orderId: 42 }, body: { billingAddress, paymentMethod: "bacs", key: "key" } } as never,
+			errors: createThrowableErrorMap(errors) as never,
+		}),
+	).catch((error) => error)
+	expect(Object.keys(error.data)).toEqual(["issues"])
+	expect(
+		error.data.issues.map(({ message, registeredFields }: { message: string; registeredFields: unknown }) => ({
+			message,
+			registeredFields,
+		})),
+	).toEqual([
+		{ message: "Missing reference", registeredFields: [{ id: "plugin/a.b[0]", bucket: "billingAddress" }] },
+		{ message: "Invalid reference", registeredFields: [{ id: "plugin/a.b[0]", bucket: "billingAddress" }] },
+		{ message: "Consent required", registeredFields: [{ id: "contact/consent", bucket: "additionalFields" }] },
+	])
+	expect(callback).toHaveBeenCalledTimes(1)
+})

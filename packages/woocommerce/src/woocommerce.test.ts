@@ -6,7 +6,7 @@ import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
 import { resolveRegisteredFieldTarget } from "./field-projections"
-import { resolveCheckoutValidationIssues, woocommerce } from "./index"
+import { woocommerce } from "./index"
 import { Order } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
@@ -1194,10 +1194,11 @@ test("pickup and opaque extension conditions preserve native submission, persist
 			message: evidence.serverErrorFields.additional_fields,
 		}),
 	)
-	expect(resolveCheckoutValidationIssues(missing.error.data, storefront.address.fields)).toContainEqual(
+	expect(missing.error.data.issues).toContainEqual(
 		expect.objectContaining({
-			scope: "field",
-			target: evidence.targetPath,
+			scope: "unresolved",
+			target: null,
+			registeredFields: [{ id: evidence.fieldId, bucket: "additionalFields" }],
 		}),
 	)
 	// Woo's parameter summary is group-level; structured data supplies the exact registered key.

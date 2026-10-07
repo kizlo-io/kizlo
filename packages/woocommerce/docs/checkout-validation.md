@@ -1,46 +1,42 @@
 # Handle checkout validation issues
 
-Narrow an update, confirm, or retry error by `code === "CHECKOUT_VALIDATION_FAILED"`. Its envelope keeps `code`, `message` and `status`; `data` contains only `{ issues }`. Each issue preserves its message and available `source`, literal `sourcePath` segments and upstream `code`.
+Narrow an update, confirm, or retry error by `code === "CHECKOUT_VALIDATION_FAILED"`. Its envelope keeps `code`, `message` and `status`; `data` contains only `{ issues }`. Each issue preserves its message, available `source`, `sourcePath` and upstream `code`, plus normalized SDK targeting information.
 
-## Resolve targets in a client
-
-Import the supported browser runtime from `@kizlo/woocommerce/checkout-validation`. This entry exports `resolveCheckoutValidationIssues`, the validation schemas/types and the `StorefrontField` type without loading server integration handlers. Root exports remain available for server integrations.
-
-```ts
-import { resolveCheckoutValidationIssues } from "@kizlo/woocommerce/checkout-validation"
-
-if (result.error?.code === "CHECKOUT_VALIDATION_FAILED") {
-  const issues = resolveCheckoutValidationIssues(result.error.data, store.address.fields)
-  for (const issue of issues) {
-    if (issue.scope === "field") {
-      myHandler.addFieldMessage(issue.target, issue.message)
-    } else {
-      myHandler.addSummaryMessage(issue.message)
-    }
-  }
-}
-```
-
-Pass definitions already loaded from the same storefront's `storefront.get` response. The resolver performs no requests and returns new issues without mutating its input. Core address and native billing Tax ID targets resolve without definitions; registered fields use the definitions' SDK bindings.
-
-## Interpret scope and evidence
+## Choose a target
 
 | Scope | Target | Consumer handling |
 | --- | --- | --- |
-| `field` | Exact SDK path segments | Pass the path and message to your handler |
-| `group` | An address or additional-fields bucket | Retain the group message |
-| `unresolved` | `null` | Retain the message without choosing a control |
+| `field` | Reliable core/native SDK path segments | Attach the message to that path |
+| `group` | An address or additional-fields bucket | Retain the section message |
+| `unresolved` | `null` | Match registered references against loaded bindings, or keep the message in the summary |
 
-Keep a plugin ID such as `plug/a.b[0]` as one segment. A bare address ID does not select billing or shipping; conflicting literal-ID/path interpretations stay unresolved. A message mentioning Tax ID does not identify that field. Multiple messages remain separate issues, including nested additional errors and parent group failures.
+Every issue has `registeredFields`. An empty array means no registered-field candidate is supplied. Each reference contains a literal `id` and a `bucket`: `billingAddress`, `shippingAddress`, `additionalFields`, or `null` when context is unspecified. Contact and order fields share `additionalFields`; definitions determine their location. References are candidates, not proof of registration or an editable control.
+
+```ts
+// Explicit billing context supplies one reference.
+{ id: "plugin/a.b[0]", bucket: "billingAddress" }
+
+// An ambiguous source "billing_address.foo/reference" supplies both alternatives.
+[
+  { id: "billing_address.foo/reference", bucket: null },
+  { id: "foo/reference", bucket: "billingAddress" },
+]
+```
+
+## Match registered fields
+
+Load definitions from the same active storefront's `storefront.get` response. Match each candidate's entire `id` by equality. Billing/shipping references select the corresponding address binding; `additionalFields` selects a non-address field's `bindings.other`. An unspecified reference can match a contact/order field, but must not choose an address copy. Resolve only one matching binding across all candidates and definitions; unknown, duplicate or conflicting matches stay unresolved.
+
+Use bindings intact, prefixing address-relative bindings with the reference bucket. Never split, decode or reparse an ID, including dots, slashes, brackets, quotes or percent escapes. Explicit structured identity suppresses speculative alternatives. `source` and `sourcePath` are diagnostic evidence, not inputs to consumer matching. Retain every message, including section failures and failures without a matching control. See the [type-checked standalone handler](./checkout-validation-example.ts) for equivalent local metadata matching.
 
 ## Consume errors through Kit
 
-Install the SDK as a runtime dependency in the app that calls the resolver, using the release containing this contract or the [PR #277 package preview](https://github.com/kizlo-io/kizlo/pull/277). Deploy the same contract on the SDK server. Kit's SDK development dependency does not install this runtime entry for your app.
+Register your updated generated client contract with `kizlo` and include that registration in the app's TypeScript program. Kit derives `CheckoutError` and `onError` data from `ActiveKizloClient`; an older registered contract cannot describe `registeredFields`. SDK extraction uses no storefront queries or loaded definitions.
 
-Register your generated client contract with `kizlo` and include that registration in the app's TypeScript program. Kit derives `CheckoutError` and `onError` data from `ActiveKizloClient`; an older registered contract cannot describe the new issues. Supply loaded storefront definitions separately. See the [type-checked caller-owned handler example](./checkout-validation-example.ts).
+[KIT-28](https://linear.app/kizlo/issue/KIT-28/integrate-checkout-server-errors-into-usecheckoutfields) owns automatic matching in `useCheckoutFields`, form projection, error and submission-batch identities, Nanostores state, section/summary placement and selective clearing. This SDK change supplies its contract; it does not implement that Kit runtime behavior or add a form-library dependency. Kit consumes inferred types and loaded bindings without an SDK runtime import.
 
-## Keep application state in the application
+## Import validation schemas
 
-The SDK supplies evidence and domain paths. Error IDs, submission-batch identities, Nanostores storage, automatic `useCheckoutFields` integration, safe form-name/address projection, grouped section messages and selective store/form clearing belong to [KIT-28](https://linear.app/kizlo/issue/KIT-28/integrate-checkout-server-errors-into-usecheckoutfields). This contract adds no form-library dependency or automatic Kit runtime behavior.
+`@kizlo/woocommerce/checkout-validation` retains `CheckoutValidationData`, `CheckoutValidationIssue` and `CheckoutRegisteredFieldReference` as schemas/types, plus the `StorefrontField` type. Root schema/type exports remain available. Install the SDK runtime only if your standalone app uses those schemas; the browser entry excludes server integration handlers and provides no storefront resolver.
 
-See the [migration guide](./checkout-validation-migration.md) before replacing a dictionary-based consumer.
+See the [migration guide](./checkout-validation-migration.md) when upgrading an existing handler.

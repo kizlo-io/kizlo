@@ -66,7 +66,7 @@ Storefront field definitions include SDK binding paths derived from the same add
 
 ## Checkout validation
 
-Update, confirm, and retry expose `CHECKOUT_VALIDATION_FAILED.data = { issues }`. Import the resolver from `@kizlo/woocommerce/checkout-validation` and supply loaded storefront definitions. See [client handling and Kit requirements](./docs/checkout-validation.md) and the [breaking migration from data.fields](./docs/checkout-validation-migration.md).
+Update, confirm, and retry expose `CHECKOUT_VALIDATION_FAILED.data = { issues }`. Registered fields carry literal IDs and normalized SDK buckets for Kit or standalone consumers to match against loaded bindings. The browser entry retains schemas/types; the SDK resolver is removed. See [client handling and Kit requirements](./docs/checkout-validation.md) and the [breaking handler migration](./docs/checkout-validation-migration.md).
 
 ## Storefront settings
 
