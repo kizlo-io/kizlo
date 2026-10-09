@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.14.1
+
+### Patch Changes
+
+- [#280](https://github.com/kizlo-io/kizlo/pull/280) [`2b43264`](https://github.com/kizlo-io/kizlo/commit/2b43264a2fb6148efd3b56073e1c131a466e7d72) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Preserve registered billing-field requiredness and enums in checkout submissions.
+
 ## 0.14.0
 
 ### Minor Changes
