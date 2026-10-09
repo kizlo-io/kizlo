@@ -5,6 +5,16 @@ import { Cart } from "../cart/schema"
 import { CheckoutValidationData } from "./validation"
 
 const CheckoutConflictData = z.object({ cart: Cart.nullable() })
+const CheckoutTotalMismatchData = CheckoutConflictData.extend({
+	expectedTotal: z
+		.string()
+		.regex(/^[0-9]+$/)
+		.optional(),
+	actualTotal: z
+		.string()
+		.regex(/^[0-9]+$/)
+		.optional(),
+})
 
 export const GET_CHECKOUT_ERROR_MAP = defineErrorMap({
 	CHECKOUT_ORDER_NOT_FOUND: {
@@ -80,6 +90,11 @@ export const CONFIRM_CHECKOUT_ERROR_MAP = defineErrorMap({
 		status: 409,
 		message: "The cart is empty.",
 		data: CheckoutConflictData,
+	},
+	CHECKOUT_TOTAL_MISMATCH: {
+		status: 409,
+		message: "The order total increased. Please review the updated total.",
+		data: CheckoutTotalMismatchData,
 	},
 	CHECKOUT_CART_INVALID: {
 		status: 409,

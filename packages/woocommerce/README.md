@@ -70,6 +70,28 @@ Storefront field definitions include SDK binding paths derived from the same add
 
 Update, confirm, and retry expose `CHECKOUT_VALIDATION_FAILED.data = { issues }`. Registered fields carry literal IDs and normalized SDK buckets for Kit or standalone consumers to match against loaded bindings. The browser entry retains schemas/types; the SDK resolver is removed. See [client handling and Kit requirements](./docs/checkout-validation.md) and the [breaking handler migration](./docs/checkout-validation-migration.md).
 
+## Protect a reviewed checkout total
+
+Pass optional `expectedTotal` when confirming checkout to protect the amount your shopper reviewed. Capture it with the cart you display, in minor units: `"1250"` means 12.50 in a currency with two decimal places. The input accepts digits-only strings, including `"0"`, and forwards them unchanged as WooCommerce's `expected_total`.
+
+```ts
+const reviewedTotal = String(cart.totals.total)
+
+const result = await kizlo.client.woocommerce.checkout.confirm({
+  body: { ...checkoutInput, expectedTotal: reviewedTotal },
+})
+
+if (!result.success && result.error.code === "CHECKOUT_TOTAL_MISMATCH") {
+  const { cart: updatedCart, expectedTotal, actualTotal } = result.error.data
+  // Display the available evidence and ask the shopper to review again.
+}
+```
+
+Upgrade `kizlo` to 0.26.1 or later alongside `@kizlo/woocommerce` so browser clients preserve the typed conflict. This protection requires [WooCommerce 11.1.0 or later](https://github.com/woocommerce/woocommerce/blob/11.1.0/plugins/woocommerce/src/StoreApi/Routes/V1/Checkout.php). An increased recalculated total returns `CHECKOUT_TOTAL_MISMATCH` with status 409 before order creation or payment; equal and decreased totals are allowed. Error data contains `cart: Cart | null` and optional minor-unit digit strings `expectedTotal` and `actualTotal`; missing or malformed evidence preserves the conflict. Omit the field for manual or express flows that cannot know the total up front, and on older WooCommerce versions that do not enforce it.
+
+- Keep the reviewed amount until the shopper approves a new one. Confirmation performs no cart refresh, amount substitution, or automatic retry.
+- `checkout.retry` pays an existing order through a separate protocol and does not accept `expectedTotal`.
+
 ## Storefront settings
 
 `storefront.get` returns the store-wide settings a storefront renders with, so nothing has to be hardcoded:

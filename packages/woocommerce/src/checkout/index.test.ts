@@ -1,7 +1,11 @@
 import { createThrowableErrorMap, type KizloError } from "kizlo"
 import { expect, test, vi } from "vitest"
+import { Cart } from "../cart/schema"
+import type { WCK_Cart } from "../cart/types"
+import { deserializeCart } from "../cart/utils"
 import { CONFIRM_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERROR_MAP, UPDATE_CHECKOUT_ERROR_MAP } from "./error"
 import { CHECKOUT_PROCEDURES } from "./index"
+import { ConfirmCheckoutInput } from "./schema"
 
 const billingAddress = {
 	firstName: "Ada",
@@ -24,6 +28,7 @@ function confirmContext(response: unknown) {
 		wordpress: {
 			woocommerce: {
 				store: {
+					cart: { retrieve: vi.fn() },
 					checkout: {
 						retrieve: vi.fn(),
 						create: vi.fn().mockResolvedValue(response),
@@ -35,6 +40,152 @@ function confirmContext(response: unknown) {
 		logger: { error: vi.fn() },
 	}
 }
+
+test.each(["0", "1250", "001250", "9007199254740993"])("confirm forwards reviewed total %s unchanged", async (expectedTotal) => {
+	const { context, promise } = await confirm(
+		{ status: 409, data: null, error: { code: "woocommerce_rest_checkout_total_mismatch", message: "Review total", data: null } },
+		ConfirmCheckoutInput.parse({ billingAddress, paymentMethod: "bacs", expectedTotal }),
+	)
+	await expect(promise).rejects.toMatchObject({ code: "CHECKOUT_TOTAL_MISMATCH", status: 409 })
+	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledTimes(1)
+	expect(context.wordpress.woocommerce.store.checkout.create).toHaveBeenCalledWith(
+		{ body: expect.objectContaining({ expected_total: expectedTotal }) },
+		{ headers: context.sessionHeaders },
+	)
+	expect(context.wordpress.woocommerce.store.checkout.retrieve).not.toHaveBeenCalled()
+	expect(context.wordpress.woocommerce.store.cart.retrieve).not.toHaveBeenCalled()
+})
+
+test("confirm omits protection when no reviewed total was supplied", async () => {
+	const { context, promise } = await confirm(
+		{ status: 400, data: null, error: { code: "rest_invalid_param", message: "Invalid", data: null } },
+		ConfirmCheckoutInput.parse({ billingAddress, paymentMethod: "bacs" }),
+	)
+	await expect(promise).rejects.toMatchObject({ code: "CHECKOUT_VALIDATION_FAILED" })
+	expect(context.wordpress.woocommerce.store.checkout.create.mock.calls[0]?.[0].body).not.toHaveProperty("expected_total")
+})
+
+function conflictCart(): WCK_Cart {
+	const address = {
+		first_name: "Ada",
+		last_name: "Lovelace",
+		company: "",
+		address_1: "1 Store Street",
+		address_2: "",
+		city: "London",
+		state: "",
+		postcode: "SW1A 1AA",
+		country: "GB",
+		phone: "0123456789",
+	}
+	return {
+		items: [],
+		items_count: 0,
+		items_weight: 0,
+		coupons: [],
+		fees: [],
+		cross_sells: [],
+		needs_payment: false,
+		needs_shipping: false,
+		has_calculated_shipping: false,
+		shipping_rates: [],
+		billing_address: { ...address, email: "ada@example.com" },
+		shipping_address: address,
+		payment_methods: [],
+		payment_requirements: [],
+		errors: [],
+		extensions: { kizlo: null, qaCheckout: null, qaConditions: null, acme: { refreshed: true } },
+		totals: {
+			currency_code: "GBP",
+			currency_symbol: "£",
+			currency_minor_unit: 2,
+			currency_decimal_separator: ".",
+			currency_thousand_separator: ",",
+			currency_prefix: "£",
+			currency_suffix: "",
+			total_items: "1500",
+			total_items_tax: "0",
+			total_fees: "0",
+			total_fees_tax: "0",
+			total_discount: "0",
+			total_discount_tax: "0",
+			total_shipping: null,
+			total_shipping_tax: null,
+			total_price: "1500",
+			total_tax: "0",
+			tax_lines: [],
+		},
+	}
+}
+
+test("confirm preserves the mismatch message, normalized cart and integer/string amounts", async () => {
+	const cart = conflictCart()
+	const { context, promise } = await confirm(
+		{
+			status: 409,
+			data: null,
+			error: {
+				code: "woocommerce_rest_checkout_total_mismatch",
+				message: "Total rose from £12.50 to £15.00.",
+				data: { cart, expected_total: 1250, actual_total: "1500", status: 409 },
+			},
+		},
+		{ billingAddress, paymentMethod: "bacs", expectedTotal: "1250" },
+	)
+	await expect(promise).rejects.toMatchObject({
+		code: "CHECKOUT_TOTAL_MISMATCH",
+		status: 409,
+		message: "Total rose from £12.50 to £15.00.",
+		data: { cart: deserializeCart(cart), expectedTotal: "1250", actualTotal: "1500" },
+	})
+	expect(context.logger.error).not.toHaveBeenCalled()
+})
+
+test.each([
+	{ evidence: null, data: { cart: null } },
+	{ evidence: [], data: { cart: null } },
+	{ evidence: { expected_total: 0, actual_total: 1500 }, data: { cart: null, expectedTotal: "0", actualTotal: "1500" } },
+	{ evidence: { cart: conflictCart() }, data: { cart: deserializeCart(conflictCart()) } },
+	{
+		evidence: { cart: {}, expected_total: "001250", actual_total: "9007199254740993" },
+		data: { cart: null, expectedTotal: "001250", actualTotal: "9007199254740993" },
+	},
+	{
+		evidence: { cart: { ...conflictCart(), items_count: undefined }, expected_total: "1250", actual_total: 1500 },
+		data: { cart: null, expectedTotal: "1250", actualTotal: "1500" },
+	},
+	{ evidence: { cart: conflictCart(), expected_total: -1, actual_total: "1.5" }, data: { cart: deserializeCart(conflictCart()) } },
+])("confirm retains a conflict with incomplete evidence: $evidence", async ({ evidence, data }) => {
+	const { promise } = await confirm(
+		{ status: 409, data: null, error: { code: "woocommerce_rest_checkout_total_mismatch", message: "Review total", data: evidence } },
+		{ billingAddress, paymentMethod: "bacs" },
+	)
+	await expect(promise).rejects.toMatchObject({ code: "CHECKOUT_TOTAL_MISMATCH", status: 409, message: "Review total", data })
+	const error = await Promise.resolve(promise).catch((error) => error)
+	expect(error.data).toEqual(data)
+	expect(CONFIRM_CHECKOUT_ERROR_MAP.CHECKOUT_TOTAL_MISMATCH.data.safeParse(error.data).success).toBe(true)
+	if (error.data.cart) expect(Cart.safeParse(error.data.cart).success).toBe(true)
+})
+
+test.each(["", "-1", "1.5", "1e3", " 1", "1\n", 1.5, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, null, {}])(
+	"confirm omits malformed amount evidence %j without losing the 409",
+	async (amount) => {
+		const { promise } = await confirm(
+			{
+				status: 409,
+				data: null,
+				error: {
+					code: "woocommerce_rest_checkout_total_mismatch",
+					message: "Review total",
+					data: { expected_total: amount, actual_total: amount },
+				},
+			},
+			{ billingAddress, paymentMethod: "bacs" },
+		)
+		await expect(promise).rejects.toMatchObject({ code: "CHECKOUT_TOTAL_MISMATCH", status: 409, data: { cart: null } })
+		expect((await Promise.resolve(promise).catch((error) => error)).data).toEqual({ cart: null })
+	},
+)
 
 async function confirm(response: unknown, body: Record<string, unknown>) {
 	const context = confirmContext(response)

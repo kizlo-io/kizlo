@@ -492,12 +492,28 @@ test("registered browser checkout errors retain references through published dec
 		fs.writeFileSync(
 			path.join(dir, "usage.ts"),
 			`import { createKizloClient, type ActiveKizloClient } from "kizlo"
-		import type { CheckoutValidationIssue, CheckoutRegisteredFieldReference } from "@kizlo/woocommerce"
+		import type { Cart, ConfirmCheckoutInput, CheckoutValidationIssue, CheckoutRegisteredFieldReference } from "@kizlo/woocommerce"
 		import { contract } from "./generated"
 		type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 		type Assert<T extends true> = T
 		const client = createKizloClient(contract).client
 		type Result = Awaited<ReturnType<typeof client.woocommerce.checkout.confirm>>
+		type ReviewedTotal = Assert<Equal<ConfirmCheckoutInput["expectedTotal"], string | undefined>>
+		type ClientReviewedTotal = Assert<Equal<Parameters<typeof client.woocommerce.checkout.confirm>[0]["body"]["expectedTotal"], string | undefined>>
+		const reviewedTotal: ConfirmCheckoutInput["expectedTotal"] = "0"
+		// @ts-expect-error minor-unit totals reject numeric input
+		const numericTotal: ConfirmCheckoutInput["expectedTotal"] = 1250
+		type Mismatch = Extract<NonNullable<Result["error"]>, { code: "CHECKOUT_TOTAL_MISMATCH" }>
+		type ExpectedAmount = Assert<Equal<Mismatch["data"]["expectedTotal"], string | undefined>>
+		type ActualAmount = Assert<Equal<Mismatch["data"]["actualTotal"], string | undefined>>
+		declare const mismatch: Mismatch
+		const cart: Cart | null = mismatch.data.cart
+		const status: number = mismatch.status
+		declare const result: Result
+		if (!result.success && result.error.code === "CHECKOUT_TOTAL_MISMATCH") {
+			const expected: string | undefined = result.error.data.expectedTotal
+			const actual: string | undefined = result.error.data.actualTotal
+		}
 		type Error = Extract<NonNullable<Result["error"]>, { code: "CHECKOUT_VALIDATION_FAILED" }>
 		type Issue = Error["data"]["issues"][number]
 		declare const issue: Issue

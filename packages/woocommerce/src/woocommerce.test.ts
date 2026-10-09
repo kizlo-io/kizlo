@@ -1,6 +1,6 @@
 import { type CookiesAdapter, createAuthAdapter } from "kizlo"
 import { getKizloClientTestInstance, getKizloTestInstance, getTestCredentials } from "kizlo/test-harness"
-import { afterAll, beforeAll, expect, test } from "vitest"
+import { afterAll, beforeAll, expect, test, vi } from "vitest"
 import { Cart, type CartBillingAddress } from "./cart/schema"
 import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { WC_CORE_BASE } from "./constants"
@@ -600,6 +600,96 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 	expect(customer.additionalFields).not.toHaveProperty("qa/slot")
 	expect(stored.billingAddress.taxId).toBe("GB-CHECKOUT-42")
 	expect(stored.shippingAddress).not.toHaveProperty("taxId")
+})
+
+async function reviewedCheckout(quantity = 1) {
+	const apiUrl = "http://test.local/api/kizlo"
+	const api = getKizloTestInstance({
+		baseUrl: apiUrl,
+		integrations: [woocommerce()],
+		adapters: { auth: createAuthAdapter({ getSession: () => null }) },
+	})
+	let cookie = ""
+	const browser = await getKizloClientTestInstance(api, {
+		url: apiUrl,
+		fetch: async (request) => {
+			if (cookie) request.headers.set("cookie", cookie)
+			const response = await api.handler(request)
+			const sessionCookie = response.headers.getSetCookie().find((header) => header.startsWith("guest-session="))
+			if (sessionCookie) cookie = sessionCookie.split(";", 1)[0] ?? ""
+			return response
+		},
+	})
+	const guest = browser.client.woocommerce
+	const address = { ...RETRY_BILLING, city: "Los Angeles", state: "CA", postcode: "90210", country: "US", taxId: "REVIEWED-TOTAL" }
+	const added = await guest.cart.items.add.call({ body: { productId, quantity } })
+	const key = added.items[0]?.key
+	if (!key) throw new Error("Reviewed checkout has no cart item")
+	const addressed = await guest.cart.update.call({ body: { billingAddress: address, shippingAddress: address } })
+	const pkg = addressed.shippingPackages[0]
+	const rate = pkg?.rates.find((rate) => rate.methodId === "flat_rate")
+	if (!pkg || !rate) throw new Error("Reviewed checkout has no flat shipping rate")
+	const cart = await guest.cart.selectShippingRate.call({ body: { packageId: pkg.id, rateId: rate.id } })
+	return { guest, key, cart, body: { billingAddress: address, shippingAddress: address, paymentMethod: "bacs" } }
+}
+
+test.each(["matching", "decreased", "omitted"] as const)("reviewed checkout allows %s totals", async (scenario) => {
+	const { guest, key, cart, body } = await reviewedCheckout(scenario === "decreased" ? 2 : 1)
+	const reviewedTotal = String(cart.totals.total)
+	if (scenario === "decreased") await guest.cart.items.update.call({ params: { key }, body: { quantity: 1 } })
+	try {
+		const result = await guest.checkout.confirm.call({
+			body: { ...body, ...(scenario !== "omitted" && { expectedTotal: reviewedTotal }) },
+		})
+		expect(result.orderId).toEqual(expect.any(Number))
+		expect(result.paymentResult?.status).toBe("success")
+		const observed = await guest.cart.get.call()
+		expect(observed.extensions.qaCheckout).toMatchObject({ ordersCreated: 1, paymentAttempts: 1 })
+	} finally {
+		const remaining = await guest.cart.get.call()
+		for (const item of remaining.items) await guest.cart.items.remove.call({ params: { key: item.key } })
+	}
+})
+
+test("an increased reviewed total reaches the registered browser error union before order creation or payment", async () => {
+	const { guest, key, cart, body } = await reviewedCheckout()
+	const expectedTotal = String(cart.totals.total)
+	const changed = await guest.cart.items.update.call({ params: { key }, body: { quantity: 2 } })
+	expect(changed.totals.total).toBeGreaterThan(cart.totals.total)
+	try {
+		const result = await guest.checkout.confirm({ body: { ...body, expectedTotal } })
+		expect(result.success).toBe(false)
+		if (result.success) throw new Error("Checkout accepted an increased total")
+		expect(result.error.code).toBe("CHECKOUT_TOTAL_MISMATCH")
+		if (result.error.code !== "CHECKOUT_TOTAL_MISMATCH") throw result.error
+		expect(result.error.status).toBe(409)
+		expect(result.error.message).toContain("order total changed")
+		expect(result.error.data.expectedTotal).toBe(expectedTotal)
+		expect(result.error.data.actualTotal).toBe(String(changed.totals.total))
+		expect(result.error.data.cart?.totals.total).toBe(changed.totals.total)
+		expect(result.error.data.cart?.items[0]?.quantity).toBe(2)
+		expect(result.error.data.cart?.extensions.qaCheckout).toEqual({ ordersCreated: 0, paymentAttempts: 0 })
+		const after = await guest.cart.get.call()
+		expect(after.extensions.qaCheckout).toEqual({ ordersCreated: 0, paymentAttempts: 0 })
+		expect(after.items[0]?.key).toBe(key)
+	} finally {
+		await guest.cart.items.remove.call({ params: { key } })
+	}
+})
+
+test.each(["", "-1", "1.5", "x", 1250])("checkout rejects reviewed total %j before requesting WordPress", async (expectedTotal) => {
+	const request = vi.spyOn(globalThis, "fetch")
+	try {
+		const result = await client().checkout.confirm({
+			body: { billingAddress: RETRY_BILLING, paymentMethod: "bacs", expectedTotal } as never,
+		})
+		expect(result.success).toBe(false)
+		if (result.success) throw new Error("Checkout accepted an invalid reviewed total")
+		expect(result.error.code).toBe("BAD_REQUEST")
+		expect(request).not.toHaveBeenCalled()
+	} finally {
+		request.mockRestore()
+	}
 })
 
 test("a failed shipping selection keeps the checkout cart available", async () => {
