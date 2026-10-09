@@ -58,6 +58,8 @@ The native value maps to the official registered `kizlo/tax-id` address field. F
 
 Raw introspection preserves `kizlo/tax-id` in both address schemas. Normalized billing `additionalFields` omits it from types and values: use the native property. Raw billing inputs using that key are rejected even when a duplicate equals `taxId`; there is no raw-only compatibility alias. Other registered and compatible unknown response extras retain their usual buckets.
 
+Registered billing extras retain their named enum and scalar types in reads, partial cart updates, and full confirmation/retry inputs, including registrations with a scalar string index. Full submissions require the registered answers and reject values outside their enums; partial cart updates allow omitted answers. These are compile-time guarantees from the consumer's registered contract. WooCommerce continues to validate against its live registry at runtime.
+
 Customer reads use the grouped `billing.additional_fields` adapter backed by public CheckoutFields helpers. Orders read their own snapshot, never the current profile. Storage remains `_wc_billing/kizlo/tax-id`, so existing saved values need no migration. Order admin edits set/replace/clear the order alone; profile edits affect later cart hydration. The retry validation/persistence bridge and shipping cleanup remain required on WooCommerce 11.0.1.
 
 Consumers should deploy the matching WooCommerce plugin and regenerate their contract after upgrading; the old per-field raw `billing.tax_id` response is removed. The native API remains `customer.billing.taxId` and `billingAddress.taxId`. This feature does not validate jurisdiction-specific identifiers or calculate tax exemptions.

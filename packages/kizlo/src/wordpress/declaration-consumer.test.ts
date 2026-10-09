@@ -266,6 +266,10 @@ const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProc
 	type ProductCompiles = Assert<Equal<Product["custom"], Record<string, unknown>>>
 	type StubAddressFields = Assert<Equal<Cart["billingAddress"]["additionalFields"]["future/field"], string | boolean | undefined>>
 	type StubProjectedField = Assert<Equal<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"], undefined>>
+	const fallback: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "future/field": "future" }
+	const partialFallback: UpdateCartInput = { billingAddress: { additionalFields: { "future/flag": false } } }
+	// @ts-expect-error unregistered fallback still excludes raw billing projections
+	const rawFallback: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "kizlo/tax-id": "GB" }
 	type StubCheckoutFields = Assert<Equal<Checkout["additionalFields"], Record<string, string | boolean | undefined>>>
 	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
 	type WooCommerceProcedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
@@ -461,7 +465,9 @@ test("empty registered buckets keep scalar reads and reject invented literal wri
 		const dynamic: string | boolean | undefined = cart.billingAddress.additionalFields["future/field"]
 		// @ts-expect-error a present empty registry has no registered write keys
 		const invented: UpdateCartInput = { shippingAddress: { additionalFields: { "future/field": true } } }
-		export { empty, update, checkout, dynamic, invented }`,
+		// @ts-expect-error projecting an empty billing registry must not invent writable fields
+		const inventedBilling: UpdateCartInput = { billingAddress: { additionalFields: { "future/field": true } } }
+		export { empty, update, checkout, dynamic, invented, inventedBilling }`,
 		)
 		expect(compile(dir)).toEqual([])
 	} finally {
@@ -524,3 +530,89 @@ test("registered browser checkout errors retain references through published dec
 		fs.rmSync(dir, { force: true, recursive: true })
 	}
 }, 30_000)
+
+const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartInput, type ConfirmCheckoutInput, type RetryCheckoutInput, woocommerce } from "@kizlo/woocommerce"
+	import type { InferIntegrationProcedures, InferProcedureInput, WP_Schema } from "kizlo"
+	import "./wordpress"
+
+	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+	type Assert<T extends true> = T
+	type Procedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>["woocommerce"]
+	type ConfirmFields = InferProcedureInput<Procedures["checkout"]["confirm"]>["body"]["billingAddress"]["additionalFields"]
+	type RetryFields = InferProcedureInput<Procedures["checkout"]["retry"]>["body"]["billingAddress"]["additionalFields"]
+	type ConfirmAlias = Assert<Equal<ConfirmFields, ConfirmCheckoutInput["billingAddress"]["additionalFields"]>>
+	type RetryAlias = Assert<Equal<RetryFields, RetryCheckoutInput["billingAddress"]["additionalFields"]>>
+	type AddressAlias = Assert<Equal<ConfirmFields, CartBillingAddressInput["additionalFields"]>>
+	type SchemaInput = Assert<Equal<ConfirmFields, typeof CartBillingAddressSubmission["_input"]["additionalFields"]>>
+	type RequiredChoice = Assert<Equal<ConfirmFields["billing/choice"], "home" | "office">>
+	type OptionalFlag = Assert<Equal<ConfirmFields["billing/flag"], boolean | undefined>>
+	type ReadChoice = Assert<Equal<Cart["billingAddress"]["additionalFields"]["billing/choice"], "" | "home" | "office" | undefined>>
+	type ReadFlag = Assert<Equal<Cart["billingAddress"]["additionalFields"]["billing/flag"], boolean | undefined>>
+	type RawTaxId = Assert<Equal<WP_Schema<"woocommerce.additional-fields.address.write">["kizlo/tax-id"], string>>
+	type ProjectedTaxId = Assert<Equal<ConfirmFields["kizlo/tax-id"], undefined>>
+	type NativeTaxId = Assert<Equal<Cart["billingAddress"]["taxId"], string>>
+
+	const confirmation: ConfirmFields = { "billing/choice": "home", "billing/flag": false }
+	const retry: RetryFields = { "billing/choice": "office" }
+	const partial: UpdateCartInput = { billingAddress: { additionalFields: {} } }
+	const partialFlag: UpdateCartInput = { billingAddress: { taxId: "", additionalFields: { "billing/flag": false } } }
+	// @ts-expect-error confirmation must retain the registered required answer
+	const missingConfirm: ConfirmFields = {}
+	// @ts-expect-error retry must retain the registered required answer
+	const missingRetry: RetryFields = {}
+	// @ts-expect-error confirmation must retain the registered enum
+	const invalidConfirm: ConfirmFields = { "billing/choice": "warehouse" }
+	// @ts-expect-error retry must retain the registered enum
+	const invalidRetry: RetryFields = { "billing/choice": "warehouse" }
+	// @ts-expect-error a required select excludes the editable empty placeholder
+	const placeholder: ConfirmFields = { "billing/choice": "" }
+	// @ts-expect-error named checkbox types survive an open scalar index
+	const invalidFlag: ConfirmFields = { "billing/choice": "home", "billing/flag": "false" }
+	// @ts-expect-error partial updates retain named enum types
+	const invalidPartial: UpdateCartInput = { billingAddress: { additionalFields: { "billing/choice": "warehouse" } } }
+	// @ts-expect-error partial updates retain named checkbox types
+	const invalidPartialFlag: UpdateCartInput = { billingAddress: { additionalFields: { "billing/flag": "false" } } }
+	// @ts-expect-error raw Tax ID remains forbidden alongside valid required answers
+	const duplicate: ConfirmFields = { "billing/choice": "home", "kizlo/tax-id": "GB" }
+	// @ts-expect-error retry keeps the same native-only projection
+	const duplicateRetry: RetryFields = { "billing/choice": "office", "kizlo/tax-id": "GB" }
+	// @ts-expect-error partial updates also reject a raw projected key
+	const duplicatePartial: UpdateCartInput = { billingAddress: { additionalFields: { "kizlo/tax-id": "GB" } } }
+
+	type ShippingFields = NonNullable<InferProcedureInput<Procedures["checkout"]["confirm"]>["body"]["shippingAddress"]>["additionalFields"]
+	type ShippingChoice = Assert<Equal<ShippingFields["billing/choice"], "home" | "office">>
+	type CheckoutFlag = Assert<Equal<NonNullable<ConfirmCheckoutInput["additionalFields"]>["billing/opt-in"], boolean | undefined>>
+	declare const cart: Cart
+	const unknownRead: string | boolean | undefined = cart.billingAddress.additionalFields["future/field"]
+`
+
+test.each(["closed", "indexed"] as const)(
+	"published billing declarations preserve %s registered field contracts",
+	(registration) => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-billing-fields-consumer-"))
+		try {
+			const document = introspection("billing")
+			for (const mode of ["read", "write"] as const) {
+				document.schemas[`woocommerce.additional-fields.address.${mode}`] = {
+					type: "object",
+					properties: {
+						"billing/choice": {
+							type: "string",
+							enum: mode === "write" ? ["home", "office"] : ["", "home", "office"],
+							required: mode === "write",
+						},
+						"billing/flag": { type: "boolean" },
+						"kizlo/tax-id": { type: "string", required: mode === "write" },
+					},
+					additionalProperties: registration === "indexed" ? { anyOf: [{ type: "string" }, { type: "boolean" }] } : false,
+				}
+			}
+			fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(document))
+			fs.writeFileSync(path.join(dir, "usage.ts"), BILLING_FIELDS_USAGE)
+			expect(compile(dir)).toEqual([])
+		} finally {
+			fs.rmSync(dir, { force: true, recursive: true })
+		}
+	},
+	30_000,
+)

@@ -1,4 +1,4 @@
-import { createProcedure, schemaType } from "kizlo"
+import { createProcedure, type Procedure, schemaType } from "kizlo"
 import type z from "zod/v4"
 import type { WCK_Cart } from "../cart/types"
 import { deserializeCart } from "../cart/utils"
@@ -15,7 +15,7 @@ import {
 
 import { checkoutValidationData } from "./validation"
 
-export const CHECKOUT_PROCEDURES = {
+const checkoutProcedures = {
 	get: createProcedure(
 		{
 			scope: "api",
@@ -277,3 +277,16 @@ function conflictData(data: unknown): { cart: ReturnType<typeof deserializeCart>
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 }
+
+/** Keep billing registry aliases consumer-resolved instead of emitting the build-time fallback. */
+export const CHECKOUT_PROCEDURES: {
+	get: typeof checkoutProcedures.get
+	update: typeof checkoutProcedures.update
+	confirm: Procedure<"api", { body: ConfirmCheckoutInput }, Checkout, typeof CONFIRM_CHECKOUT_ERROR_MAP>
+	retry: Procedure<
+		"api",
+		{ body: Omit<RetryCheckoutInput, "orderId">; params: { orderId: RetryCheckoutInput["orderId"] } },
+		Checkout,
+		typeof RETRY_CHECKOUT_ERROR_MAP
+	>
+} = checkoutProcedures

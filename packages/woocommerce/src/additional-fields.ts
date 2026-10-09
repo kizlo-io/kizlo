@@ -3,19 +3,21 @@ import z from "zod/v4"
 import { isExcludedRegisteredField, isProjectedBillingField, type ProjectedBillingFieldId } from "./field-projections"
 
 type ScalarFields = Record<string, string | boolean | undefined>
+/** Key remapping retains named properties and modifiers on schemas with a string index. */
+type WithoutFields<T, TExcluded extends string> = { [K in keyof T as K extends TExcluded ? never : K]: T[K] }
 type RegisteredRead<TLocation extends string, TExcluded extends string = never> =
 	WP_Schema<`woocommerce.additional-fields.${TLocation}.read`, ScalarFields> extends Record<string, never>
 		? ScalarFields
 		: [TExcluded] extends [never]
 			? WP_Schema<`woocommerce.additional-fields.${TLocation}.read`, ScalarFields> & ScalarFields
-			: Omit<WP_Schema<`woocommerce.additional-fields.${TLocation}.read`, ScalarFields>, TExcluded> & ScalarFields
+			: WithoutFields<WP_Schema<`woocommerce.additional-fields.${TLocation}.read`, ScalarFields>, TExcluded> & ScalarFields
 type RegisteredWrite<TLocation extends string> = WP_Schema<`woocommerce.additional-fields.${TLocation}.write`, ScalarFields>
 
 export type AddressAdditionalFields = RegisteredRead<"address">
 export type AddressAdditionalFieldsInput = Partial<RegisteredWrite<"address">>
 export type AddressAdditionalFieldsSubmission = RegisteredWrite<"address">
 /** Explicit never keys also prevent the compatible unknown-read index from reintroducing a projected value. */
-type WithoutBillingProjections<T> = Omit<T, ProjectedBillingFieldId> & { [K in ProjectedBillingFieldId]?: never }
+type WithoutBillingProjections<T> = WithoutFields<T, ProjectedBillingFieldId> & { [K in ProjectedBillingFieldId]?: never }
 export type BillingAdditionalFields = RegisteredRead<"address", ProjectedBillingFieldId> & { [K in ProjectedBillingFieldId]?: never }
 export type BillingAdditionalFieldsInput = WithoutBillingProjections<AddressAdditionalFieldsInput>
 export type BillingAdditionalFieldsSubmission = WithoutBillingProjections<AddressAdditionalFieldsSubmission>
