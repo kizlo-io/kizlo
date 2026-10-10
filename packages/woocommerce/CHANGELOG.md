@@ -1,5 +1,11 @@
 # @kizlo/woocommerce
 
+## 0.15.0
+
+### Minor Changes
+
+- [#282](https://github.com/kizlo-io/kizlo/pull/282) [`0715343`](https://github.com/kizlo-io/kizlo/commit/0715343dd20e2ef28ef466e28da1f9610852b4a2) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Support reviewed checkout totals and require kizlo 0.26.1 or later to preserve total-mismatch conflicts.
+
 ## 0.14.1
 
 ### Patch Changes
