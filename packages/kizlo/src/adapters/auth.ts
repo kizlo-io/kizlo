@@ -16,7 +16,7 @@ export interface AuthUser {
 export type AuthGetSession = (request: Request | null) => Promisify<AuthUser | null>
 
 export interface AuthAdapter {
-	/** Resolve the authenticated session from the request, or `null` when there is no session. Receives `null` for server-side (non-HTTP) invocations. */
+	/** Resolve the session from an HTTP request, a cookie-derived server request, or `null` when neither is available. */
 	getSession: AuthGetSession
 }
 

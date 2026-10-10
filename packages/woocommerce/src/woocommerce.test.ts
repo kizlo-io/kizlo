@@ -972,6 +972,35 @@ test("orders.get returns an order to its registered owner", async () => {
 	expect(result.items[0]?.product).not.toHaveProperty("permalink")
 })
 
+test("orders.get preserves cookie-derived identity for server and HTTP calls and enforces ownership", async () => {
+	const owner = getTestCredentials().users.user
+	const other = getTestCredentials().users.admin
+	const order = await createPendingOrder(owner.id)
+	const cookies = { getAll: vi.fn(() => [{ name: "session", value: "owner" }]), setAll: vi.fn(), deleteAll: vi.fn() }
+	const getSession = vi.fn(async (request: Request | null) =>
+		request?.headers.get("cookie") === "session=owner" ? { id: String(owner.id), email: owner.email } : null,
+	)
+	const storefront = getKizloTestInstance({
+		baseUrl: "https://app.example/api/kizlo",
+		integrations: [woocommerce()],
+		adapters: { auth: { getSession }, cookies },
+	})
+	const http = (orderId: number) =>
+		storefront.handler(new Request(`https://app.example/api/kizlo/orders/${orderId}`, { headers: { cookie: "session=owner" } }))
+
+	expect((await storefront.client.woocommerce.orders.get.call({ params: { orderId: order.id } })).id).toBe(order.id)
+	const response = await http(order.id)
+	expect(response.status).toBe(200)
+	expect(await response.json()).toMatchObject({ id: order.id })
+
+	const otherOrder = await createPendingOrder(other.id)
+	await expect(storefront.client.woocommerce.orders.get.call({ params: { orderId: otherOrder.id } })).rejects.toMatchObject({
+		code: "ORDER_FORBIDDEN",
+		status: 403,
+	})
+	expect((await http(otherOrder.id)).status).toBe(403)
+})
+
 test("orders.get returns a guest order with its key and billing email", async () => {
 	const order = await createPendingOrder()
 

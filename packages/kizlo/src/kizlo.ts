@@ -55,6 +55,7 @@ export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
 		const integrations = this.registerIntegrations()
 
 		this.context = new Context({
+			baseUrl: config.baseUrl,
 			adapters: integrations.adapters,
 			siteSecret: config.siteSecret,
 			credentials: config.credentials,
