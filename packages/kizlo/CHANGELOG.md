@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.26.2
+
+### Patch Changes
+
+- [#284](https://github.com/kizlo-io/kizlo/pull/284) [`e15de6c`](https://github.com/kizlo-io/kizlo/commit/e15de6c339b67b239cba1f65a498d6f0f92589b1) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Preserve cookie-based authentication in direct server calls and register Next.js cookies automatically.
+
 ## 0.26.1
 
 ### Patch Changes
