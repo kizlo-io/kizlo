@@ -129,6 +129,13 @@ export function myAuth() {
   and the providers a customer-facing app expects. Your users come through an auth adapter instead. This is <strong>one of the reasons Kizlo keeps WordPress auth off the frontend.</strong>
 </Callout>
 
+#### Direct server calls
+
+For direct server calls, Kizlo supplies an in-memory `Request` with your configured `baseUrl` and the
+cookies from your cookies adapter. If either is unavailable or the cookie store is empty, the auth adapter
+receives `null`. Cookie-read failures propagate; this fallback supplies no incoming bearer token, other headers, or browser URL. Auth that
+needs those values must use the HTTP handler or resolve them from its framework's request context.
+
 ### `cookies`: read & write cookies
 
 ```ts
@@ -140,8 +147,8 @@ interface CookiesAdapter {
 ```
 
 These three operations wrap whatever cookie store your framework gives you. Kizlo uses them to set, read, and clear
-sessions. On Next.js this maps straight onto `next/headers`; on another framework you wrap its equivalent. The
-framework integration usually wires this one for you, so you rarely write it by hand.
+sessions. Registering `nextjs()` wires `next/headers` automatically and reads cookies only when needed.
+On another framework, wrap its equivalent cookie store.
 
 ### `geo`: describe the connection
 

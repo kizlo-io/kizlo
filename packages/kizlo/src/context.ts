@@ -64,6 +64,8 @@ function claimWordPressWarning(key: string): boolean {
 }
 
 export interface ContextConfig {
+	/** Public Kizlo URL used to resolve cookie-based authentication for direct server calls. */
+	baseUrl?: string
 	siteSecret: string
 	adapters?: ServiceAdapters
 	credentials: WordPressCredentials
@@ -201,7 +203,7 @@ export class Context {
 			wordpress: this.wordpress,
 			settings: this.settings,
 			email: this.email,
-			getSession: this.createGetSessionFn(null),
+			getSession: this.createGetSessionFn(null, cookies),
 			getConnInfo: this.createConnInfoFn(null),
 			verifyCaptcha: this.createVerifyCaptchaFn(null),
 			verifyPreviewToken: this.createVerifyPreviewTokenFn(),
@@ -255,9 +257,19 @@ export class Context {
 		}
 	}
 
-	private createGetSessionFn(request: Request | null): SessionFn {
+	private createGetSessionFn(request: Request | null, cookies?: CookiesStorage): SessionFn {
 		return async () => {
-			return (await Promise.resolve(this.config.adapters?.auth?.getSession?.(request))) ?? null
+			const auth = this.config.adapters?.auth
+			if (!auth) return null
+
+			let authRequest = request
+			if (!authRequest && this.config.baseUrl && cookies) {
+				// shortcut: cookie-only auth input; use the HTTP handler when auth needs other request metadata.
+				const cookieHeader = (await cookies.get()).map(({ name, value }) => stringifySetCookie({ name, value })).join("; ")
+				if (cookieHeader) authRequest = new Request(this.config.baseUrl, { headers: { cookie: cookieHeader } })
+			}
+
+			return (await auth.getSession(authRequest)) ?? null
 		}
 	}
 

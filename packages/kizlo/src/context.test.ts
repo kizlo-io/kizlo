@@ -1,4 +1,6 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import { pluginUpdateMessage } from "@kizlo/shared"
+import { parseCookie } from "cookie"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import type { AuthAdapter } from "./adapters/auth"
 import { Context, type ContextConfig } from "./context"
@@ -108,6 +110,101 @@ describe("auth session", () => {
 
 	test("returns null server-side when no auth adapter is configured", async () => {
 		await expect(createContext("https://session.example").createServerContext().getSession()).resolves.toBeNull()
+	})
+
+	test("lazily supplies encoded cookies and the configured URL only to server authentication", async () => {
+		const session = { id: "auth-1", email: "ada@example.com" }
+		const getSession = vi.fn<AuthAdapter["getSession"]>().mockResolvedValue(session)
+		const getAll = vi.fn().mockResolvedValue([{ name: "session", value: "Jeff & Sons, Ltd." }])
+		const context = createContext("https://wordpress.example", {
+			baseUrl: "https://app.example/api/kizlo",
+			adapters: { auth: { getSession }, cookies: { getAll, setAll: vi.fn(), deleteAll: vi.fn() } },
+		}).createServerContext()
+
+		expect(getAll).not.toHaveBeenCalled()
+		await expect(context.getSession()).resolves.toEqual(session)
+		const authRequest = getSession.mock.calls[0]?.[0]
+		expect(authRequest?.url).toBe("https://app.example/api/kizlo")
+		expect(authRequest?.headers.get("cookie")).toBe("session=Jeff%20%26%20Sons%2C%20Ltd.")
+		expect(context).toMatchObject({ request: null, headers: null, invokedBy: "server" })
+	})
+
+	test.each([[], null])("preserves null authentication input when cookies are %j", async (values) => {
+		const getSession = vi.fn<AuthAdapter["getSession"]>().mockResolvedValue(null)
+		const context = createContext("https://wordpress.example", {
+			baseUrl: "https://app.example",
+			adapters: { auth: { getSession }, cookies: { getAll: () => values, setAll: vi.fn(), deleteAll: vi.fn() } },
+		})
+
+		await expect(context.createServerContext().getSession()).resolves.toBeNull()
+		expect(getSession).toHaveBeenCalledWith(null)
+	})
+
+	test("preserves direct Context construction without a base URL or cookies adapter", async () => {
+		const getSession = vi.fn<AuthAdapter["getSession"]>().mockResolvedValue(null)
+		const getAll = vi.fn().mockResolvedValue([{ name: "session", value: "token" }])
+		const cookies = { getAll, setAll: vi.fn(), deleteAll: vi.fn() }
+
+		await createContext("https://wordpress.example", { adapters: { auth: { getSession }, cookies } })
+			.createServerContext()
+			.getSession()
+		await createContext("https://wordpress.example", { baseUrl: "https://app.example", adapters: { auth: { getSession } } })
+			.createServerContext()
+			.getSession()
+
+		expect(getAll).not.toHaveBeenCalled()
+		expect(getSession.mock.calls).toEqual([[null], [null]])
+	})
+
+	test("does not read framework cookies for HTTP authentication or without an auth adapter", async () => {
+		const getAll = vi.fn().mockRejectedValue(new Error("no request scope"))
+		const getSession = vi.fn<AuthAdapter["getSession"]>().mockResolvedValue(null)
+		const cookies = { getAll, setAll: vi.fn(), deleteAll: vi.fn() }
+		const httpRequest = new Request("https://app.example/api", { headers: { authorization: "Bearer token" } })
+
+		await createContext("https://wordpress.example", { baseUrl: "https://app.example", adapters: { auth: { getSession }, cookies } })
+			.createRestContext(httpRequest)
+			.getSession()
+		await createContext("https://wordpress.example", { baseUrl: "https://app.example", adapters: { cookies } })
+			.createServerContext()
+			.getSession()
+
+		expect(getSession).toHaveBeenCalledWith(httpRequest)
+		expect(getAll).not.toHaveBeenCalled()
+	})
+
+	test("propagates cookie-read failures without calling authentication", async () => {
+		const failure = new Error("no request scope")
+		const getSession = vi.fn<AuthAdapter["getSession"]>()
+		const context = createContext("https://wordpress.example", {
+			baseUrl: "https://app.example",
+			adapters: { auth: { getSession }, cookies: { getAll: () => Promise.reject(failure), setAll: vi.fn(), deleteAll: vi.fn() } },
+		})
+
+		await expect(context.createServerContext().getSession()).rejects.toBe(failure)
+		expect(getSession).not.toHaveBeenCalled()
+	})
+
+	test("isolates cookies between concurrent invocations and rereads them for later sessions", async () => {
+		const users = new AsyncLocalStorage<string>()
+		const context = createContext("https://wordpress.example", {
+			baseUrl: "https://app.example",
+			adapters: {
+				cookies: { getAll: async () => [{ name: "session", value: users.getStore() ?? "" }], setAll: vi.fn(), deleteAll: vi.fn() },
+				auth: {
+					getSession: async (request) => {
+						await Promise.resolve()
+						const id = parseCookie(request?.headers.get("cookie") ?? "").session
+						return id ? { id, email: `${id}@example.com` } : null
+					},
+				},
+			},
+		})
+		const server = context.createServerContext()
+		const sessions = await Promise.all(["alice", "bob"].map((id) => users.run(id, () => server.getSession())))
+
+		expect(sessions.map((session) => session?.id)).toEqual(["alice", "bob"])
+		await expect(users.run("carol", () => context.createServerContext().getSession())).resolves.toMatchObject({ id: "carol" })
 	})
 })
 
