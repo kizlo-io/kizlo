@@ -36,7 +36,32 @@ add_action('woocommerce_init', static function (): void {
         'schema_callback' => static fn(): array => ['reference.required' => ['type' => 'boolean', 'readonly' => true]],
         'schema_type' => ARRAY_A,
     ]);
+
+    // Session-local observations let SDK tests prove a conflict stops before either side effect.
+    woocommerce_store_api_register_endpoint_data([
+        'endpoint' => \Automattic\WooCommerce\StoreApi\Schemas\V1\CartSchema::IDENTIFIER,
+        'namespace' => 'qaCheckout',
+        'data_callback' => static fn(): array => [
+            'ordersCreated' => (int) WC()->session->get('qa_checkout_orders_created', 0),
+            'paymentAttempts' => (int) WC()->session->get('qa_checkout_payment_attempts', 0),
+        ],
+        'schema_callback' => static fn(): array => [
+            'ordersCreated' => ['type' => 'integer', 'readonly' => true],
+            'paymentAttempts' => ['type' => 'integer', 'readonly' => true],
+        ],
+        'schema_type' => ARRAY_A,
+    ]);
 });
+
+add_action('woocommerce_new_order', static function (): void {
+    if (WC()->session) {
+        WC()->session->set('qa_checkout_orders_created', (int) WC()->session->get('qa_checkout_orders_created', 0) + 1);
+    }
+}, 1);
+
+add_action('woocommerce_rest_checkout_process_payment_with_context', static function (): void {
+    WC()->session->set('qa_checkout_payment_attempts', (int) WC()->session->get('qa_checkout_payment_attempts', 0) + 1);
+}, 1);
 
 // Available to every seeded package without changing a store's shipping zones.
 add_filter('woocommerce_shipping_methods', static function (array $methods): array {

@@ -47,7 +47,7 @@ const introspectionFixtures = [
 	...coreFixtures,
 	kizloCore,
 	woocommerce({
-		plugins: [{ name: "woocommerce", source: "woocommerce", version: "11.0.1" }, { path: "plugins/kizlo-woocommerce" }],
+		plugins: [{ name: "woocommerce", source: "woocommerce", version: "11.1.2" }, { path: "plugins/kizlo-woocommerce" }],
 	}),
 	defineFixture({
 		name: "woocommerce-additional-fields",

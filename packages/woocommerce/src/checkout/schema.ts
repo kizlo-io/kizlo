@@ -76,6 +76,10 @@ export const ConfirmCheckoutInput = z.object({
 	billingAddress: CartBillingAddressSubmission,
 	shippingAddress: CartShippingAddressSubmission.optional(),
 	paymentMethod: z.string(),
+	expectedTotal: z
+		.string()
+		.regex(/^[0-9]+$/)
+		.optional(),
 	customerNote: z.string().optional(),
 	createAccount: z.boolean().optional(),
 	customerPassword: z.string().optional(),

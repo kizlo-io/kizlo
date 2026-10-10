@@ -182,6 +182,7 @@ function rawCart(): WCK_Cart {
 			tax_lines: [{ name: "Sales tax", price: "85", rate: "20%" }],
 		},
 		extensions: {
+			qaCheckout: null,
 			qaConditions: null,
 			kizlo: {
 				payment_methods: [
@@ -240,6 +241,7 @@ test("reads payment methods from the kizlo extension, preserving order and metad
 	const cart = rawCart()
 	cart.payment_methods = ["bacs", "cod", "stripe"]
 	cart.extensions = {
+		qaCheckout: null,
 		qaConditions: null,
 		kizlo: {
 			payment_methods: [

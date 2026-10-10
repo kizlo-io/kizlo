@@ -1,5 +1,6 @@
 import { createProcedure, type Procedure, schemaType } from "kizlo"
 import type z from "zod/v4"
+import { Cart } from "../cart/schema"
 import type { WCK_Cart } from "../cart/types"
 import { deserializeCart } from "../cart/utils"
 import { sessionMiddleware } from "../session"
@@ -119,6 +120,7 @@ const checkoutProcedures = {
 						shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
 						payment_method: gateway(input.body.paymentMethod),
 						customer_note: input.body.customerNote,
+						...(input.body.expectedTotal !== undefined && { expected_total: input.body.expectedTotal }),
 						create_account: input.body.createAccount ?? false,
 						customer_password: input.body.customerPassword,
 						payment_data: input.body.paymentData,
@@ -171,6 +173,8 @@ const checkoutProcedures = {
 						throw errors.CHECKOUT_CART_INVALID({ message: response.error.message, data: conflict })
 					case "removed_coupons":
 						throw errors.CHECKOUT_COUPONS_REMOVED({ message: response.error.message, data: conflict })
+					case "woocommerce_rest_checkout_total_mismatch":
+						throw errors.CHECKOUT_TOTAL_MISMATCH({ message: response.error.message, data: totalMismatchData(response.error.data) })
 					case "woocommerce_rest_coupon_reserve_failed":
 						throw errors.CHECKOUT_COUPON_RESERVATION_FAILED({ message: response.error.message, data: conflict })
 					case "woocommerce_rest_product_partially_out_of_stock":
@@ -276,6 +280,25 @@ function conflictData(data: unknown): { cart: ReturnType<typeof deserializeCart>
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function totalMismatchData(data: unknown): { cart: Cart | null; expectedTotal?: string; actualTotal?: string } {
+	const { cart } = conflictData(data)
+	const expectedTotal = minorUnitTotal(isRecord(data) ? data.expected_total : undefined)
+	const actualTotal = minorUnitTotal(isRecord(data) ? data.actual_total : undefined)
+
+	return {
+		// Deserialization can leave missing scalars behind without throwing; only retain usable evidence.
+		cart: Cart.safeParse(cart).success ? cart : null,
+		...(expectedTotal !== undefined && { expectedTotal }),
+		...(actualTotal !== undefined && { actualTotal }),
+	}
+}
+
+function minorUnitTotal(value: unknown): string | undefined {
+	if (typeof value === "string" && /^[0-9]+$/.test(value)) return value
+	if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value)
+	return undefined
 }
 
 /** Keep billing registry aliases consumer-resolved instead of emitting the build-time fallback. */

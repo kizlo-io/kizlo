@@ -1,4 +1,4 @@
-import { createORPCClient, DynamicLink } from "@orpc/client"
+import { createORPCClient, createORPCErrorFromJson, DynamicLink, isORPCErrorJson } from "@orpc/client"
 import { RPCLink } from "@orpc/client/fetch"
 import { inferRPCMethodFromContractRouter } from "@orpc/contract"
 import { OpenAPILink } from "@orpc/openapi-client/fetch"
@@ -45,7 +45,16 @@ export class KizloClient<TProcedures extends AnyProcedureTree> {
 		const url = this.getUrl()
 		const orpcContract = restoreContract(config.contract as Contract)
 
-		const openapiLink = new OpenAPILink(orpcContract, { url, fetch: config.fetch })
+		const openapiLink = new OpenAPILink(orpcContract, {
+			url,
+			fetch: config.fetch,
+			customErrorResponseBodyDecoder(body, response) {
+				if (body === null || typeof body !== "object" || Array.isArray(body)) return undefined
+				// Kizlo's OpenAPI encoder omits oRPC's protocol-only `defined` flag.
+				const error = { defined: false, ...body }
+				return isORPCErrorJson(error) && error.status === response.status ? createORPCErrorFromJson(error) : undefined
+			},
+		})
 
 		const remoteLink = new RPCLink({
 			url,
