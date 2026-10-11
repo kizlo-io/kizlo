@@ -311,9 +311,32 @@ vendor/bin/changelogger add -f <slug> -s <significance> -t <type> -e "<entry>" -
 This writes a small file to `plugins/<plugin>/changelog/`. Commit it with your
 change. **Do not hand-edit `CHANGELOG.md`** — it's generated from these fragments
 at release time, when the fragments are compiled and the version is bumped across
-the plugin's `kizlo.php` header, `KIZLO_VERSION` define, `readme.txt`, and
+the plugin's PHP entry-point header, version define, `readme.txt`, and
 `package.json` (kept in sync by `scripts/check-versions.mjs`). Releasing is
 triggered by pushing a `<plugin>-v<version>` tag (see `.github/workflows/plugin-release.yml`).
+
+After the change's pull request is merged, a maintainer releases from a clean,
+up-to-date `main`. Use the Node, pnpm, PHP, and Composer prerequisites above,
+run `pnpm install`, and ensure Git can push the release commit and tag to `origin`.
+From the repository root, run:
+
+```bash
+pnpm plugin:release kizlo-woocommerce  # replace with the plugin slug being released
+```
+
+This delegates to `scripts/release.mjs`: it validates the fragments, derives the
+next version from their significance, and runs the plugin's typecheck/build and
+`pnpm check`. It compiles and removes the fragments, generates `CHANGELOG.md`
+and the `readme.txt` changelog, synchronizes the version sources, and checks they
+agree. It then creates the generated release commit and tag and pushes both.
+The tag triggers the workflow above to build the zip and publish the GitHub release.
+This generated release commit is the maintainer-only exception to the rule
+against committing directly to `main`; ordinary changes still go through a PR.
+
+`pnpm plugin:release <plugin> --dry-run` skips the branch guards, pre-release
+checks, commit, tag, and push, but **still rewrites the release files and removes
+the fragments**. Use a disposable worktree to inspect those changes, then discard
+that worktree; do not use it as a read-only preview in a working checkout.
 
 ## Branch names
 
@@ -341,7 +364,8 @@ Cut every branch from a clean tree and a freshly pulled `main`
 (`git status` clean, then `git checkout main && git pull`). Branching on top of
 uncommitted work or a stale `main` is what produces avoidable conflicts later.
 
-Never commit directly to `main`.
+Never commit directly to `main`, except for the maintainer's generated plugin
+release commit described above.
 
 ### Worktrees for tracked-issue automation
 

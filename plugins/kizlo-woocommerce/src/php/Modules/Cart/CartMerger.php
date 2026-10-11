@@ -75,6 +75,7 @@ final class CartMerger
             if ($guestData === null) return true;
 
             $controller = CartSerializer::cart_controller();
+            $controller->load_cart();
             foreach (self::unserializeCart($guestData['cart'] ?? null) as $item) {
                 try {
                     $controller->add_to_cart([

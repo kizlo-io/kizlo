@@ -70,7 +70,7 @@ class WooCommerceModuleTest extends TestCase
 
     public function registerTestRoutes(): void
     {
-        foreach (['/cart/kizlo-auth-test', '/kizlo-public-test'] as $route) {
+        foreach (['/cart/kizlo-auth-test', '/checkout/kizlo-auth-test', '/kizlo-public-test'] as $route) {
             register_rest_route('wc/store/v1', $route, [
                 'methods'             => WP_REST_Server::READABLE,
                 'permission_callback' => function (): bool {
@@ -209,7 +209,8 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame('US', $customer->get_shipping_country());
     }
 
-    public function test_guest_cart_merges_during_the_original_cart_request(): void
+    /** @dataProvider provide_cart_transition_routes */
+    public function test_saved_and_guest_carts_merge_during_the_original_request(string $route): void
     {
         global $wpdb;
 
@@ -218,29 +219,34 @@ class WooCommerceModuleTest extends TestCase
         $product->set_regular_price('10');
         $product->set_status('publish');
         $product->save();
+        $saved = $this->createShippableProduct('Saved customer cart');
 
-        $cartKey = md5((string) $product->get_id());
-        $wpdb->replace(
-            $wpdb->prefix . 'woocommerce_sessions',
-            [
-                'session_key'    => self::GUEST_TOKEN,
-                'session_value'  => maybe_serialize([
-                    'cart' => maybe_serialize([
-                        $cartKey => [
-                            'key'          => $cartKey,
-                            'product_id'   => $product->get_id(),
-                            'variation_id' => 0,
-                            'variation'    => [],
-                            'quantity'     => 1,
-                        ],
+        foreach ([self::GUEST_TOKEN => $product, (string) $this->customerId => $saved] as $key => $item) {
+            $cartKey = md5((string) $item->get_id());
+            $wpdb->replace(
+                $wpdb->prefix . 'woocommerce_sessions',
+                [
+                    'session_key'    => (string) $key,
+                    'session_value'  => maybe_serialize([
+                        'cart' => maybe_serialize([
+                            $cartKey => [
+                                'key'          => $cartKey,
+                                'product_id'   => $item->get_id(),
+                                'variation_id' => 0,
+                                'variation'    => [],
+                                'quantity'     => 1,
+                                'data_hash'    => wc_get_cart_item_data_hash($item),
+                            ],
+                        ]),
                     ]),
-                ]),
-                'session_expiry' => time() + SessionHandler::SESSION_LIFETIME,
-            ],
-            ['%s', '%s', '%d']
-        );
+                    'session_expiry' => time() + SessionHandler::SESSION_LIFETIME,
+                ],
+                ['%s', '%s', '%d']
+            );
+        }
 
-        $request = $this->request('/wc/store/v1/cart/kizlo-auth-test', [
+        $this->resetWooCommerce();
+        $request = $this->request($route, [
             SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
             SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
         ]);
@@ -251,12 +257,31 @@ class WooCommerceModuleTest extends TestCase
 
         $this->assertSame(200, $response->get_status());
         $this->assertSame($this->customerId, $response->get_data()['user_id']);
-        $this->assertSame(1, WC()->cart->get_cart_contents_count());
+        $expected = [$saved->get_id() => 1, $product->get_id() => 1];
+        $this->assertSame($expected, array_column(WC()->cart->get_cart(), 'quantity', 'product_id'));
+        $stored = $this->readSession((string) $this->customerId);
+        $this->assertSame($expected, array_column(maybe_unserialize($stored['cart']), 'quantity', 'product_id'));
         $this->assertNull($wpdb->get_var($wpdb->prepare(
             'SELECT session_key FROM %i WHERE session_key = %s',
             $wpdb->prefix . 'woocommerce_sessions',
             self::GUEST_TOKEN
         )));
+
+        $retry = $this->dispatch($route, $this->adminId, true, [
+            SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
+            SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
+        ]);
+        $this->assertSame(200, $retry->get_status());
+        $this->assertSame($expected, array_column(WC()->cart->get_cart(), 'quantity', 'product_id'));
+    }
+
+    /** @return array<string, array{string}> */
+    public function provide_cart_transition_routes(): array
+    {
+        return [
+            'cart'     => ['/wc/store/v1/cart/kizlo-auth-test'],
+            'checkout' => ['/wc/store/v1/checkout/kizlo-auth-test'],
+        ];
     }
 
     public function test_catalog_routes_ignore_identity_headers_and_do_not_initialize_a_session(): void
@@ -742,6 +767,10 @@ class WooCommerceModuleTest extends TestCase
         WC()->session  = null;
         WC()->customer = null;
         WC()->cart     = null;
+        unset(
+            $GLOBALS['wp_actions']['woocommerce_load_cart_from_session'],
+            $GLOBALS['wp_actions']['woocommerce_after_calculate_totals'],
+        );
         SessionHandler::clearPreparedIdentity();
         unset($GLOBALS['wp_rest_application_password_uuid']);
     }

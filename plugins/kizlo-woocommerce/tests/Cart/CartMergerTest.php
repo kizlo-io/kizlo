@@ -15,12 +15,15 @@ class CartMergerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Match the headless module's disabled native persistent cart.
+        add_filter('woocommerce_persistent_cart_enabled', '__return_false');
         $this->customerId = self::factory()->user->create(['role' => 'subscriber']);
     }
 
     protected function tearDown(): void
     {
         $this->resetWooCommerce();
+        remove_filter('woocommerce_persistent_cart_enabled', '__return_false');
         parent::tearDown();
     }
 
@@ -28,7 +31,7 @@ class CartMergerTest extends TestCase
     {
         $product    = $this->product('Merge product');
         $guestToken = $this->guestToken($product->get_id());
-        $this->seedGuestCart($guestToken, [
+        $this->seedCart($guestToken, [
             $this->cartItem($product->get_id(), 2),
         ]);
 
@@ -47,7 +50,7 @@ class CartMergerTest extends TestCase
     {
         $product    = $this->product('Valid merge product');
         $guestToken = $this->guestToken($product->get_id());
-        $this->seedGuestCart($guestToken, [
+        $this->seedCart($guestToken, [
             $this->cartItem($product->get_id(), 1),
             $this->cartItem(99999999, 1),
         ]);
@@ -62,11 +65,48 @@ class CartMergerTest extends TestCase
         $this->assertNotEmpty($errors->get_error_messages());
     }
 
+    /** @dataProvider provide_customer_cart_overlap */
+    public function test_cold_customer_cart_is_merged_persisted_and_not_merged_twice(bool $overlap): void
+    {
+        $saved      = $this->product('Saved customer product');
+        $guest      = $overlap ? $saved : $this->product('Guest product');
+        $guestToken = $this->guestToken($guest->get_id());
+        $this->seedCart((string) $this->customerId, [$this->cartItem($saved->get_id(), 1)]);
+        $this->seedCart($guestToken, [$this->cartItem($guest->get_id(), 2)]);
+        $expected = $overlap
+            ? [$saved->get_id() => 3]
+            : [$saved->get_id() => 1, $guest->get_id() => 2];
+
+        $result = CartMerger::merge($guestToken, function (): true {
+            $this->initializeCustomer();
+            $this->assertSame(0, did_action('woocommerce_load_cart_from_session'));
+            $this->assertSame([], WC()->cart->get_cart_contents());
+            return true;
+        });
+
+        $this->assertTrue($result);
+        $this->assertSame($expected, array_column(WC()->cart->get_cart(), 'quantity', 'product_id'));
+        $stored = $this->storedSession((string) $this->customerId);
+        $this->assertNotNull($stored);
+        $this->assertSame($expected, array_column(maybe_unserialize($stored['cart']), 'quantity', 'product_id'));
+        $this->assertNull($this->storedSession($guestToken));
+
+        $retry = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer());
+        $this->assertTrue($retry);
+        $this->assertSame($expected, array_column(WC()->cart->get_cart(), 'quantity', 'product_id'));
+    }
+
+    /** @return array<string, array{bool}> */
+    public function provide_customer_cart_overlap(): array
+    {
+        return ['distinct products' => [false], 'overlapping product' => [true]];
+    }
+
     public function test_a_contended_advisory_lock_leaves_the_guest_session_unconsumed(): void
     {
         $product    = $this->product('Locked merge product');
         $guestToken = $this->guestToken($product->get_id());
-        $this->seedGuestCart($guestToken, [$this->cartItem($product->get_id(), 1)]);
+        $this->seedCart($guestToken, [$this->cartItem($product->get_id(), 1)]);
 
         $other    = new \wpdb(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST);
         $lockName = 'kizlo_cart_' . substr(hash('sha256', $guestToken), 0, 48);
@@ -108,13 +148,37 @@ class CartMergerTest extends TestCase
         $this->assertLessThanOrEqual($after, $expires);
     }
 
-    private function initializeCustomer(): true
+    public function test_failed_persistence_keeps_the_guest_session_and_releases_the_lock(): void
+    {
+        $product    = $this->product('Unpersisted merge product');
+        $guestToken = $this->guestToken($product->get_id());
+        $this->seedCart($guestToken, [$this->cartItem($product->get_id(), 1)]);
+        $session = new class extends SessionHandler {
+            public function persist(): bool
+            {
+                return false;
+            }
+        };
+
+        $result = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer($session));
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('kizlo_cart_merge_persistence_failed', $result->get_error_code());
+        $this->assertNotNull($this->storedSession($guestToken));
+
+        $retry = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer());
+        $this->assertTrue($retry);
+        $this->assertSame(1, WC()->cart->get_cart_contents_count());
+        $this->assertNull($this->storedSession($guestToken));
+    }
+
+    private function initializeCustomer(?SessionHandler $session = null): true
     {
         $this->resetWooCommerce();
         wp_set_current_user($this->customerId);
         SessionHandler::prepareIdentity(['user_id' => $this->customerId, 'guest_token' => null]);
 
-        $session      = new SessionHandler();
+        $session    ??= new SessionHandler();
         WC()->session = $session;
         $session->init();
         wc_load_cart();
@@ -135,17 +199,19 @@ class CartMergerTest extends TestCase
     /** @return array<string, mixed> */
     private function cartItem(int $productId, int $quantity): array
     {
+        $product = wc_get_product($productId);
         return [
-            'key'          => md5($productId . ':' . $quantity),
+            'key'          => md5((string) $productId),
             'product_id'   => $productId,
             'variation_id' => 0,
             'variation'    => [],
             'quantity'     => $quantity,
+            'data_hash'    => $product ? wc_get_cart_item_data_hash($product) : '',
         ];
     }
 
     /** @param array<int, array<string, mixed>> $items */
-    private function seedGuestCart(string $guestToken, array $items): void
+    private function seedCart(string $key, array $items): void
     {
         global $wpdb;
 
@@ -155,7 +221,7 @@ class CartMergerTest extends TestCase
         $wpdb->replace(
             $wpdb->prefix . 'woocommerce_sessions',
             [
-                'session_key'    => $guestToken,
+                'session_key'    => $key,
                 'session_value'  => maybe_serialize(['cart' => maybe_serialize($cart)]),
                 'session_expiry' => time() + SessionHandler::SESSION_LIFETIME,
             ],
@@ -199,6 +265,10 @@ class CartMergerTest extends TestCase
         WC()->session  = null;
         WC()->customer = null;
         WC()->cart     = null;
+        unset(
+            $GLOBALS['wp_actions']['woocommerce_load_cart_from_session'],
+            $GLOBALS['wp_actions']['woocommerce_after_calculate_totals'],
+        );
         SessionHandler::clearPreparedIdentity();
     }
 }
