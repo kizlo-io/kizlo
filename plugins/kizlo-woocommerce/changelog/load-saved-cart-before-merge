@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Retain saved customer and guest cart items when signing in.

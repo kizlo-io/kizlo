@@ -48,6 +48,8 @@ namespace Automattic\WooCommerce\StoreApi\Routes\V1 {
 namespace Automattic\WooCommerce\StoreApi\Utilities {
     class CartController
     {
+        public function load_cart(): void {}
+
         public function get_cart_for_response(): \WC_Cart {}
 
         public function calculate_totals(): \WC_Cart {}
