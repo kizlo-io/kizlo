@@ -4,7 +4,7 @@ Tags: kizlo, woocommerce, headless, javascript, ai
 Requires at least: 6.5
 Tested up to: 6.7
 Requires PHP: 8.2
-Stable tag: 0.13.0
+Stable tag: 0.13.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,7 +18,8 @@ Requires the Kizlo core plugin and WooCommerce to be active.
 
 == Changelog ==
 
-= 0.13.0 =
-* Added: Expose WooCommerce local pickup method IDs in storefront settings.
+= 0.13.1 =
+* Fixed: Identify the registered billing Tax ID in checkout retry validation errors.
+* Fixed: Retain saved customer and guest cart items when signing in.
 
 [See the full changelog](https://github.com/kizlo-io/kizlo/blob/main/plugins/kizlo-woocommerce/CHANGELOG.md).

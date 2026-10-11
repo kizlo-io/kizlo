@@ -4,6 +4,11 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2026-10-11
+### Fixed
+- Identify the registered billing Tax ID in checkout retry validation errors.
+- Retain saved customer and guest cart items when signing in.
+
 ## [0.13.0] - 2026-10-06
 ### Added
 - Expose WooCommerce local pickup method IDs in storefront settings.
@@ -128,6 +133,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.13.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.13.0...kizlo-woocommerce-v0.13.1
 [0.13.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.12.0...kizlo-woocommerce-v0.13.0
 [0.12.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.11.0...kizlo-woocommerce-v0.12.0
 [0.11.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.10.1...kizlo-woocommerce-v0.11.0
