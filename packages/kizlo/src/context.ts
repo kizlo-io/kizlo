@@ -122,14 +122,26 @@ export class Context {
 
 	constructor(config: ContextConfig) {
 		this.config = config
-		const options = { credentials: config.credentials, onResult: (result: WordPressTransportResult) => this.warnIfOutdated(result) }
+		this.logger = this.createLogger()
+		const services = this.createServices(null)
+		this.wordpress = services.wordpress
+		this.settings = services.settings
+		this.email = services.email
+	}
+
+	private createServices(request: Request | null) {
+		const config = this.config
+		const geo = config.adapters?.geo
+		const options = {
+			credentials: config.credentials,
+			onResult: (result: WordPressTransportResult) => this.warnIfOutdated(result),
+			getClientIp: geo ? async () => (await geo.getConnInfo(request)).ip : undefined,
+		}
 		const transport = new WordPressTransport(options)
 		// The generated endpoints are inert data, so the client is the pair: the tree overlaid on the
 		// transport it runs against. The cast hands back whatever shape that project's `introspection.ts` declares.
-		this.wordpress = createWordPressClient(transport, config.introspection ?? {}) as ActiveWordPressClient
-		this.settings = new SettingsService(this.wordpress)
-		this.email = new EmailService(this.wordpress)
-		this.logger = this.createLogger()
+		const wordpress = createWordPressClient(transport, config.introspection ?? {}) as ActiveWordPressClient
+		return { wordpress, settings: new SettingsService(wordpress), email: new EmailService(wordpress) }
 	}
 
 	/**
@@ -179,9 +191,9 @@ export class Context {
 			request: request.clone(),
 			config: this.config,
 			logger: this.logger,
-			wordpress: this.wordpress,
-			settings: this.settings,
-			email: this.email,
+			...(this.config.adapters?.geo
+				? this.createServices(request)
+				: { wordpress: this.wordpress, settings: this.settings, email: this.email }),
 			getConnInfo: this.createConnInfoFn(request),
 			verifyCaptcha: this.createVerifyCaptchaFn(request),
 			getSession: this.createGetSessionFn(request),
@@ -200,9 +212,9 @@ export class Context {
 			request: null,
 			config: this.config,
 			logger: this.logger,
-			wordpress: this.wordpress,
-			settings: this.settings,
-			email: this.email,
+			...(this.config.adapters?.geo
+				? this.createServices(null)
+				: { wordpress: this.wordpress, settings: this.settings, email: this.email }),
 			getSession: this.createGetSessionFn(null, cookies),
 			getConnInfo: this.createConnInfoFn(null),
 			verifyCaptcha: this.createVerifyCaptchaFn(null),

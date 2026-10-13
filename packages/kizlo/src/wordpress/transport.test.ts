@@ -167,3 +167,104 @@ describe("generated endpoints", () => {
 		expect(fetch).not.toHaveBeenCalled()
 	})
 })
+
+describe("trusted client IP forwarding", () => {
+	test.each(["203.0.113.10", "2001:db8::1"])("forwards %s while preserving request data", async (ip) => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }))
+		vi.stubGlobal("fetch", fetch)
+		const controller = new AbortController()
+		const transport = new WordPressTransport({ credentials, getClientIp: async () => ip })
+		await transport.post("wp-json/wc/store/v1/cart/add-item", {
+			body: { id: 42, quantity: 2 },
+			headers: { "Cart-Token": "guest-cart", "X-Real-IP": "spoofed", authorization: "spoofed" },
+			signal: controller.signal,
+		})
+		const init = fetch.mock.calls[0]?.[1]
+		const headers = new Headers(init?.headers)
+		expect(headers.get("x-real-ip")).toBe(ip)
+		expect(headers.get("authorization")).toBe(`Basic ${btoa("admin:secret")}`)
+		expect(headers.get("cart-token")).toBe("guest-cart")
+		expect(headers.has("cookie")).toBe(false)
+		expect(init?.body).toBe(JSON.stringify({ id: 42, quantity: 2 }))
+		expect(init?.redirect).toBe("error")
+		controller.abort()
+		expect(init?.signal?.aborted).toBe(true)
+	})
+
+	test.each([
+		null,
+		"",
+		"unknown-ip",
+		"203.0.113.1, 203.0.113.2",
+		"127.0.0.1:80",
+		"[::1]",
+		"fe80::1%eth0",
+		"1.2.3.999",
+		"1.2.3.4\r\nx-test: bad",
+	])("omits missing or invalid IP %s and removes case variants of caller overrides", async (ip) => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({}))
+		vi.stubGlobal("fetch", fetch)
+		await new WordPressTransport({ credentials, getClientIp: () => ip }).get("wp-json/kizlo/v1/settings", {
+			headers: { "X-Real-Ip": "spoofed" },
+		})
+		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has("x-real-ip")).toBe(false)
+		expect(fetch.mock.calls[0]?.[1]?.redirect).toBeUndefined()
+	})
+
+	test("does not forward when disabled or resolve an IP for another origin", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({}))
+		vi.stubGlobal("fetch", fetch)
+		await new WordPressTransport({ credentials }).get("wp-json/kizlo/v1/settings", {})
+		const getClientIp = vi.fn(() => "203.0.113.10")
+		await new WordPressTransport({ credentials, getClientIp }).get("https://other.example/api", {})
+		expect(getClientIp).not.toHaveBeenCalled()
+		for (const [, init] of fetch.mock.calls) expect(new Headers(init?.headers).has("x-real-ip")).toBe(false)
+	})
+
+	test("reports resolver failures through the existing transport error result", async () => {
+		const fetch = vi.fn<FetchFn>()
+		vi.stubGlobal("fetch", fetch)
+		const transport = new WordPressTransport({
+			credentials,
+			getClientIp: async () => {
+				throw new Error("resolver failed")
+			},
+		})
+		const result = await transport.get("wp-json/kizlo/v1/settings", {})
+		expect(result.status).toBe(0)
+		expect(result.error?.message).toBe("resolver failed")
+		expect(fetch).not.toHaveBeenCalled()
+	})
+
+	test("aborts while an async IP resolver is still pending", async () => {
+		const fetch = vi.fn<FetchFn>()
+		vi.stubGlobal("fetch", fetch)
+		const controller = new AbortController()
+		let started = () => {}
+		const resolving = new Promise<void>((resolve) => {
+			started = resolve
+		})
+		const transport = new WordPressTransport({
+			credentials,
+			getClientIp: () => {
+				started()
+				return new Promise(() => {})
+			},
+		})
+		const pending = transport.get("wp-json/kizlo/v1/settings", { signal: controller.signal })
+		await resolving
+		controller.abort(new Error("cancelled"))
+		expect((await pending).error?.message).toBe("cancelled")
+		expect(fetch).not.toHaveBeenCalled()
+	})
+
+	test("times out an unresolved IP lookup", async () => {
+		const fetch = vi.fn<FetchFn>()
+		vi.stubGlobal("fetch", fetch)
+		const transport = new WordPressTransport({ credentials, getClientIp: () => new Promise(() => {}) })
+		const result = await transport.get("wp-json/kizlo/v1/settings", { timeout: 5 })
+		expect(result.status).toBe(0)
+		expect(result.error).not.toBeNull()
+		expect(fetch).not.toHaveBeenCalled()
+	})
+})

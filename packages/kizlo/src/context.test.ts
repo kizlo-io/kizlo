@@ -3,7 +3,9 @@ import { pluginUpdateMessage } from "@kizlo/shared"
 import { parseCookie } from "cookie"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import type { AuthAdapter } from "./adapters/auth"
+import { geoMock } from "./adapters/geo"
 import { Context, type ContextConfig } from "./context"
+import { wpEndpoint } from "./wordpress/endpoint"
 
 type FetchFn = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
@@ -248,4 +250,78 @@ describe("REST cookie storage", () => {
 
 		expect(cookies).toEqual([{ name: "kizlo_session", value: "first" }])
 	})
+})
+
+describe("invocation client IP isolation", () => {
+	test.each(["rest", "server"] as const)("isolates concurrent %s WordPress, settings and email calls", async (mode) => {
+		const visitors = new AsyncLocalStorage<string>()
+		const fetch = vi.fn<FetchFn>(async (_url, init) => {
+			const ip = new Headers(init?.headers).get("x-real-ip")
+			if (init?.method === "POST") expect(JSON.parse(String(init.body)).to || null).toBe(ip)
+			return Response.json({ ip }, { headers: { "x-kizlo-version": "999.0.0" } })
+		})
+		vi.stubGlobal("fetch", fetch)
+		const getConnInfo = vi.fn(async (request: Request | null) => {
+			const ip = request ? request.headers.get("cf-connecting-ip") : visitors.getStore() || null
+			await new Promise((resolve) => setTimeout(resolve, ip ? 5 : 0))
+			return geoMock({ ip }).getConnInfo(request)
+		})
+		const endpoint = (path: string, method: "GET" | "POST") =>
+			wpEndpoint({
+				namespace: "kizlo/v1",
+				path,
+				method,
+				pathParameters: [],
+				responseContentTypes: { "200": "application/json" },
+				...(method === "POST" ? { requestContentType: "application/json" as const } : {}),
+			})
+		const context = createContext("https://isolated.example", {
+			adapters: { geo: { getConnInfo } },
+			introspection: { kizlo: { settings: { retrieve: endpoint("/settings", "GET") }, email: { send: endpoint("/email", "POST") } } },
+		})
+		await Promise.all(
+			["203.0.113.1", "2001:db8::2", null].map((ip) =>
+				visitors.run(ip ?? "", async () => {
+					const invocation =
+						mode === "rest"
+							? context.createRestContext(
+									new Request("https://app.example/api", {
+										headers: ip ? { "cf-connecting-ip": ip, cookie: "secret=cookie", "x-forwarded-for": "spoofed" } : {},
+									}),
+								)
+							: context.createServerContext()
+					const [direct, settings] = await Promise.all([
+						invocation.wordpress.get<{ ip: string | null }>("wp-json/kizlo/v1/posts", {}),
+						invocation.settings.get(),
+						invocation.email.send({ to: ip ?? "", subject: "test", body: "test" }),
+					])
+					expect(direct.data).toEqual({ ip })
+					expect(settings.data).toEqual({ ip })
+				}),
+			),
+		)
+		expect(fetch).toHaveBeenCalledTimes(9)
+		for (const [, init] of fetch.mock.calls) {
+			const headers = new Headers(init?.headers)
+			expect(headers.has("cookie")).toBe(false)
+			expect(headers.has("cf-connecting-ip")).toBe(false)
+			expect(headers.has("x-forwarded-for")).toBe(false)
+		}
+	})
+
+	test("does not forward IPs without a geo adapter", async () => {
+		const fetch = vi.fn<FetchFn>(async () => Response.json({}, { headers: { "x-kizlo-version": "999.0.0" } }))
+		vi.stubGlobal("fetch", fetch)
+		const context = createContext("https://no-forwarding.example")
+		await request(context)
+		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has("x-real-ip")).toBe(false)
+	})
+})
+
+test.each([null, "not-an-ip"])("does not forward unavailable or invalid geo IP %s", async (ip) => {
+	const fetch = vi.fn<FetchFn>(async () => Response.json({}, { headers: { "x-kizlo-version": "999.0.0" } }))
+	vi.stubGlobal("fetch", fetch)
+	const context = createContext("https://missing-geo.example", { adapters: { geo: geoMock({ ip }) } })
+	await request(context)
+	expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has("x-real-ip")).toBe(false)
 })

@@ -11,12 +11,9 @@ export function geoVercelNext(): GeoAdapter {
 			try {
 				const mod = await import("next/headers")
 				nextHeaders = (await mod.headers()) as unknown as Headers
-			} catch (err) {
-				throw new Error(
-					"geoVercelNext: no Request was provided and `next/headers` could not be loaded. " +
-						"Install `next` as a peer dependency, or pass a Request to the SDK.",
-					{ cause: err },
-				)
+			} catch {
+				// Builds and background jobs have no visitor request.
+				return readVercelHeaders(new Headers())
 			}
 
 			return readVercelHeaders(nextHeaders)

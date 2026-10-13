@@ -203,6 +203,66 @@ the generated contract in sync as you edit your server files.
 
 </Steps>
 
+## Forward trusted visitor IPs on Cloudflare
+
+For Next.js or vinext behind Cloudflare, register its geo adapter through your platform integration:
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createIntegration, createKizlo, geoCloudflareNext } from "kizlo"
+import { nextjs } from "kizlo/nextjs/server"
+import { introspection } from "./generated"
+
+const cloudflare = createIntegration({
+  id: "cloudflare",
+  adapters: { geo: geoCloudflareNext() },
+})
+
+export const { client, handler } = createKizlo({
+  integrations: [nextjs(), cloudflare],
+  introspection,
+})
+```
+
+Kizlo forwards the configured geo adapter's valid `ip` to WordPress as `x-real-ip`, including for
+WooCommerce calls. `geoCloudflareNext()` reads `CF-Connecting-IP` from HTTP requests or lazy,
+request-local `next/headers` for direct server calls. Missing request context and invalid IPv4/IPv6
+values produce no visitor header. Without a geo adapter, forwarding stays off; existing geo
+configurations now forward their valid IP.
+
+### Trust your ingress
+
+<Callout type="warn">
+  Register this adapter only when your ingress guarantees that Cloudflare supplies `CF-Connecting-IP` and
+  callers cannot bypass it or forge that header. Kizlo validates the address format, not the sender.
+  It never falls back to incoming `x-real-ip` or `x-forwarded-for`.
+</Callout>
+
+Your storefront Worker and Cloudflare-proxied WordPress hostname must be in the **same Cloudflare
+zone**. Cross-zone Worker subrequests replace the visitor address with Cloudflare's shared Worker IP;
+forwarding alone cannot override that behavior. See [Cloudflare's subrequest rules](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip-in-worker-subrequests).
+Use the final WordPress URL: requests carrying a visitor IP reject redirects to avoid leaking it to
+another destination. Private cart, checkout, and session responses must remain uncached. A geo adapter
+that reads request headers can make an SSR route dynamic; avoid visitor-specific lookups for shared static data.
+
+### Use another platform
+
+Your framework or platform integration should supply `adapters.geo`. On Vercel, use `geoVercelNext()`;
+for other providers, implement the [geo adapter contract](/docs/reference/functions/create-geo-adapter).
+No separate client-IP option is needed. Return `ip: null` when the address is unknown; use
+`geoMock({ ip: null })` in tests that should not forward a simulated visitor.
+
+Register a platform integration after the framework integration to override its geo adapter. Forwarding
+is limited to the configured WordPress origin; browser cookies and unrelated incoming headers are never
+copied. Unexpected adapter errors produce the usual WordPress transport error, and timeouts and aborts
+cover the lookup too.
+
+### Replace an existing workaround
+
+Keep an existing fetch wrapper until a released Kizlo version includes geo-based forwarding. When migrating,
+remove the wrapper and its fetch-patch initialization together, then verify visitor IPs at WordPress
+for homepage SSR and browser API calls, repeat homepage/filter checks, and check guest carts and
+signed-out checkout protection before removing the working deployment mitigation.
+
 ## Render a post
 
 Here is a complete dynamic blog post route. A single Server Component fetches

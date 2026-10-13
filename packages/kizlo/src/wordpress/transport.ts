@@ -1,6 +1,7 @@
 import {
 	type Duration,
 	milliseconds,
+	type Promisify,
 	type SearchParamsLike,
 	stringifyQueryString,
 	type TryCatchResult,
@@ -8,12 +9,17 @@ import {
 	tryCatch,
 	tryCatchSync,
 } from "@kizlo/shared"
+import { z } from "zod"
 import { SAFE_REQUEST_TIMEOUT, UNEXPECTED_BODY_SNIPPET_LENGTH, WP_AUTH_HEADER_KEY, WP_AUTH_TYPE } from "./constants"
 import { WP_Error } from "./error"
 import type { WordPressCredentials, WP_List, WP_ListMetadata, WP_RequestContentType, WP_RequestInput, WP_Result } from "./types"
 import { isWordPressResourceError } from "./utils"
 
+const clientIpSchema = z.union([z.ipv4(), z.ipv6()])
+
 export interface WordPressTransportOptions {
+	/** Resolve a trusted IP for this invocation. Missing or invalid IPs are omitted. */
+	getClientIp?: () => Promisify<string | null>
 	credentials: WordPressCredentials
 	timeout?: Duration
 	onResponse?: (headers: Headers) => void
@@ -27,6 +33,7 @@ export interface WordPressTransportResult {
 }
 
 export class WordPressTransport {
+	private readonly getClientIp?: WordPressTransportOptions["getClientIp"]
 	private readonly siteBase: string
 	private readonly authHeader: string
 	private readonly defaultTimeout: Duration
@@ -46,6 +53,7 @@ export class WordPressTransport {
 		this.defaultTimeout = context.timeout ?? SAFE_REQUEST_TIMEOUT
 		this.onResponse = context.onResponse
 		this.onResult = context.onResult
+		this.getClientIp = context.getClientIp
 	}
 
 	public async post<TData, TCode extends string = never>(
@@ -257,12 +265,37 @@ export class WordPressTransport {
 			[WP_AUTH_HEADER_KEY]: this.authHeader,
 		}
 
+		const signal = this.#resolveSignal(input)
+		let clientIp: string | undefined
+		if (this.getClientIp && url.origin === new URL(this.siteBase).origin) {
+			// Header names are case-insensitive; a caller must not override the trusted resolver.
+			for (const name of Object.keys(headers)) if (name.toLowerCase() === "x-real-ip") delete headers[name]
+			let onAbort = () => {}
+			try {
+				signal.throwIfAborted()
+				const value = await Promise.race([
+					Promise.resolve().then(() => this.getClientIp?.()),
+					new Promise<never>((_, reject) => {
+						onAbort = () => reject(signal.reason)
+						signal.addEventListener("abort", onAbort, { once: true })
+					}),
+				])
+				const parsed = clientIpSchema.safeParse(value)
+				if (parsed.success) clientIp = parsed.data
+			} finally {
+				signal.removeEventListener("abort", onAbort)
+			}
+			if (clientIp) headers["x-real-ip"] = clientIp
+		}
+
 		const hasBody = !["GET", "DELETE", "HEAD", "OPTIONS"].includes(input.method)
 
 		return fetch(url.toString(), {
 			headers,
 			method: input.method,
-			signal: this.#resolveSignal(input),
+			signal,
+			// Do not let fetch carry the visitor IP to a redirect destination.
+			...(clientIp ? { redirect: "error" as const } : {}),
 			...(hasBody && body !== undefined ? { body } : {}),
 		})
 	}
