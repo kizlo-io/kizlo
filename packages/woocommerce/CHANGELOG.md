@@ -1,5 +1,13 @@
 # @kizlo/woocommerce
 
+## 0.16.0
+
+### Minor Changes
+
+- [#289](https://github.com/kizlo-io/kizlo/pull/289) [`1b1c307`](https://github.com/kizlo-io/kizlo/commit/1b1c30715431b4356f5e5b2f3a1d68529eeca8cf) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Remove the embedded cart from checkout responses and read cart through its own API.
+
+- [#290](https://github.com/kizlo-io/kizlo/pull/290) [`aac37e9`](https://github.com/kizlo-io/kizlo/commit/aac37e9ece58b4777a35c334ccd9b6148c1d2894) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add an allowGuest option to require authentication for checkout without restricting guest carts or public browsing.
+
 ## 0.15.0
 
 ### Minor Changes

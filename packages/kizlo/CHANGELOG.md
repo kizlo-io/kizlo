@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.27.0
+
+### Minor Changes
+
+- [#287](https://github.com/kizlo-io/kizlo/pull/287) [`5e64ea1`](https://github.com/kizlo-io/kizlo/commit/5e64ea19c56bf83a8a8e8ac74a0fcdb4eea96777) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Forward trusted geo-adapter IPs to WordPress with isolated request transports and Cloudflare support.
+
 ## 0.26.2
 
 ### Patch Changes
