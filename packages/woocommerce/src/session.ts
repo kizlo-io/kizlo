@@ -51,14 +51,16 @@ function getCartHeaders(options: { email?: string; token?: string; connInfo: Con
 	return headers
 }
 
-export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duration; transitionGuestCart?: boolean }) {
+export function sessionMiddleware(options?: { cookieName?: string; ttl?: Duration; transitionGuestCart?: boolean; allowGuest?: boolean }) {
 	const cookieName = options?.cookieName ?? "guest-session"
 	const ttlSeconds = seconds(options?.ttl ?? "48 hours")
 	const cookieOptions = { ...GUEST_COOKIE_OPTIONS, maxAge: ttlSeconds }
 
 	return createMiddleware(async ({ context, next }) => {
-		const connInfo = await context.getConnInfo()
 		const session = await context.getSession()
+		if (!session && options?.allowGuest === false) throw new KizloError("UNAUTHORIZED")
+
+		const connInfo = await context.getConnInfo()
 		const foundToken = await context.cookies.get(cookieName)
 
 		if (!session) {

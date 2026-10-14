@@ -6,7 +6,7 @@ import { Checkout, type RetryCheckoutInput } from "./checkout/schema"
 import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
 import { resolveRegisteredFieldTarget } from "./field-projections"
-import { woocommerce } from "./index"
+import { type WooCommerceOptions, woocommerce } from "./index"
 import { Order } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
@@ -32,8 +32,8 @@ let productSlug = ""
 let variableProductId = 0
 let variationId = 0
 
-function instance() {
-	return getKizloTestInstance({ integrations: [woocommerce()] })
+function instance(options?: WooCommerceOptions) {
+	return getKizloTestInstance({ integrations: [woocommerce(options)] })
 }
 
 beforeAll(async () => {
@@ -302,8 +302,8 @@ test("an API guest cart is available to a server-rendered storefront request", a
 	expect(serverCart.items).toEqual(expect.arrayContaining([expect.objectContaining({ productId, quantity: 1 })]))
 
 	await emptyCart()
-	const signedInApi = getKizloTestInstance({ baseUrl: apiUrl, integrations: [woocommerce()] })
-	const merged = await signedInApi.handler(new Request(`${apiUrl}/cart`, { headers: { cookie: cookieHeader } }))
+	const signedInApi = getKizloTestInstance({ baseUrl: apiUrl, integrations: [woocommerce({ allowGuest: false })] })
+	const merged = await signedInApi.handler(new Request(`${apiUrl}/checkout`, { headers: { cookie: cookieHeader } }))
 	const deletedCookie = merged.headers.getSetCookie().find((header) => header.startsWith("guest-session="))
 
 	expect(merged.status).toBe(200)
@@ -954,15 +954,15 @@ test("checkout.retry refuses a body with no billing address", async () => {
 // ORDERS: wc/store/v1
 // ==================================================
 
-function guestClient() {
+function guestClient(allowGuest = true) {
 	const auth = createAuthAdapter({ getSession: () => null })
-	return getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth } }).client.woocommerce
+	return getKizloTestInstance({ integrations: [woocommerce({ allowGuest })], adapters: { auth } }).client.woocommerce
 }
 
-test("orders.get returns an order to its registered owner", async () => {
+test.each([true, false])("orders.get returns an order to its registered owner (allowGuest=%s)", async (allowGuest) => {
 	const order = await createPendingOrder(getTestCredentials().users.user.id)
 
-	const result = await client().orders.get.call({ params: { orderId: order.id } })
+	const result = await instance({ allowGuest }).client.woocommerce.orders.get.call({ params: { orderId: order.id } })
 
 	expect(Order.safeParse(result).success).toBe(true)
 	expect(result.id).toBe(order.id)
@@ -1001,10 +1001,10 @@ test("orders.get preserves cookie-derived identity for server and HTTP calls and
 	expect((await http(otherOrder.id)).status).toBe(403)
 })
 
-test("orders.get returns a guest order with its key and billing email", async () => {
+test.each([true, false])("orders.get returns a guest order with its key and billing email (allowGuest=%s)", async (allowGuest) => {
 	const order = await createPendingOrder()
 
-	const result = await guestClient().orders.get.call({
+	const result = await guestClient(allowGuest).orders.get.call({
 		params: { orderId: order.id },
 		query: { key: order.order_key, billingEmail: ORDER_EMAIL },
 	})
@@ -1013,9 +1013,9 @@ test("orders.get returns a guest order with its key and billing email", async ()
 	expect(result.id).toBe(order.id)
 })
 
-test("orders.get refuses missing or incorrect guest credentials", async () => {
+test.each([true, false])("orders.get refuses missing or incorrect guest credentials (allowGuest=%s)", async (allowGuest) => {
 	const order = await createPendingOrder()
-	const orders = guestClient().orders
+	const orders = guestClient(allowGuest).orders
 
 	await expect(orders.get.call({ params: { orderId: order.id } })).rejects.toMatchObject({ code: "ORDER_FORBIDDEN", status: 403 })
 	await expect(
@@ -1026,10 +1026,10 @@ test("orders.get refuses missing or incorrect guest credentials", async () => {
 	).rejects.toMatchObject({ code: "ORDER_FORBIDDEN", status: 403 })
 })
 
-test("orders.get refuses a different registered owner", async () => {
+test.each([true, false])("orders.get refuses a different registered owner (allowGuest=%s)", async (allowGuest) => {
 	const order = await createPendingOrder(getTestCredentials().users.admin.id)
 
-	await expect(client().orders.get.call({ params: { orderId: order.id } })).rejects.toMatchObject({
+	await expect(instance({ allowGuest }).client.woocommerce.orders.get.call({ params: { orderId: order.id } })).rejects.toMatchObject({
 		code: "ORDER_FORBIDDEN",
 		status: 403,
 	})
@@ -1125,14 +1125,17 @@ test("orders keep the HS code captured before the product changes", async () => 
 // CUSTOMERS: wc/v3
 // ==================================================
 
-test("customers.get reads the signed-in customer through the generated endpoint", async () => {
-	const creds = getTestCredentials()
-	const result = await client().customers.get.call()
+test.each([true, false])(
+	"customers.get reads the signed-in customer through the generated endpoint (allowGuest=%s)",
+	async (allowGuest) => {
+		const creds = getTestCredentials()
+		const result = await instance({ allowGuest }).client.woocommerce.customers.get.call()
 
-	expect(Customer.safeParse(result).success).toBe(true)
-	expect(result.id).toBe(creds.users.user.id)
-	expect(result.email).toBe(creds.users.user.email)
-})
+		expect(Customer.safeParse(result).success).toBe(true)
+		expect(result.id).toBe(creds.users.user.id)
+		expect(result.email).toBe(creds.users.user.email)
+	},
+)
 
 test("an email-authenticated cart add operates on the matching WordPress customer", async () => {
 	const creds = getTestCredentials()
@@ -1339,4 +1342,15 @@ test("pickup and opaque extension conditions preserve native submission, persist
 	if (!confirmed.orderId) throw new Error("Pickup submission has no saved order")
 	const stored = await client().orders.get.call({ params: { orderId: confirmed.orderId } })
 	expect(stored.additionalFields["qa/pickup-reference"]).toBe(evidence.persistedValue)
+})
+
+test("disabling guest checkout preserves guest carts and public browsing", async () => {
+	const guest = getKizloTestInstance({
+		integrations: [woocommerce({ allowGuest: false })],
+		adapters: { auth: createAuthAdapter({ getSession: () => null }) },
+	}).client.woocommerce
+
+	expect(Cart.safeParse(await guest.cart.get.call()).success).toBe(true)
+	expect(ProductList.safeParse(await guest.products.list.call({ query: { perPage: 1 } })).success).toBe(true)
+	await expect(guest.storefront.get.call()).resolves.toHaveProperty("checkout")
 })

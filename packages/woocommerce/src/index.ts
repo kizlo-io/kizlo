@@ -1,6 +1,6 @@
 import { createIntegration } from "kizlo"
 import { CART_PROCEDURES } from "./cart"
-import { CHECKOUT_PROCEDURES } from "./checkout"
+import { createCheckoutProcedures } from "./checkout"
 import { CUSTOMER_PROCEDURES } from "./customer"
 import { ORDER_PROCEDURES } from "./order"
 import { PRODUCT_PROCEDURES } from "./product"
@@ -23,7 +23,12 @@ export * from "./order/schema"
 export * from "./product/schema"
 export * from "./storefront/schema"
 
-export function woocommerce() {
+export interface WooCommerceOptions {
+	/** Allow logged-out checkout, subject to the store's guest-checkout settings. @default true */
+	allowGuest?: boolean
+}
+
+export function woocommerce(options: WooCommerceOptions = {}) {
 	return createIntegration({
 		id: "woocommerce",
 		requires: {
@@ -44,7 +49,7 @@ export function woocommerce() {
 		procedures: {
 			cart: CART_PROCEDURES,
 			products: PRODUCT_PROCEDURES,
-			checkout: CHECKOUT_PROCEDURES,
+			checkout: createCheckoutProcedures(options.allowGuest),
 			customers: CUSTOMER_PROCEDURES,
 			orders: ORDER_PROCEDURES,
 			storefront: STOREFRONT_PROCEDURES,

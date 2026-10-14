@@ -53,6 +53,18 @@ const cart = await kizlo.woocommerce.cart.get.call()
 
 Refresh cart separately after checkout changes when your UI needs current totals or items. Checkout conflict errors still carry `data.cart` evidence; see [reviewed total protection](#protect-a-reviewed-checkout-total). Update consumers before deploying the companion plugin update.
 
+## Require login for checkout
+
+Set `allowGuest: false` to require a session from your configured Kizlo auth adapter for `checkout.get`, `checkout.update`, `checkout.confirm`, and `checkout.retry`. Anonymous calls return `UNAUTHORIZED` (401) before changing guest cookies or contacting WooCommerce. Register the integration alongside your auth integration in `createKizlo`; commerce hooks need no auth-provider client state.
+
+```ts
+import { woocommerce } from "@kizlo/woocommerce"
+
+const commerce = woocommerce({ allowGuest: false })
+```
+
+`allowGuest` defaults to `true`, permitting logged-out checkout subject to WooCommerce's own guest-checkout settings and validation. Customer APIs such as `customers.get` always require login. Guest carts, product/storefront reads, and order ownership/key checks (including guest receipts) keep their existing behavior. After installing a release containing this option, replace your application checkout-auth wrapper with `woocommerce({ allowGuest: false })`; procedure inputs, outputs, and hooks stay the same.
+
 ## Billing Tax IDs
 
 Billing addresses expose `taxId` on customers, carts, checkout responses, and orders. The field is always a string on output and defaults to `""` when it has not been set. Billing address inputs accept an optional `taxId`; shipping addresses have no native `taxId`, and Kizlo discards managed shipping copies independently of the hidden UI rule.

@@ -26,6 +26,59 @@ async function mintCookie(): Promise<StoredCookie> {
 }
 
 describe("sessionMiddleware", () => {
+	test.each([null, "valid", "malformed"])("rejects protected checkout before cookie effects (%s)", async (token) => {
+		const cookie = token === "valid" ? (await mintCookie()).value : token
+		const set = vi.fn()
+		const remove = vi.fn()
+		const next = vi.fn()
+		const context = testContext({ session: null, cookie, set, remove })
+		const readCookie = vi.spyOn(context.cookies, "get")
+		const getSession = vi.spyOn(context, "getSession")
+		const getConnInfo = vi.spyOn(context, "getConnInfo")
+
+		await expect(run(sessionMiddleware({ allowGuest: false }), context, next)).rejects.toMatchObject({
+			code: "UNAUTHORIZED",
+			status: 401,
+		})
+		expect(getSession).toHaveBeenCalledOnce()
+		expect(readCookie).not.toHaveBeenCalled()
+		expect(getConnInfo).not.toHaveBeenCalled()
+		expect(set).not.toHaveBeenCalled()
+		expect(remove).not.toHaveBeenCalled()
+		expect(next).not.toHaveBeenCalled()
+	})
+
+	test("propagates adapter failure before guest cookie effects", async () => {
+		const set = vi.fn()
+		const next = vi.fn()
+		const context = testContext({ session: null, cookie: null, set })
+		const failure = new Error("Auth unavailable")
+		vi.spyOn(context, "getSession").mockImplementation(() => {
+			throw failure
+		})
+
+		await expect(run(sessionMiddleware({ allowGuest: false }), context, next)).rejects.toBe(failure)
+		expect(set).not.toHaveBeenCalled()
+		expect(next).not.toHaveBeenCalled()
+	})
+
+	test("reuses one authenticated session for protected checkout and the guest cart transition", async () => {
+		const cookie = await mintCookie()
+		const remove = vi.fn()
+		const context = testContext({ session: { email: EMAIL }, cookie: cookie.value, remove })
+		const getSession = vi.spyOn(context, "getSession")
+
+		await run(sessionMiddleware({ allowGuest: false, transitionGuestCart: true }), context, async (injected) => {
+			expect(injected.sessionHeaders).toMatchObject({
+				"X-Kizlo-User-Email": EMAIL,
+				"X-Kizlo-Guest-Token": expect.stringMatching(/^t_[a-f0-9]{30}$/),
+			})
+			return { output: "checkout", context: injected }
+		})
+		expect(getSession).toHaveBeenCalledOnce()
+		expect(remove).toHaveBeenCalledOnce()
+	})
+
 	test("aligns the guest cookie with the 48-hour signed-token lifetime", async () => {
 		const cookie = await mintCookie()
 

@@ -16,7 +16,20 @@ import {
 
 import { checkoutValidationData } from "./validation"
 
-const checkoutProcedures = {
+/** Keep billing registry aliases consumer-resolved instead of emitting the build-time fallback. */
+type CheckoutProcedures = {
+	get: Procedure<"api", Record<never, never>, Checkout, typeof GET_CHECKOUT_ERROR_MAP>
+	update: Procedure<"api", { body: UpdateCheckoutInput }, Checkout, typeof UPDATE_CHECKOUT_ERROR_MAP>
+	confirm: Procedure<"api", { body: ConfirmCheckoutInput }, Checkout, typeof CONFIRM_CHECKOUT_ERROR_MAP>
+	retry: Procedure<
+		"api",
+		{ body: Omit<RetryCheckoutInput, "orderId">; params: { orderId: RetryCheckoutInput["orderId"] } },
+		Checkout,
+		typeof RETRY_CHECKOUT_ERROR_MAP
+	>
+}
+
+export const createCheckoutProcedures = (allowGuest = true): CheckoutProcedures => ({
 	get: createProcedure(
 		{
 			scope: "api",
@@ -24,7 +37,7 @@ const checkoutProcedures = {
 			path: "/checkout",
 			output: schemaType<Checkout>(Checkout),
 			errors: GET_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true, allowGuest })],
 		},
 		async ({ context, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.retrieve({}, { headers: context.sessionHeaders })
@@ -52,7 +65,7 @@ const checkoutProcedures = {
 			body: schemaType<UpdateCheckoutInput, z.output<typeof UpdateCheckoutInput>>(UpdateCheckoutInput),
 			output: schemaType<Checkout>(Checkout),
 			errors: UPDATE_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true, allowGuest })],
 		},
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.update(
@@ -110,7 +123,7 @@ const checkoutProcedures = {
 			body: schemaType<ConfirmCheckoutInput, z.output<typeof ConfirmCheckoutInput>>(ConfirmCheckoutInput),
 			output: schemaType<Checkout>(Checkout),
 			errors: CONFIRM_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true, allowGuest })],
 		},
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.create(
@@ -207,7 +220,7 @@ const checkoutProcedures = {
 			),
 			output: schemaType<Checkout>(Checkout),
 			errors: RETRY_CHECKOUT_ERROR_MAP,
-			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
+			middlewares: [sessionMiddleware({ transitionGuestCart: true, allowGuest })],
 		},
 		async ({ context, input, errors }) => {
 			const response = await context.wordpress.woocommerce.store.checkout.updateById(
@@ -266,7 +279,7 @@ const checkoutProcedures = {
 			return deserializeCheckout(response.data)
 		},
 	),
-}
+})
 
 function conflictData(data: unknown): { cart: ReturnType<typeof deserializeCart> | null } {
 	if (!isRecord(data) || !isRecord(data.cart)) return { cart: null }
@@ -301,15 +314,4 @@ function minorUnitTotal(value: unknown): string | undefined {
 	return undefined
 }
 
-/** Keep billing registry aliases consumer-resolved instead of emitting the build-time fallback. */
-export const CHECKOUT_PROCEDURES: {
-	get: typeof checkoutProcedures.get
-	update: typeof checkoutProcedures.update
-	confirm: Procedure<"api", { body: ConfirmCheckoutInput }, Checkout, typeof CONFIRM_CHECKOUT_ERROR_MAP>
-	retry: Procedure<
-		"api",
-		{ body: Omit<RetryCheckoutInput, "orderId">; params: { orderId: RetryCheckoutInput["orderId"] } },
-		Checkout,
-		typeof RETRY_CHECKOUT_ERROR_MAP
-	>
-} = checkoutProcedures
+export const CHECKOUT_PROCEDURES = createCheckoutProcedures()

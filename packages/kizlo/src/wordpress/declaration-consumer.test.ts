@@ -167,7 +167,14 @@ function usage(prefix: string): string {
 	const confirmFields: ConfirmCheckoutInput["additionalFields"] = { "${prefix}/opt-in": false }
 	const retryFields: RetryCheckoutInput["additionalFields"] = { "${prefix}/slot": "morning" }
 
-	type WooCommerceProcedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
+	const protectedCheckout = woocommerce({ allowGuest: false })
+	const guestCheckout = woocommerce({ allowGuest: true })
+	const defaultCheckout = woocommerce()
+	// @ts-expect-error allowGuest accepts only a boolean
+	woocommerce({ allowGuest: "false" })
+	type SameCheckoutContract = Assert<Equal<typeof protectedCheckout, typeof guestCheckout>>
+	type SameDefaultContract = Assert<Equal<typeof protectedCheckout, typeof defaultCheckout>>
+	type WooCommerceProcedures = InferIntegrationProcedures<[typeof protectedCheckout]>
 	type Customer = InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>
 	type WooCommerceClient = ResultClient<WooCommerceProcedures>
 	type ProductGetResult = Awaited<ReturnType<WooCommerceClient["woocommerce"]["products"]["get"]>>
@@ -275,7 +282,14 @@ const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProc
 	const rawFallback: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "kizlo/tax-id": "GB" }
 	type StubCheckoutFields = Assert<Equal<Checkout["additionalFields"], Record<string, string | boolean | undefined>>>
 	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
-	type WooCommerceProcedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
+	const protectedCheckout = woocommerce({ allowGuest: false })
+	const guestCheckout = woocommerce({ allowGuest: true })
+	const defaultCheckout = woocommerce()
+	// @ts-expect-error allowGuest accepts only a boolean
+	woocommerce({ allowGuest: "false" })
+	type SameCheckoutContract = Assert<Equal<typeof protectedCheckout, typeof guestCheckout>>
+	type SameDefaultContract = Assert<Equal<typeof protectedCheckout, typeof defaultCheckout>>
+	type WooCommerceProcedures = InferIntegrationProcedures<[typeof protectedCheckout]>
 	type Customer = InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>
 	type WooCommerceClient = ResultClient<WooCommerceProcedures>
 	type ProductGetResult = Awaited<ReturnType<WooCommerceClient["woocommerce"]["products"]["get"]>>
