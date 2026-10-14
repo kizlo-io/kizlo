@@ -7,8 +7,14 @@ description: Build a custom geo adapter that describes the caller's connection.
 the connection (IP, location, and user agent) for the current request. Provide the result through an
 [integration](/docs/reference/functions/create-integration)'s `adapters.geo`.
 
-Reach for this when your platform exposes geo data Kizlo doesn't read out of the box. For Vercel's edge headers,
-use the prebuilt adapter instead. That one lives in the adapter guides, not here.
+## Forward trusted IPs
+
+Registering a geo adapter also forwards its valid `ip` to WordPress as `x-real-ip`. Return only an address
+your platform verifies; use `null` when unavailable. There is no separate forwarding option. Existing geo
+configurations gain this behavior, including mocks with a non-null IP.
+
+Use `geoVercelNext()` on Vercel or `geoCloudflareNext()` on Cloudflare with Next.js/vinext. See the
+[Cloudflare setup and trust requirements](/docs/quickstarts/nextjs#forward-trusted-visitor-ips-on-cloudflare).
 
 ## Parameters
 
@@ -37,13 +43,15 @@ documented entry point.
 
 ## Examples
 
+This example assumes your trusted ingress sets `x-ingress-verified-ip` and rejects spoofed values.
+
 ```ts title="src/lib/kizlo/adapters/geo.ts"
 import { createGeoAdapter } from "kizlo"
 
 export const geo = createGeoAdapter({
   getConnInfo(request) {
     return {
-      ip: request?.headers.get("x-forwarded-for") ?? null,
+      ip: request?.headers.get("x-ingress-verified-ip") ?? null,
       country: request?.headers.get("x-geo-country") ?? null,
       city: request?.headers.get("x-geo-city") ?? null,
       state: null,

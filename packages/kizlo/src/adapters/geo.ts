@@ -1,7 +1,7 @@
 import type { Promisify } from "@kizlo/shared"
 
 export interface ConnInfo {
-	/** Client IP address, or `null` if unavailable. */
+	/** Trusted client IP forwarded to WordPress as x-real-ip, or `null` if unavailable. */
 	ip: string | null
 	/** ISO country code, or `null`. */
 	country: string | null

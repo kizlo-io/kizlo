@@ -169,8 +169,9 @@ interface GeoAdapter {
 ```
 
 Given the request, return what you can about where it came from. Fields you can't resolve are `null`; return
-the shape, not an error. The prebuilt `geoVercelNext` reads Vercel's edge headers (`x-vercel-ip-country` and
-friends); behind another CDN, you read its headers instead.
+the shape, not an error. The platform integration supplies this adapter. Kizlo also forwards its valid `ip`
+to WordPress, so the adapter must return a trusted address. See [geo adapter configuration](/docs/reference/functions/create-geo-adapter)
+for the built-in providers and trust requirements.
 
 ### `captcha`: verify a challenge token
 
@@ -215,7 +216,7 @@ built-in `consoleLog` prints; a one-liner can forward each `payload` to your pla
 ## Built-ins, defaults, and mocks
 
 You rarely write an adapter from scratch. Kizlo ships implementations for the common cases: `turnstile`,
-`recaptcha`, and `hcaptcha` for captcha; `consoleLog` for logging; `geoVercelNext` for reading geo on Vercel.
+`recaptcha`, and `hcaptcha` for captcha; `consoleLog` for logging; `geoVercelNext` and `geoCloudflareNext` for platform geo.
 For auth, the separate `@kizlo/clerk` package maps a verified [Clerk](https://clerk.com) session onto the
 contract above. The [framework integration](/docs/installation) can wire defaults such as its cookie store. Add
 a later integration to override a capability or provide one Kizlo does not ship.
@@ -230,7 +231,7 @@ const testAdapters = createIntegration({
   id: "test-adapters",
   adapters: {
     auth: authMock({ email: "user@example.com" }), // every request is this signed-in user
-    geo: geoMock({ country: "IN" }),   // pinned location
+    geo: geoMock({ country: "IN", ip: null }),   // pinned location without forwarding a mock IP
   },
 })
 

@@ -313,6 +313,7 @@ function compile(dir: string, entries: readonly string[] = ["introspection.ts", 
 		paths: {
 			"@kizlo/woocommerce": [WOOCOMMERCE_TYPES],
 			kizlo: [KIZLO_TYPES],
+			"kizlo/nextjs/server": [fileURLToPath(new URL("../../dist/nextjs/server.d.ts", import.meta.url))],
 		},
 		resolveJsonModule: true,
 		skipLibCheck: true,
@@ -632,3 +633,26 @@ test.each(["closed", "indexed"] as const)(
 	},
 	30_000,
 )
+
+test("published declarations expose trusted client IP configuration", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-client-ip-consumer-"))
+	try {
+		fs.writeFileSync(
+			path.join(dir, "usage.ts"),
+			`
+			import { createIntegration, createKizlo, createGeoAdapter, geoCloudflareNext, geoVercelNext, WordPressTransport } from "kizlo"
+			import { nextjs } from "kizlo/nextjs/server"
+			createKizlo({ integrations: [nextjs(), createIntegration({ id: "cloudflare", adapters: { geo: geoCloudflareNext() } })] })
+			createKizlo({ integrations: [nextjs(), createIntegration({ id: "vercel", adapters: { geo: geoVercelNext() } })] })
+			new WordPressTransport({ credentials: { url: "https://wp.example", username: "admin", password: "secret" }, getClientIp: () => "2001:db8::1" })
+			// @ts-expect-error IP forwarding uses the geo adapter, not a separate framework option
+			nextjs({ clientIp: "cloudflare" })
+			// @ts-expect-error geo adapters return connection info rather than just an IP
+			createGeoAdapter({ getConnInfo: () => "203.0.113.1" })
+		`,
+		)
+		expect(compile(dir, ["usage.ts"])).toEqual([])
+	} finally {
+		fs.rmSync(dir, { force: true, recursive: true })
+	}
+})
