@@ -2,7 +2,7 @@ import type { InferIntegrationProcedures, InferProcedureError, InferProcedureInp
 import { expectTypeOf } from "vitest"
 import type { Cart } from "../cart/schema"
 import type { woocommerce } from "../index"
-import type { ConfirmCheckoutInput, RetryCheckoutInput } from "./schema"
+import type { Checkout, ConfirmCheckoutInput, RetryCheckoutInput } from "./schema"
 
 type Procedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
 type Confirm = Procedures["woocommerce"]["checkout"]["confirm"]
@@ -11,6 +11,10 @@ type Client = ResultClient<Procedures>
 type Result = Awaited<ReturnType<Client["woocommerce"]["checkout"]["confirm"]>>
 
 expectTypeOf<ConfirmCheckoutInput["expectedTotal"]>().toEqualTypeOf<string | undefined>()
+expectTypeOf<Checkout>().not.toHaveProperty("cart")
+declare const checkout: Checkout
+// @ts-expect-error Cart is a separate resource.
+checkout.cart
 expectTypeOf<InferProcedureInput<Confirm>["body"]["expectedTotal"]>().toEqualTypeOf<string | undefined>()
 expectTypeOf<Error["status"]>().toEqualTypeOf<number>()
 expectTypeOf<Error["data"]["expectedTotal"]>().toEqualTypeOf<string | undefined>()

@@ -510,7 +510,7 @@ test("cart.updateItem changes an item it did not create with 200", async () => {
 // CHECKOUT: wc/store/v1
 // ==================================================
 
-test("checkout.get returns a checkout carrying the cart WooCommerce does not declare", async () => {
+test("checkout.get keeps checkout and cart separate", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 	const cart = await client().cart.get.call()
@@ -518,10 +518,8 @@ test("checkout.get returns a checkout carrying the cart WooCommerce does not dec
 	const result = await client().checkout.get.call()
 
 	expect(Checkout.safeParse(result).success).toBe(true)
-	// `__experimentalCart` is returned by both checkout responses and described by neither, so this
-	// resolving at all is the hand-written half of the spec doing its job.
-	expect(result.cart && Cart.safeParse(result.cart).success).toBe(true)
-	expect(result.cart?.items).toEqual(cart.items)
+	expect(result).not.toHaveProperty("cart")
+	expect(cart.items).toContainEqual(expect.objectContaining({ productId, quantity: 1 }))
 })
 
 test("checkout.confirm submits the caller's complete checkout and returns the created order", async () => {
@@ -572,6 +570,7 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 	})
 
 	expect(Checkout.safeParse(result).success).toBe(true)
+	expect(result).not.toHaveProperty("cart")
 	expect(result).toMatchObject({
 		orderId: expect.any(Number),
 		orderNumber: expect.any(String),
@@ -692,7 +691,7 @@ test.each(["", "-1", "1.5", "x", 1250])("checkout rejects reviewed total %j befo
 	}
 })
 
-test("a failed shipping selection keeps the checkout cart available", async () => {
+test("a failed shipping selection keeps cart available through the cart API", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 	const addressed = await client().cart.update.call({
@@ -743,7 +742,8 @@ test("a failed shipping selection keeps the checkout cart available", async () =
 	const cart = await client().cart.get.call()
 	const checkout = await client().checkout.get.call()
 	expect(checkout.status).toBe("checkout-draft")
-	expect(checkout.cart?.items).toEqual(cart.items)
+	expect(checkout).not.toHaveProperty("cart")
+	expect(cart.items).toContainEqual(expect.objectContaining({ productId, quantity: 1 }))
 })
 
 /**

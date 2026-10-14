@@ -42,6 +42,17 @@ pnpm add @kizlo/woocommerce
 
 See the [docs](https://kizlo.io/docs) for setup and usage.
 
+## Read cart separately from checkout
+
+Checkout get, update, confirm, and retry responses no longer include `cart`. Replace reads of `checkout.cart` with `cart.get`, or use the cart returned by a cart mutation:
+
+```ts
+const checkout = await kizlo.woocommerce.checkout.get.call()
+const cart = await kizlo.woocommerce.cart.get.call()
+```
+
+Refresh cart separately after checkout changes when your UI needs current totals or items. Checkout conflict errors still carry `data.cart` evidence; see [reviewed total protection](#protect-a-reviewed-checkout-total). Update consumers before deploying the companion plugin update.
+
 ## Billing Tax IDs
 
 Billing addresses expose `taxId` on customers, carts, checkout responses, and orders. The field is always a string on output and defaults to `""` when it has not been set. Billing address inputs accept an optional `taxId`; shipping addresses have no native `taxId`, and Kizlo discards managed shipping copies independently of the hidden UI rule.

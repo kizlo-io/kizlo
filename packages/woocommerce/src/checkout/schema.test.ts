@@ -1,5 +1,9 @@
 import { expect, test } from "vitest"
-import { ConfirmCheckoutInput } from "./schema"
+import { Checkout, ConfirmCheckoutInput } from "./schema"
+
+test("checkout schema has no embedded cart", () => {
+	expect(Checkout.shape).not.toHaveProperty("cart")
+})
 
 test.each(["0", "1250", "001250", "9007199254740993"])("reviewed total %s survives parsing unchanged", (expectedTotal) => {
 	expect(ConfirmCheckoutInput.shape.expectedTotal.parse(expectedTotal)).toBe(expectedTotal)

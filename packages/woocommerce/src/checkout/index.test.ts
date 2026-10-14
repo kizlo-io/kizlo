@@ -5,7 +5,7 @@ import type { WCK_Cart } from "../cart/types"
 import { deserializeCart } from "../cart/utils"
 import { CONFIRM_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERROR_MAP, UPDATE_CHECKOUT_ERROR_MAP } from "./error"
 import { CHECKOUT_PROCEDURES } from "./index"
-import { ConfirmCheckoutInput } from "./schema"
+import { Checkout, ConfirmCheckoutInput } from "./schema"
 
 const billingAddress = {
 	firstName: "Ada",
@@ -117,6 +117,51 @@ function conflictCart(): WCK_Cart {
 		},
 	}
 }
+
+test.each(["get", "update", "confirm", "retry"] as const)("%s returns checkout without reading or embedding cart", async (operation) => {
+	const cart = conflictCart()
+	const response = {
+		status: 200,
+		error: null,
+		data: {
+			order_id: 42,
+			order_number: "42",
+			order_key: "wc_order_key",
+			status: "pending",
+			customer_id: 0,
+			customer_note: "Keep checkout data",
+			billing_address: cart.billing_address,
+			shipping_address: cart.shipping_address,
+			payment_method: "bacs",
+			payment_result: null,
+			additional_fields: {},
+			__experimentalCart: cart,
+			extensions: { kizlo: { is_paid: false } },
+		},
+	}
+	const upstream = {
+		retrieve: vi.fn().mockResolvedValue(response),
+		update: vi.fn().mockResolvedValue(response),
+		create: vi.fn().mockResolvedValue(response),
+		updateById: vi.fn().mockResolvedValue(response),
+	}
+	const cartRead = vi.fn()
+	const result = await CHECKOUT_PROCEDURES[operation]["~kizlo"].handler({
+		context: {
+			wordpress: { woocommerce: { store: { checkout: upstream, cart: { retrieve: cartRead } } } },
+			sessionHeaders: {},
+		} as never,
+		input: { params: { orderId: 42 }, body: { billingAddress, paymentMethod: "bacs", key: "wc_order_key" } } as never,
+		errors: {} as never,
+	})
+
+	expect(Checkout.safeParse(result).success).toBe(true)
+	expect(result).not.toHaveProperty("cart")
+	expect(result).not.toHaveProperty("__experimentalCart")
+	expect(result).toMatchObject({ orderId: 42, customerNote: "Keep checkout data", paymentMethod: "bacs" })
+	expect(cartRead).not.toHaveBeenCalled()
+	expect(Object.values(upstream).flatMap((call) => call.mock.calls)).toHaveLength(1)
+})
 
 test("confirm preserves the mismatch message, normalized cart and integer/string amounts", async () => {
 	const cart = conflictCart()
