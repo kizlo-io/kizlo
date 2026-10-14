@@ -8,7 +8,6 @@ import {
 	type CheckoutAdditionalFields as RegisteredCheckoutAdditionalFields,
 } from "../additional-fields"
 import {
-	Cart,
 	CartBillingAddress,
 	type CartBillingAddressInput,
 	CartBillingAddressSubmission,
@@ -51,14 +50,12 @@ export const Checkout = z.object({
 	paymentMethod: z.string().nullable(),
 	paymentResult: CheckoutPaymentResult.nullable(),
 	additionalFields: CheckoutAdditionalFields,
-	cart: Cart.nullable(),
 	extensions: CheckoutExtensions,
 })
-export type Checkout = Omit<z.output<typeof Checkout>, "additionalFields" | "billingAddress" | "shippingAddress" | "cart"> & {
+export type Checkout = Omit<z.output<typeof Checkout>, "additionalFields" | "billingAddress" | "shippingAddress"> & {
 	additionalFields: RegisteredCheckoutAdditionalFields
 	billingAddress: CartBillingAddress
 	shippingAddress: CartShippingAddress
-	cart: Cart | null
 }
 
 export const UpdateCheckoutInput = z.object({

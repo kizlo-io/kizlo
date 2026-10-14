@@ -3,7 +3,6 @@ import { additionalFieldValues } from "../additional-fields"
 import type { CartBillingAddress, CartShippingAddress } from "../cart/schema"
 import type { WCK_Cart } from "../cart/types"
 import {
-	deserializeCart,
 	deserializeCartBillingAddress,
 	deserializeCartShippingAddress,
 	serializeCartBillingAddress,
@@ -16,7 +15,7 @@ import type { WCK_Checkout, WCK_CheckoutOrder } from "./types"
 type Gateway = NonNullable<NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["body"]>["payment_method"]>
 
 const CHECKOUT_KEYS = [
-	"__experimentalCart",
+	"__experimentalCart", // Upstream-only: consumers read cart through the cart API.
 	"additional_fields",
 	"billing_address",
 	"customer_id",
@@ -107,7 +106,6 @@ export function deserializeCheckout(data: WCK_Checkout | WCK_CheckoutOrder): Che
 						redirectUrl: paymentResult.redirect_url === "" ? null : paymentResult.redirect_url,
 					},
 		additionalFields: checkoutAdditionalFields(data.additional_fields),
-		cart: data.__experimentalCart ? deserializeCart(data.__experimentalCart) : null,
 		extensions,
 	}
 }

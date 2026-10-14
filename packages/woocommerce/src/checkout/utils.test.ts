@@ -67,6 +67,15 @@ test("deserializes draft sentinels, dynamic fields, and opaque extensions", () =
 	expect(result.extensions).not.toHaveProperty("kizlo")
 })
 
+test.each([null, { items: [] }])("ignores the upstream embedded cart %j", (cart) => {
+	const result = deserializeCheckout(rawCheckout({ __experimentalCart: cart as WCK_Checkout["__experimentalCart"] }))
+
+	expect(result).not.toHaveProperty("cart")
+	expect(result).not.toHaveProperty("__experimentalCart")
+	expect(Checkout.safeParse(result).success).toBe(true)
+	expect(result.billingAddress.taxId).toBe("GB-42")
+})
+
 test("preserves custom payment statuses and normalizes empty redirects", () => {
 	const result = deserializeCheckout(
 		rawCheckout({

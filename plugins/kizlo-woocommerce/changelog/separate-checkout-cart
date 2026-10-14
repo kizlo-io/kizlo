@@ -1,0 +1,4 @@
+Significance: minor
+Type: removed
+
+Remove checkout cart rebuilding; read current cart data through the cart API.

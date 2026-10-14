@@ -152,7 +152,10 @@ function usage(prefix: string): string {
 	type CustomerShippingField = Assert<Equal<Customer["shipping"]["additionalFields"]["${prefix}/reference"], string | undefined>>
 	type ContactField = Assert<Equal<Checkout["additionalFields"]["${prefix}/opt-in"], boolean | undefined>>
 	type SlotField = Assert<Equal<Order["additionalFields"]["${prefix}/slot"], "" | "morning" | "afternoon" | undefined>>
-	type NestedField = Assert<Equal<NonNullable<Checkout["cart"]>["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	type CheckoutBillingField = Assert<Equal<Checkout["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+	declare const checkout: Checkout
+	// @ts-expect-error cart is a separate resource in published declarations
+	checkout.cart
 	const updateAddress: UpdateCartInput = { shippingAddress: { additionalFields: { "${prefix}/reference": "" } } }
 	const updateFields: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": false, "${prefix}/slot": "" } }
 	// @ts-expect-error contact fields cannot be assigned to an address bucket

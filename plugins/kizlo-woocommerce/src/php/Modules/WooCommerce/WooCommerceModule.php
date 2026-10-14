@@ -2,12 +2,7 @@
 
 namespace Kizlo\WooCommerce\Modules\WooCommerce;
 
-use Automattic\WooCommerce\StoreApi\Schemas\V1\CartSchema;
-use Automattic\WooCommerce\StoreApi\SchemaController;
-use Automattic\WooCommerce\StoreApi\StoreApi;
 use Kizlo\WooCommerce\Modules\Cart\CartMerger;
-use Kizlo\WooCommerce\Modules\Cart\CartSerializer;
-use WC_Cart;
 use WP_Error;
 use WP_HTTP_Response;
 use WP_REST_Request;
@@ -28,7 +23,6 @@ class WooCommerceModule
         add_filter('woocommerce_session_handler', [$this, 'maybeUseHeadlessSession']);
         add_filter('woocommerce_persistent_cart_enabled', [$this, 'maybeDisablePersistentCart']);
         add_filter('woocommerce_store_api_disable_nonce_check', [$this, 'maybeDisableNonceCheck']);
-        add_filter('rest_post_dispatch', [$this, 'addCheckoutDraftCart'], 10, 3);
         add_filter('rest_post_dispatch', [$this, 'addCartTokenHeader'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this, 'maybeSwitchStoreApiUser'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this, 'maybeApplyGeoDefaults'], 30, 3);
@@ -67,46 +61,6 @@ class WooCommerceModule
     {
         if ($disabled) return true;
         return $this->headlessRequestId !== null && $this->trustedAdminAuth;
-    }
-
-    /**
-     * A GET /checkout serializes its order through CheckoutSchema without the
-     * per-request cart calculation `/cart` runs, so `__experimentalCart` comes
-     * back either null or a cart with empty `shipping_rates`. It is null for a
-     * pending or failed order the route keeps returning while its payment is
-     * still outstanding (returning to checkout after starting an online
-     * payment), and a non-null but shipping-less cart for the checkout-draft the
-     * route rebuilds (WooCommerce 10.9+ defers draft creation until checkout
-     * POST, so a POST that fails after materialising the draft leaves the next
-     * GET reading the saved order). In both cases the route only ever hands back
-     * that order while its cart hash still matches the live cart, so WC()->cart
-     * is the cart behind it. Rebuild `__experimentalCart` through the same
-     * `get_cart_for_response()` builder `/cart` uses so the checkout resource
-     * carries priced shipping packages without a second Store API request. That
-     * builder's `did_action('woocommerce_after_calculate_totals')` guard makes
-     * the calculation idempotent, so overwriting whatever WooCommerce embedded
-     * costs nothing when totals were already calculated this request.
-     */
-    public function addCheckoutDraftCart(mixed $response, mixed $server, mixed $request): mixed
-    {
-        if (! $response instanceof WP_HTTP_Response) return $response;
-        if (! $request instanceof WP_REST_Request) return $response;
-        if ($request->get_method() !== 'GET' || $request->get_route() !== '/wc/store/v1/checkout') return $response;
-        if ($response->get_status() >= 400) return $response;
-
-        $data = $response->get_data();
-        if (! is_array($data)) return $response;
-        if (! in_array($data['status'] ?? null, ['checkout-draft', 'pending', 'failed'], true)) return $response;
-        // @phpstan-ignore instanceof.alwaysTrue
-        if (! WC()->cart instanceof WC_Cart) return $response;
-        $schema = StoreApi::container()->get(SchemaController::class)->get(CartSchema::IDENTIFIER);
-        if (! $schema instanceof CartSchema) return $response;
-
-        $cart                       = CartSerializer::cart_controller()->get_cart_for_response();
-        $data['__experimentalCart'] = (object) $schema->get_item_response($cart);
-        $response->set_data($data);
-
-        return $response;
     }
 
     /**
