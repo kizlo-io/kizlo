@@ -1,0 +1,144 @@
+---
+title: Cloudflare
+description: Forward trusted visitor IPs from Workers without a framework headers dependency.
+---
+
+Use `cloudflare()` alongside your framework integration when the frontend runs on Cloudflare Workers.
+WordPress can run on any host. Follow the [Next.js setup](/docs/quickstarts/nextjs) first for a vinext app.
+
+## Register the platform
+
+```ts title="src/lib/kizlo/server/index.ts"
+import { createKizlo } from "kizlo"
+import { cloudflare } from "kizlo/cloudflare"
+import { nextjs } from "kizlo/nextjs/server"
+import { introspection } from "./generated"
+
+export const { client, handler } = createKizlo({
+  integrations: [nextjs(), cloudflare()],
+  introspection,
+})
+```
+
+`nextjs()` supplies cookies, environment mapping, and revalidation. `cloudflare()` supplies geo.
+Framework integrations do not choose a hosting provider. A custom application integration can override
+`adapters.geo`; built-in runtime integrations mount first regardless of array order.
+
+## Capture Vinext rendering stages
+
+Add the build plugin before your existing Vinext and Cloudflare plugins. Keep your current cache
+backend, bindings, and deployment configuration; this example uses Workers Cache:
+
+```ts title="vite.config.ts"
+import { defineConfig } from "vite"
+import vinext from "vinext"
+import { workersCacheCdnAdapter } from "@vinext/cloudflare/cache/workers-cache-cdn-adapter"
+import { cloudflare } from "@cloudflare/vite-plugin"
+import { cloudflareVinext } from "kizlo/cloudflare/vinext"
+
+export default defineConfig({
+  plugins: [
+    cloudflareVinext(),
+    vinext({ cache: { cdn: workersCacheCdnAdapter() } }),
+    cloudflare({ viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] } }),
+  ],
+})
+```
+
+Workers Cache and Response Store can render in separate Worker entrypoints reached over service
+bindings. An outer Worker scope does not cross that boundary. `cloudflareVinext()` wraps the public
+request-stage and response-stage loaders so each invocation captures its own Request, including cache
+misses and regeneration. It leaves the cache adapter's routing, keys, and replay metadata intact.
+
+This build-only entry requires Vite 8 and Vinext's public `vinext/server/request-stage` and
+`vinext/server/response-stage` loaders. The verified consumer uses Vinext 1.2.1 and
+`@vinext/cloudflare` 1.1.1. Older adapters that do not use these loaders are unsupported.
+Import this plugin in Vite configuration, not Worker or browser code.
+
+## Wrap a single-entry Worker
+
+For a deployment that renders inside the same invocation, wrap the complete framework handler,
+preserving your existing Worker bindings and execution context:
+
+```ts title="worker/index.ts"
+import { withCloudflareRequest } from "kizlo/cloudflare"
+import vinext from "vinext/server/app-router-entry"
+
+export default {
+  fetch(...args: Parameters<typeof vinext.fetch>) {
+    return withCloudflareRequest(args[0], () => vinext.fetch(...args))
+  },
+}
+```
+
+Point Wrangler's `main` at this entry only for this single-entry setup. With another framework, wrap
+its complete fetch handler the same way. For staged Vinext caching, retain the cache adapter's generated
+entry and use the build plugin above. Keep an outer wrapper too if your custom Worker makes Kizlo calls
+before dispatching. Wrapping only Kizlo's API route leaves page rendering outside the context.
+
+```jsonc title="wrangler.jsonc (relevant fields)"
+{
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat"]
+}
+```
+
+The wrapper uses `node:async_hooks`. Enable Node.js compatibility on earlier compatibility dates;
+dates from `2026-08-04` enable it by default. See [Cloudflare's runtime requirements](https://developers.cloudflare.com/workers/runtime-apis/nodejs/asynclocalstorage/).
+Import `kizlo/cloudflare` only in server and Worker code. Browser clients and other platform entries
+do not load its AsyncLocalStorage implementation.
+
+## Resolve connection information
+
+`geoCloudflare()` is also exported for custom integrations. It reads an explicit `Request` first,
+or the active Worker context for direct server calls. It reads `CF-Connecting-IP`, `CF-IPCountry`,
+and `User-Agent`; unavailable fields are `null`, including special country codes `XX` and `T1`.
+It never calls `next/headers` or trusts incoming `x-real-ip` or `x-forwarded-for`.
+
+Concurrent visitors and streamed response production keep their own context. Context clears when the
+body completes, fails, or is cancelled, or immediately for bodyless responses and handler errors.
+Builds and context-free jobs have no visitor IP. Request-driven revalidation uses its own active
+context; replayed regeneration without visitor headers has no visitor IP, even if another request is
+active. Background work after completion cannot reuse that visitor. WebSocket upgrades pass through
+with no retained connection context.
+
+## Keep public output cacheable
+
+Capturing connection info does not introduce a Next.js request dependency or change cache headers,
+cookies, or revalidation policy. Visitor-independent pages can retain their existing public cache policy.
+
+<Callout type="warn">
+  Keep cart, checkout, account, and session output private. If rendered output depends on the visitor's
+  IP or location, use the framework's dynamic/private rendering controls. AsyncLocalStorage is invisible
+  to automatic dependency tracking, so forwarding does not make personalized output safe to share.
+</Callout>
+
+## Trust ingress and check the origin
+
+<Callout type="warn">
+  Use this integration only behind trusted Cloudflare ingress that supplies `CF-Connecting-IP` and
+  prevents callers from bypassing it or forging the header. Kizlo validates address syntax, not the sender.
+</Callout>
+
+The existing transport forwards valid IPv4/IPv6 addresses as `x-real-ip`, including WooCommerce calls,
+only to the configured WordPress origin. Authentication, timeouts, aborts, and redirect protection remain
+in place. Use the final WordPress URL, since requests carrying a visitor IP reject redirects.
+
+For Cloudflare-proxied WordPress, use a frontend custom domain in the **same Cloudflare zone**.
+Same-zone subrequests can derive `CF-Connecting-IP` from `x-real-ip`; cross-zone subrequests use a shared
+Worker IP. Check `workers.dev` separately from that setup. A non-Cloudflare origin applies its own trust
+and protection rules. Forwarding cannot guarantee that a host or WAF accepts a request.
+See [Cloudflare's subrequest rules](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip-in-worker-subrequests).
+
+## Migrate after a compatible release
+
+Kizlo `0.27.1` does not export `kizlo/cloudflare`. Install a release or PR preview containing this entry
+before changing imports. Replace your custom integration using `geoCloudflareNext()` with `cloudflare()`
+and add the Vite plugin for staged Vinext caching, or the Worker wrapper for a single-entry deployment.
+The old adapter keeps its existing `next/headers` fallback; other geo adapters remain compatible.
+Remove any global fetch patch and its initialization together when adopting this setup.
+
+Before rollout, verify WordPress IPs for SSR and API calls, public cache hits and revalidation, private
+responses, streaming, and concurrent visitors. Check the same-zone custom domain separately from cross-zone
+and `workers.dev` traffic. Keep Umahra and Lazoey migrations separate from this release.

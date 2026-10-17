@@ -13,8 +13,8 @@ Registering a geo adapter also forwards its valid `ip` to WordPress as `x-real-i
 your platform verifies; use `null` when unavailable. There is no separate forwarding option. Existing geo
 configurations gain this behavior, including mocks with a non-null IP.
 
-Use `geoVercelNext()` on Vercel or `geoCloudflareNext()` on Cloudflare with Next.js/vinext. See the
-[Cloudflare setup and trust requirements](/docs/quickstarts/nextjs#forward-trusted-visitor-ips-on-cloudflare).
+Use `geoVercelNext()` on Vercel or the [Cloudflare integration](/docs/quickstarts/cloudflare) on Workers.
+Cloudflare's `geoCloudflare()` reads the Worker-entry context without a Next.js headers dependency.
 
 ## Parameters
 

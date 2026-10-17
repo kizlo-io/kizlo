@@ -58,6 +58,18 @@
 				"default": "./dist/test.js"
 			}
 		},
+		"./cloudflare": {
+			"import": {
+				"types": "./dist/cloudflare.d.ts",
+				"default": "./dist/cloudflare.js"
+			}
+		},
+		"./cloudflare/vinext": {
+			"import": {
+				"types": "./dist/cloudflare/vinext.d.ts",
+				"default": "./dist/cloudflare/vinext.js"
+			}
+		},
 		"./node": {
 			"import": {
 				"types": "./dist/node.d.ts",
@@ -150,6 +162,7 @@
 		"react-dom": "catalog:react19",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
+		"vite": "catalog:",
 		"vitest": "catalog:",
 		"yaml": "^2.9.0"
 	},
@@ -160,7 +173,8 @@
 		"next": "^14.0.0 || ^15.0.0 || ^16.0.0",
 		"react": "^18.0.0 || ^19.0.0",
 		"react-dom": "^18.0.0 || ^19.0.0",
-		"typescript": "^5.0.0"
+		"typescript": "^5.0.0",
+		"vite": "^8.0.0"
 	},
 	"peerDependenciesMeta": {
 		"@tanstack/react-router": {
@@ -182,6 +196,9 @@
 			"optional": true
 		},
 		"typescript": {
+			"optional": true
+		},
+		"vite": {
 			"optional": true
 		}
 	}

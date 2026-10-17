@@ -24,6 +24,7 @@
 		"/docs/php/functions/translate-spec-properties",
 		"/docs/php/functions/translate-spec-schema",
 		"/docs/quickstarts/astro",
+		"/docs/quickstarts/cloudflare",
 		"/docs/quickstarts/nextjs",
 		"/docs/quickstarts/tanstack-start/react",
 		"/docs/quickstarts/tanstack-start/solid",
