@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.27.1
+
+### Patch Changes
+
+- [#291](https://github.com/kizlo-io/kizlo/pull/291) [`2fdffb9`](https://github.com/kizlo-io/kizlo/commit/2fdffb9b5b85f76ce7636fd24f3d4d7df3c6b190) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Fix WordPress requests on Cloudflare Workers when forwarding trusted client IPs.
+
 ## 0.27.0
 
 ### Minor Changes
