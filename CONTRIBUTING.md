@@ -402,7 +402,7 @@ reuse one issue's worktree for a different issue.
   scope rather than inventing a new one. History contains `plugins`,
   `templates`, and `cli`; those are drift, not the convention.
 - The PR title must match the commit subject.
-  `.github/workflows/lint-pr.yml` validates it and fails the PR otherwise.
+  `.github/workflows/pr.yaml` validates it and fails the PR otherwise.
 - Keep PRs focused; describe what changed and why.
 - Write the PR body under these headings, in order: **Why** (the problem or
   motivation), **What changed** (the resulting behaviour and the shape of the

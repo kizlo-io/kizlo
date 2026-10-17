@@ -331,6 +331,8 @@ function compile(dir: string, entries: readonly string[] = ["introspection.ts", 
 			"@kizlo/woocommerce": [WOOCOMMERCE_TYPES],
 			kizlo: [KIZLO_TYPES],
 			"kizlo/nextjs/server": [fileURLToPath(new URL("../../dist/nextjs/server.d.ts", import.meta.url))],
+			"kizlo/cloudflare": [fileURLToPath(new URL("../../dist/cloudflare.d.ts", import.meta.url))],
+			"kizlo/cloudflare/vinext": [fileURLToPath(new URL("../../dist/cloudflare/vinext.d.ts", import.meta.url))],
 		},
 		resolveJsonModule: true,
 		skipLibCheck: true,
@@ -659,6 +661,14 @@ test("published declarations expose trusted client IP configuration", () => {
 			`
 			import { createIntegration, createKizlo, createGeoAdapter, geoCloudflareNext, geoVercelNext, WordPressTransport } from "kizlo"
 			import { nextjs } from "kizlo/nextjs/server"
+			import { cloudflare, geoCloudflare, withCloudflareRequest } from "kizlo/cloudflare"
+			import { cloudflareVinext } from "kizlo/cloudflare/vinext"
+			cloudflareVinext()
+			createKizlo({ integrations: [nextjs(), cloudflare()] })
+			geoCloudflare().getConnInfo(null)
+			const response: Promise<Response> = withCloudflareRequest(new Request("https://app.example"), () => new Response("public"))
+			// @ts-expect-error the Worker entry wrapper must return a Response
+			withCloudflareRequest(new Request("https://app.example"), () => "public")
 			createKizlo({ integrations: [nextjs(), createIntegration({ id: "cloudflare", adapters: { geo: geoCloudflareNext() } })] })
 			createKizlo({ integrations: [nextjs(), createIntegration({ id: "vercel", adapters: { geo: geoVercelNext() } })] })
 			new WordPressTransport({ credentials: { url: "https://wp.example", username: "admin", password: "secret" }, getClientIp: () => "2001:db8::1" })

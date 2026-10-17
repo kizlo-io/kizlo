@@ -17,6 +17,8 @@ export default defineConfig({
 		config: "src/config.ts",
 		test: "src/test/index.ts",
 		node: "src/integrations/node/index.ts",
+		cloudflare: "src/integrations/cloudflare/index.ts",
+		"cloudflare/vinext": "src/integrations/cloudflare/vinext.ts",
 		"cli/index": "src/cli/index.ts",
 		"cli/wp/watchdog": "src/cli/wp/watchdog.ts",
 		nextjs: "src/integrations/nextjs/index.ts",
