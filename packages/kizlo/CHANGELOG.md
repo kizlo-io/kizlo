@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.28.0
+
+### Minor Changes
+
+- [#293](https://github.com/kizlo-io/kizlo/pull/293) [`900f48a`](https://github.com/kizlo-io/kizlo/commit/900f48aa160f8c8856c3b1a4c47a0532c2a04da7) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add a Cloudflare integration with Worker and Vinext rendering-stage context for trusted IP forwarding without Next.js headers.
+
 ## 0.27.1
 
 ### Patch Changes
