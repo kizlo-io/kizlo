@@ -290,14 +290,19 @@ export class WordPressTransport {
 
 		const hasBody = !["GET", "DELETE", "HEAD", "OPTIONS"].includes(input.method)
 
-		return fetch(url.toString(), {
+		const response = await fetch(url.toString(), {
 			headers,
 			method: input.method,
 			signal,
 			// Do not let fetch carry the visitor IP to a redirect destination.
-			...(clientIp ? { redirect: "error" as const } : {}),
+			...(clientIp ? { redirect: "manual" as const } : {}),
 			...(hasBody && body !== undefined ? { body } : {}),
 		})
+		if (clientIp && [301, 302, 303, 307, 308].includes(response.status)) {
+			await response.body?.cancel()
+			throw new TypeError("WordPress redirects are not allowed when forwarding a client IP")
+		}
+		return response
 	}
 
 	#serializeBody(body: unknown, contentType: WP_RequestContentType | undefined): BodyInit | undefined {

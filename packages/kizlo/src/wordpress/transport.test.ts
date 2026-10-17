@@ -170,15 +170,19 @@ describe("generated endpoints", () => {
 
 describe("trusted client IP forwarding", () => {
 	test.each(["203.0.113.10", "2001:db8::1"])("forwards %s while preserving request data", async (ip) => {
-		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }))
+		const fetch = vi.fn<FetchFn>(async (_url, init) => {
+			if (init?.redirect === "error") throw new TypeError('Invalid redirect value, must be one of "follow" or "manual"')
+			return Response.json({ ok: true })
+		})
 		vi.stubGlobal("fetch", fetch)
 		const controller = new AbortController()
 		const transport = new WordPressTransport({ credentials, getClientIp: async () => ip })
-		await transport.post("wp-json/wc/store/v1/cart/add-item", {
+		const result = await transport.post("wp-json/wc/store/v1/cart/add-item", {
 			body: { id: 42, quantity: 2 },
 			headers: { "Cart-Token": "guest-cart", "X-Real-IP": "spoofed", authorization: "spoofed" },
 			signal: controller.signal,
 		})
+		expect(result).toMatchObject({ status: 200, data: { ok: true }, error: null })
 		const init = fetch.mock.calls[0]?.[1]
 		const headers = new Headers(init?.headers)
 		expect(headers.get("x-real-ip")).toBe(ip)
@@ -186,9 +190,36 @@ describe("trusted client IP forwarding", () => {
 		expect(headers.get("cart-token")).toBe("guest-cart")
 		expect(headers.has("cookie")).toBe(false)
 		expect(init?.body).toBe(JSON.stringify({ id: 42, quantity: 2 }))
-		expect(init?.redirect).toBe("error")
+		expect(init?.redirect).toBe("manual")
 		controller.abort()
 		expect(init?.signal?.aborted).toBe(true)
+	})
+
+	test.each([301, 302, 303, 307, 308])("rejects HTTP %s without following or accepting redirect data", async (status) => {
+		for (const location of ["https://wp.example/moved", "https://other.example/moved"]) {
+			const response = Response.json({ ok: true }, { status, headers: { location } })
+			const fetch = vi.fn<FetchFn>().mockResolvedValue(response)
+			vi.stubGlobal("fetch", fetch)
+			const onResponse = vi.fn()
+			const onResult = vi.fn()
+			const transport = new WordPressTransport({ credentials, getClientIp: () => "203.0.113.10", onResponse, onResult })
+			const result = await transport.request({
+				path: "wp-json/kizlo/v1/settings",
+				method: "GET",
+				dataResponseStatuses: ["default"],
+			})
+
+			expect(result).toMatchObject({ status: 0, data: null, error: { code: "unknown_error" } })
+			expect(result.error?.message).toMatch(/redirect/i)
+			expect(fetch).toHaveBeenCalledExactlyOnceWith(
+				"https://wp.example/wp-json/kizlo/v1/settings",
+				expect.objectContaining({ redirect: "manual" }),
+			)
+			expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("x-real-ip")).toBe("203.0.113.10")
+			expect(onResponse).not.toHaveBeenCalled()
+			expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ status: 0 }))
+			expect(response.bodyUsed).toBe(true)
+		}
 	})
 
 	test.each([
