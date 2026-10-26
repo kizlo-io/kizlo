@@ -26,7 +26,7 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export type WP_CallArguments<I> = Record<string, never> extends I ? [input?: I, options?: WP_CallOptions] : [input: I, options?: WP_CallOptions]
 	export type WP_Client<T> = { [K in keyof T]: T[K] extends WP_Endpoint<infer I, infer R> ? (...args: WP_CallArguments<I>) => Promise<R> : WP_Client<T[K]> }
 	export function wpEndpoint<TInput, TResult>(definition: unknown): WP_Endpoint<TInput, TResult>
-	export function createWordPressClient<T extends object>(transport: WordPressTransport, endpoints: T): WP_Client<T> & WordPressTransport
+	export function createKizlo(options: { integrations: readonly unknown[]; introspection: object }): { readonly wordpress: ActiveWordPressClient }
 	export interface WordPressClientRegistry {}
 	export interface WordPressEndpointRegistry {}
 	export interface WordPressCustomFieldsRegistry {}
@@ -353,10 +353,9 @@ describe("generateWordPressClient", () => {
 				"kizlo.d.ts": KIZLO_MODULE,
 				"wordpress.ts": client,
 				// The tree an app runs on is the whole description, so calls are checked against it once bound.
-				"usage.ts": `import { createProcedure, createWordPressClient, WordPressTransport } from "kizlo"
+				"usage.ts": `import { createProcedure, createKizlo } from "kizlo"
 				import { introspection } from "./wordpress"
-				const transport = new WordPressTransport({ credentials: { url: "", username: "", password: "" } })
-				const wordpress = createWordPressClient(transport, introspection)
+				const { wordpress } = createKizlo({ integrations: [], introspection })
 				${CLIENT_CALLS}`,
 			}),
 		).toEqual([])

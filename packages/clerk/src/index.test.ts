@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { createClerkClient } from "@clerk/backend"
-import { createIntegration, Kizlo } from "kizlo"
+import { Context } from "kizlo"
 import { describe, expect, it, vi } from "vitest"
 import { type ClerkOptions, clerk } from "./index"
 import { type ClerkUserFixtureOptions, clerkClientFixture, clerkUserFixture } from "./test/index"
@@ -53,17 +53,13 @@ describe("cookie authentication with Clerk verification", () => {
 		const getUser = vi
 			.spyOn(client.users, "getUser")
 			.mockResolvedValue(clerkUserFixture({ id: "user_cookie", emails: [{ email: "cookie@example.com" }] }))
-		const integrations = [
-			clerk({ client }),
-			createIntegration({ id: "cookies", adapters: { cookies: { getAll: () => cookies, setAll: vi.fn(), deleteAll: vi.fn() } } }),
-		] as const
-		const kizlo = new Kizlo<typeof integrations>({
+		const context = new Context({
 			baseUrl: "https://app.example/api/kizlo",
 			siteSecret: "secret",
 			credentials: { url: "https://wordpress.example", username: "admin", password: "password" },
-			integrations,
+			adapters: { ...clerk({ client }).adapters, cookies: { getAll: () => cookies, setAll: vi.fn(), deleteAll: vi.fn() } },
 		})
-		return { context: kizlo.context, getUser }
+		return { context, getUser }
 	}
 
 	it.each(["", `_${suffix}`])("resolves the same identity from server and HTTP cookies with suffix %j", async (suffix) => {

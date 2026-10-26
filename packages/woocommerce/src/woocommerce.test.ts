@@ -289,11 +289,9 @@ test("an API guest cart is available to a server-rendered storefront request", a
 
 	const cookieHeader = guestSetCookie.split(";", 1)[0]
 	if (!cookieHeader) throw new Error("The guest session cookie had no name/value pair.")
-	const storefrontRequest = new Request("http://test.local/cart", { headers: { cookie: cookieHeader } })
-	const storefrontCookies = guestApi.context.createRestContext(storefrontRequest).cookies
 	const cookies: CookiesAdapter = {
 		deleteAll: () => {},
-		getAll: () => storefrontCookies.get(),
+		getAll: () => [{ name: "guest-session", value: cookieHeader.slice("guest-session=".length) }],
 		setAll: () => {},
 	}
 	const storefront = getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth: guestAuth, cookies } })
@@ -414,7 +412,7 @@ test("cart.coupons.apply maps an unknown coupon to its Kizlo error", async () =>
  * are the layer whose schemas already refuse the call.
  */
 function store() {
-	return kizlo.context.createServerContext().wordpress.woocommerce.store
+	return kizlo.wordpress.woocommerce.store
 }
 
 /** What the session middleware sends, so these land on the same cart as the tests above. */
@@ -790,7 +788,7 @@ type SeededOrder = { id: number; order_key: string; shipping: typeof STORED_SHIP
 
 /** The admin-authenticated client the test instance is wired with, for the wc/v3 routes Kizlo has no procedure for. */
 function admin() {
-	return kizlo.context.createServerContext().wordpress
+	return kizlo.wordpress
 }
 
 async function createPendingOrder(customerId = 0): Promise<SeededOrder> {

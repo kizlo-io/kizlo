@@ -161,7 +161,7 @@ import { getSecret } from "astro:env/server"
 import { createKizlo } from "kizlo"
 import { astro } from "kizlo/astro/server"
 
-export const { procedures, client, context, handler } = createKizlo({
+export const { procedures, client, wordpress, handler } = createKizlo({
   integrations: [astro({ env: getSecret })],
 })
 ```

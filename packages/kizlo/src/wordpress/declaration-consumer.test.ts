@@ -124,13 +124,29 @@ function usage(prefix: string): string {
 	} from "kizlo"
 	import { type Product, type Cart, type Checkout, type UpdateCartInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
 	import type { WP_Schema } from "kizlo"
-	import "./wordpress"
+	import { createKizlo } from "kizlo"
+	import { introspection } from "./introspection"
+	// @ts-expect-error independent client initialization is internal
+	import { createWordPressClient } from "kizlo"
 
 	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 	type Assert<T extends true> = T
 	type IsAny<T> = 0 extends 1 & T ? true : false
 	type IsNever<T> = [T] extends [never] ? true : false
 	type IncludesUndefined<T> = undefined extends T ? true : false
+
+	const server = createKizlo({ introspection })
+	const { wordpress } = server
+	type Retrieve = typeof wordpress.kizlo.postTypes.post.retrieve
+	type InputIsExact = Assert<Equal<Parameters<Retrieve>[0], { params: { identifier: string } }>>
+	type ResultIsExact = Assert<Equal<Awaited<ReturnType<Retrieve>>, WP_EndpointResult<"kizlo.postTypes.post.retrieve">>>
+	wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: "hello" } })
+	// @ts-expect-error generated identifiers are strings
+	wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: 7 } })
+	// @ts-expect-error server context is internal
+	server.context
+	// @ts-expect-error configured client is read-only
+	server.wordpress = wordpress
 
 	type PostFields = Post["custom"]
 	type PageFields = Page["custom"]
@@ -265,7 +281,11 @@ function usage(prefix: string): string {
 const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProcedures, InferProcedureData, Page, Post, ResultClient, Tag } from "kizlo"
 	import { type Product, type Cart, type Checkout, type UpdateCartInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
 	import type { WP_Schema } from "kizlo"
-	import "./wordpress"
+	import "./introspection"
+
+	import { createKizlo } from "kizlo"
+	const { wordpress } = createKizlo()
+	wordpress.future.nested.endpoint({ future: true })
 
 	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 	type Assert<T extends true> = T
@@ -477,7 +497,7 @@ test("empty registered buckets keep scalar reads and reject invented literal wri
 			path.join(dir, "usage.ts"),
 			`import type { Cart, UpdateCartInput, UpdateCheckoutInput } from "@kizlo/woocommerce"
 		import type { WP_Schema } from "kizlo"
-		import "./wordpress"
+		import "./introspection"
 		const empty: WP_Schema<"woocommerce.additional-fields.address.read"> = {}
 		const update: UpdateCartInput = { billingAddress: { additionalFields: {} } }
 		const checkout: UpdateCheckoutInput = { additionalFields: {} }
@@ -569,7 +589,7 @@ test("registered browser checkout errors retain references through published dec
 
 const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartInput, type ConfirmCheckoutInput, type RetryCheckoutInput, woocommerce } from "@kizlo/woocommerce"
 	import type { InferIntegrationProcedures, InferProcedureInput, WP_Schema } from "kizlo"
-	import "./wordpress"
+	import "./introspection"
 
 	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 	type Assert<T extends true> = T
