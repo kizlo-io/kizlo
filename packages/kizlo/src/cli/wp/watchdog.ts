@@ -1,8 +1,5 @@
-import { execFile } from "node:child_process"
-import { promisify } from "node:util"
-import { ownerAlive, type ProcessOwner } from "../process-owner"
-
-const exec = promisify(execFile)
+import { ownerStatus, type ProcessOwner } from "../process-owner"
+import { retireSession } from "./session"
 
 /**
  * Standalone watchdog process spawned (detached, in its own session) by a foreground
@@ -17,14 +14,7 @@ const parentPid = Number(process.argv[2])
 const parentPort = Number(process.argv[3])
 const parentToken = process.argv[4]
 const project = process.argv[5]
-
-async function stopStack(): Promise<void> {
-	try {
-		const { stdout } = await exec("docker", ["ps", "-q", "--filter", `label=com.docker.compose.project=${project}`])
-		const ids = stdout.split("\n").filter(Boolean)
-		if (ids.length) await exec("docker", ["stop", ...ids])
-	} catch {}
-}
+const operationFile = process.argv[6]
 
 if (!parentPid || !parentPort || !parentToken || !project) process.exit(1)
 const parent: ProcessOwner = { pid: parentPid, port: parentPort, token: parentToken }
@@ -43,8 +33,8 @@ let missed = 0
 const timer = setInterval(() => {
 	if (checking) return
 	checking = true
-	void ownerAlive(parent).then((alive) => {
-		if (alive) {
+	void ownerStatus(parent).then(async (status) => {
+		if (status !== "dead") {
 			missed = 0
 			checking = false
 			return
@@ -53,7 +43,16 @@ const timer = setInterval(() => {
 			checking = false
 			return
 		}
+		try {
+			if (!(await retireSession(project, { ...parent, operationFile }))) {
+				checking = false
+				return
+			}
+		} catch {
+			checking = false
+			return
+		}
 		clearInterval(timer)
-		void stopStack().then(() => process.exit(0))
+		process.exit(0)
 	})
 }, 1000)

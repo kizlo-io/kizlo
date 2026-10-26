@@ -4,7 +4,8 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
-import { currentProcessOwner, ownerAlive, type ProcessOwner, type StoredProcessOwner } from "../process-owner"
+import { acquire, releaseOwned } from "../daemon/lock"
+import { currentProcessOwner, ownerStatus, type ProcessOwner, type StoredProcessOwner } from "../process-owner"
 import { stopProjectContainers } from "./docker"
 
 const exec = promisify(execFile)
@@ -19,7 +20,12 @@ function registryPath(): string {
 }
 
 /** A live foreground session, including the discriminator that survives PID reuse. */
-type Registry = Record<string, StoredProcessOwner>
+type Session = StoredProcessOwner & { operationFile?: string }
+type Registry = Record<string, Session>
+
+export function projectSession(project: string): Session | undefined {
+	return readRegistry()[project]
+}
 
 function readRegistry(): Registry {
 	const file = registryPath()
@@ -66,13 +72,17 @@ export async function removeProjectContainers(project: string): Promise<boolean>
  * being stopped, so the watchdog would have nothing to do). Best effort: a failure
  * here just means we fall back to signal handlers + the startup reaper.
  */
-export function spawnWatchdog(project: string, owner: ProcessOwner): number | undefined {
+export function spawnWatchdog(project: string, owner: ProcessOwner, operationFile?: string): number | undefined {
 	try {
 		const watchdog = fileURLToPath(new URL("./watchdog.js", import.meta.url))
-		const child = spawn(process.execPath, [watchdog, String(owner.pid), String(owner.port), owner.token, project], {
-			detached: true,
-			stdio: "ignore",
-		})
+		const child = spawn(
+			process.execPath,
+			[watchdog, String(owner.pid), String(owner.port), owner.token, project, ...(operationFile ? [operationFile] : [])],
+			{
+				detached: true,
+				stdio: "ignore",
+			},
+		)
 		child.unref()
 		return child.pid
 	} catch {
@@ -81,10 +91,10 @@ export function spawnWatchdog(project: string, owner: ProcessOwner): number | un
 }
 
 /** Record this process as the owner of `project`'s foreground stack. */
-export async function registerSession(project: string): Promise<ProcessOwner> {
+export async function registerSession(project: string, operationFile?: string): Promise<ProcessOwner> {
 	const owner = await currentProcessOwner()
 	const registry = readRegistry()
-	registry[project] = owner
+	registry[project] = { ...owner, ...(operationFile ? { operationFile } : {}) }
 	writeRegistry(registry)
 	return owner
 }
@@ -100,6 +110,26 @@ export function unregisterSession(project: string): void {
 	} catch {}
 }
 
+/** Defer crash cleanup while an export/lifecycle operation owns the project's resources. */
+export async function retireSession(project: string, session: Session): Promise<boolean> {
+	const file = session.operationFile
+	if (file && !(await acquire(file))) return false
+	try {
+		const successor = projectSession(project)
+		if (
+			successor &&
+			"token" in successor &&
+			(!("token" in session) || successor.token !== session.token) &&
+			(await ownerStatus(successor)) !== "dead"
+		)
+			return true
+		await stopProjectContainers(project)
+		return true
+	} finally {
+		if (file) await releaseOwned(file)
+	}
+}
+
 /**
  * Stop any foreground stacks whose owning session has died (SIGKILL, crash, power
  * loss) — the cases a signal handler can never catch. Runs at the start of every
@@ -112,11 +142,13 @@ export async function reapOrphans(): Promise<string[]> {
 	let changed = false
 
 	for (const [project, session] of Object.entries(registry)) {
-		if (await ownerAlive(session)) continue
+		if ((await ownerStatus(session)) !== "dead") continue
 		try {
-			await stopProjectContainers(project)
+			if (!(await retireSession(project, session))) continue
 			reaped.push(project)
-		} catch {}
+		} catch {
+			continue
+		}
 		delete registry[project]
 		changed = true
 	}

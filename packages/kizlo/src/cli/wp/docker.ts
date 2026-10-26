@@ -7,7 +7,7 @@ import { createReadStream } from "node:fs"
  * - `detached`: run in its own process group so a terminal Ctrl+C (delivered to the whole
  *   foreground group) can't kill it mid-flight — used for teardown's `stop`, which must finish.
  */
-type RunInput = { input?: string; inputFile?: string; detached?: boolean }
+type RunInput = { input?: string; inputFile?: string; detached?: boolean; signal?: AbortSignal; timeout?: number }
 
 /** A docker-compose stack: project id (`-p`), published port, image tag, and compose files (`-f`). */
 export interface Stack {
@@ -42,7 +42,13 @@ export interface RunResult {
 
 function run(cmd: string, args: string[], env: NodeJS.ProcessEnv, opts?: RunInput): Promise<RunResult> {
 	return new Promise((resolvePromise, reject) => {
-		const child = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"], env, detached: opts?.detached })
+		const child = spawn(cmd, args, {
+			stdio: ["pipe", "pipe", "pipe"],
+			env,
+			detached: opts?.detached,
+			signal: opts?.signal,
+			timeout: opts?.timeout,
+		})
 		let stdout = ""
 		let stderr = ""
 		child.stdout.on("data", (d) => {
@@ -52,11 +58,17 @@ function run(cmd: string, args: string[], env: NodeJS.ProcessEnv, opts?: RunInpu
 			stderr += d
 		})
 		child.on("error", reject)
-		child.on("close", (code) => resolvePromise({ code: code ?? 0, stdout, stderr }))
+		child.on("close", (code) => resolvePromise({ code: code ?? 1, stdout, stderr }))
+		child.stdin.on("error", reject)
 		if (opts?.inputFile !== undefined) createReadStream(opts.inputFile).on("error", reject).pipe(child.stdin)
 		else if (opts?.input !== undefined) child.stdin.end(opts.input)
 		else child.stdin.end()
 	})
+}
+
+/** File transfers use Docker's copy support, keeping archive/SQL bytes out of stdout. */
+export function docker(args: string[], opts?: RunInput): Promise<RunResult> {
+	return run("docker", args, process.env, opts)
 }
 
 /**
@@ -105,8 +117,8 @@ export async function dockerAvailable(): Promise<boolean> {
  * this works from any directory and without the project's compose files. Throws when docker itself
  * could not answer, which the callers tell apart from an empty answer.
  */
-export async function runningProjectContainers(project: string): Promise<string[]> {
-	const res = await run("docker", ["ps", "-q", "--filter", `label=com.docker.compose.project=${project}`], process.env)
+export async function runningProjectContainers(project: string, opts?: RunInput): Promise<string[]> {
+	const res = await run("docker", ["ps", "-q", "--filter", `label=com.docker.compose.project=${project}`], process.env, opts)
 	if (res.code !== 0) throw new Error(`docker ps failed:\n${res.stderr || res.stdout}`)
 	return res.stdout.split("\n").filter(Boolean)
 }

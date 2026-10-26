@@ -26,7 +26,7 @@ A handful of commands cover the whole workflow, from first scaffold to a green t
 | [`kizlo init`](#kizlo-init) | Set up Kizlo in the current project |
 | [`kizlo check`](#kizlo-check) | Verify generated files without changing them |
 | [`kizlo generate`](#kizlo-generate) | Generate the contract once for builds and CI |
-| [`kizlo dev`](#kizlo-dev) | Watch and regenerate the contract as you edit, and run local WordPress. Bare starts it; `stop`, `reset` |
+| [`kizlo dev`](#kizlo-dev) | Watch and regenerate the contract as you edit, and run local WordPress. Bare starts it; `stop`, `reset`, `--export` |
 | [`kizlo test`](#kizlo-test) | Boot local WordPress, seed it, and run your tests (`stop`, `reset`) |
 
 Every command reads [`kizlo.config.ts`](#configuration) to find where your server lives and how your test
@@ -185,12 +185,52 @@ environment:
 | Command | What it does |
 | --- | --- |
 | `kizlo dev` | Start local WordPress and the watcher; idempotent, never wipes |
+| `kizlo dev --export` | Export the existing database and content to a ZIP, then leave dev stopped |
 | `kizlo dev stop` | Stop local WordPress, keeping everything for a fast resume |
 | `kizlo dev reset` | Wipe the database **and** the `.kizlo/local` install, so the next `kizlo dev` rebuilds fresh |
 
 `kizlo dev` runs in the foreground and stops local WordPress when you press **Ctrl+C** or close the terminal,
 like `next dev`, so it never outlives your session. `stop` and `reset` are escape hatches for the rare times
 you need to act on it outside a `kizlo dev` run.
+
+### Export a local site
+
+Run `npx kizlo dev --export` from an initialized local project, whether WordPress is
+running or stopped. It writes a unique ZIP under `.kizlo/exports/`, prints its absolute
+path, and stops this project's Kizlo dev session, watcher/MCP and WordPress stack.
+It preserves the database and local files for the next `kizlo dev`.
+
+The ZIP contains `wp-content/` (including fixture-mounted plugins), `database.sql.zip`,
+and `README.txt`. It contains private site data and user credentials; keep it secure.
+WordPress core, root `wp-config.php` and project configuration come from the destination.
+
+- An uninitialized site or a conflicting lifecycle operation fails without provisioning.
+- If lock recovery is interrupted, stop this project's dev commands and remove the
+  recovery guard directory named in the error before retrying.
+
+#### Restore manually
+
+1. Back up the destination. Install compatible WordPress, PHP and plugins, then copy
+   the exported `wp-content/` into the destination install.
+2. Extract `database.sql.zip` from the outer ZIP and keep that inner ZIP compressed.
+   In phpMyAdmin, select the destination database, open **Import**, choose that file,
+   and select **SQL**. The destination database name may differ. Matching tables are
+   replaced; do not import the outer ZIP containing the content files.
+3. Use destination-owned database credentials and configuration. Set the table prefix
+   from `README.txt`. Replace source URLs with a serialization-aware tool such as
+   `wp search-replace`, first with `--dry-run`, as a separate post-import step.
+4. Verify admin login, uploads, active plugins and representative content.
+
+The README records the source WordPress/database versions, URLs, table prefix and
+collations. Export preserves schema and serialized data; the destination must support
+the source collations and SQL features. Compressed phpMyAdmin 5.2.3 imports have been
+verified against MySQL 8.4.10 and MariaDB 11.8.9 using `utf8mb4_0900_ai_ci` and
+`utf8mb4_unicode_520_ci` tables. Other versions and collations need their own check.
+Exports containing views, triggers, routines or events fail with an explanation because their DEFINER privileges need a separate
+hosting-specific migration. The PHP ZIP writer rejects exports exceeding 4 GiB or 65,535 entries.
+
+Large imports may require higher PHP/phpMyAdmin upload and timeout limits. Those limits
+are separate from database engine compatibility. See the [phpMyAdmin import documentation](https://docs.phpmyadmin.net/en/latest/import_export.html).
 
 ### Enabling local WordPress
 

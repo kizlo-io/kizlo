@@ -4,14 +4,17 @@ import { join } from "node:path"
 import { defineCommand } from "citty"
 import { palette } from "../banner"
 import { type ResolvedDevConfig, resolveDevConfig, resolveMcpConfig, usesLocalWordPress } from "../daemon/config"
+import { operationLock, withOperation } from "../daemon/lock"
 import { log } from "../daemon/logger"
 import { watchReload } from "../daemon/reload"
 import { type StackWatch, startWatcher } from "../daemon/watch"
 import { createMcpState, resolveMcpPort, startMcp } from "../mcp"
+import { ownerStatus } from "../process-owner"
 import { DEFAULT_ENV_KEYS, ensureGitignored, envGroups, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
 import { createStack, type DockerStack, dockerHint, dockerStatus, stackStatus } from "../wp/docker"
-import { reapOrphans, registerSession, removeProjectContainers, spawnWatchdog, unregisterSession } from "../wp/session"
+import { exportDev } from "../wp/export"
+import { projectSession, reapOrphans, registerSession, removeProjectContainers, spawnWatchdog, unregisterSession } from "../wp/session"
 import { syncSiteSettings } from "../wp/settings"
 import { devStack } from "../wp/stack"
 import { findConfigDir } from "../wp/utils"
@@ -155,8 +158,9 @@ export function syncLocalUrl(configDir: string, url: string): boolean {
  * an `npm`/`pnpm` wrapper silently swallows — leaving us orphaned but alive otherwise).
  */
 async function armForegroundTeardown(cfg: ResolvedDevConfig): Promise<(line?: string) => void> {
-	const owner = await registerSession(cfg.project)
-	spawnWatchdog(cfg.project, owner)
+	const file = operationLock(cfg.configDir)
+	const owner = await registerSession(cfg.project, file)
+	spawnWatchdog(cfg.project, owner, file)
 
 	let exiting = false
 	// `line` is optional so a caller that has already said why it is ending the session does not have
@@ -296,44 +300,56 @@ async function rebootStack(
  */
 async function startForeground(cfg: ResolvedDevConfig): Promise<void> {
 	const cwd = process.cwd()
-	let ready = await prepareStack(cfg)
-	const shutdown = await armForegroundTeardown(ready)
-	const { creds, start } = await bootAndSync(ready)
+	let ready = cfg
+	const session = await withOperation(cfg.configDir, async () => {
+		const existing = projectSession(cfg.project)
+		if (existing && (await ownerStatus(existing)) !== "dead")
+			throw new Error("Local WordPress already has an active dev session. Stop it before starting another.")
+		ready = await prepareStack(cfg)
+		const shutdown = await armForegroundTeardown(ready)
+		const { creds, start } = await bootAndSync(ready)
 
-	// The poll is the only thing here that talks to WordPress, so it is where a stopped stack shows up
-	// first. It ends the session through the same teardown the signal handlers use, which drops the
-	// registry entry and lets the `exit` handler below give back the watcher lock. It reports the stack
-	// itself, so the teardown adds no line of its own.
-	const stack: StackWatch = {
-		status: () => stackStatus(ready.project),
-		onStopped: () => shutdown(),
-	}
-	// One holder for the whole session. Every `startWatcher` below writes the current connection and
-	// contract into it, and MCP reads it per tool call, so a reload never rebinds the socket.
-	const mcp = createMcpState()
-	const mcpPort = ready.mcpPort
-	let stopContract = await startWatcher(ready.configDir, { stack, mcp })
-	// Only when the watcher is ours. A watcher that did not start means another `kizlo dev` holds the
-	// lock and is already serving MCP; binding here would fail on its port and report a misconfiguration.
-	const mcpServer = stopContract && mcpPort !== undefined ? await startMcp(mcp, mcpPort) : undefined
-	// The one case `startMcp` never hears about, so it cannot report it: no watcher means another
-	// `kizlo dev` owns this project and is already serving MCP for it.
-	if (!stopContract) log.info("Another `kizlo dev` is serving MCP for this project.")
+		// The poll is the only thing here that talks to WordPress, so it is where a stopped stack shows up
+		// first. It ends the session through the same teardown the signal handlers use, which drops the
+		// registry entry and lets the `exit` handler below give back the watcher lock. It reports the stack
+		// itself, so the teardown adds no line of its own.
+		const stack: StackWatch = {
+			status: () => stackStatus(ready.project),
+			onStopped: () => shutdown(),
+		}
+		// One holder for the whole session. Every `startWatcher` below writes the current connection and
+		// contract into it, and MCP reads it per tool call, so a reload never rebinds the socket.
+		const mcp = createMcpState()
+		const mcpPort = ready.mcpPort
+		const stopContract = await startWatcher(ready.configDir, { stack, mcp })
+		// Only when the watcher is ours. A watcher that did not start means another `kizlo dev` holds the
+		// lock and is already serving MCP; binding here would fail on its port and report a misconfiguration.
+		const mcpServer = stopContract && mcpPort !== undefined ? await startMcp(mcp, mcpPort) : undefined
+		// The one case `startMcp` never hears about, so it cannot report it: no watcher means another
+		// `kizlo dev` owns this project and is already serving MCP for it.
+		if (!stopContract) log.info("Another `kizlo dev` is serving MCP for this project.")
 
-	// Everything the summary names is up by now, so the MCP row is an address that answers.
-	printReady(creds, false, start, mcpServer?.url)
+		// Everything the summary names is up by now, so the MCP row is an address that answers.
+		printReady(creds, false, start, mcpServer?.url)
+
+		return { stack, mcp, mcpPort, stopContract, mcpServer }
+	})
+	let { stopContract } = session
+	const { stack, mcp, mcpPort, mcpServer } = session
 
 	let reloading = false
 	const reload = async (changed: string): Promise<void> => {
 		if (reloading) return
 		reloading = true
 		try {
-			stopContract?.()
-			const rebooted = await rebootStack(cwd, `${changed} changed — restarting the session`, mcpPort)
-			ready = rebooted.ready
-			stopContract = await startWatcher(ready.configDir, { stack, mcp })
-			// MCP was never restarted, so the address it was serving on is still the live one.
-			printReady(rebooted.creds, true, rebooted.start, mcpServer?.url)
+			await withOperation(ready.configDir, async () => {
+				stopContract?.()
+				const rebooted = await rebootStack(cwd, `${changed} changed — restarting the session`, mcpPort)
+				ready = rebooted.ready
+				stopContract = await startWatcher(ready.configDir, { stack, mcp })
+				// MCP was never restarted, so the address it was serving on is still the live one.
+				printReady(rebooted.creds, true, rebooted.start, mcpServer?.url)
+			})
 		} catch (error) {
 			log.error("Failed to reload the dev session:", error)
 		} finally {
@@ -438,28 +454,48 @@ async function bringUp(): Promise<void> {
 
 const stop = defineCommand({
 	meta: { name: "stop", description: "Stop local WordPress, keeping the database volume" },
-	async run() {
+	args: { export: { type: "boolean", description: "Export the existing local site" } },
+	async run({ args }) {
+		if (args.export) throw new Error("--export cannot be combined with stop or reset. Run `kizlo dev --export`.")
 		if (!(await requireLocalWordPress(process.cwd()))) return
-		const { stack } = await resolve(process.cwd())
-		await withSpinner("Stopping local WordPress", () => stack.composeStop(), "Local WordPress stopped (volumes kept)")
+		const cfg = await resolveDevConfig(process.cwd())
+		await withOperation(cfg.configDir, async () => {
+			const { stack } = await resolve(process.cwd())
+			await withSpinner("Stopping local WordPress", () => stack.composeStop(), "Local WordPress stopped (volumes kept)")
+		})
 	},
 })
 
 const reset = defineCommand({
 	meta: { name: "reset", description: "Wipe the database and the install folder so the next `kizlo dev` rebuilds fresh" },
-	async run() {
+	args: { export: { type: "boolean", description: "Export the existing local site" } },
+	async run({ args }) {
+		if (args.export) throw new Error("--export cannot be combined with stop or reset. Run `kizlo dev --export`.")
 		if (!(await requireLocalWordPress(process.cwd()))) return
-		const { cfg, stack } = await resolve(process.cwd())
-		await withSpinner("Wiping local WordPress", () => stack.composeDown({ volumes: true }), "Local WordPress reset successfully")
-		rmSync(cfg.wordpressDir, { recursive: true, force: true })
-		note("Run `kizlo dev` to rebuild fresh.")
+		const cfg = await resolveDevConfig(process.cwd())
+		await withOperation(cfg.configDir, async () => {
+			const { stack } = await resolve(process.cwd())
+			await withSpinner("Wiping local WordPress", () => stack.composeDown({ volumes: true }), "Local WordPress reset successfully")
+			rmSync(cfg.wordpressDir, { recursive: true, force: true })
+			note("Run `kizlo dev` to rebuild fresh.")
+		})
 	},
 })
 
 const subCommands = { stop, reset }
 
 export const dev = defineCommand({
-	meta: { name: "dev", description: "Run local WordPress and the contract watcher (stop | reset)" },
+	meta: { name: "dev", description: "Run local WordPress and the contract watcher (stop | reset | --export)" },
+	args: { export: { type: "boolean", description: "Export site content and SQL to a ZIP and stop dev" } },
 	subCommands,
-	run: groupDefault(Object.keys(subCommands), bringUp),
+	setup({ args, rawArgs }) {
+		if (args.export && rawArgs.some((arg) => arg === "stop" || arg === "reset"))
+			throw new Error("--export cannot be combined with stop or reset. Run `kizlo dev --export`.")
+	},
+	run: groupDefault(Object.keys(subCommands), async ({ args }) => {
+		if (args.export) {
+			const output = await exportDev(process.cwd())
+			note(`Exported ${output}\n   Local WordPress and its dev session are stopped.`)
+		} else await bringUp()
+	}),
 })

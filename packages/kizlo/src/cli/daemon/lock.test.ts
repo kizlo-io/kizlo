@@ -86,3 +86,140 @@ describe("acquire", () => {
 		await expect(isLocked(file)).resolves.toBe(true)
 	})
 })
+
+describe("operation ownership", () => {
+	test("does not release a replacement owner's lock", async () => {
+		const { releaseOwned } = await import("./lock")
+		await acquire(file)
+		fs.writeFileSync(file, JSON.stringify({ ...owner(), token: "replacement" }))
+		await releaseOwned(file)
+		expect(owner().token).toBe("replacement")
+	})
+
+	test("serializes lifecycle operations and releases on failure", async () => {
+		const { withOperation, operationLock } = await import("./lock")
+		await expect(
+			withOperation(cwd, async () => {
+				await expect(withOperation(cwd, async () => {})).rejects.toThrow("Another dev")
+				throw new Error("failed operation")
+			}),
+		).rejects.toThrow("failed operation")
+		await expect(isLocked(operationLock(cwd))).resolves.toBe(false)
+	})
+})
+
+describe("stale lock recovery", () => {
+	test("never replaces a lock that changed during its owner probe", async () => {
+		const { createServer } = await import("node:net")
+		const { currentProcessOwner } = await import("../process-owner")
+		const replacement = await currentProcessOwner()
+		const server = createServer((socket) => {
+			fs.writeFileSync(file, JSON.stringify(replacement))
+			socket.end("different-token")
+		})
+		await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+		try {
+			const address = server.address()
+			if (!address || typeof address === "string") throw new Error("Missing test probe")
+			fs.mkdirSync(path.dirname(file), { recursive: true })
+			fs.writeFileSync(file, JSON.stringify({ pid: process.pid, port: address.port, token: "stale" }))
+			expect(await acquire(file)).toBe(false)
+			expect(owner()).toEqual(replacement)
+		} finally {
+			server.close()
+		}
+	})
+
+	test("does not reclaim an operation lock when its live owner misses a probe", async () => {
+		const { createServer } = await import("node:net")
+		const sockets: import("node:net").Socket[] = []
+		const server = createServer((socket) => {
+			sockets.push(socket)
+		})
+		await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+		try {
+			const address = server.address()
+			if (!address || typeof address === "string") throw new Error("Missing test endpoint")
+			fs.mkdirSync(path.dirname(file), { recursive: true })
+			const record = JSON.stringify({ pid: process.pid, port: address.port, token: "busy" })
+			fs.writeFileSync(file, record)
+			expect(await acquire(file)).toBe(false)
+			expect(fs.readFileSync(file, "utf8")).toBe(record)
+		} finally {
+			for (const socket of sockets) socket.destroy()
+			server.close()
+		}
+	})
+
+	test("fails safely when an earlier recovery was interrupted", async () => {
+		const pid = deadPid()
+		held(pid)
+		fs.mkdirSync(`${file}.reclaim`)
+		await expect(acquire(file)).rejects.toThrow("stop this project's dev commands and remove")
+		expect(fs.readFileSync(file, "utf8")).toBe(String(pid))
+	})
+
+	test("two processes recovering the same stale lock cannot both own it", async () => {
+		const { spawn } = await import("node:child_process")
+		const { createServer } = await import("node:net")
+		const { fileURLToPath, pathToFileURL } = await import("node:url")
+		const { transpileModule, ModuleKind, ScriptTarget } = await import("typescript")
+		for (const [source, target] of [
+			["./lock.ts", "lock.mjs"],
+			["../process-owner.ts", "process-owner.mjs"],
+		] as const) {
+			const text = fs
+				.readFileSync(fileURLToPath(new URL(source, import.meta.url)), "utf8")
+				.replace('"../process-owner"', '"./process-owner.mjs"')
+			fs.writeFileSync(
+				path.join(cwd, target),
+				transpileModule(text, { compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022 } }).outputText,
+			)
+		}
+		const sockets: import("node:net").Socket[] = []
+		const server = createServer((socket) => {
+			sockets.push(socket)
+			if (sockets.length === 2) {
+				sockets[0]?.end("different-token")
+				setTimeout(() => sockets[1]?.end("different-token"), 150)
+			}
+		})
+		await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+		const address = server.address()
+		if (!address || typeof address === "string") throw new Error("Missing test probe")
+		fs.mkdirSync(path.dirname(file), { recursive: true })
+		fs.writeFileSync(file, JSON.stringify({ pid: process.pid, port: address.port, token: "stale" }))
+		const code = `import {acquire,releaseOwned} from ${JSON.stringify(pathToFileURL(path.join(cwd, "lock.mjs")).href)};
+process.once('message',async()=>{
+ const won=await acquire(${JSON.stringify(file)});
+ process.send({won});
+ if(won) { await new Promise(r=>setTimeout(r,500)); await releaseOwned(${JSON.stringify(file)}); }
+ process.disconnect();
+});
+process.send('ready');`
+		const children = Array.from({ length: 2 }, () =>
+			spawn(process.execPath, ["--input-type=module", "-e", code], { stdio: ["ignore", "ignore", "pipe", "ipc"] }),
+		)
+		try {
+			const results = children.map(
+				(child) =>
+					new Promise<boolean>((resolve, reject) => {
+						child.on("message", (message: unknown) => {
+							if (typeof message === "object" && message && "won" in message) resolve(message.won === true)
+						})
+						child.on("error", reject)
+						child.on("exit", (code) => {
+							if (code !== 0) reject(new Error(`Lock contender exited ${code}`))
+						})
+					}),
+			)
+			await Promise.all(children.map((child) => new Promise<void>((resolve) => child.once("message", () => resolve()))))
+			for (const child of children) child.send("go")
+			expect((await Promise.all(results)).filter(Boolean)).toHaveLength(1)
+		} finally {
+			for (const child of children) child.kill()
+			for (const socket of sockets) socket.destroy()
+			server.close()
+		}
+	})
+})

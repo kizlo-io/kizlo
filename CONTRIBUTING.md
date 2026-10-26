@@ -146,6 +146,7 @@ Build the plugin assets first, then start it:
 pnpm install
 pnpm build            # build the workspace incl. the CLI + plugin assets
 pnpm kizlo dev        # start + provision WordPress, update .env, run the contract watcher (foreground)
+pnpm kizlo dev --export # export existing content + SQL to .kizlo/exports/, leave dev stopped
 pnpm kizlo dev stop   # pause (DB + plugins kept)
 pnpm kizlo dev reset  # wipe DB + install; the next `kizlo dev` rebuilds fresh
 ```

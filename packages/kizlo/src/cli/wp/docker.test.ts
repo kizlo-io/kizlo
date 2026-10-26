@@ -15,7 +15,7 @@ function exited(code: number, stdout = "", stderr = ""): unknown {
 	const child = Object.assign(new EventEmitter(), {
 		stdout: new EventEmitter(),
 		stderr: new EventEmitter(),
-		stdin: { end: () => {} },
+		stdin: Object.assign(new EventEmitter(), { end: () => {} }),
 	})
 	setImmediate(() => {
 		if (stdout) child.stdout.emit("data", stdout)
