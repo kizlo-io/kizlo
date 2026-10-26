@@ -1,7 +1,7 @@
 import { expect, test } from "vitest"
 import { Cart } from "./schema"
 import type { WCK_Cart } from "./types"
-import { deserializeCart, serializeCartUpdateInput } from "./utils"
+import { deserializeCart, serializeCartAddressInput } from "./utils"
 
 const currency = {
 	currency_code: "USD",
@@ -378,7 +378,7 @@ test("reuses ProductSummary serialization for cart cross-sells", () => {
 
 test("serializes only supplied customer fields and flattens merchant fields", () => {
 	expect(
-		serializeCartUpdateInput({
+		serializeCartAddressInput({
 			billingAddress: {
 				address1: "",
 				taxId: "GB-7",
@@ -409,7 +409,7 @@ test("address extras cannot inject core fields, including fields omitted from a 
 		"qa/reference": "",
 		"qa/address-flag": false,
 	}
-	expect(serializeCartUpdateInput({ shippingAddress: { additionalFields: extras } })).toEqual({
+	expect(serializeCartAddressInput({ shippingAddress: { additionalFields: extras } })).toEqual({
 		shipping_address: { "qa/reference": "", "qa/address-flag": false },
 	})
 })

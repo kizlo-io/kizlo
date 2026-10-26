@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
 import { BillingAdditionalFieldsSchema, billingAdditionalFieldValues } from "./additional-fields"
-import { CartBillingAddress, UpdateCartInput } from "./cart/schema"
-import { deserializeCartBillingAddress, serializeCartUpdateInput } from "./cart/utils"
+import { CartBillingAddress, UpdateCartAddressInput } from "./cart/schema"
+import { deserializeCartBillingAddress, serializeCartAddressInput } from "./cart/utils"
 import { ConfirmCheckoutInput, RetryCheckoutInput } from "./checkout/schema"
 import { serializeCheckoutBillingAddress } from "./checkout/utils"
 import { BillingFieldProjections, BillingNativeFields, deserializeBillingFields, resolveRegisteredFieldTarget } from "./field-projections"
@@ -30,14 +30,14 @@ test("the registered projection governs native schemas, defaults, reads and wire
 	for (const taxId of ["GB-1", "GB-2", ""]) {
 		const input = { billingAddress: { taxId, additionalFields: { "qa/reference": "", "qa/address-flag": false } } }
 		const before = structuredClone(input)
-		const wire = serializeCartUpdateInput(input)
+		const wire = serializeCartAddressInput(input)
 		expect(wire.billing_address).toEqual({ "kizlo/tax-id": taxId, "qa/reference": "", "qa/address-flag": false })
 		expect(deserializeCartBillingAddress(wire.billing_address as Parameters<typeof deserializeCartBillingAddress>[0]).taxId).toBe(taxId)
 		expect(serializeCheckoutBillingAddress({ ...address, taxId })).toHaveProperty("kizlo/tax-id", taxId)
 		expect(input).toEqual(before)
 	}
-	expect(UpdateCartInput.parse({ billingAddress: { city: "London" } })).toEqual({ billingAddress: { city: "London" } })
-	expect(serializeCartUpdateInput({ billingAddress: { city: "London" } })).toEqual({ billing_address: { city: "London" } })
+	expect(UpdateCartAddressInput.parse({ billingAddress: { city: "London" } })).toEqual({ billingAddress: { city: "London" } })
+	expect(serializeCartAddressInput({ billingAddress: { city: "London" } })).toEqual({ billing_address: { city: "London" } })
 	expect(billingAdditionalFieldValues({ "kizlo/tax-id": "GB", "unknown/field": "future", "qa/address-flag": false })).toEqual({
 		"unknown/field": "future",
 		"qa/address-flag": false,
@@ -48,19 +48,19 @@ describe.each(["different", "GB-42", undefined])("raw projected billing key %s",
 	test("rejects duplicate or raw-only inputs through schemas and serializers without mutation", () => {
 		const input = { billingAddress: { ...address, taxId: "GB-42", additionalFields: { "kizlo/tax-id": raw } } }
 		const before = structuredClone(input)
-		expect(UpdateCartInput.safeParse(input).success).toBe(false)
+		expect(UpdateCartAddressInput.safeParse(input).success).toBe(false)
 		expect(ConfirmCheckoutInput.safeParse({ ...input, paymentMethod: "bacs" }).success).toBe(false)
 		expect(RetryCheckoutInput.safeParse({ ...input, paymentMethod: "bacs", key: "key", orderId: 1 }).success).toBe(false)
 		expect(BillingAdditionalFieldsSchema.safeParse(input.billingAddress.additionalFields).success).toBe(false)
-		expect(() => serializeCartUpdateInput(input as unknown as Parameters<typeof serializeCartUpdateInput>[0])).toThrow(
+		expect(() => serializeCartAddressInput(input as unknown as Parameters<typeof serializeCartAddressInput>[0])).toThrow(
 			"Use billingAddress.taxId",
 		)
 		expect(() =>
 			serializeCheckoutBillingAddress(input.billingAddress as unknown as Parameters<typeof serializeCheckoutBillingAddress>[0]),
 		).toThrow("Use billingAddress.taxId")
 		expect(() =>
-			serializeCartUpdateInput({ billingAddress: { additionalFields: input.billingAddress.additionalFields } } as unknown as Parameters<
-				typeof serializeCartUpdateInput
+			serializeCartAddressInput({ billingAddress: { additionalFields: input.billingAddress.additionalFields } } as unknown as Parameters<
+				typeof serializeCartAddressInput
 			>[0]),
 		).toThrow()
 		expect(input).toEqual(before)
@@ -86,7 +86,7 @@ test("metadata and error targets keep native identity beside the Woo-shaped cond
 	for (const id of ["unknown/key", "billing_address", "kizlo/tax-id"]) expect(resolveRegisteredFieldTarget(locations, id)).toBeNull()
 	expect(resolveRegisteredFieldTarget(locations, "kizlo/tax-id", "shipping")).toBeNull()
 	expect(resolveRegisteredFieldTarget({ ...locations, contact: ["kizlo/tax-id"] }, "kizlo/tax-id", "billing")).toBeNull()
-	const fields = serializeCartUpdateInput({ billingAddress: { taxId: "GB" } })
+	const fields = serializeCartAddressInput({ billingAddress: { taxId: "GB" } })
 	expect(fields).toEqual({ billing_address: { "kizlo/tax-id": "GB" } })
 	// Rule evaluation remains on Woo's registered identity, not the normalized native property.
 	expect(fields.billing_address).not.toHaveProperty("taxId")

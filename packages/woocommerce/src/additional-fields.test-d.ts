@@ -1,7 +1,7 @@
 import type { InferIntegrationProcedures, InferProcedureData, InferProcedureInput, WP_Schema } from "kizlo"
 import { expectTypeOf } from "vitest"
 import type { AddressAdditionalFields, BillingAdditionalFields } from "./additional-fields"
-import type { Cart, UpdateCartInput } from "./cart/schema"
+import type { Cart, UpdateCartAddressInput } from "./cart/schema"
 import type { Checkout, ConfirmCheckoutInput, RetryCheckoutInput, UpdateCheckoutInput } from "./checkout/schema"
 import type { Customer } from "./customer/schema"
 import type { woocommerce } from "./index"
@@ -30,10 +30,10 @@ expectTypeOf<NonNullable<InferProcedureInput<Procedures["checkout"]["retry"]>["b
 	"" | "morning" | "afternoon" | undefined
 >()
 
-const address: UpdateCartInput = { shippingAddress: { additionalFields: { "qa/reference": "", "qa/address-flag": false } } }
+const address: UpdateCartAddressInput = { shippingAddress: { additionalFields: { "qa/reference": "", "qa/address-flag": false } } }
 const checkout: UpdateCheckoutInput = { additionalFields: { "qa/opt-in": false, "qa/slot": "morning" } }
 // @ts-expect-error contact keys do not belong in address literal inputs
-const contactInAddress: UpdateCartInput = { shippingAddress: { additionalFields: { "qa/opt-in": false } } }
+const contactInAddress: UpdateCartAddressInput = { shippingAddress: { additionalFields: { "qa/opt-in": false } } }
 // @ts-expect-error address keys do not belong in checkout literal inputs
 const addressInCheckout: UpdateCheckoutInput = { additionalFields: { "qa/reference": "BILL" } }
 // @ts-expect-error checkbox assignments must be boolean
@@ -49,9 +49,9 @@ expectTypeOf<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"]>().toEqu
 expectTypeOf<Checkout["billingAddress"]["additionalFields"]["kizlo/tax-id"]>().toEqualTypeOf<undefined>()
 expectTypeOf<Order["billingAddress"]["additionalFields"]["kizlo/tax-id"]>().toEqualTypeOf<undefined>()
 expectTypeOf<Customer["billing"]["additionalFields"]["kizlo/tax-id"]>().toEqualTypeOf<undefined>()
-const native: UpdateCartInput = { billingAddress: { taxId: "", additionalFields: { "qa/address-flag": false } } }
+const native: UpdateCartAddressInput = { billingAddress: { taxId: "", additionalFields: { "qa/address-flag": false } } }
 // @ts-expect-error the native projection is the only billing input
-const duplicate: UpdateCartInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
+const duplicate: UpdateCartAddressInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
 // @ts-expect-error confirm must not expose two independently writable tax values
 const duplicateConfirm: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "kizlo/tax-id": "GB" }
 // @ts-expect-error retry uses the same billing projection

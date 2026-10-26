@@ -8,7 +8,7 @@ import {
 import { CoreAddressFieldKeys, deserializeCoreAddress, serializeCoreAddress } from "../address-fields"
 import { deserializeBillingFields, isExcludedRegisteredField, serializeBillingFields } from "../field-projections"
 import { deserializeExtensions, deserializeProductSummary, productCustomFields } from "../product/utils"
-import type { Cart, CartBillingAddress, CartShippingAddress, UpdateCartInput } from "./schema"
+import type { Cart, CartBillingAddress, CartShippingAddress, UpdateCartAddressInput } from "./schema"
 import type {
 	WCK_Cart,
 	WCK_CartCoupon,
@@ -434,7 +434,7 @@ function additionalAddressFields(address: Record<string, unknown>, standardKeys:
 	)
 }
 
-export function serializeCartUpdateInput(input: UpdateCartInput): UpdateCustomerInput {
+export function serializeCartAddressInput(input: UpdateCartAddressInput): UpdateCustomerInput {
 	return {
 		...(input.billingAddress !== undefined && { billing_address: serializeCartBillingAddress(input.billingAddress) }),
 		...(input.shippingAddress !== undefined && { shipping_address: serializeCartShippingAddress(input.shippingAddress) }),
@@ -442,8 +442,8 @@ export function serializeCartUpdateInput(input: UpdateCartInput): UpdateCustomer
 }
 
 export function serializeCartShippingAddress(address: CartShippingAddress): SerializedFullShippingAddress
-export function serializeCartShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress
-export function serializeCartShippingAddress(address: NonNullable<UpdateCartInput["shippingAddress"]>): SerializedShippingAddress {
+export function serializeCartShippingAddress(address: NonNullable<UpdateCartAddressInput["shippingAddress"]>): SerializedShippingAddress
+export function serializeCartShippingAddress(address: NonNullable<UpdateCartAddressInput["shippingAddress"]>): SerializedShippingAddress {
 	// A field the caller left out is dropped rather than sent empty, because the
 	// cart merges whatever arrives and an empty string is a value.
 	const additionalFields = Object.fromEntries(
@@ -459,8 +459,8 @@ export function serializeCartShippingAddress(address: NonNullable<UpdateCartInpu
 }
 
 export function serializeCartBillingAddress(address: CartBillingAddress): SerializedFullBillingAddress
-export function serializeCartBillingAddress(address: NonNullable<UpdateCartInput["billingAddress"]>): SerializedBillingAddress
-export function serializeCartBillingAddress(address: NonNullable<UpdateCartInput["billingAddress"]>): SerializedBillingAddress {
+export function serializeCartBillingAddress(address: NonNullable<UpdateCartAddressInput["billingAddress"]>): SerializedBillingAddress
+export function serializeCartBillingAddress(address: NonNullable<UpdateCartAddressInput["billingAddress"]>): SerializedBillingAddress {
 	return compactAddress({
 		...serializeCartShippingAddress(address),
 		email: address.email,

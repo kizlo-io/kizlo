@@ -334,9 +334,9 @@ test("cart.items.update changes quantity through the shared cart serializer", as
 	expect(result.items[0]).toMatchObject({ key, productId, quantity: 2 })
 })
 
-test("cart.update preserves omitted address fields and set, replaces, and clears a billing Tax ID", async () => {
+test("cart.updateAddress preserves omitted address fields and set, replaces, and clears a billing Tax ID", async () => {
 	await emptyCart()
-	await client().cart.update.call({
+	await client().cart.updateAddress.call({
 		body: {
 			billingAddress: { taxId: "GB-CART-1" },
 			shippingAddress: {
@@ -349,7 +349,7 @@ test("cart.update preserves omitted address fields and set, replaces, and clears
 		},
 	})
 
-	const updated = await client().cart.update.call({
+	const updated = await client().cart.updateAddress.call({
 		body: { billingAddress: { taxId: "GB-CART-2" }, shippingAddress: { postcode: "10001", firstName: "" } },
 	})
 
@@ -358,14 +358,14 @@ test("cart.update preserves omitted address fields and set, replaces, and clears
 	expect(updated.billingAddress.taxId).toBe("GB-CART-2")
 	expect(updated.billingAddress.additionalFields).not.toHaveProperty("kizlo/tax-id")
 
-	const cleared = await client().cart.update.call({ body: { billingAddress: { taxId: "" } } })
+	const cleared = await client().cart.updateAddress.call({ body: { billingAddress: { taxId: "" } } })
 	expect(cleared.billingAddress.taxId).toBe("")
 })
 
 test("cart.selectShippingRate accepts and returns the package identifier", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
-	const addressed = await client().cart.update.call({
+	const addressed = await client().cart.updateAddress.call({
 		body: { shippingAddress: { city: "Los Angeles", state: "CA", postcode: "90210", country: "US" } },
 	})
 	const shippingPackage = addressed.shippingPackages[0]
@@ -523,7 +523,7 @@ test("checkout.get keeps checkout and cart separate", async () => {
 test("checkout.confirm submits the caller's complete checkout and returns the created order", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
-	const addressed = await client().cart.update.call({
+	const addressed = await client().cart.updateAddress.call({
 		body: { shippingAddress: { city: "Los Angeles", state: "CA", postcode: "90210", country: "US" } },
 	})
 	const shippingPackage = addressed.shippingPackages[0]
@@ -589,7 +589,7 @@ test("checkout.confirm submits the caller's complete checkout and returns the cr
 	expect(customer.billing.additionalFields).toMatchObject({ "qa/reference": "BILL", "qa/address-flag": false })
 	expect(customer.billing.taxId).toBe("GB-CHECKOUT-42")
 	expect(customer.billing.additionalFields).not.toHaveProperty("kizlo/tax-id")
-	await client().cart.update.call({ body: { billingAddress: { taxId: "PROFILE-AFTER-ORDER" } } })
+	await client().cart.updateAddress.call({ body: { billingAddress: { taxId: "PROFILE-AFTER-ORDER" } } })
 	expect((await client().customers.get.call()).billing.taxId).toBe("PROFILE-AFTER-ORDER")
 	expect((await client().orders.get.call({ params: { orderId: result.orderId } })).billingAddress.taxId).toBe("GB-CHECKOUT-42")
 	expect(customer.additionalFields).toMatchObject({ "qa/opt-in": false })
@@ -622,7 +622,7 @@ async function reviewedCheckout(quantity = 1) {
 	const added = await guest.cart.items.add.call({ body: { productId, quantity } })
 	const key = added.items[0]?.key
 	if (!key) throw new Error("Reviewed checkout has no cart item")
-	const addressed = await guest.cart.update.call({ body: { billingAddress: address, shippingAddress: address } })
+	const addressed = await guest.cart.updateAddress.call({ body: { billingAddress: address, shippingAddress: address } })
 	const pkg = addressed.shippingPackages[0]
 	const rate = pkg?.rates.find((rate) => rate.methodId === "flat_rate")
 	if (!pkg || !rate) throw new Error("Reviewed checkout has no flat shipping rate")
@@ -632,7 +632,7 @@ async function reviewedCheckout(quantity = 1) {
 
 test.each([false, true])("checkout.confirm preserves omitted address values and clears explicit values: clear=%s", async (clear) => {
 	const { guest, body } = await reviewedCheckout()
-	await guest.cart.update.call({
+	await guest.cart.updateAddress.call({
 		body: {
 			billingAddress: { company: "Saved billing", address2: "Suite 2", phone: "01610000000" },
 			shippingAddress: { company: "Saved shipping", address2: "Floor 3", phone: "01610000001" },
@@ -680,7 +680,7 @@ test.each([false, true])("checkout.confirm preserves omitted address values and 
 
 test("checkout.confirm maps live validation for a partial address with no saved required values", async () => {
 	const { guest } = await reviewedCheckout()
-	await guest.cart.update.call({
+	await guest.cart.updateAddress.call({
 		body: {
 			billingAddress: { firstName: "", lastName: "", address1: "", city: "", postcode: "", email: "" },
 			shippingAddress: { firstName: "", lastName: "", address1: "", city: "", postcode: "" },
@@ -759,7 +759,7 @@ test.each(["", "-1", "1.5", "x", 1250])("checkout rejects reviewed total %j befo
 test("a failed shipping selection keeps cart available through the cart API", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
-	const addressed = await client().cart.update.call({
+	const addressed = await client().cart.updateAddress.call({
 		body: { shippingAddress: { city: "Los Angeles", state: "CA", postcode: "90210", country: "US" } },
 	})
 	const shippingPackage = addressed.shippingPackages[0]
@@ -962,7 +962,7 @@ test.each([false, true])("checkout.retry preserves omitted address values and cl
 test("checkout.retry requires a billing Tax ID only while the setting is enabled", async () => {
 	const order = await createPendingOrder()
 	const billingAddress = { ...RETRY_BILLING, taxId: "", city: "must not persist" }
-	await client().cart.update.call({ body: { billingAddress: { taxId: "PROFILE-BEFORE-FAILURE" } } })
+	await client().cart.updateAddress.call({ body: { billingAddress: { taxId: "PROFILE-BEFORE-FAILURE" } } })
 	const before = await client().customers.get.call()
 	const orderBefore = await storedOrder(order.id)
 
@@ -1269,7 +1269,7 @@ test("an email-authenticated cart add operates on the matching WordPress custome
 test("registered fields round-trip cart and checkout partial updates, omission and explicit clearing", async () => {
 	await emptyCart()
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
-	await client().cart.update.call({
+	await client().cart.updateAddress.call({
 		body: {
 			billingAddress: { city: "London", additionalFields: { "qa/reference": "BILL", "qa/address-flag": false } },
 			shippingAddress: {
@@ -1280,7 +1280,7 @@ test("registered fields round-trip cart and checkout partial updates, omission a
 			},
 		},
 	})
-	const cart = await client().cart.update.call({ body: { billingAddress: { city: "London" } } })
+	const cart = await client().cart.updateAddress.call({ body: { billingAddress: { city: "London" } } })
 	expect(cart.billingAddress.additionalFields).toMatchObject({ "qa/reference": "BILL", "qa/address-flag": false })
 	expect(cart.shippingAddress.additionalFields).toMatchObject({ "qa/reference": "SHIP", "qa/address-flag": true })
 	await client().checkout.update.call({ body: { additionalFields: { "qa/opt-in": false, "qa/slot": "afternoon", "qa/message": "keep" } } })
@@ -1288,7 +1288,7 @@ test("registered fields round-trip cart and checkout partial updates, omission a
 	expect(unchanged.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/slot": "afternoon", "qa/message": "keep" })
 	const cleared = await client().checkout.update.call({ body: { additionalFields: { "qa/slot": "", "qa/message": "" } } })
 	expect(cleared.additionalFields).toMatchObject({ "qa/opt-in": false, "qa/slot": "", "qa/message": "" })
-	const clearedAddress = await client().cart.update.call({ body: { billingAddress: { additionalFields: { "qa/reference": "" } } } })
+	const clearedAddress = await client().cart.updateAddress.call({ body: { billingAddress: { additionalFields: { "qa/reference": "" } } } })
 	expect(clearedAddress.billingAddress.additionalFields["qa/reference"]).toBe("")
 	expect(clearedAddress.shippingAddress.additionalFields["qa/reference"]).toBe("SHIP")
 })
@@ -1319,13 +1319,15 @@ test("authenticated cart edits save the canonical billing profile and preserve o
 	try {
 		const auth = createAuthAdapter({ getSession: () => ({ id: String(created.data.id), email }) })
 		const customerClient = getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth } }).client.woocommerce
-		await customerClient.cart.update.call({ body: { billingAddress: { taxId: "SAVED-PROFILE" } } })
+		await customerClient.cart.updateAddress.call({ body: { billingAddress: { taxId: "SAVED-PROFILE" } } })
 		expect((await customerClient.customers.get.call()).billing.taxId).toBe("SAVED-PROFILE")
 		expect((await customerClient.cart.get.call()).billingAddress.taxId).toBe("SAVED-PROFILE")
 		for (const taxId of ["REPLACED", ""]) {
-			await customerClient.cart.update.call({ body: { billingAddress: { taxId } } })
+			await customerClient.cart.updateAddress.call({ body: { billingAddress: { taxId } } })
 			expect((await customerClient.customers.get.call()).billing.taxId).toBe(taxId)
-			expect((await customerClient.cart.update.call({ body: { billingAddress: { city: "London" } } })).billingAddress.taxId).toBe(taxId)
+			expect((await customerClient.cart.updateAddress.call({ body: { billingAddress: { city: "London" } } })).billingAddress.taxId).toBe(
+				taxId,
+			)
 		}
 	} finally {
 		await admin().delete(`${WC_CORE_BASE}/customers/${created.data.id}`, { searchParams: { force: true } })
@@ -1353,15 +1355,17 @@ test("guest billing values survive session updates, confirmation, retry and orde
 	})
 	const guest = browser.client.woocommerce
 	await guest.cart.items.add.call({ body: { productId, quantity: 1 } })
-	await guest.cart.update.call({
+	await guest.cart.updateAddress.call({
 		body: {
 			billingAddress: { ...guestBilling, taxId: "GUEST-CART" },
 			shippingAddress: { ...guestBilling },
 		},
 	})
 	expect((await guest.cart.get.call()).billingAddress.taxId).toBe("GUEST-CART")
-	expect((await guest.cart.update.call({ body: { billingAddress: { city: "Manchester" } } })).billingAddress.taxId).toBe("GUEST-CART")
-	await guest.cart.update.call({ body: { billingAddress: { taxId: "" } } })
+	expect((await guest.cart.updateAddress.call({ body: { billingAddress: { city: "Manchester" } } })).billingAddress.taxId).toBe(
+		"GUEST-CART",
+	)
+	await guest.cart.updateAddress.call({ body: { billingAddress: { taxId: "" } } })
 	expect((await guest.cart.get.call()).billingAddress.taxId).toBe("")
 	const cart = await guest.cart.get.call()
 	const pkg = cart.shippingPackages[0]
@@ -1406,7 +1410,7 @@ test("pickup and opaque extension conditions preserve native submission, persist
 	expect(definition).toMatchObject({ location: "order", required: evidence.requiredRule, bindings: { other: evidence.targetPath } })
 	await client().cart.items.add.call({ body: { productId, quantity: 1 } })
 	const address = { ...RETRY_BILLING, city: "Los Angeles", state: "CA", postcode: "90210", country: "US" }
-	const addressed = await client().cart.update.call({ body: { billingAddress: address, shippingAddress: address } })
+	const addressed = await client().cart.updateAddress.call({ body: { billingAddress: address, shippingAddress: address } })
 	const pkg = addressed.shippingPackages[0]
 	if (!pkg) throw new Error("Pickup evidence has no shipping package")
 	const selected = await client().cart.selectShippingRate.call({ body: { packageId: pkg.id, rateId: evidence.rateId } })

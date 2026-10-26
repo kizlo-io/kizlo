@@ -90,7 +90,7 @@ Omitted fields produce no wire keys; explicit empty strings request clearing whe
 Billing addresses expose `taxId` on customers, carts, checkout responses, and orders. The field is always a string on output and defaults to `""` when it has not been set. Billing address inputs accept an optional `taxId`; shipping addresses have no native `taxId`, and Kizlo discards managed shipping copies independently of the hidden UI rule.
 
 ```ts
-await kizlo.woocommerce.cart.update.call({
+await kizlo.woocommerce.cart.updateAddress.call({
   body: { billingAddress: { taxId: "GB123456789" } },
 })
 ```

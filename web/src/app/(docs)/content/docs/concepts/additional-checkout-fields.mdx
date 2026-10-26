@@ -33,7 +33,7 @@ checkout.shippingAddress.additionalFields["business/reference"] // string | unde
 checkout.additionalFields["marketing/opt-in"] // boolean | undefined
 checkout.additionalFields["delivery/slot"] // "" | "morning" | "afternoon" | undefined
 
-await client.woocommerce.cart.update.call({
+await client.woocommerce.cart.updateAddress.call({
   body: {
     billingAddress: { additionalFields: { "business/reference": "PO-42" } },
     shippingAddress: { additionalFields: { "business/reference": "SHIP-42" } },
