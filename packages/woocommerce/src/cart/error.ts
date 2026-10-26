@@ -3,13 +3,13 @@ import { defineErrorMap } from "kizlo"
 export const GET_CART_ERROR_MAP = defineErrorMap({})
 export type GetCartErrorMap = typeof GET_CART_ERROR_MAP
 
-export const UPDATE_CART_ERROR_MAP = defineErrorMap({
+export const UPDATE_CART_ADDRESS_ERROR_MAP = defineErrorMap({
 	CART_ADDRESS_INVALID: {
 		status: 400,
 		message: "The cart address is invalid.",
 	},
 })
-export type UpdateCartErrorMap = typeof UPDATE_CART_ERROR_MAP
+export type UpdateCartAddressErrorMap = typeof UPDATE_CART_ADDRESS_ERROR_MAP
 
 export const ADD_CART_ITEM_ERROR_MAP = defineErrorMap({
 	CART_ITEM_OUT_OF_STOCK: {

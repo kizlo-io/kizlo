@@ -8,7 +8,7 @@ import {
 	REMOVE_CART_ITEM_ERROR_MAP,
 	REMOVE_COUPON_ERROR_MAP,
 	SELECT_SHIPPING_RATE_ERROR_MAP,
-	UPDATE_CART_ERROR_MAP,
+	UPDATE_CART_ADDRESS_ERROR_MAP,
 	UPDATE_CART_ITEM_ERROR_MAP,
 } from "./error"
 import {
@@ -18,10 +18,10 @@ import {
 	RemoveCartItemInput,
 	RemoveCouponInput,
 	SelectCartShippingRateInput,
-	UpdateCartInput,
+	UpdateCartAddressInput,
 	UpdateCartItemInput,
 } from "./schema"
-import { deserializeCart, serializeCartUpdateInput } from "./utils"
+import { deserializeCart, serializeCartAddressInput } from "./utils"
 
 export const CART_PROCEDURES = {
 	get: createProcedure(
@@ -51,19 +51,19 @@ export const CART_PROCEDURES = {
 		},
 	),
 
-	update: createProcedure(
+	updateAddress: createProcedure(
 		{
 			scope: "api",
 			method: "PUT",
 			path: "/cart",
 			output: schemaType<Cart>(Cart),
-			body: schemaType<UpdateCartInput, z.output<typeof UpdateCartInput>>(UpdateCartInput),
-			errors: UPDATE_CART_ERROR_MAP,
+			body: schemaType<UpdateCartAddressInput, z.output<typeof UpdateCartAddressInput>>(UpdateCartAddressInput),
+			errors: UPDATE_CART_ADDRESS_ERROR_MAP,
 			middlewares: [sessionMiddleware({ transitionGuestCart: true })],
 		},
 		async ({ context, input: { body: input }, errors }) => {
 			const response = await context.wordpress.woocommerce.store.cart.updateCustomer.create(
-				{ body: serializeCartUpdateInput(input) },
+				{ body: serializeCartAddressInput(input) },
 				{
 					headers: context.sessionHeaders,
 				},

@@ -122,7 +122,7 @@ function usage(prefix: string): string {
 		WP_EndpointPath,
 		WP_EndpointResult,
 	} from "kizlo"
-	import { type Product, type Cart, type Checkout, type UpdateCartInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
+	import { type Product, type Cart, type Checkout, type UpdateCartAddressInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
 	import type { WP_Schema } from "kizlo"
 	import { createKizlo } from "kizlo"
 	import { introspection } from "./introspection"
@@ -162,7 +162,7 @@ function usage(prefix: string): string {
 	type NativeTaxId = Assert<Equal<Cart["billingAddress"]["taxId"], string>>
 	type ProjectedBillingKey = Assert<Equal<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"], undefined>>
 	// @ts-expect-error published declarations retain the single-value billing projection
-	const duplicateTaxId: UpdateCartInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
+	const duplicateTaxId: UpdateCartAddressInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
 	type ShippingField = Assert<Equal<Cart["shippingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
 	type CustomerBillingField = Assert<Equal<Customer["billing"]["additionalFields"]["${prefix}/reference"], string | undefined>>
 	type CustomerShippingField = Assert<Equal<Customer["shipping"]["additionalFields"]["${prefix}/reference"], string | undefined>>
@@ -172,10 +172,10 @@ function usage(prefix: string): string {
 	declare const checkout: Checkout
 	// @ts-expect-error cart is a separate resource in published declarations
 	checkout.cart
-	const updateAddress: UpdateCartInput = { shippingAddress: { additionalFields: { "${prefix}/reference": "" } } }
+	const updateAddress: UpdateCartAddressInput = { shippingAddress: { additionalFields: { "${prefix}/reference": "" } } }
 	const updateFields: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": false, "${prefix}/slot": "" } }
 	// @ts-expect-error contact fields cannot be assigned to an address bucket
-	const wrongLocation: UpdateCartInput = { billingAddress: { additionalFields: { "${prefix}/opt-in": true } } }
+	const wrongLocation: UpdateCartAddressInput = { billingAddress: { additionalFields: { "${prefix}/opt-in": true } } }
 	// @ts-expect-error known checkbox fields reject string values
 	const wrongType: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": "false" } }
 	// @ts-expect-error registered select fields retain their enum
@@ -279,7 +279,7 @@ function usage(prefix: string): string {
 }
 
 const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProcedures, InferProcedureData, Page, Post, ResultClient, Tag } from "kizlo"
-	import { type Product, type Cart, type Checkout, type UpdateCartInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
+	import { type Product, type Cart, type Checkout, type UpdateCartAddressInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
 	import type { WP_Schema } from "kizlo"
 	import "./introspection"
 
@@ -297,7 +297,7 @@ const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProc
 	type StubAddressFields = Assert<Equal<Cart["billingAddress"]["additionalFields"]["future/field"], string | boolean | undefined>>
 	type StubProjectedField = Assert<Equal<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"], undefined>>
 	const fallback: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "future/field": "future" }
-	const partialFallback: UpdateCartInput = { billingAddress: { additionalFields: { "future/flag": false } } }
+	const partialFallback: UpdateCartAddressInput = { billingAddress: { additionalFields: { "future/flag": false } } }
 	// @ts-expect-error unregistered fallback still excludes raw billing projections
 	const rawFallback: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "kizlo/tax-id": "GB" }
 	type StubCheckoutFields = Assert<Equal<Checkout["additionalFields"], Record<string, string | boolean | undefined>>>
@@ -495,18 +495,18 @@ test("empty registered buckets keep scalar reads and reject invented literal wri
 		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(document))
 		fs.writeFileSync(
 			path.join(dir, "usage.ts"),
-			`import type { Cart, UpdateCartInput, UpdateCheckoutInput } from "@kizlo/woocommerce"
+			`import type { Cart, UpdateCartAddressInput, UpdateCheckoutInput } from "@kizlo/woocommerce"
 		import type { WP_Schema } from "kizlo"
 		import "./introspection"
 		const empty: WP_Schema<"woocommerce.additional-fields.address.read"> = {}
-		const update: UpdateCartInput = { billingAddress: { additionalFields: {} } }
+		const update: UpdateCartAddressInput = { billingAddress: { additionalFields: {} } }
 		const checkout: UpdateCheckoutInput = { additionalFields: {} }
 		declare const cart: Cart
 		const dynamic: string | boolean | undefined = cart.billingAddress.additionalFields["future/field"]
 		// @ts-expect-error a present empty registry has no registered write keys
-		const invented: UpdateCartInput = { shippingAddress: { additionalFields: { "future/field": true } } }
+		const invented: UpdateCartAddressInput = { shippingAddress: { additionalFields: { "future/field": true } } }
 		// @ts-expect-error projecting an empty billing registry must not invent writable fields
-		const inventedBilling: UpdateCartInput = { billingAddress: { additionalFields: { "future/field": true } } }
+		const inventedBilling: UpdateCartAddressInput = { billingAddress: { additionalFields: { "future/field": true } } }
 		export { empty, update, checkout, dynamic, invented, inventedBilling }`,
 		)
 		expect(compile(dir)).toEqual([])
@@ -587,7 +587,7 @@ test("registered browser checkout errors retain references through published dec
 	}
 }, 30_000)
 
-const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type CheckoutBillingAddressInput, type CheckoutShippingAddressInput, woocommerce } from "@kizlo/woocommerce"
+const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartAddressInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type CheckoutBillingAddressInput, type CheckoutShippingAddressInput, woocommerce } from "@kizlo/woocommerce"
 	import type { InferIntegrationProcedures, InferProcedureInput, WP_Schema } from "kizlo"
 	import "./introspection"
 
@@ -624,8 +624,8 @@ const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, 
 
 	const confirmation: ConfirmFields = { "billing/choice": "home", "billing/flag": false }
 	const retry: RetryFields = { "billing/choice": "office" }
-	const partial: UpdateCartInput = { billingAddress: { additionalFields: {} } }
-	const partialFlag: UpdateCartInput = { billingAddress: { taxId: "", additionalFields: { "billing/flag": false } } }
+	const partial: UpdateCartAddressInput = { billingAddress: { additionalFields: {} } }
+	const partialFlag: UpdateCartAddressInput = { billingAddress: { taxId: "", additionalFields: { "billing/flag": false } } }
 	// @ts-expect-error confirmation must retain the registered required answer
 	const missingConfirm: ConfirmFields = {}
 	// @ts-expect-error retry must retain the registered required answer
@@ -639,15 +639,15 @@ const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, 
 	// @ts-expect-error named checkbox types survive an open scalar index
 	const invalidFlag: ConfirmFields = { "billing/choice": "home", "billing/flag": "false" }
 	// @ts-expect-error partial updates retain named enum types
-	const invalidPartial: UpdateCartInput = { billingAddress: { additionalFields: { "billing/choice": "warehouse" } } }
+	const invalidPartial: UpdateCartAddressInput = { billingAddress: { additionalFields: { "billing/choice": "warehouse" } } }
 	// @ts-expect-error partial updates retain named checkbox types
-	const invalidPartialFlag: UpdateCartInput = { billingAddress: { additionalFields: { "billing/flag": "false" } } }
+	const invalidPartialFlag: UpdateCartAddressInput = { billingAddress: { additionalFields: { "billing/flag": "false" } } }
 	// @ts-expect-error raw Tax ID remains forbidden alongside valid required answers
 	const duplicate: ConfirmFields = { "billing/choice": "home", "kizlo/tax-id": "GB" }
 	// @ts-expect-error retry keeps the same native-only projection
 	const duplicateRetry: RetryFields = { "billing/choice": "office", "kizlo/tax-id": "GB" }
 	// @ts-expect-error partial updates also reject a raw projected key
-	const duplicatePartial: UpdateCartInput = { billingAddress: { additionalFields: { "kizlo/tax-id": "GB" } } }
+	const duplicatePartial: UpdateCartAddressInput = { billingAddress: { additionalFields: { "kizlo/tax-id": "GB" } } }
 
 	type ShippingFields = NonNullable<InferProcedureInput<Procedures["checkout"]["confirm"]>["body"]["shippingAddress"]>["additionalFields"]
 	type ShippingChoice = Assert<Equal<ShippingFields["billing/choice"], "home" | "office">>

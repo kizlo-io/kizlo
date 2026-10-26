@@ -239,7 +239,7 @@ export type SelectCartShippingRateInput = z.infer<typeof SelectCartShippingRateI
 const CartShippingAddressInput = z.object(CartAddressFields).partial()
 const CartBillingAddressInput = CartBillingAddress.partial().extend(BillingNativeInputFields)
 
-export const UpdateCartInput = z.object({
+export const UpdateCartAddressInput = z.object({
 	shippingAddress: CartShippingAddressInput.optional(),
 	billingAddress: CartBillingAddressInput.optional(),
 })
@@ -249,7 +249,7 @@ export type CartBillingAddressInput = Omit<z.input<typeof CartBillingAddress>, "
 export type CartShippingAddressInput = Omit<z.input<typeof CartShippingAddress>, "additionalFields"> & {
 	additionalFields: AddressAdditionalFieldsSubmission
 }
-export type UpdateCartInput = {
+export type UpdateCartAddressInput = {
 	billingAddress?: Partial<Omit<CartBillingAddressInput, "additionalFields">> & { additionalFields?: BillingAdditionalFieldsInput }
 	shippingAddress?: Partial<Omit<CartShippingAddressInput, "additionalFields">> & { additionalFields?: AddressAdditionalFieldsInput }
 }
