@@ -1,10 +1,10 @@
 ---
 title: createKizlo
-description: Create a Kizlo server, procedure tree, client, request handler, and context for your app.
+description: Create a Kizlo server, procedure tree, client, request handler, and WordPress client for your app.
 ---
 
 `createKizlo` builds your Kizlo server from credentials and registered [integrations](/docs/reference/functions/create-integration).
-It returns the `handler` you mount on a route, a server-to-server `client`, the resolved `procedures`, and the `context`.
+It returns the `handler` you mount on a route, a server-to-server `client`, the resolved `procedures`, and the configured `wordpress` client.
 Call it once and export the pieces you need.
 
 ## Parameters
@@ -39,7 +39,7 @@ A `Kizlo` instance with four members:
 | `handler` | `(request: Request) => Promise<Response>`, the fetch handler to mount on your server route. It is pre-bound, so destructuring keeps it working. |
 | `client` | A server-to-server client for calling your own procedures from server code. |
 | `procedures` | The resolved procedure tree: core procedures, namespaced integration procedures, and webhooks. |
-| `context` | The shared server context passed to procedures and middleware. |
+| `wordpress` | The configured WordPress client, with generated endpoints and raw transport methods for server code. |
 
 ## Examples
 
@@ -49,7 +49,7 @@ On a Node server, map `process.env` through the Node integration:
 import { createKizlo } from "kizlo"
 import { node } from "kizlo/node"
 
-export const { procedures, client, handler } = createKizlo({
+export const { procedures, client, wordpress, handler } = createKizlo({
   integrations: [node()],
 })
 ```
@@ -61,7 +61,7 @@ import { createKizlo } from "kizlo"
 import { nextjs } from "kizlo/nextjs/server"
 import { reviews } from "./reviews"
 
-export const { procedures, client, handler } = createKizlo({
+export const { procedures, client, wordpress, handler } = createKizlo({
   integrations: [nextjs(), reviews()],
 })
 ```
@@ -73,7 +73,7 @@ import { createKizlo } from "kizlo"
 import { nextjs } from "kizlo/nextjs/server"
 import { introspection } from "./generated"
 
-export const { procedures, client, handler } = createKizlo({
+export const { procedures, client, wordpress, handler } = createKizlo({
   integrations: [nextjs()],
   introspection,
   logging: "debug",
@@ -82,3 +82,22 @@ export const { procedures, client, handler } = createKizlo({
 
 `introspection` is the tree that types the WordPress client. Pass the `introspection` export of your
 generated barrel; WordPress credentials resolve from the values your integrations contribute.
+
+## Call WordPress directly
+
+```ts title="src/app/posts.ts"
+import { wordpress } from "@/lib/kizlo/server"
+
+const result = await wordpress.kizlo.postTypes.post.list({ query: { per_page: 10 } })
+```
+
+Direct calls use your configured WordPress credentials and bypass Kizlo procedure middleware.
+Keep `wordpress` in server code; never export it from your browser client entry.
+Procedures and middleware still receive their invocation context, including `context.wordpress`.
+
+## Migrate existing access
+
+Replace public `createWordPressClient` imports and `kizlo.context.createServerContext().wordpress`
+with `kizlo.wordpress`, or destructure `wordpress` from `createKizlo({ integrations, introspection })`.
+The factory is now internal and `Kizlo.context` is private. Export `wordpress` instead of `context`
+from your server entry; use a procedure's context for its session, cookies, and other services.

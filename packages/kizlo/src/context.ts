@@ -23,7 +23,8 @@ import { SettingsService } from "./settings/service"
 import { compare, hmac } from "./shared/crypto"
 import { PreviewTokenData, type PreviewTokenPayload } from "./shared/schema"
 import type { ActiveWordPressClient, WordPressCredentials, WordPressTransportResult } from "./wordpress"
-import { createWordPressClient, WordPressTransport } from "./wordpress"
+import { WordPressTransport } from "./wordpress"
+import { createWordPressClient } from "./wordpress/endpoint"
 
 const warningRegistryKey = Symbol.for("kizlo.reportedWordPressWarnings")
 const warningRegistry = globalThis as typeof globalThis & Record<symbol, Set<string> | undefined>

@@ -25,7 +25,7 @@ import { createResultClient, type ResultClient } from "./shared/result"
 import { createOrpcRouter } from "./shared/router"
 import { isTypescriptObject } from "./shared/utils"
 import { createWebhookRouter, type EventHandler } from "./webhook"
-import type { WordPressCredentials } from "./wordpress"
+import type { ActiveWordPressClient, WordPressCredentials } from "./wordpress"
 
 export type AnyKizloConfig = KizloConfig<any>
 
@@ -43,7 +43,7 @@ export type RootProcedures<TIntegrations extends readonly AnyIntegration[]> = In
 export type S2SClient<TIntegrations extends readonly AnyIntegration[]> = ResultClient<RootProcedures<TIntegrations>>
 
 export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
-	public readonly context: Context
+	private readonly context: Context
 	public readonly client: S2SClient<TIntegrations>
 	public readonly procedures: RootProcedures<TIntegrations>
 	private readonly remoteHandler: RPCHandler<ProcedureContext>
@@ -91,6 +91,10 @@ export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
 		})
 
 		this.handler = this.handler.bind(this)
+	}
+
+	public get wordpress(): ActiveWordPressClient {
+		return this.context.createServerContext().wordpress
 	}
 
 	public async handler(request: Request): Promise<Response> {

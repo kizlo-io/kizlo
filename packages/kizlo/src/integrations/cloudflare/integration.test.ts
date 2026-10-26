@@ -198,9 +198,23 @@ describe("Cloudflare composition and transport", () => {
 			[cloudflare(), app],
 			[app, cloudflare()],
 		]) {
-			const server = new Kizlo({ ...config, integrations })
+			const server = new Kizlo({
+				...config,
+				integrations: [
+					...integrations,
+					createIntegration({
+						id: "probe",
+						procedures: {
+							ip: createProcedure(
+								{ scope: "internal", output: schemaType<string | null | undefined>() },
+								async ({ context }) => (await context.getConnInfo())?.ip,
+							),
+						},
+					}),
+				] as const,
+			})
 			await withCloudflareRequest(request("203.0.113.1"), async () => {
-				expect((await server.context.createServerContext().getConnInfo())?.ip).toBeNull()
+				expect(await server.client.probe?.ip.call()).toBeNull()
 				return new Response(null)
 			})
 		}

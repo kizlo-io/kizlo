@@ -112,7 +112,7 @@ describe("trusted Cloudflare client IP", () => {
 			"fetch",
 			vi.fn(async () => Response.json({}, { headers: { "x-kizlo-version": "999.0.0" } })),
 		)
-		await server.context.createServerContext().wordpress.get("wp-json/kizlo/v1/settings", {})
+		await server.wordpress.get("wp-json/kizlo/v1/settings", {})
 		expect(resolver).toHaveBeenCalledWith(null)
 		expect(headers).not.toHaveBeenCalled()
 	})

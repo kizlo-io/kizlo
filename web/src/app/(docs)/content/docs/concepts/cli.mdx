@@ -114,7 +114,7 @@ Your configured server entry must export `procedures`. `generate` reads that pro
 contract whose generated barrel is typed as `typeof procedures`:
 
 ```ts title="src/lib/kizlo/server/index.ts"
-export const { procedures, client, context, handler } = createKizlo({ integrations: [nextjs()] })
+export const { procedures, client, wordpress, handler } = createKizlo({ integrations: [nextjs()] })
 ```
 
 <Callout type="warn">

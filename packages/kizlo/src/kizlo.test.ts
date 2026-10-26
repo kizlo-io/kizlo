@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
+import { introspection } from "../../../introspection"
 import { authMock } from "./adapters/auth"
-import type { ProcedureContext } from "./context"
+import { geoMock } from "./adapters/geo"
+import { Context, type ProcedureContext } from "./context"
+import * as publicApi from "./index"
 import { createKizlo, integrationEnv, Kizlo, resolveKizloConfig, wordPressConnectionComplete } from "./kizlo"
 import { CORE_PROCEDURES } from "./procedures"
 import { createIntegration } from "./shared/integration"
+import { createProcedure, schemaType } from "./shared/procedure"
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllGlobals()
 })
 
 const credentials = { url: "https://wp.example", username: "admin", password: "secret" }
@@ -151,12 +156,17 @@ describe("wordPressConnectionComplete", () => {
 	})
 })
 
+const probe = createIntegration({
+	id: "probe",
+	procedures: { context: createProcedure({ scope: "internal", output: schemaType<ProcedureContext>() }, ({ context }) => context) },
+})
+
 function config(integrations?: readonly ReturnType<typeof createIntegration>[]) {
 	return {
 		baseUrl: "https://app.example",
 		siteSecret: "site-secret",
 		credentials,
-		integrations,
+		integrations: [...(integrations ?? []), probe] as const,
 	}
 }
 
@@ -164,10 +174,10 @@ describe("integration composition", () => {
 	test("uses an adapter bundled by a provider integration without app wiring", async () => {
 		const kizlo = new Kizlo(config([createIntegration({ id: "provider", adapters: { auth: authMock({ id: "42" }) } })]))
 
-		await expect(kizlo.context.createServerContext().getSession()).resolves.toMatchObject({ id: "42" })
+		await expect((await kizlo.client.probe.context.call()).getSession()).resolves.toMatchObject({ id: "42" })
 	})
 
-	test("resolves integration adapters from left to right without erasing concrete values", () => {
+	test("resolves integration adapters from left to right without erasing concrete values", async () => {
 		const firstAuth = authMock({ id: "1" })
 		const secondAuth = authMock({ id: "2" })
 		const logger = vi.fn()
@@ -181,9 +191,9 @@ describe("integration composition", () => {
 			baseUrl: "https://app.example",
 			siteSecret: "site-secret",
 			logging: "debug",
-			integrations: [createIntegration({ id: "runtime", env: runtimeValues }), ...integrations],
+			integrations: [createIntegration({ id: "runtime", env: runtimeValues }), ...integrations, probe],
 		})
-		const adapters = new Kizlo(resolved).context.createServerContext().config.adapters
+		const adapters = (await new Kizlo(resolved).client.probe.context.call()).config.adapters
 
 		expect(adapters).toMatchObject({
 			auth: secondAuth,
@@ -192,7 +202,7 @@ describe("integration composition", () => {
 		})
 	})
 
-	test("mounts a lower-order integration first even when it is declared last", () => {
+	test("mounts a lower-order integration first even when it is declared last", async () => {
 		const frameworkAuth = authMock({ id: "framework" })
 		const appAuth = authMock({ id: "app" })
 
@@ -202,9 +212,10 @@ describe("integration composition", () => {
 			integrations: [
 				createIntegration({ id: "app", adapters: { auth: appAuth } }),
 				createIntegration({ id: "framework", order: -100, env: runtimeValues, adapters: { auth: frameworkAuth } }),
+				probe,
 			],
 		})
-		const adapters = new Kizlo(resolved).context.createServerContext().config.adapters
+		const adapters = (await new Kizlo(resolved).client.probe.context.call()).config.adapters
 
 		expect(adapters).toMatchObject({ auth: appAuth })
 	})
@@ -330,13 +341,13 @@ describe("integration composition", () => {
 })
 
 describe("request error interceptor", () => {
-	test("logging enables the built-in console adapter at the selected level", () => {
+	test("logging enables the built-in console adapter at the selected level", async () => {
 		const debug = vi.spyOn(console, "debug").mockImplementation(() => {})
 		const info = vi.spyOn(console, "info").mockImplementation(() => {})
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
 		const error = vi.spyOn(console, "error").mockImplementation(() => {})
 		const kizlo = new Kizlo({ ...config(), logging: "warn" })
-		const logger = kizlo.context.createServerContext().logger
+		const { logger } = await kizlo.client.probe.context.call()
 
 		logger.debug("debug")
 		logger.info("info")
@@ -360,14 +371,16 @@ describe("request error interceptor", () => {
 		})
 		const interceptor = (
 			kizlo as unknown as {
-				errorInterceptor(): (options: {
-					context: ReturnType<typeof kizlo.context.createServerContext>
-					next: () => Promise<never>
-				}) => Promise<never>
+				errorInterceptor(): (options: { context: ProcedureContext; next: () => Promise<never> }) => Promise<never>
 			}
 		).errorInterceptor()
 
-		await expect(interceptor({ context: kizlo.context.createServerContext(), next: () => Promise.reject(failure) })).rejects.toBe(failure)
+		await expect(
+			interceptor({
+				context: new Context({ ...config(), adapters: { logger } }).createServerContext(),
+				next: () => Promise.reject(failure),
+			}),
+		).rejects.toBe(failure)
 		expect(logger).toHaveBeenCalledOnce()
 		expect(logger).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -404,5 +417,68 @@ describe("response headers", () => {
 
 		expect(response.headers.getSetCookie()).toEqual(["session=one; Path=/", "preference=two; Path=/"])
 		expect(response.headers.get("X-Context")).toBe("forwarded")
+	})
+})
+
+describe("configured WordPress access", () => {
+	test.each([
+		{ env: runtimeValues, active: runtimeValues.remote },
+		{ env: localRuntimeValues, active: localRuntimeValues.local },
+	])("destructures the generated client using the active connection", async ({ env, active }) => {
+		const fetch = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+			Response.json({ id: 7 }, { headers: { "x-kizlo-version": "999.0.0" } }),
+		)
+		vi.stubGlobal("fetch", fetch)
+		const { wordpress } = createKizlo({ integrations: [createIntegration({ id: "runtime", env })], introspection })
+		expect(fetch).not.toHaveBeenCalled()
+
+		const result = await wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: "hello world" } })
+		expect(fetch).toHaveBeenCalledWith(
+			`${active.wordpressUrl}/wp-json/kizlo/v1/post-types/post/hello%20world`,
+			expect.objectContaining({ method: "GET" }),
+		)
+		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(
+			`Basic ${btoa(`${active.wordpressUsername}:${active.wordpressPassword}`)}`,
+		)
+		expect(result).toMatchObject({ data: { id: 7 }, error: null, status: 200 })
+		expect(wordpress.get).toBeTypeOf("function")
+	})
+
+	test("resolves the current trusted IP for each call on a destructured client", async () => {
+		let ip = "203.0.113.1"
+		const getConnInfo = vi.fn(() => geoMock({ ip }).getConnInfo(null))
+		const fetch = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+			Response.json({}, { headers: { "x-kizlo-version": "999.0.0" } }),
+		)
+		vi.stubGlobal("fetch", fetch)
+		const { wordpress } = createKizlo({
+			integrations: [createIntegration({ id: "runtime", env: runtimeValues, adapters: { geo: { getConnInfo } } })],
+			introspection,
+		})
+		expect(getConnInfo).not.toHaveBeenCalled()
+		await wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: "first" } })
+		ip = "2001:db8::2"
+		await wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: "second" } })
+
+		expect(fetch.mock.calls.map(([, init]) => new Headers(init?.headers).get("x-real-ip"))).toEqual(["203.0.113.1", "2001:db8::2"])
+		expect(getConnInfo).toHaveBeenCalledTimes(2)
+		expect(getConnInfo).toHaveBeenCalledWith(null)
+	})
+
+	test("keeps plugin compatibility diagnostics on direct WordPress calls", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => Response.json({}, { headers: { "x-kizlo-version": "0.0.1" } })),
+		)
+		const { wordpress } = createKizlo({ integrations: [createIntegration({ id: "runtime", env: runtimeValues })] })
+		await wordpress.get("wp-json/kizlo/v1/settings", {})
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining("0.0.1"))
+	})
+
+	test("does not export independent WordPress client initialization", () => {
+		expect(publicApi).not.toHaveProperty("createWordPressClient")
+		expect(publicApi.wpEndpoint).toBeTypeOf("function")
+		expect(publicApi.buildWordPressRequest).toBeTypeOf("function")
 	})
 })

@@ -11,7 +11,7 @@ export const base: Fallback = {
 import { node } from "kizlo/node"
 import { introspection } from "./generated"
 
-export const { procedures, client, context, handler } = createKizlo({ integrations: [node()], introspection })
+export const { procedures, client, wordpress, handler } = createKizlo({ integrations: [node()], introspection })
 `,
 			},
 			{ label: "Browser client", relPath: ctx.clientPath, contents: clientEntry(ctx) },

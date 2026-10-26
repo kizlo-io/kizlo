@@ -1,7 +1,8 @@
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, test } from "vitest"
+import { base } from "./base"
 import { adaptFile, changesFor, fileEntries, isExample, patchEntries, readManifest, renderNote, resolvePatch } from "./template"
 import type { ScaffoldContext } from "./types"
 
@@ -116,7 +117,8 @@ describe.each(["nextjs", "astro", "tanstack-start-react", "tanstack-start-solid"
 		const server = fs.readFileSync(path.join(dir, "index.ts"), "utf8")
 		const generated = fs.readFileSync(path.join(dir, "generated/index.ts"), "utf8")
 
-		expect(server).toContain("export const { procedures, client, context, handler }")
+		expect(server).toContain("export const { procedures, client, wordpress, handler }")
+		expect(server).not.toContain("context")
 		expect(server).not.toContain("router")
 		expect(generated).toContain('import type { procedures } from ".."')
 		expect(generated).toContain("typeof procedures")
@@ -139,4 +141,10 @@ describe("renderNote", () => {
 	it("passes the title through unchanged", () => {
 		expect(renderNote(note, "@/").title).toBe("Add the head component")
 	})
+})
+
+test("generic scaffold exports the configured WordPress client", () => {
+	const server = base.scaffolds(ctx()).find((entry) => entry.relPath === ctx().serverEntryPath)
+	expect(server?.contents).toContain("export const { procedures, client, wordpress, handler }")
+	expect(server?.contents).not.toContain("context")
 })

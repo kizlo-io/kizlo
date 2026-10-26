@@ -1,6 +1,8 @@
 import { beforeEach, expect, test, vi } from "vitest"
+import type { ProcedureContext } from "../../context"
 import { Kizlo } from "../../kizlo"
 import { createIntegration } from "../../shared/integration"
+import { createProcedure, schemaType } from "../../shared/procedure"
 import { nextjs } from "./integration"
 import { createNextCookiesInterface } from "./utils"
 
@@ -28,7 +30,13 @@ function server(integrations: ReturnType<typeof createIntegration>[]) {
 		baseUrl: "https://app.example/api/kizlo",
 		siteSecret: "secret",
 		credentials: { url: "https://wordpress.example", username: "admin", password: "password" },
-		integrations,
+		integrations: [
+			...integrations,
+			createIntegration({
+				id: "probe",
+				procedures: { context: createProcedure({ scope: "internal", output: schemaType<ProcedureContext>() }, ({ context }) => context) },
+			}),
+		] as const,
 	})
 }
 
@@ -36,7 +44,12 @@ test("registers Next.js cookies without reading them until the server needs them
 	const integration = nextjs({ env: {}, revalidate: false })
 	const session = { id: "customer", email: "customer@example.com" }
 	const getSession = vi.fn(async (request: Request | null) => (request?.headers.get("cookie") === "session=token" ? session : null))
-	const context = server([integration, createIntegration({ id: "auth", adapters: { auth: { getSession } } })]).context.createServerContext()
+	const context = await server([
+		integration,
+		createIntegration({ id: "auth", adapters: { auth: { getSession } } }),
+	]).client.probe?.context.call()
+
+	if (!context) throw new Error("Missing context probe")
 
 	expect(integration.adapters?.cookies?.getAll).toBeTypeOf("function")
 	expect(readCookies).not.toHaveBeenCalled()
@@ -50,7 +63,9 @@ test.each([true, false])("preserves an explicit cookies override when Next.js is
 	const cookies = { getAll: vi.fn(() => [{ name: "session", value: "override" }]), setAll: vi.fn(), deleteAll: vi.fn() }
 	const application = createIntegration({ id: "application", adapters: { cookies } })
 	const framework = nextjs({ env: {}, revalidate: false })
-	const context = server(frameworkFirst ? [framework, application] : [application, framework]).context.createServerContext()
+	const context = await server(frameworkFirst ? [framework, application] : [application, framework]).client.probe?.context.call()
+
+	if (!context) throw new Error("Missing context probe")
 
 	expect(context.config.adapters?.cookies).toBe(cookies)
 	await expect(context.cookies.get("session")).resolves.toBe("override")

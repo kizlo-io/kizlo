@@ -1,4 +1,4 @@
-export * from "./endpoint"
+export { buildWordPressRequest, wpEndpoint } from "./endpoint"
 export * from "./error"
 export * from "./transport"
 export * from "./types"

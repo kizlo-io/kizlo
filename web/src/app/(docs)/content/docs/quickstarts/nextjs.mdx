@@ -119,7 +119,7 @@ At `src/lib/kizlo/server/index.ts`. `nextjs()` reads the framework environment a
 import { createKizlo } from "kizlo"
 import { nextjs } from "kizlo/nextjs/server"
 
-export const { procedures, client, context, handler } = createKizlo({
+export const { procedures, client, wordpress, handler } = createKizlo({
   integrations: [nextjs()],
 })
 ```
