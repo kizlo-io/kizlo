@@ -3,12 +3,7 @@ import { createConnection, createServer, type Server } from "node:net"
 
 const HOST = "127.0.0.1"
 
-/**
- * How long to wait for an owner to answer its liveness probe. A dead owner refuses the connection
- * at once and never reaches this, so the timeout only decides how long a *live* owner may be too
- * busy to answer before it is read as gone. The dev session answers on the same event loop it
- * typechecks the generated client on, which blocks it for the better part of a second.
- */
+/** A busy dev session can miss this deadline; timeout means unknown, never confirmed exit. */
 const PROBE_TIMEOUT_MS = 1_000
 
 /** A process identity that stays unique when the operating system recycles its PID. */
@@ -34,7 +29,11 @@ export function currentProcessOwner(): Promise<ProcessOwner> {
 
 	ownerPromise = new Promise((resolve, reject) => {
 		const token = randomUUID()
-		const server = createServer((socket) => socket.end(token))
+		const server = createServer((socket) => {
+			// A probe may time out while type checking blocks this process's event loop.
+			socket.on("error", () => {})
+			socket.end(token)
+		})
 		server.unref()
 
 		const failed = (error: Error): void => {
@@ -61,13 +60,15 @@ export function currentProcessOwner(): Promise<ProcessOwner> {
 	return ownerPromise
 }
 
-function pidAlive(pid: number): boolean {
-	if (!Number.isSafeInteger(pid) || pid <= 0) return false
+export type OwnerStatus = "alive" | "dead" | "unknown"
+
+function pidStatus(pid: number): OwnerStatus {
+	if (!Number.isSafeInteger(pid) || pid <= 0) return "dead"
 	try {
 		process.kill(pid, 0)
-		return true
-	} catch {
-		return false
+		return "alive"
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code === "ESRCH" ? "dead" : "unknown"
 	}
 }
 
@@ -75,13 +76,13 @@ function hasDiscriminator(owner: StoredProcessOwner): owner is ProcessOwner {
 	return "port" in owner || "token" in owner
 }
 
-/** True only when the recorded PID and its random liveness token still match. */
-export async function ownerAlive(owner: StoredProcessOwner): Promise<boolean> {
-	if (typeof owner !== "object" || owner === null || !("pid" in owner)) return false
-	if (!pidAlive(owner.pid)) return false
-	if (!hasDiscriminator(owner)) return true
+/** A missed probe cannot distinguish a busy owner from a stale record. */
+export async function ownerStatus(owner: StoredProcessOwner): Promise<OwnerStatus> {
+	if (typeof owner !== "object" || owner === null || !("pid" in owner)) return "dead"
+	const pid = pidStatus(owner.pid)
+	if (pid !== "alive" || !hasDiscriminator(owner)) return pid
 	if (!Number.isSafeInteger(owner.port) || owner.port <= 0 || owner.port > 65_535 || typeof owner.token !== "string" || !owner.token) {
-		return false
+		return "dead"
 	}
 
 	return new Promise((resolve) => {
@@ -91,19 +92,28 @@ export async function ownerAlive(owner: StoredProcessOwner): Promise<boolean> {
 		socket.setEncoding("utf8")
 		socket.setTimeout(PROBE_TIMEOUT_MS)
 
-		const finish = (alive: boolean): void => {
+		const finish = (status: OwnerStatus): void => {
 			if (settled) return
 			settled = true
 			socket.destroy()
-			resolve(alive)
+			resolve(status)
 		}
 
 		socket.on("data", (chunk: string) => {
 			response += chunk
-			if (response.length > owner.token.length) finish(false)
+			if (response.length > owner.token.length) finish("dead")
 		})
-		socket.on("end", () => finish(response === owner.token))
-		socket.on("error", () => finish(false))
-		socket.on("timeout", () => finish(false))
+		const missed = (): void => finish(pidStatus(owner.pid) === "dead" ? "dead" : "unknown")
+		socket.on("end", () => {
+			if (response) finish(response === owner.token ? "alive" : "dead")
+			else missed()
+		})
+		socket.on("error", missed)
+		socket.on("timeout", missed)
 	})
+}
+
+/** True only when the recorded PID and its random liveness token still match. */
+export async function ownerAlive(owner: StoredProcessOwner): Promise<boolean> {
+	return (await ownerStatus(owner)) === "alive"
 }

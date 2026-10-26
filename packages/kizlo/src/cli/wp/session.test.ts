@@ -26,14 +26,15 @@ vi.mock("node:child_process", async (importOriginal) => {
 	return { ...original, execFile: mocks.execFile, spawn: mocks.spawn }
 })
 
-import { reapOrphans, registerSession, spawnWatchdog } from "./session"
+import { acquire, operationLock, releaseOwned } from "../daemon/lock"
+import { reapOrphans, registerSession, retireSession, spawnWatchdog } from "./session"
 
 /** A finished `docker` invocation, delivered the way `spawn` delivers one. */
 function exited(code: number, stdout = ""): unknown {
 	const child = Object.assign(new EventEmitter(), {
 		stdout: new EventEmitter(),
 		stderr: new EventEmitter(),
-		stdin: { end: () => {} },
+		stdin: Object.assign(new EventEmitter(), { end: () => {} }),
 	})
 	setImmediate(() => {
 		if (stdout) child.stdout.emit("data", stdout)
@@ -95,5 +96,35 @@ describe("dev session liveness", () => {
 			{ detached: true, stdio: "ignore" },
 		)
 		expect(unref).toHaveBeenCalled()
+	})
+	test("a retiring watchdog defers while export holds the operation lock", async () => {
+		const file = operationLock(mocks.home)
+		const owner = await registerSession("site", file)
+		await acquire(file)
+		expect(await retireSession("site", { ...owner, operationFile: file })).toBe(false)
+		expect(mocks.spawn).not.toHaveBeenCalled()
+		await releaseOwned(file)
+		expect(await retireSession("site", { ...owner, operationFile: file })).toBe(true)
+		expect(mocks.spawn).toHaveBeenCalledWith("docker", ["ps", "-q", "--filter", "label=com.docker.compose.project=site"], expect.anything())
+	})
+	test("retiring watchdog never stops a verified successor's stack", async () => {
+		const file = operationLock(mocks.home)
+		const owner = await registerSession("site", file)
+		expect(await retireSession("site", { ...owner, token: "old-session", operationFile: file })).toBe(true)
+		expect(mocks.spawn).not.toHaveBeenCalled()
+	})
+	test("orphan reaper leaves an active export and unrelated live sessions alone", async () => {
+		const file = operationLock(mocks.home)
+		const owner = await registerSession("site", file)
+		await registerSession("unrelated")
+		const registry = readRegistry()
+		registry.site = { ...owner, token: "dead", operationFile: file } as ProcessOwner
+		fs.writeFileSync(registryPath(), JSON.stringify(registry))
+		await acquire(file)
+		expect(await reapOrphans()).toEqual([])
+		expect(mocks.spawn).not.toHaveBeenCalled()
+		await releaseOwned(file)
+		expect(await reapOrphans()).toEqual(["site"])
+		expect(Object.keys(readRegistry())).toEqual(["unrelated"])
 	})
 })
