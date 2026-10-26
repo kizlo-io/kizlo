@@ -46,7 +46,11 @@ await client.woocommerce.checkout.update.call({
 
 The examples assume those fields were registered on your store. Update writes are partial. Omitted
 keys retain their existing values; `false` and an allowed empty string are explicit values. Confirm
-and retry also submit fields in these buckets. Core address fields keep their existing requirements.
+and retry accept optional core address fields, including billing email. Billing remains a required
+object; shipping is optional. Each supplied address requires `additionalFields` and its registered
+required answers, with select and checkbox types preserved. Omitted core fields produce no wire keys;
+explicit empty strings request clearing where WooCommerce permits it. This also applies to native
+`billingAddress.taxId`: omission preserves the saved value, and `taxId: ""` requests clearing.
 Extras cannot overwrite core wire properties. WooCommerce mirrors billing into shipping when a cart
 needs no shipping and a billing update omits the shipping address. Send an explicit shipping patch
 when preserving a separate address in that situation.
