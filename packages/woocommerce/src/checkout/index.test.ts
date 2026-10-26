@@ -5,7 +5,7 @@ import type { WCK_Cart } from "../cart/types"
 import { deserializeCart } from "../cart/utils"
 import { CONFIRM_CHECKOUT_ERROR_MAP, RETRY_CHECKOUT_ERROR_MAP, UPDATE_CHECKOUT_ERROR_MAP } from "./error"
 import { CHECKOUT_PROCEDURES } from "./index"
-import { Checkout, ConfirmCheckoutInput } from "./schema"
+import { Checkout, ConfirmCheckoutInput, RetryCheckoutInput } from "./schema"
 
 const billingAddress = {
 	firstName: "Ada",
@@ -570,3 +570,40 @@ test.each(["update", "confirm", "retry"] as const)("%s extracts registered refer
 	])
 	expect(callback).toHaveBeenCalledTimes(1)
 })
+
+for (const operation of ["confirm", "retry"] as const) {
+	test.each([false, true])(`${operation} forwards partial address keys with shipping=%s`, async (shipping) => {
+		const callback = vi.fn().mockResolvedValue({
+			status: 400,
+			data: null,
+			error: { code: "rest_invalid_param", message: "Invalid", data: null },
+		})
+		const cartRead = vi.fn()
+		const context = {
+			wordpress: { woocommerce: { store: { checkout: { create: callback, updateById: callback }, cart: { retrieve: cartRead } } } },
+			sessionHeaders: {},
+			logger: { error: vi.fn() },
+		}
+		const body = {
+			paymentMethod: "bacs",
+			key: "key",
+			orderId: 42,
+			billingAddress: { company: "", additionalFields: { "qa/reference": "", "qa/address-flag": false } },
+			...(shipping && { shippingAddress: { city: "Leeds", additionalFields: { "qa/address-flag": false } } }),
+		}
+		const schema = operation === "confirm" ? ConfirmCheckoutInput : RetryCheckoutInput
+		await expect(
+			CHECKOUT_PROCEDURES[operation]["~kizlo"].handler({
+				context: context as never,
+				input: { params: { orderId: 42 }, body: schema.parse(body) } as never,
+				errors: createThrowableErrorMap(operation === "confirm" ? CONFIRM_CHECKOUT_ERROR_MAP : RETRY_CHECKOUT_ERROR_MAP) as never,
+			}),
+		).rejects.toMatchObject({ code: "CHECKOUT_VALIDATION_FAILED" })
+		expect(callback).toHaveBeenCalledTimes(1)
+		const wire = JSON.parse(JSON.stringify(callback.mock.calls[0]?.[0].body))
+		expect(wire.billing_address).toEqual({ company: "", "qa/reference": "", "qa/address-flag": false })
+		if (shipping) expect(wire.shipping_address).toEqual({ city: "Leeds", "qa/address-flag": false })
+		else expect(wire).not.toHaveProperty("shipping_address")
+		expect(cartRead).not.toHaveBeenCalled()
+	})
+}

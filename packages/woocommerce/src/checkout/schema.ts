@@ -1,20 +1,16 @@
 import { NumberLike } from "@kizlo/shared"
 import z from "zod"
 import {
+	type AddressAdditionalFieldsSubmission,
+	type BillingAdditionalFieldsSubmission,
 	type CheckoutAdditionalFieldsInput,
 	CheckoutAdditionalFieldsSchema,
 	type CheckoutAdditionalFieldsSubmission,
 	CheckoutAdditionalFieldsSubmissionSchema,
 	type CheckoutAdditionalFields as RegisteredCheckoutAdditionalFields,
 } from "../additional-fields"
-import {
-	CartBillingAddress,
-	type CartBillingAddressInput,
-	CartBillingAddressSubmission,
-	CartShippingAddress,
-	type CartShippingAddressInput,
-	CartShippingAddressSubmission,
-} from "../cart/schema"
+import { CartBillingAddress, CartBillingAddressSubmission, CartShippingAddress, CartShippingAddressSubmission } from "../cart/schema"
+import { BillingNativeInputFields } from "../field-projections"
 
 export const CheckoutAdditionalFields: typeof CheckoutAdditionalFieldsSchema = CheckoutAdditionalFieldsSchema
 export type CheckoutAdditionalFields = RegisteredCheckoutAdditionalFields
@@ -69,9 +65,24 @@ export type UpdateCheckoutInput = Omit<z.input<typeof UpdateCheckoutInput>, "add
 	additionalFields?: CheckoutAdditionalFieldsInput
 }
 
+export const CheckoutBillingAddressInput = CartBillingAddressSubmission.partial().extend({
+	...BillingNativeInputFields,
+	additionalFields: CartBillingAddressSubmission.shape.additionalFields,
+})
+export type CheckoutBillingAddressInput = Omit<z.input<typeof CheckoutBillingAddressInput>, "additionalFields"> & {
+	additionalFields: BillingAdditionalFieldsSubmission
+}
+
+export const CheckoutShippingAddressInput = CartShippingAddressSubmission.partial().extend({
+	additionalFields: CartShippingAddressSubmission.shape.additionalFields,
+})
+export type CheckoutShippingAddressInput = Omit<z.input<typeof CheckoutShippingAddressInput>, "additionalFields"> & {
+	additionalFields: AddressAdditionalFieldsSubmission
+}
+
 export const ConfirmCheckoutInput = z.object({
-	billingAddress: CartBillingAddressSubmission,
-	shippingAddress: CartShippingAddressSubmission.optional(),
+	billingAddress: CheckoutBillingAddressInput,
+	shippingAddress: CheckoutShippingAddressInput.optional(),
 	paymentMethod: z.string(),
 	expectedTotal: z
 		.string()
@@ -88,8 +99,8 @@ export const ConfirmCheckoutInput = z.object({
 })
 export type ConfirmCheckoutInput = Omit<z.input<typeof ConfirmCheckoutInput>, "additionalFields" | "billingAddress" | "shippingAddress"> & {
 	additionalFields?: CheckoutAdditionalFieldsSubmission
-	billingAddress: CartBillingAddressInput
-	shippingAddress?: CartShippingAddressInput
+	billingAddress: CheckoutBillingAddressInput
+	shippingAddress?: CheckoutShippingAddressInput
 }
 
 export const RetryCheckoutInput = z.object({
@@ -97,9 +108,9 @@ export const RetryCheckoutInput = z.object({
 	orderId: NumberLike,
 	paymentMethod: z.string(),
 	billingEmail: z.email().optional(),
-	billingAddress: CartBillingAddressSubmission,
+	billingAddress: CheckoutBillingAddressInput,
 	paymentData: CheckoutPaymentData.optional(),
-	shippingAddress: CartShippingAddressSubmission.optional(),
+	shippingAddress: CheckoutShippingAddressInput.optional(),
 	customerNote: z.string().optional(),
 	additionalFields: CheckoutAdditionalFieldsSubmissionSchema.optional(),
 	extensions: CheckoutExtensions.optional(),
@@ -108,6 +119,6 @@ export const RetryCheckoutInput = z.object({
 })
 export type RetryCheckoutInput = Omit<z.input<typeof RetryCheckoutInput>, "additionalFields" | "billingAddress" | "shippingAddress"> & {
 	additionalFields?: CheckoutAdditionalFieldsSubmission
-	billingAddress: CartBillingAddressInput
-	shippingAddress?: CartShippingAddressInput
+	billingAddress: CheckoutBillingAddressInput
+	shippingAddress?: CheckoutShippingAddressInput
 }

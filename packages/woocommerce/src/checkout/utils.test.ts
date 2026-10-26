@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { Checkout } from "./schema"
+import { Checkout, CheckoutBillingAddressInput, CheckoutShippingAddressInput } from "./schema"
 import type { WCK_Checkout } from "./types"
 import { deserializeCheckout, serializeCheckoutBillingAddress, serializeCheckoutShippingAddress, withKizloRedirectPaths } from "./utils"
 
@@ -179,5 +179,20 @@ test("reuses cart address serialization and preserves merchant fields", () => {
 		email: "ada@example.com",
 		"kizlo/tax-id": "GB-42",
 		delivery_note: "Reception",
+	})
+})
+
+test("partial checkout serialization preserves explicit values and blocks injected core keys", () => {
+	const additionalFields = { first_name: "injected", email: "injected", "qa/reference": "", "qa/address-flag": false }
+	const billing = CheckoutBillingAddressInput.parse({ additionalFields })
+	const shipping = CheckoutShippingAddressInput.parse({ additionalFields: { ...additionalFields, "kizlo/tax-id": "excluded" } })
+	const extras = { "qa/reference": "", "qa/address-flag": false }
+	expect(serializeCheckoutBillingAddress(billing)).toEqual(extras)
+	expect(serializeCheckoutShippingAddress(shipping)).toEqual(extras)
+	expect(serializeCheckoutBillingAddress(CheckoutBillingAddressInput.parse({ ...billing, email: "", taxId: "", phone: "" }))).toEqual({
+		...extras,
+		email: "",
+		phone: "",
+		"kizlo/tax-id": "",
 	})
 })

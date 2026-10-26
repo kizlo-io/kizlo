@@ -587,7 +587,7 @@ test("registered browser checkout errors retain references through published dec
 	}
 }, 30_000)
 
-const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartInput, type ConfirmCheckoutInput, type RetryCheckoutInput, woocommerce } from "@kizlo/woocommerce"
+const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type CheckoutBillingAddressInput, type CheckoutShippingAddressInput, woocommerce } from "@kizlo/woocommerce"
 	import type { InferIntegrationProcedures, InferProcedureInput, WP_Schema } from "kizlo"
 	import "./introspection"
 
@@ -600,6 +600,20 @@ const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, 
 	type RetryAlias = Assert<Equal<RetryFields, RetryCheckoutInput["billingAddress"]["additionalFields"]>>
 	type AddressAlias = Assert<Equal<ConfirmFields, CartBillingAddressInput["additionalFields"]>>
 	type SchemaInput = Assert<Equal<ConfirmFields, typeof CartBillingAddressSubmission["_input"]["additionalFields"]>>
+	const partialBilling: CheckoutBillingAddressInput = { additionalFields: { "billing/choice": "home", "billing/flag": false } }
+	const partialShipping: CheckoutShippingAddressInput = { city: "London", additionalFields: { "billing/choice": "office", "kizlo/tax-id": "excluded" } }
+	const partialConfirm: ConfirmCheckoutInput = { billingAddress: partialBilling, shippingAddress: partialShipping, paymentMethod: "bacs" }
+	const partialRetry: RetryCheckoutInput = { billingAddress: partialBilling, paymentMethod: "bacs", key: "key", orderId: 42 }
+	const inferredConfirm: InferProcedureInput<Procedures["checkout"]["confirm"]>["body"] = partialConfirm
+	const inferredRetry: InferProcedureInput<Procedures["checkout"]["retry"]>["body"] = partialRetry
+	// @ts-expect-error a partial core address still requires registered answers
+	const missingAnswer: CheckoutBillingAddressInput = { additionalFields: {} }
+	// @ts-expect-error a supplied shipping address retains registered requirements
+	const missingShippingAnswer: CheckoutShippingAddressInput = { additionalFields: {} }
+	// @ts-expect-error billing remains required on confirmation
+	const missingBilling: ConfirmCheckoutInput = { paymentMethod: "bacs" }
+	// @ts-expect-error billing remains required on retry
+	const missingRetryBilling: RetryCheckoutInput = { paymentMethod: "bacs", key: "key", orderId: 42 }
 	type RequiredChoice = Assert<Equal<ConfirmFields["billing/choice"], "home" | "office">>
 	type OptionalFlag = Assert<Equal<ConfirmFields["billing/flag"], boolean | undefined>>
 	type ReadChoice = Assert<Equal<Cart["billingAddress"]["additionalFields"]["billing/choice"], "" | "home" | "office" | undefined>>

@@ -65,6 +65,26 @@ const commerce = woocommerce({ allowGuest: false })
 
 `allowGuest` defaults to `true`, permitting logged-out checkout subject to WooCommerce's own guest-checkout settings and validation. Customer APIs such as `customers.get` always require login. Guest carts, product/storefront reads, and order ownership/key checks (including guest receipts) keep their existing behavior. After installing a release containing this option, replace your application checkout-auth wrapper with `woocommerce({ allowGuest: false })`; procedure inputs, outputs, and hooks stay the same.
 
+## Submit partial checkout addresses
+
+Confirm and retry accept optional core address fields, including billing email. Send only the fields you collect. The billing address object is required; shipping is optional. Each supplied address must include `additionalFields`, with any registered required answers (or `{}` when none are required).
+
+```ts
+const billingAddress = {
+  firstName: "Ada", lastName: "Lovelace",
+  address1: "1 Store Street", city: "London", postcode: "SW1A 1AA", country: "GB",
+  email: "ada@example.com", additionalFields: {},
+}
+await kizlo.woocommerce.checkout.confirm.call({ body: { billingAddress, paymentMethod: "bacs" } })
+// For an existing unpaid order:
+await kizlo.woocommerce.checkout.retry.call({
+  params: { orderId },
+  body: { key: orderKey, billingAddress, paymentMethod: "bacs" },
+})
+```
+
+Omitted fields produce no wire keys; explicit empty strings request clearing where WooCommerce permits it. WooCommerce validates the resulting address against its live rules through the existing checkout errors. Full-address callers remain valid. See [Billing Tax IDs](#billing-tax-ids) for Tax ID omission and [additional checkout fields](https://kizlo.io/docs/concepts/additional-checkout-fields) for registered answer contracts and native billing-to-shipping mirroring.
+
 ## Billing Tax IDs
 
 Billing addresses expose `taxId` on customers, carts, checkout responses, and orders. The field is always a string on output and defaults to `""` when it has not been set. Billing address inputs accept an optional `taxId`; shipping addresses have no native `taxId`, and Kizlo discards managed shipping copies independently of the hidden UI rule.
@@ -77,11 +97,11 @@ await kizlo.woocommerce.cart.update.call({
 
 Store administrators can make the field mandatory from **WooCommerce → Settings → Accounts & Privacy → Checkout → Require Tax ID at checkout**. It remains optional by default.
 
-The native value maps to the official registered `kizlo/tax-id` address field. For example, `{ billingAddress: { taxId: "GB123" } }` becomes `{ billing_address: { "kizlo/tax-id": "GB123" } }` on the Store API wire. Partial cart/customer-address updates omit the key when `taxId` is omitted; `taxId: ""` clears it. Full confirmation/retry inputs retain the existing empty-string default. WooCommerce owns sanitization and contextual requiredness.
+The native value maps to the official registered `kizlo/tax-id` address field. For example, `{ billingAddress: { taxId: "GB123" } }` becomes `{ billing_address: { "kizlo/tax-id": "GB123" } }` on the Store API wire. Cart/customer-address updates and checkout confirm/retry omit the key when `taxId` is omitted, preserving the saved value. Send `taxId: ""` to clear it explicitly. WooCommerce owns sanitization and contextual requiredness.
 
 Raw introspection preserves `kizlo/tax-id` in both address schemas. Normalized billing `additionalFields` omits it from types and values: use the native property. Raw billing inputs using that key are rejected even when a duplicate equals `taxId`; there is no raw-only compatibility alias. Other registered and compatible unknown response extras retain their usual buckets.
 
-Registered billing extras retain their named enum and scalar types in reads, partial cart updates, and full confirmation/retry inputs, including registrations with a scalar string index. Full submissions require the registered answers and reject values outside their enums; partial cart updates allow omitted answers. These are compile-time guarantees from the consumer's registered contract. WooCommerce continues to validate against its live registry at runtime.
+Registered billing extras retain their named enum and scalar types in reads, partial cart updates, and confirmation/retry inputs, including registrations with a scalar string index. Confirmation and retry require the registered answers and reject values outside their enums; partial cart updates allow omitted answers. These are compile-time guarantees from the consumer's registered contract. WooCommerce continues to validate against its live registry at runtime.
 
 Customer reads use the grouped `billing.additional_fields` adapter backed by public CheckoutFields helpers. Orders read their own snapshot, never the current profile. Storage remains `_wc_billing/kizlo/tax-id`, so existing saved values need no migration. Order admin edits set/replace/clear the order alone; profile edits affect later cart hydration. The retry validation/persistence bridge and shipping cleanup remain required on WooCommerce 11.0.1.
 

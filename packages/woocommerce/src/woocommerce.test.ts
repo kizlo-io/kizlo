@@ -630,6 +630,73 @@ async function reviewedCheckout(quantity = 1) {
 	return { guest, key, cart, body: { billingAddress: address, shippingAddress: address, paymentMethod: "bacs" } }
 }
 
+test.each([false, true])("checkout.confirm preserves omitted address values and clears explicit values: clear=%s", async (clear) => {
+	const { guest, body } = await reviewedCheckout()
+	await guest.cart.update.call({
+		body: {
+			billingAddress: { company: "Saved billing", address2: "Suite 2", phone: "01610000000" },
+			shippingAddress: { company: "Saved shipping", address2: "Floor 3", phone: "01610000001" },
+		},
+	})
+	const empty = clear ? { company: "", address2: "", phone: "" } : {}
+	const result = await guest.checkout.confirm.call({
+		body: {
+			paymentMethod: "bacs",
+			billingAddress: {
+				firstName: "Partial",
+				...empty,
+				...(clear && { taxId: "" }),
+				additionalFields: { "qa/reference": "PARTIAL", "qa/address-flag": false },
+			},
+			shippingAddress: { firstName: "Delivery", ...empty, additionalFields: { "qa/reference": "SHIP", "qa/address-flag": false } },
+		},
+	})
+	if (result.orderId === null || result.orderKey === null) throw new Error("Partial checkout returned no order identity")
+	const stored = await guest.orders.get.call({
+		params: { orderId: result.orderId },
+		query: { key: result.orderKey, billingEmail: body.billingAddress.email },
+	})
+	for (const snapshot of [result, stored]) {
+		expect(snapshot.billingAddress).toMatchObject({
+			firstName: "Partial",
+			email: body.billingAddress.email,
+			address1: body.billingAddress.address1,
+			company: clear ? "" : "Saved billing",
+			address2: clear ? "" : "Suite 2",
+			phone: clear ? "" : "01610000000",
+			taxId: clear ? "" : "REVIEWED-TOTAL",
+			additionalFields: { "qa/reference": "PARTIAL", "qa/address-flag": false },
+		})
+		expect(snapshot.shippingAddress).toMatchObject({
+			firstName: "Delivery",
+			address1: body.shippingAddress.address1,
+			company: clear ? "" : "Saved shipping",
+			address2: clear ? "" : "Floor 3",
+			phone: clear ? "" : "01610000001",
+			additionalFields: { "qa/reference": "SHIP", "qa/address-flag": false },
+		})
+	}
+})
+
+test("checkout.confirm maps live validation for a partial address with no saved required values", async () => {
+	const { guest } = await reviewedCheckout()
+	await guest.cart.update.call({
+		body: {
+			billingAddress: { firstName: "", lastName: "", address1: "", city: "", postcode: "", email: "" },
+			shippingAddress: { firstName: "", lastName: "", address1: "", city: "", postcode: "" },
+		},
+	})
+	await expect(
+		guest.checkout.confirm.call({
+			body: {
+				billingAddress: { additionalFields: {} },
+				shippingAddress: { additionalFields: {} },
+				paymentMethod: "bacs",
+			},
+		}),
+	).rejects.toMatchObject({ code: "CHECKOUT_EMAIL_MISSING", status: 400 })
+})
+
 test.each(["matching", "decreased", "omitted"] as const)("reviewed checkout allows %s totals", async (scenario) => {
 	const { guest, key, cart, body } = await reviewedCheckout(scenario === "decreased" ? 2 : 1)
 	const reviewedTotal = String(cart.totals.total)
@@ -842,6 +909,54 @@ test("checkout.retry pays an order owned by the headless customer", async () => 
 	expect(customer.billing.additionalFields).not.toHaveProperty("kizlo/tax-id")
 	const stored = await storedOrder(order.id)
 	expect(stored.status).toBe("on-hold")
+})
+
+test.each([false, true])("checkout.retry preserves omitted address values and clears explicit values: clear=%s", async (clear) => {
+	const order = await createPendingOrder(getTestCredentials().users.user.id)
+	const saved = await admin().put(`${WC_CORE_BASE}/orders/${order.id}`, {
+		body: {
+			billing: { company: "Saved billing", address_2: "Suite 2", phone: "01610000000" },
+			shipping: { company: "Saved shipping", address_2: "Floor 3", phone: "01610000001" },
+			meta_data: [{ key: "_wc_billing/kizlo/tax-id", value: "SAVED-TAX" }],
+		},
+	})
+	if (saved.error) throw saved.error
+	const empty = clear ? { company: "", address2: "", phone: "" } : {}
+	const result = await client().checkout.retry.call({
+		params: { orderId: order.id },
+		body: {
+			key: order.order_key,
+			billingEmail: ORDER_EMAIL,
+			paymentMethod: "bacs",
+			billingAddress: {
+				firstName: "Partial",
+				...empty,
+				...(clear && { taxId: "" }),
+				additionalFields: { "qa/reference": "PARTIAL", "qa/address-flag": false },
+			},
+			shippingAddress: { firstName: "Delivery", ...empty, additionalFields: { "qa/reference": "SHIP", "qa/address-flag": false } },
+		},
+	})
+	for (const snapshot of [result, await client().orders.get.call({ params: { orderId: order.id } })]) {
+		expect(snapshot.billingAddress).toMatchObject({
+			firstName: "Partial",
+			email: ORDER_EMAIL,
+			address1: STORED_SHIPPING.address_1,
+			company: clear ? "" : "Saved billing",
+			address2: clear ? "" : "Suite 2",
+			phone: clear ? "" : "01610000000",
+			taxId: clear ? "" : "SAVED-TAX",
+			additionalFields: { "qa/reference": "PARTIAL", "qa/address-flag": false },
+		})
+		expect(snapshot.shippingAddress).toMatchObject({
+			firstName: "Delivery",
+			address1: STORED_SHIPPING.address_1,
+			company: clear ? "" : "Saved shipping",
+			address2: clear ? "" : "Floor 3",
+			phone: clear ? "" : "01610000001",
+			additionalFields: { "qa/reference": "SHIP", "qa/address-flag": false },
+		})
+	}
 })
 
 test("checkout.retry requires a billing Tax ID only while the setting is enabled", async () => {

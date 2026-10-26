@@ -1,4 +1,4 @@
-import { createProcedure, type Procedure, schemaType } from "kizlo"
+import { createProcedure, type Procedure, schemaType, type WP_EndpointInput } from "kizlo"
 import type z from "zod/v4"
 import { Cart } from "../cart/schema"
 import type { WCK_Cart } from "../cart/types"
@@ -126,11 +126,15 @@ export const createCheckoutProcedures = (allowGuest = true): CheckoutProcedures 
 			middlewares: [sessionMiddleware({ transitionGuestCart: true, allowGuest })],
 		},
 		async ({ context, input, errors }) => {
+			type Body = WP_EndpointInput<"woocommerce.store.checkout.create">["body"]
 			const response = await context.wordpress.woocommerce.store.checkout.create(
 				{
 					body: {
-						billing_address: serializeCheckoutBillingAddress(input.body.billingAddress),
-						shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
+						// WooCommerce accepts partial addresses despite its published required core keys.
+						billing_address: serializeCheckoutBillingAddress(input.body.billingAddress) as Body["billing_address"],
+						shipping_address: input.body.shippingAddress
+							? (serializeCheckoutShippingAddress(input.body.shippingAddress) as Body["shipping_address"])
+							: undefined,
 						payment_method: gateway(input.body.paymentMethod),
 						customer_note: input.body.customerNote,
 						...(input.body.expectedTotal !== undefined && { expected_total: input.body.expectedTotal }),
@@ -223,6 +227,7 @@ export const createCheckoutProcedures = (allowGuest = true): CheckoutProcedures 
 			middlewares: [sessionMiddleware({ transitionGuestCart: true, allowGuest })],
 		},
 		async ({ context, input, errors }) => {
+			type Body = WP_EndpointInput<"woocommerce.store.checkout.updateById">["body"]
 			const response = await context.wordpress.woocommerce.store.checkout.updateById(
 				{
 					params: { id: String(input.params.orderId) },
@@ -231,8 +236,11 @@ export const createCheckoutProcedures = (allowGuest = true): CheckoutProcedures 
 						payment_data: input.body.paymentData,
 						billing_email: input.body.billingEmail,
 						payment_method: gateway(input.body.paymentMethod),
-						billing_address: serializeCheckoutBillingAddress(input.body.billingAddress),
-						shipping_address: input.body.shippingAddress ? serializeCheckoutShippingAddress(input.body.shippingAddress) : undefined,
+						// WooCommerce accepts partial addresses despite its published required core keys.
+						billing_address: serializeCheckoutBillingAddress(input.body.billingAddress) as Body["billing_address"],
+						shipping_address: input.body.shippingAddress
+							? (serializeCheckoutShippingAddress(input.body.shippingAddress) as Body["shipping_address"])
+							: undefined,
 						customer_note: input.body.customerNote,
 						additional_fields: input.body.additionalFields,
 						extensions: withKizloRedirectPaths(input.body.extensions, {

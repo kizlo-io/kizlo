@@ -1,6 +1,6 @@
 import type { WP_EndpointInput } from "kizlo"
+import type z from "zod"
 import { additionalFieldValues } from "../additional-fields"
-import type { CartBillingAddress, CartShippingAddress } from "../cart/schema"
 import type { WCK_Cart } from "../cart/types"
 import {
 	deserializeCartBillingAddress,
@@ -9,7 +9,13 @@ import {
 	serializeCartShippingAddress,
 } from "../cart/utils"
 import { deserializeExtensions } from "../product/utils"
-import type { Checkout, CheckoutAdditionalFields, CheckoutExtensions } from "./schema"
+import type {
+	Checkout,
+	CheckoutAdditionalFields,
+	CheckoutBillingAddressInput,
+	CheckoutExtensions,
+	CheckoutShippingAddressInput,
+} from "./schema"
 import type { WCK_Checkout, WCK_CheckoutOrder } from "./types"
 
 type Gateway = NonNullable<NonNullable<WP_EndpointInput<"woocommerce.store.checkout.update">["body"]>["payment_method"]>
@@ -132,11 +138,11 @@ export function withKizloRedirectPaths(
 	return { ...extensions, kizlo: { ...existingKizlo, ...kizlo } }
 }
 
-export function serializeCheckoutShippingAddress(address: CartShippingAddress) {
+export function serializeCheckoutShippingAddress(address: z.output<typeof CheckoutShippingAddressInput>) {
 	return serializeCartShippingAddress(address)
 }
 
-export function serializeCheckoutBillingAddress(address: CartBillingAddress) {
+export function serializeCheckoutBillingAddress(address: z.output<typeof CheckoutBillingAddressInput>) {
 	return serializeCartBillingAddress(address)
 }
 
