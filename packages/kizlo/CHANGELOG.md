@@ -1,5 +1,13 @@
 # kizlo
 
+## 0.29.0
+
+### Minor Changes
+
+- [#297](https://github.com/kizlo-io/kizlo/pull/297) [`21afbc2`](https://github.com/kizlo-io/kizlo/commit/21afbc27f22825d114f41bb118ae7e0a569d24a0) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add local WordPress exports with content, phpMyAdmin-ready SQL and manual restore instructions.
+
+- [#295](https://github.com/kizlo-io/kizlo/pull/295) [`a327ad8`](https://github.com/kizlo-io/kizlo/commit/a327ad8a3908b72b7808ff7a2ded86c17d3db5cb) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Expose the configured WordPress client through createKizlo().wordpress in place of public context access and createWordPressClient initialization.
+
 ## 0.28.0
 
 ### Minor Changes

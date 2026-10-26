@@ -1,5 +1,15 @@
 # @kizlo/woocommerce
 
+## 0.17.0
+
+### Minor Changes
+
+- [#299](https://github.com/kizlo-io/kizlo/pull/299) [`138fc82`](https://github.com/kizlo-io/kizlo/commit/138fc8282a53ff0f2e329c868ebdcd15fc70cdd9) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Rename `cart.update` to `cart.updateAddress` and `UpdateCartInput` to `UpdateCartAddressInput` as a breaking API change.
+
+### Patch Changes
+
+- [#298](https://github.com/kizlo-io/kizlo/pull/298) [`25e5b13`](https://github.com/kizlo-io/kizlo/commit/25e5b13b213d50e0e724a9c3cc1bb4e3d68145f8) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Accept partial core addresses on checkout confirmation and payment retry while preserving omitted values and registered field requirements.
+
 ## 0.16.0
 
 ### Minor Changes
