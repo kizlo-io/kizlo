@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Resolve missing authenticated customers without requiring a cart request and coordinate customer creation across requests.

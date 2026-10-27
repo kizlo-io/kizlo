@@ -65,6 +65,12 @@ const commerce = woocommerce({ allowGuest: false })
 
 `allowGuest` defaults to `true`, permitting logged-out checkout subject to WooCommerce's own guest-checkout settings and validation. Customer APIs such as `customers.get` always require login. Guest carts, product/storefront reads, and order ownership/key checks (including guest receipts) keep their existing behavior. After installing a release containing this option, replace your application checkout-auth wrapper with `woocommerce({ allowGuest: false })`; procedure inputs, outputs, and hooks stay the same.
 
+## Read a customer before loading a cart
+
+`customers.get()` resolves the signed-in user's email and creates a missing WooCommerce customer on demand. Account and address pages can call it directly after signup. Existing accounts and saved details are preserved; customer and cart requests share the same identity and creation lock.
+
+Install the matching companion plugin and regenerate your WordPress contract before upgrading the SDK. The contract must include `woocommerce.kizlo.customers.retrieve`. Provisioning or lock failures return `SERVICE_UNAVAILABLE` (503), which you can retry; they do not return an empty customer or require checkout first.
+
 ## Submit partial checkout addresses
 
 Confirm and retry accept optional core address fields, including billing email. Send only the fields you collect. The billing address object is required; shipping is optional. Each supplied address must include `additionalFields`, with any registered required answers (or `{}` when none are required).

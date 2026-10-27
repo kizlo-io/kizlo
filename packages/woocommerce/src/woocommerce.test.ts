@@ -1235,8 +1235,52 @@ test("orders keep the HS code captured before the product changes", async () => 
 })
 
 // ==================================================
-// CUSTOMERS: wc/v3
+// CUSTOMERS: kizlo/v1 and wc/v3
 // ==================================================
+
+test.each([false, true])("customer-first provisioning converges with cart loading (concurrent=%s)", async (concurrent) => {
+	const email = `c-${crypto.randomUUID()}@example.com`
+	const auth = createAuthAdapter({ getSession: () => ({ id: "external-auth-user", email }) })
+	const api = getKizloTestInstance({ baseUrl: "http://test.local/api/kizlo", integrations: [woocommerce()], adapters: { auth } })
+	const before = await admin().woocommerce.customers.list({ query: { email, role: "all" } })
+	if (before.error) throw before.error
+	expect(before.data).toEqual([])
+	try {
+		const read = () => api.handler(new Request("http://test.local/api/kizlo/customers"))
+		let responses: Response[]
+		if (concurrent) {
+			const [first, second, third, cart] = await Promise.all([
+				read(),
+				read(),
+				read(),
+				api.handler(new Request("http://test.local/api/kizlo/cart")),
+			])
+			expect(cart.status).toBe(200)
+			expect(Cart.parse(await cart.json()).billingAddress.email).toBe(email)
+			responses = [first, second, third]
+		} else {
+			responses = [await read()]
+		}
+		for (const response of responses) expect(response.status).toBe(200)
+		const customers = await Promise.all(responses.map(async (response) => Customer.parse(await response.json())))
+		const customer = customers[0]
+		if (!customer) throw new Error("No customer response")
+		expect(customer.email).toBe(email)
+		expect(customer.role).toBe("customer")
+		expect(customers.every((item) => item.id === customer.id)).toBe(true)
+		expect((await api.client.woocommerce.customers.get.call()).id).toBe(customer.id)
+
+		const matches = await admin().woocommerce.customers.list({ query: { email, role: "all" } })
+		if (matches.error) throw matches.error
+		expect(matches.data.map((item) => item.id)).toEqual([customer.id])
+	} finally {
+		const matches = await admin().woocommerce.customers.list({ query: { email, role: "all" } })
+		expect(matches.error).toBeNull()
+		for (const customer of matches.data ?? []) {
+			await admin().delete(`${WC_CORE_BASE}/customers/${customer.id}`, { searchParams: { force: true } })
+		}
+	}
+})
 
 test.each([true, false])(
 	"customers.get reads the signed-in customer through the generated endpoint (allowGuest=%s)",

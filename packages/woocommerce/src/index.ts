@@ -38,6 +38,7 @@ export function woocommerce(options: WooCommerceOptions = {}) {
 			// missing or predates the contract rather than anything being wrong with WooCommerce.
 			endpoints: [
 				"woocommerce.customers",
+				"woocommerce.kizlo.customers",
 				"woocommerce.kizlo.storefront",
 				"woocommerce.products",
 				"woocommerce.store.cart",

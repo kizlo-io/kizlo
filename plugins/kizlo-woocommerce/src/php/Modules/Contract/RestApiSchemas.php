@@ -55,6 +55,11 @@ final class RestApiSchemas
         }
 
         if ($controller instanceof WC_REST_Customers_Controller && is_array($properties['billing']['properties'] ?? null)) {
+            // Accounts created through WordPress have no last-update timestamp until first edited.
+            foreach (['date_modified', 'date_modified_gmt'] as $date) {
+                $properties[$date]['nullable'] = true;
+            }
+
             // Response adapters only: wc/v3 has no official grouped-field write input.
             foreach (['billing', 'shipping'] as $group) {
                 $properties[$group]['properties']['additional_fields'] = [
