@@ -91,6 +91,16 @@ await kizlo.woocommerce.checkout.retry.call({
 
 Omitted fields produce no wire keys; explicit empty strings request clearing where WooCommerce permits it. WooCommerce validates the resulting address against its live rules through the existing checkout errors. Full-address callers remain valid. See [Billing Tax IDs](#billing-tax-ids) for Tax ID omission and [additional checkout fields](https://kizlo.io/docs/concepts/additional-checkout-fields) for registered answer contracts and native billing-to-shipping mirroring.
 
+## Order history
+
+`client.woocommerce.orders.list({ query: { page: 1, perPage: 10 } })` returns `{ items: Order[], meta: ListMetadata }` for the signed-in customer. Both query inputs are optional positive integers; `perPage` is capped at 100. Orders are newest first, with descending ID breaking ties. Metadata includes `page`, `totalItems`, `totalPages`, `nextPage`, `prevPage`, `hasNextPage`, and `hasPrevPage`. Empty history and pages beyond the last page succeed with an empty `items` array.
+
+List items use the same normalized `Order` as `orders.get`, including items, additional fields, currency and totals. Both expose `number`, preserving the store's custom order numbering, and `createdAt`, the order's UTC creation time as Unix milliseconds (`0` when unavailable). Raw `status` values preserve custom statuses. Use the backend's `isPaid` and `needsPayment` flags for payment behavior; status labels do not define whether an order is paid.
+
+History always requires login, including when `allowGuest` is enabled. The server derives the customer from the authenticated session; caller-selected email/customer IDs cannot change ownership. Internal checkout drafts and trash are excluded. Anonymous calls return `UNAUTHORIZED`, backend access denial returns `FORBIDDEN`, and other backend failures remain errors rather than empty history. History HTTP responses use `Cache-Control: private, no-store`. The existing order-key/email checks still apply to guest `orders.get` receipts.
+
+Update the Kizlo WooCommerce plugin and run `kizlo generate` before using this API so your generated contract includes `woocommerce.kizlo.orders.list` and the shared order metadata.
+
 ## Billing Tax IDs
 
 Billing addresses expose `taxId` on customers, carts, checkout responses, and orders. The field is always a string on output and defaults to `""` when it has not been set. Billing address inputs accept an optional `taxId`; shipping addresses have no native `taxId`, and Kizlo discards managed shipping copies independently of the hidden UI rule.

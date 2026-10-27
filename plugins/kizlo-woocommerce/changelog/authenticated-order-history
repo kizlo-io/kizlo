@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add authenticated paginated order history with shared order numbers and UTC creation dates.

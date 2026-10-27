@@ -1,5 +1,5 @@
 import { MediaImage, NumberLike } from "@kizlo/shared"
-import { CurrencyFormat } from "kizlo"
+import { CurrencyFormat, ListMetadata } from "kizlo"
 import { z } from "zod/v4"
 import { type CheckoutAdditionalFields, CheckoutAdditionalFieldsSchema } from "../additional-fields"
 import {
@@ -70,6 +70,9 @@ export const Order = z.object({
 	additionalFields: CheckoutAdditionalFieldsSchema,
 	id: z.number(),
 	status: z.string(),
+	number: z.string(),
+	/** UTC Unix milliseconds, or 0 when the creation date is unavailable. */
+	createdAt: z.number(),
 	isPaid: z.boolean(),
 	items: z.array(OrderItem),
 	coupons: z.array(CartCoupon),
@@ -96,3 +99,12 @@ export const GetOrderInput = z.object({
 	billingEmail: z.email().optional(),
 })
 export type GetOrderInput = z.input<typeof GetOrderInput>
+
+export const ListOrderInput = z.object({
+	page: NumberLike.pipe(z.int().min(1)).optional(),
+	perPage: NumberLike.pipe(z.int().min(1).max(100)).optional(),
+})
+export type ListOrderInput = z.input<typeof ListOrderInput>
+
+export const OrderList = z.object({ items: z.array(Order), meta: ListMetadata })
+export type OrderList = Omit<z.infer<typeof OrderList>, "items"> & { items: Order[] }

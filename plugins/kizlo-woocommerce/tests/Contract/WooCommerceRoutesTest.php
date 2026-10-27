@@ -377,6 +377,20 @@ class WooCommerceRoutesTest extends TestCase
         $this->assertTrue($order_hs_code['nullable'] ?? false);
     }
 
+    public function test_order_history_reuses_the_store_order_schema_and_declares_pagination(): void
+    {
+        (new \Kizlo\WooCommerce\Modules\Order\OrderModule())->register();
+        $document = $this->rebuiltDocument();
+        $order = $document['schemas'][WooCommerceSchemas::STORE_ORDER]['properties']['extensions']['properties']['kizlo']['properties'];
+        $this->assertSame('string', $order['number']['type']);
+        $this->assertSame('string', $order['date_created_gmt']['type']);
+        $this->assertTrue($order['date_created_gmt']['nullable']);
+        $response = $document['apis']['woocommerce.kizlo.orders']['paths']['/woocommerce/orders']['list']['responses']['200'];
+        $this->assertSame(WooCommerceSchemas::STORE_ORDER, $response['body']['items']['$ref']);
+        $this->assertSame('integer', $response['headers']['properties']['X-WP-Total']['type']);
+        $this->assertSame('integer', $response['headers']['properties']['X-WP-TotalPages']['type']);
+    }
+
     public function test_tax_id_is_described_on_customer_and_store_billing_schemas(): void
     {
         $document = $this->document();

@@ -85,6 +85,14 @@ namespace Automattic\WooCommerce\StoreApi\Schemas\V1 {
         const IDENTIFIER = 'cart-item';
     }
 
+    class OrderSchema extends AbstractSchema
+    {
+        const IDENTIFIER = 'order';
+
+        /** @return array<string, mixed> */
+        public function get_item_response(\WC_Order $order): array {}
+    }
+
     class ProductSchema extends AbstractSchema
     {
         const IDENTIFIER = 'product';

@@ -129,7 +129,7 @@ function rawOrder(): WCSK_Order {
 			delivery_note: "",
 			"kizlo/tax-id": "must-not-leak",
 		},
-		extensions: { kizlo: { is_paid: false } },
+		extensions: { kizlo: { is_paid: false, number: "STORE-0042", date_created_gmt: "2026-01-02T03:04:05" } },
 		needs_payment: false,
 		needs_shipping: true,
 		payment_requirements: ["products", "future-requirement"],
@@ -159,6 +159,8 @@ describe("deserializeOrder", () => {
 
 		expect(result).toMatchObject({
 			id: 42,
+			number: "STORE-0042",
+			createdAt: Date.parse("2026-01-02T03:04:05Z"),
 			status: "wc-awaiting-pickup",
 			isPaid: false,
 			needsPayment: false,
@@ -284,4 +286,28 @@ test("reads the declared order contact/order adapter and defaults old plugin res
 	expect(deserializeOrder(data).additionalFields).toEqual(data.additional_fields)
 	delete (data as unknown as { additional_fields?: unknown }).additional_fields
 	expect(deserializeOrder(data).additionalFields).toEqual({})
+})
+
+test("order creation dates use UTC milliseconds in every host timezone", () => {
+	const original = process.env.TZ
+	try {
+		for (const timezone of ["UTC", "Asia/Kolkata", "America/Los_Angeles"]) {
+			process.env.TZ = timezone
+			expect(deserializeOrder(rawOrder()).createdAt).toBe(Date.parse("2026-01-02T03:04:05Z"))
+		}
+	} finally {
+		if (original === undefined) delete process.env.TZ
+		else process.env.TZ = original
+	}
+})
+
+test("older or malformed date metadata uses the existing zero sentinel and preserves the ID number fallback", () => {
+	for (const value of [null, "invalid", "2026-01-02T03:04:05Z"]) {
+		const data = rawOrder()
+		data.extensions = { kizlo: { is_paid: false, number: "STORE-42", date_created_gmt: value } }
+		expect(deserializeOrder(data).createdAt).toBe(0)
+	}
+	const data = rawOrder()
+	data.extensions = { kizlo: null }
+	expect(deserializeOrder(data)).toMatchObject({ createdAt: 0, number: "42" })
 })
