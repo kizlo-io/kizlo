@@ -7,7 +7,7 @@ import { WC_CORE_BASE } from "./constants"
 import { Customer } from "./customer/schema"
 import { resolveRegisteredFieldTarget } from "./field-projections"
 import { type WooCommerceOptions, woocommerce } from "./index"
-import { Order } from "./order/schema"
+import { Order, OrderList } from "./order/schema"
 import { Product, ProductFilters, ProductList } from "./product/schema"
 import { deserializeProduct } from "./product/utils"
 import { BANK_TRANSFER_DESCRIPTION, BANK_TRANSFER_TITLE } from "./test"
@@ -1066,6 +1066,54 @@ test("checkout.retry refuses a body with no billing address", async () => {
 // ==================================================
 // ORDERS: wc/store/v1
 // ==================================================
+
+test("orders.list pages only the signed-in customer's orders using the same normalized Order as get", async () => {
+	const owner = getTestCredentials().users.user
+	const first = await createPendingOrder(owner.id)
+	const second = await createPendingOrder(owner.id)
+	const foreign = await createPendingOrder(getTestCredentials().users.admin.id)
+	const orders = client().orders
+	const page1 = await orders.list.call({ query: { perPage: 1 } })
+	const page2 = await orders.list.call({ query: { page: 2, perPage: 1 } })
+	expect(OrderList.safeParse(page1).success).toBe(true)
+	expect(page1.items.map((order) => order.id)).toEqual([second.id])
+	expect(page2.items.map((order) => order.id)).toEqual([first.id])
+	expect(page1.items[0]).toEqual(await orders.get.call({ params: { orderId: second.id } }))
+	expect(page1.items[0]?.number).toBe(String(second.id))
+	expect(page1.items[0]?.createdAt).toBeGreaterThan(0)
+	expect(page1.meta).toMatchObject({ page: 1, nextPage: 2, hasNextPage: true })
+	const all = await orders.list.call({ query: { perPage: 100 } })
+	expect(all.items.map((order) => order.id)).not.toContain(foreign.id)
+	expect((await orders.list.call({ query: { page: all.meta.totalPages + 1, perPage: 100 } })).items).toEqual([])
+})
+
+test("orders.list keeps authenticated HTTP history private and cannot select another owner", async () => {
+	const owner = getTestCredentials().users.user
+	const owned = await createPendingOrder(owner.id)
+	const foreign = await createPendingOrder(getTestCredentials().users.admin.id)
+	const storefront = getKizloTestInstance({ baseUrl: "https://app.example/api/kizlo", integrations: [woocommerce()] })
+	const response = await storefront.handler(
+		new Request(`https://app.example/api/kizlo/orders?customer=${getTestCredentials().users.admin.id}&email=other@example.com&perPage=100`),
+	)
+	expect(response.status).toBe(200)
+	expect(response.headers.get("cache-control")).toBe("private, no-store")
+	const body = (await response.json()) as OrderList
+	expect(body.items.map((order) => order.id)).toContain(owned.id)
+	expect(body.items.map((order) => order.id)).not.toContain(foreign.id)
+})
+
+test.each([true, false])("orders.list requires login even when allowGuest=%s", async (allowGuest) => {
+	await expect(guestClient(allowGuest).orders.list.call()).rejects.toMatchObject({ code: "UNAUTHORIZED", status: 401 })
+})
+
+test("orders.list returns empty history for a new authenticated customer", async () => {
+	const auth = createAuthAdapter({ getSession: () => ({ id: "external-provider-user", email: `history-${Date.now()}@example.com` }) })
+	const storefront = getKizloTestInstance({ integrations: [woocommerce()], adapters: { auth } })
+	expect(await storefront.client.woocommerce.orders.list.call()).toMatchObject({
+		items: [],
+		meta: { page: 1, totalItems: 0, totalPages: 0, hasNextPage: false },
+	})
+})
 
 function guestClient(allowGuest = true) {
 	const auth = createAuthAdapter({ getSession: () => null })

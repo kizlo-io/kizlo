@@ -161,6 +161,16 @@ final class KizloBlocks
     {
         return [
             'is_paid' => self::isPaid(),
+            'number' => [
+                'description' => 'The displayed order number, including custom order numbering.',
+                'type' => 'string',
+                'readonly' => true,
+            ],
+            'date_created_gmt' => [
+                'description' => 'Order creation time in UTC, as YYYY-MM-DDTHH:mm:ss without a timezone suffix. Null when absent.',
+                'type' => ['string', 'null'],
+                'readonly' => true,
+            ],
         ];
     }
 

@@ -1,3 +1,4 @@
+import { timestampFromWpGmt } from "@kizlo/shared"
 import { deserializeCurrencyFormat } from "kizlo"
 import { additionalFieldValues, type CheckoutAdditionalFields } from "../additional-fields"
 import { deserializeCartBillingAddress, deserializeCartShippingAddress } from "../cart/utils"
@@ -175,6 +176,8 @@ export function deserializeOrder(data: WCSK_Order): Order {
 		additionalFields: additionalFieldValues<CheckoutAdditionalFields>(data.additional_fields),
 		id: data.id,
 		status: data.status,
+		number: typeof kizlo.number === "string" ? kizlo.number : String(data.id),
+		createdAt: timestampFromWpGmt(typeof kizlo.date_created_gmt === "string" ? kizlo.date_created_gmt : null) ?? 0,
 		isPaid: kizlo.is_paid === true,
 		items: data.items.map(deserializeOrderItem),
 		coupons: data.coupons.map((coupon) => ({

@@ -1,10 +1,39 @@
-import { createProcedure, schemaType } from "kizlo"
+import { createMiddleware, createProcedure, deserializeListMetadata, schemaType } from "kizlo"
 import { sessionMiddleware } from "../session"
 import { GET_ORDER_ERROR_MAP } from "./error"
-import { GetOrderInput, Order } from "./schema"
+import { GetOrderInput, ListOrderInput, Order, OrderList } from "./schema"
 import { deserializeOrder } from "./utils"
 
 export const ORDER_PROCEDURES = {
+	list: createProcedure(
+		{
+			scope: "api",
+			method: "GET",
+			path: "/orders",
+			query: ListOrderInput.optional(),
+			output: schemaType<OrderList>(OrderList),
+			middlewares: [
+				createMiddleware(async ({ context, next }) => {
+					context.headers?.set("Cache-Control", "private, no-store")
+					return next()
+				}),
+				sessionMiddleware({ allowGuest: false }),
+			],
+		},
+		async ({ context, input, errors }) => {
+			const query = { page: input.query?.page ?? 1, per_page: input.query?.perPage ?? 10 }
+			const response = await context.wordpress.woocommerce.kizlo.orders.list({ query }, { headers: context.sessionHeaders })
+			if (response.error) {
+				if (response.status === 401) throw errors.UNAUTHORIZED()
+				if (response.status === 403) throw errors.FORBIDDEN()
+				if (response.status === 400) throw errors.BAD_REQUEST({ message: response.error.message })
+				context.logger.error("List orders unhandled error", response.error, { code: response.error.code })
+				throw errors.INTERNAL_SERVER_ERROR()
+			}
+			const list = context.wordpress.resolveList({ data: response.data, headers: response.headers, searchParams: query })
+			return { items: list.items.map(deserializeOrder), meta: deserializeListMetadata(list.meta) }
+		},
+	),
 	get: createProcedure(
 		{
 			scope: "api",

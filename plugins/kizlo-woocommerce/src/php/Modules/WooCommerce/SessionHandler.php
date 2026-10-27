@@ -3,6 +3,7 @@
 namespace Kizlo\WooCommerce\Modules\WooCommerce;
 
 use WC_Session_Handler;
+use WC_Customer;
 use WP_Error;
 use WP_REST_Request;
 use Kizlo\WooCommerce\Modules\Customer\CustomerResolver;
@@ -121,6 +122,21 @@ class SessionHandler extends WC_Session_Handler
     public static function clearPreparedIdentity(): void
     {
         self::$preparedIdentity = null;
+    }
+
+    public static function setCurrentUser(int $userId): void
+    {
+        if (get_current_user_id() !== $userId) {
+            wp_set_current_user($userId);
+        }
+
+        // A previous customer's shutdown save must not survive the identity switch.
+        // @phpstan-ignore instanceof.alwaysTrue
+        if (WC()->customer instanceof WC_Customer && WC()->customer->get_id() !== $userId) {
+            remove_action('shutdown', [WC()->customer, 'save'], 10);
+            // @phpstan-ignore assign.propertyType
+            WC()->customer = null;
+        }
     }
 
     public static function isValidGuestToken(string $token): bool

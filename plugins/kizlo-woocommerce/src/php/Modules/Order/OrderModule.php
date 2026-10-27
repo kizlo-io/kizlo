@@ -5,6 +5,8 @@ namespace Kizlo\WooCommerce\Modules\Order;
 use Automattic\WooCommerce\Enums\OrderItemType;
 use Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema;
 use Automattic\WooCommerce\StoreApi\Schemas\V1\ProductSchema;
+use Automattic\WooCommerce\StoreApi\Schemas\V1\OrderSchema;
+use Automattic\WooCommerce\StoreApi\SchemaController;
 use Automattic\WooCommerce\StoreApi\StoreApi;
 use Kizlo\Modules\CustomFields\CustomFieldsStore;
 use Kizlo\Modules\Settings\PostType\PostTypeSettings;
@@ -14,6 +16,7 @@ use WP_REST_Response;
 use Kizlo\WooCommerce\Modules\Order\OrderRepository;
 use Kizlo\WooCommerce\Modules\Product\HsCode;
 use Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceSchemas;
+use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
 use Kizlo\WooCommerce\Support\StoreExtensions;
 use WC_Order;
 use Kizlo\WooCommerce\Modules\Contract\AdditionalFields;
@@ -41,6 +44,37 @@ class OrderModule
         add_filter('woocommerce_rest_prepare_shop_order_object', [$this, 'prepareOrderCallback'], PHP_INT_MAX, 2);
         add_filter('rest_post_dispatch', [$this, 'extendStoreOrderItems'], 10, 3);
         add_action('woocommerce_new_order_item', [$this, 'rememberOrderItemProductIds'], 10, 2);
+
+        kizlo_register_route([
+            'id'        => 'woocommerce.kizlo.orders',
+            'operation' => 'list',
+            'method'    => 'GET',
+            'route'     => '/woocommerce/orders',
+            'summary'   => 'The authenticated customer’s order history',
+            'input'     => [
+                'type' => 'object',
+                'properties' => [
+                    'page' => ['type' => 'integer', 'minimum' => 1, 'default' => 1],
+                    'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 10],
+                ],
+            ],
+            'errors'    => ['kizlo_order_history_forbidden', 'kizlo_invalid_identity', 'kizlo_conflicting_identity', 'kizlo_forbidden_identity', 'kizlo_customer_unavailable'],
+            'responses' => [
+                '200' => [
+                    'description' => 'A page of the customer’s orders, newest first.',
+                    'body' => ['type' => 'array', 'items' => ['$ref' => WooCommerceSchemas::STORE_ORDER]],
+                    'headers' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'X-WP-Total' => ['type' => 'integer', 'required' => true],
+                            'X-WP-TotalPages' => ['type' => 'integer', 'required' => true],
+                        ],
+                    ],
+                ],
+                '403' => ['description' => 'Customer authentication is required.', 'body' => ['$ref' => WooCommerceSchemas::ERROR]],
+            ],
+            'callback' => [$this, 'listOrders'],
+        ]);
 
         kizlo_register_route([
             'id'        => 'woocommerce.kizlo.orders',
@@ -122,6 +156,51 @@ class OrderModule
         return rest_ensure_response($data);
     }
 
+    public function listOrders(WP_REST_Request $request): WP_REST_Response | WP_Error
+    {
+        $identity = SessionHandler::resolveIdentity($request, false);
+        if ($identity instanceof WP_Error) return $identity;
+        $customerId = $identity['user_id'];
+        if ($customerId === null) {
+            return new WP_Error('kizlo_order_history_forbidden', 'Customer authentication is required.', ['status' => 403]);
+        }
+
+        SessionHandler::setCurrentUser($customerId);
+        WC()->customer = new \WC_Customer($customerId);
+
+        $query = [
+            'customer_id' => $customerId,
+            'type' => 'shop_order',
+            'status' => array_values(array_diff(array_keys(wc_get_order_statuses()), ['wc-checkout-draft', 'wc-trash'])),
+            'page' => (int) $request->get_param('page'),
+            'limit' => (int) $request->get_param('per_page'),
+            'paginate' => true,
+            'orderby' => ['date' => 'DESC', 'ID' => 'DESC'],
+        ];
+        $result = wc_get_orders($query);
+        // The post-based order store loses its total count when the requested page is empty.
+        if ($result->orders === [] && $query['page'] > 1) {
+            $firstPage = wc_get_orders([...$query, 'page' => 1, 'limit' => 1]);
+            $result->total = $firstPage->total;
+            $result->max_num_pages = (int) ceil($result->total / $query['limit']);
+        }
+        /** @var OrderSchema $schema */
+        $schema = StoreApi::container()->get(SchemaController::class)->get(OrderSchema::IDENTIFIER);
+        $items = [];
+        foreach ($result->orders as $order) {
+            if (! $order instanceof WC_Order || $order->get_customer_id() !== $customerId) {
+                return new WP_Error('kizlo_order_history_forbidden', 'You are not allowed to view these orders.', ['status' => 403]);
+            }
+            $items[] = $this->extendStoreOrder($schema->get_item_response($order), $order);
+        }
+
+        return new WP_REST_Response($items, 200, [
+            'X-WP-Total' => (int) $result->total,
+            'X-WP-TotalPages' => (int) $result->max_num_pages,
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
     /**
      * Add the extensions OrderItemSchema declares but does not emit at runtime,
      * and the order-level `extensions` OrderSchema does not have at all.
@@ -139,6 +218,10 @@ class OrderModule
     public function extendStoreOrderItems(mixed $response, mixed $server, mixed $request): mixed
     {
         if (! $response instanceof WP_REST_Response || ! $request instanceof WP_REST_Request) return $response;
+        if ($request->get_route() === '/kizlo/v1/woocommerce/orders') {
+            $response->header('Cache-Control', 'private, no-store');
+            return $response;
+        }
         if ($response->get_status() >= 400) return $response;
 
         if (! preg_match('#^/wc/store/v1/order/(?P<id>\d+)$#', $request->get_route(), $match)) {
@@ -152,9 +235,24 @@ class OrderModule
             return $response;
         }
 
-        $data['additional_fields'] = (object) AdditionalFields::values($order, 'other');
+        $response->set_data($this->extendStoreOrder($data, $order));
 
-        $data['extensions'] = StoreExtensions::merge($data['extensions'] ?? null, 'kizlo', ['is_paid' => $order->is_paid()]);
+        return $response;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function extendStoreOrder(array $data, WC_Order $order): array
+    {
+        $createdAt = $order->get_date_created();
+        $data['additional_fields'] = (object) AdditionalFields::values($order, 'other');
+        $data['extensions'] = StoreExtensions::merge($data['extensions'] ?? null, 'kizlo', [
+            'is_paid' => $order->is_paid(),
+            'number' => $order->get_order_number(),
+            'date_created_gmt' => $createdAt === null ? null : gmdate('Y-m-d\TH:i:s', $createdAt->getTimestamp()),
+        ]);
 
         if (is_array($data['items'] ?? null)) {
             $items = $order->get_items(OrderItemType::LINE_ITEM);
@@ -170,9 +268,7 @@ class OrderModule
             unset($item);
         }
 
-        $response->set_data($data);
-
-        return $response;
+        return $data;
     }
 
     /** @return array<string, mixed> */

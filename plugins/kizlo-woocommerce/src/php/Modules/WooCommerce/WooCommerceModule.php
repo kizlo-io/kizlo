@@ -241,19 +241,7 @@ class WooCommerceModule
         }
 
         $targetUserId = $session->get_resolved_user_id() ?? 0;
-        if (get_current_user_id() !== $targetUserId) {
-            wp_set_current_user($targetUserId);
-        }
-
-        // wc_load_cart() registers a shutdown save against the customer object
-        // it creates. Remove an earlier object so that save belongs to the
-        // resolved customer, never the Application Password administrator.
-        // @phpstan-ignore instanceof.alwaysTrue
-        if (WC()->customer instanceof \WC_Customer && WC()->customer->get_id() !== $targetUserId) {
-            remove_action('shutdown', [WC()->customer, 'save'], 10);
-            // @phpstan-ignore assign.propertyType
-            WC()->customer = null;
-        }
+        SessionHandler::setCurrentUser($targetUserId);
 
         wc_load_cart();
 

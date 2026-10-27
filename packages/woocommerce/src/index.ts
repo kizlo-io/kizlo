@@ -39,6 +39,7 @@ export function woocommerce(options: WooCommerceOptions = {}) {
 			endpoints: [
 				"woocommerce.customers",
 				"woocommerce.kizlo.customers",
+				"woocommerce.kizlo.orders.list",
 				"woocommerce.kizlo.storefront",
 				"woocommerce.products",
 				"woocommerce.store.cart",
