@@ -1,5 +1,15 @@
 # @kizlo/woocommerce
 
+## 0.18.0
+
+### Minor Changes
+
+- [#301](https://github.com/kizlo-io/kizlo/pull/301) [`5bff2d7`](https://github.com/kizlo-io/kizlo/commit/5bff2d77e3d9e8af146b69028060d4101c7d7366) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add authenticated paginated order history with shared order numbers and UTC creation dates.
+
+### Patch Changes
+
+- [#300](https://github.com/kizlo-io/kizlo/pull/300) [`a60a9d9`](https://github.com/kizlo-io/kizlo/commit/a60a9d9035c211638c2eb0649e7fe063e2642045) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Create missing authenticated customers on demand without requiring a cart request.
+
 ## 0.17.0
 
 ### Minor Changes
