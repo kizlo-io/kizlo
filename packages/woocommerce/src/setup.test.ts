@@ -29,7 +29,7 @@ test("names only the subtrees that are missing", () => {
 		woocommerce: {
 			customers: {},
 			products: {},
-			kizlo: { cart: {} },
+			kizlo: { customers: {}, storefront: {} },
 			store: { cart: {}, products: {} },
 		},
 	}
@@ -37,4 +37,16 @@ test("names only the subtrees that are missing", () => {
 	// A plugin old enough to predate the checkout routes reaches here as a tree missing one subtree.
 	expect(server(partial)).toThrow(/woocommerce\.store\.checkout/)
 	expect(server(partial)).not.toThrow(/- woocommerce\.store\.cart/)
+})
+
+test("requires the customer provisioning API from the companion plugin", () => {
+	const priorContract = {
+		woocommerce: {
+			customers: {},
+			products: {},
+			kizlo: { storefront: {} },
+			store: { cart: {}, checkout: {}, order: {}, products: {} },
+		},
+	}
+	expect(server(priorContract)).toThrow(/woocommerce\.kizlo\.customers/)
 })
