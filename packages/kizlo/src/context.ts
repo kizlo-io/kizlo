@@ -85,8 +85,8 @@ export type VerifyPreviewTokenFn = (token: string) => Promise<PreviewTokenPayloa
  * the server builds. A procedure's handler receives this base plus whatever its middleware injected
  * via `next({ context })`.
  */
-export interface ProcedureContext {
-	/** The incoming HTTP `Request`, or `null` for server-side (non-HTTP) invocations. */
+interface BuiltinProcedureContext {
+	/** The active HTTP `Request`, or `null` outside a request scope. */
 	request: Request | null
 	/** Response headers to be sent (e.g. `Set-Cookie`), or `null` server-side. */
 	headers: Headers | null
@@ -113,6 +113,12 @@ export interface ProcedureContext {
 	/** How the procedure was called: `"client"` (over HTTP) or `"server"` (direct server invocation). */
 	invokedBy: "client" | "server"
 }
+
+/** Augment in the application to add typed, server-supplied request fields. */
+export interface ProcedureContext extends BuiltinProcedureContext {}
+
+/** The application fields accepted by handler(request, values), excluding Kizlo-owned fields. */
+export type PlatformRequestCtx = Omit<ProcedureContext, keyof BuiltinProcedureContext> & object
 
 export class Context {
 	private readonly config: ContextConfig
@@ -184,10 +190,22 @@ export class Context {
 		console.warn(`\n\x1b[1m\x1b[33m${border}\n|${inner}|\n${border}\x1b[0m\n`)
 	}
 
-	public createRestContext(request: Request) {
+	public withRequestContext(request: Request, values: PlatformRequestCtx | undefined, handle: () => Promise<Response>): Promise<Response> {
+		if (values !== undefined && (values === null || typeof values !== "object" || Array.isArray(values))) {
+			throw new TypeError("Request context must be an object.")
+		}
+		return this.config.adapters?.requestContext?.run?.(request, values, handle) ?? handle()
+	}
+
+	public createRestContext(
+		request: Request,
+		values?: PlatformRequestCtx,
+	): ProcedureContext & { request: Request; headers: Headers; invokedBy: "client" } {
 		const headers = new Headers()
 
 		return {
+			...this.config.adapters?.requestContext?.get()?.values,
+			...values,
 			headers,
 			request: request.clone(),
 			config: this.config,
@@ -201,27 +219,30 @@ export class Context {
 			verifyPreviewToken: this.createVerifyPreviewTokenFn(),
 			cookies: this.createRestCookieStorage(request, headers),
 			invokedBy: "client",
-		} satisfies ProcedureContext
+		} as ProcedureContext & { request: Request; headers: Headers; invokedBy: "client" }
 	}
 
-	public createServerContext() {
+	public createServerContext(): ProcedureContext & { headers: null; invokedBy: "server" } {
+		const scope = this.config.adapters?.requestContext?.get()
+		const request = scope?.request ?? null
 		const cookies = new CookiesStorage(this.config.adapters?.cookies)
 
 		return {
+			...scope?.values,
 			cookies,
 			headers: null,
-			request: null,
+			request,
 			config: this.config,
 			logger: this.logger,
 			...(this.config.adapters?.geo
-				? this.createServices(null)
+				? this.createServices(request)
 				: { wordpress: this.wordpress, settings: this.settings, email: this.email }),
-			getSession: this.createGetSessionFn(null, cookies),
-			getConnInfo: this.createConnInfoFn(null),
-			verifyCaptcha: this.createVerifyCaptchaFn(null),
+			getSession: this.createGetSessionFn(request, cookies),
+			getConnInfo: this.createConnInfoFn(request),
+			verifyCaptcha: this.createVerifyCaptchaFn(request),
 			verifyPreviewToken: this.createVerifyPreviewTokenFn(),
 			invokedBy: "server",
-		} satisfies ProcedureContext
+		} as ProcedureContext & { headers: null; invokedBy: "server" }
 	}
 
 	private createRestCookieStorage(request: Request, headers: Headers): CookiesStorage {

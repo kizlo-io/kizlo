@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -351,8 +352,9 @@ function compile(dir: string, entries: readonly string[] = ["introspection.ts", 
 			"@kizlo/woocommerce": [WOOCOMMERCE_TYPES],
 			kizlo: [KIZLO_TYPES],
 			"kizlo/nextjs/server": [fileURLToPath(new URL("../../dist/nextjs/server.d.ts", import.meta.url))],
-			"kizlo/cloudflare": [fileURLToPath(new URL("../../dist/cloudflare.d.ts", import.meta.url))],
-			"kizlo/cloudflare/vinext": [fileURLToPath(new URL("../../dist/cloudflare/vinext.d.ts", import.meta.url))],
+			"kizlo/tanstack-start/cloudflare": [fileURLToPath(new URL("../../dist/tanstack-start/cloudflare.d.ts", import.meta.url))],
+			"kizlo/tanstack-start/server": [fileURLToPath(new URL("../../dist/tanstack-start/server.d.ts", import.meta.url))],
+			"@tanstack/react-start": [fileURLToPath(new URL("../../node_modules/@tanstack/react-start/dist/esm/index.d.ts", import.meta.url))],
 		},
 		resolveJsonModule: true,
 		skipLibCheck: true,
@@ -694,15 +696,50 @@ test("published declarations expose trusted client IP configuration", () => {
 			path.join(dir, "usage.ts"),
 			`
 			import { createIntegration, createKizlo, createGeoAdapter, geoCloudflareNext, geoVercelNext, WordPressTransport } from "kizlo"
-			import { nextjs } from "kizlo/nextjs/server"
-			import { cloudflare, geoCloudflare, withCloudflareRequest } from "kizlo/cloudflare"
-			import { cloudflareVinext } from "kizlo/cloudflare/vinext"
-			cloudflareVinext()
-			createKizlo({ integrations: [nextjs(), cloudflare()] })
+			import { nextjs, toNextJsHandler } from "kizlo/nextjs/server"
+			import { createCdnHeaders, cloudflare, geoCloudflare, revalidateTag, revalidateUrl, withCloudflare } from "kizlo/tanstack-start/cloudflare"
+			import * as cloudflareApi from "kizlo/tanstack-start/cloudflare"
+			import { matchMiddleware, tanstackStart } from "kizlo/tanstack-start/server"
+			import { createMiddleware, createStart } from "@tanstack/react-start"
+			const { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD } = toNextJsHandler(async (_request: Request) => new Response(null))
+            const nextRoute: (request: Request, route: { params: Promise<{ rest: string[] }> }) => Response | Promise<Response> = GET
+            // @ts-expect-error the adapter requires a Request/Response handler
+            toNextJsHandler(async (_request: Request) => "invalid")
+			const startWorker = withCloudflare({
+                fetch(_request: Request, options: { context: { env: { SITE: string }; executionCtx: { waitUntil(p: Promise<unknown>): void } } }) {
+                    return new Response(options.context.env.SITE)
+                },
+            })
+            startWorker.fetch(new Request("https://app.example"), { SITE: "store" }, { waitUntil: () => {} })
+            // @ts-expect-error preserve the Start worker binding types
+            startWorker.fetch(new Request("https://app.example"), { SITE: 1 }, { waitUntil: () => {} })
+			const publicHeaders: Record<string, string> = createCdnHeaders({ maxAge: 60, tags: ["catalog"] })
+			const middleware = createMiddleware().server(({ next }) => next({ context: { userId: "alice" } }))
+			const selected = matchMiddleware(middleware, ["/account(.*)", "/_serverFn/(.*)"])
+			const start = createStart(() => ({ requestMiddleware: [selected] }))
+			// @ts-expect-error middleware matching uses path patterns rather than include/exclude objects
+			matchMiddleware(middleware, { exclude: ["/"] })
+			const policy: Record<string, string> = createCdnHeaders({ maxAge: "1 hour", tags: ["catalog"], vary: ["Accept-Language"] as const })
+			const urlRevalidation: Promise<void> = revalidateUrl("/collections")
+			revalidateUrl(new URL("https://app.example/collections?page=2"))
+			const tagRevalidation: Promise<void> = revalidateTag("catalog")
+			// @ts-expect-error tags are revalidated by name, not a selector object
+			revalidateTag({ tags: ["catalog"] })
+			// @ts-expect-error Vary accepts header names as an array
+			createCdnHeaders({ maxAge: 60, vary: "Accept" })
+			// @ts-expect-error the CDN namespace has been removed
+			cloudflareApi.cdn
+			// @ts-expect-error use createCdnHeaders
+			cloudflareApi.cdnHeaders
+			// @ts-expect-error use withCloudflare
+			cloudflareApi.withTanstackStart
+			// @ts-expect-error the old selector type has been removed
+			type LegacyTargets = cloudflareApi.CdnTargets
+			// @ts-expect-error duration strings use explicit units
+			createCdnHeaders({ maxAge: "forever" })
+			createKizlo({ integrations: [tanstackStart(), cloudflare()] })
 			geoCloudflare().getConnInfo(null)
-			const response: Promise<Response> = withCloudflareRequest(new Request("https://app.example"), () => new Response("public"))
-			// @ts-expect-error the Worker entry wrapper must return a Response
-			withCloudflareRequest(new Request("https://app.example"), () => "public")
+
 			createKizlo({ integrations: [nextjs(), createIntegration({ id: "cloudflare", adapters: { geo: geoCloudflareNext() } })] })
 			createKizlo({ integrations: [nextjs(), createIntegration({ id: "vercel", adapters: { geo: geoVercelNext() } })] })
 			new WordPressTransport({ credentials: { url: "https://wp.example", username: "admin", password: "secret" }, getClientIp: () => "2001:db8::1" })
@@ -715,5 +752,89 @@ test("published declarations expose trusted client IP configuration", () => {
 		expect(compile(dir, ["usage.ts"])).toEqual([])
 	} finally {
 		fs.rmSync(dir, { force: true, recursive: true })
+	}
+})
+
+test("published ProcedureContext augmentation types flat handler values and every procedure context", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-platform-context-"))
+	try {
+		fs.writeFileSync(
+			path.join(dir, "usage.ts"),
+			`
+   import {Kizlo,createProcedure,createEventHandler,createMiddleware,schemaType,type ProcedureContext} from "kizlo"
+   import {toNextJsHandler} from "kizlo/nextjs/server"
+   declare module "kizlo" {
+    interface ProcedureContext {
+     env: { SITE: string; DB: { query(sql:string):Promise<string[]> } }
+     executionCtx: { waitUntil(work:Promise<unknown>):void }
+    }
+   }
+   const server=new Kizlo({baseUrl:"https://app.example/api",siteSecret:"secret",credentials:{url:"https://wp.example",username:"a",password:"b"}})
+   const env={SITE:"shop",DB:{query:async (_sql:string)=>["row"]}}
+   const executionCtx={waitUntil:(_work:Promise<unknown>)=>{}}
+   server.handler(new Request("https://app.example/api"),{env,executionCtx})
+   server.handler(new Request("https://app.example/api")) // Inherit a surrounding Worker request scope.
+   const {GET}=toNextJsHandler(server.handler)
+   GET(new Request("https://app.example/api"))
+   // @ts-expect-error an augmented field must have its registered type
+   server.handler(new Request("https://app.example/api"),{env:{SITE:123},executionCtx})
+   // @ts-expect-error explicit values must supply the registered required fields
+   server.handler(new Request("https://app.example/api"),{env})
+   // @ts-expect-error Kizlo owns request; it is not a platform addition
+   server.handler(new Request("https://app.example/api"),{env,executionCtx,request:null})
+   createProcedure({scope:"internal",output:schemaType<string[]>()},async ({context})=>{
+    const site:string=context.env.SITE
+    context.executionCtx.waitUntil(Promise.resolve())
+    // @ts-expect-error bindings keep the registered member types
+    const bad:number=context.env.SITE
+    return context.env.DB.query("select 1")
+   })
+   createMiddleware(async ({context,next})=>{
+    const site:string=context.env.SITE
+    context.executionCtx.waitUntil(Promise.resolve())
+    return next()
+   })
+   createEventHandler(async (_event,context)=>{
+    context.executionCtx.waitUntil(context.env.DB.query("select 1"))
+   })
+  `,
+		)
+		expect(compile(dir, ["usage.ts"])).toEqual([])
+	} finally {
+		fs.rmSync(dir, { force: true, recursive: true })
+	}
+})
+
+test("published core handles explicit HTTP context without async storage support", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-portable-context-"))
+	try {
+		const loader = path.join(dir, "loader.mjs")
+		fs.writeFileSync(
+			loader,
+			`export async function resolve(name, context, next) {
+			if (name === "node:async_hooks" || name === "async_hooks") throw new Error("Async storage unavailable")
+			return next(name, context)
+		}`,
+		)
+		const entry = new URL("../../dist/index.js", import.meta.url).href
+		const program = `import { Kizlo, createIntegration, createProcedure, schemaType } from ${JSON.stringify(entry)};
+			const server = new Kizlo({ baseUrl: "https://app.example/api", siteSecret: "secret",
+			credentials: { url: "https://wp.example", username: "a", password: "b" },
+			integrations: [createIntegration({ id: "probe", procedures: {
+				info: createProcedure({ scope: "api", method: "GET", path: "/info", output: schemaType() },
+				async ({ context }) => ({ site: context.env.SITE, url: context.request.url }))
+			} })] });
+			const response = await server.handler(new Request("https://app.example/api/info"), { env: { SITE: "portable" } });
+			const data = await response.json();
+			if (response.status !== 200 || data.site !== "portable" || data.url !== "https://app.example/api/info") throw Error("Context lost");
+			if (response.headers.get("Cache-Control") !== "private, no-store") throw Error("API privacy lost");
+			console.log("portable context passed");`
+		expect(
+			execFileSync(process.execPath, ["--no-warnings", "--experimental-loader", loader, "--input-type=module", "-e", program], {
+				encoding: "utf8",
+			}),
+		).toContain("portable context passed")
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true })
 	}
 })
