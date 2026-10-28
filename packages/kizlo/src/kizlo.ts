@@ -5,7 +5,7 @@ import { createRouterClient, ORPCError } from "@orpc/server"
 import { RPCHandler } from "@orpc/server/fetch"
 import { consoleLog, type LogLevel } from "./adapters/logger"
 import { mergeServiceAdapters } from "./adapters/types"
-import { Context, type ProcedureContext } from "./context"
+import { Context, type PlatformRequestCtx, type ProcedureContext } from "./context"
 import { CORE_PROCEDURES, type CoreProcedures } from "./procedures"
 import { RPC_PROTOCOL_HEADER } from "./shared/constants"
 import { isContractGeneration } from "./shared/contract-generation"
@@ -97,26 +97,31 @@ export class Kizlo<TIntegrations extends readonly AnyIntegration[] = []> {
 		return this.context.createServerContext().wordpress
 	}
 
-	public async handler(request: Request): Promise<Response> {
-		const serverUrl = new URL(this.config.baseUrl)
-		const context = this.context.createRestContext(request)
-		const isRpcRequest = request.headers.get(RPC_PROTOCOL_HEADER) !== null
+	public async handler(request: Request, values?: PlatformRequestCtx): Promise<Response> {
+		return this.context.withRequestContext(request, values, async () => {
+			const serverUrl = new URL(this.config.baseUrl)
+			const context = this.context.createRestContext(request, values)
+			const isRpcRequest = request.headers.get(RPC_PROTOCOL_HEADER) !== null
 
-		const result = !isRpcRequest
-			? await this.openapiHandler.handle(request, { context, prefix: serverUrl.pathname as never })
-			: await this.remoteHandler.handle(request, { context, prefix: serverUrl.pathname as never })
+			const result = !isRpcRequest
+				? await this.openapiHandler.handle(request, { context, prefix: serverUrl.pathname as never })
+				: await this.remoteHandler.handle(request, { context, prefix: serverUrl.pathname as never })
 
-		if (!result.matched) return new Response("Not Found", { status: 404 })
+			const response = result.matched ? result.response : new Response("Not Found", { status: 404 })
 
-		for (const [key, value] of context.headers.entries()) {
-			if (key.toLowerCase() === "set-cookie") continue
-			result.response.headers.set(key, value)
-		}
-		for (const cookie of context.headers.getSetCookie()) {
-			result.response.headers.append("Set-Cookie", cookie)
-		}
+			for (const [key, value] of context.headers.entries()) {
+				if (key.toLowerCase() === "set-cookie") continue
+				response.headers.set(key, value)
+			}
+			for (const cookie of context.headers.getSetCookie()) {
+				response.headers.append("Set-Cookie", cookie)
+			}
 
-		return result.response
+			// API privacy must hold without a platform wrapper or higher-priority CDN policy.
+			response.headers.set("Cache-Control", "private, no-store")
+			for (const name of ["Cloudflare-CDN-Cache-Control", "CDN-Cache-Control", "Cache-Tag"]) response.headers.delete(name)
+			return response
+		})
 	}
 
 	private errorInterceptor() {

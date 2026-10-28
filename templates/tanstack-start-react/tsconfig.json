@@ -13,6 +13,7 @@
 			"kizlo/test": ["${configDir}../../packages/kizlo/src/test/index.ts"],
 			"kizlo/tanstack-start": ["${configDir}../../packages/kizlo/src/integrations/tanstack-start/index.ts"],
 			"kizlo/tanstack-start/server": ["${configDir}../../packages/kizlo/src/integrations/tanstack-start/server.ts"],
+			"kizlo/tanstack-start/react/server": ["${configDir}../../packages/kizlo/src/integrations/tanstack-start/react/server.ts"],
 			"@kizlo/cf7": ["${configDir}../../packages/cf7/src/index.ts"],
 			"@kizlo/cf7/test": ["${configDir}../../packages/cf7/src/test/index.ts"],
 			"@kizlo/shared": ["${configDir}../../packages/shared/src/index.ts"],

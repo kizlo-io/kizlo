@@ -130,12 +130,13 @@ export const { procedures, client, wordpress, handler } = createKizlo({
 
 #### Mount the route handler
 
-At `src/app/api/kizlo/[[...rest]]/route.ts`, re-export the server's `handler` for every method:
+At `src/app/api/kizlo/[[...rest]]/route.ts`, adapt the server's `handler` into route method exports:
 
 ```ts title="src/app/api/kizlo/[[...rest]]/route.ts"
+import { toNextJsHandler } from "kizlo/nextjs/server"
 import { handler } from "@/lib/kizlo/server"
 
-export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS }
+export const { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD } = toNextJsHandler(handler)
 ```
 
 </Step>
@@ -205,12 +206,11 @@ the generated contract in sync as you edit your server files.
 
 ## Forward trusted visitor IPs on Cloudflare
 
-For a vinext app on Cloudflare Workers, register `cloudflare()` alongside `nextjs()` and configure context
-inside its rendering stages. Follow the [Cloudflare setup](/docs/quickstarts/cloudflare) for trusted ingress, runtime
-compatibility, public caching, and migration from `geoCloudflareNext()`.
-
 On Vercel, use `geoVercelNext()` through a platform integration. For another provider, implement the
 [geo adapter contract](/docs/reference/functions/create-geo-adapter).
+
+Kizlo's HTTP handler accepts explicit request context without requiring async storage. For a
+TanStack Start application on Workers, follow the [Cloudflare setup](/docs/quickstarts/cloudflare).
 
 ## Render a post
 

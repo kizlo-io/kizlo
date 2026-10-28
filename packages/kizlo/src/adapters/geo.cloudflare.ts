@@ -1,7 +1,7 @@
 import { cloudflareConnInfo } from "./cloudflare-connection"
 import type { GeoAdapter } from "./geo"
 
-/** Read trusted Cloudflare connection headers in Next.js/vinext. Only use behind Cloudflare ingress. */
+/** Read trusted Cloudflare connection headers in Next.js. Only use behind Cloudflare ingress. */
 export function geoCloudflareNext(): GeoAdapter {
 	return {
 		getConnInfo: async (request) => {

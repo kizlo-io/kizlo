@@ -127,12 +127,12 @@ export default defineConfig({
 
 #### Create the server
 
-At `src/lib/kizlo/server/index.ts`, register the TanStack Start integration so it maps the framework environment
-onto Kizlo's values:
+At `src/lib/kizlo/server/index.ts`, register the React Start integration for native request context,
+cookies and framework environment values. Use `@tanstack/react-start` 1.168.60 or later:
 
 ```ts title="src/lib/kizlo/server/index.ts"
 import { createKizlo } from "kizlo"
-import { tanstackStart } from "kizlo/tanstack-start/server"
+import { tanstackStart } from "kizlo/tanstack-start/react/server"
 
 export const { procedures, client, wordpress, handler } = createKizlo({
   integrations: [tanstackStart()],
