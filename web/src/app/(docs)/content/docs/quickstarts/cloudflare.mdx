@@ -1,144 +1,205 @@
 ---
 title: Cloudflare
-description: Forward trusted visitor IPs from Workers without a framework headers dependency.
+description: Use TanStack Start on Cloudflare with native request context and opt-in CDN caching.
 ---
 
-Use `cloudflare()` alongside your framework integration when the frontend runs on Cloudflare Workers.
-WordPress can run on any host. Follow the [Next.js setup](/docs/quickstarts/nextjs) first for a vinext app.
+Start with the [React quickstart](/docs/quickstarts/tanstack-start/react).
+Use Cloudflare's [Start deployment setup](https://developers.cloudflare.com/workers/framework-guides/web-apps/tanstack-start/)
+for the Vite plugin, Worker configuration and bindings. WordPress can run on any host.
 
-## Register the platform
+## Register the integrations
 
 ```ts title="src/lib/kizlo/server/index.ts"
 import { createKizlo } from "kizlo"
-import { cloudflare } from "kizlo/cloudflare"
-import { nextjs } from "kizlo/nextjs/server"
+import { cloudflare } from "kizlo/tanstack-start/cloudflare"
+import { tanstackStart } from "kizlo/tanstack-start/server"
 import { introspection } from "./generated"
 
 export const { client, handler } = createKizlo({
-  integrations: [nextjs(), cloudflare()],
+  integrations: [tanstackStart(), cloudflare()],
   introspection,
 })
 ```
 
-`nextjs()` supplies cookies, environment mapping, and revalidation. `cloudflare()` supplies geo.
-Framework integrations do not choose a hosting provider. A custom application integration can override
-`adapters.geo`; built-in runtime integrations mount first regardless of array order.
+`tanstackStart()` maps `VITE_KIZLO_BASE_URL` and WordPress environment variables, and uses Start's
+native request context and cookie helpers. `cloudflare()` adds trusted Cloudflare connection metadata.
+Neither installs an application data cache or requires a second async-storage scope.
 
-## Capture Vinext rendering stages
+## Forward Worker bindings
 
-Add the build plugin before your existing Vinext and Cloudflare plugins. Keep your current cache
-backend, bindings, and deployment configuration; this example uses Workers Cache:
+```ts title="src/server.ts"
+import app from "@tanstack/react-start/server-entry"
+import { withCloudflare } from "kizlo/tanstack-start/cloudflare"
 
-```ts title="vite.config.ts"
-import { defineConfig } from "vite"
-import vinext from "vinext"
-import { workersCacheCdnAdapter } from "@vinext/cloudflare/cache/workers-cache-cdn-adapter"
-import { cloudflare } from "@cloudflare/vite-plugin"
-import { cloudflareVinext } from "kizlo/cloudflare/vinext"
+export default withCloudflare(app)
+```
 
-export default defineConfig({
-  plugins: [
-    cloudflareVinext(),
-    vinext({ cache: { cdn: workersCacheCdnAdapter() } }),
-    cloudflare({ viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] } }),
-  ],
+The bridge passes native bindings and execution context to Start, defaults responses without a cache
+policy to `Cache-Control: no-store`, and encodes cache tags. It does not create hosting resources.
+
+Register the context alongside your existing router registration, using generated Cloudflare types:
+
+```ts title="src/router.tsx (type registration)"
+declare module "@tanstack/react-router" {
+  interface Register {
+    server: { requestContext: { env: Env; executionCtx: ExecutionContext } }
+  }
+}
+```
+
+To expose bindings to Kizlo procedures, augment `ProcedureContext`:
+
+```ts title="src/kizlo-env.d.ts"
+import "kizlo"
+
+declare module "kizlo" {
+  interface ProcedureContext {
+    env: Env
+    executionCtx: ExecutionContext
+  }
+}
+```
+
+Direct server calls read the active Start request. Outside a Start request, no ambient request values
+are supplied. Core HTTP handlers accept explicit platform values and work without async storage;
+custom runtimes can supply a `requestContext` adapter through `createIntegration()`.
+
+## Mount the API
+
+```ts title="src/routes/api.kizlo.$.ts"
+import { createFileRoute } from "@tanstack/react-router"
+import { createApiHandlers } from "kizlo/tanstack-start/server"
+import { handler } from "@/lib/kizlo/server"
+
+export const Route = createFileRoute("/api/kizlo/$")({
+  server: { handlers: createApiHandlers(handler) },
 })
 ```
 
-Workers Cache and Response Store can render in separate Worker entrypoints reached over service
-bindings. An outer Worker scope does not cross that boundary. `cloudflareVinext()` wraps the public
-request-stage and response-stage loaders so each invocation captures its own Request, including cache
-misses and regeneration. It leaves the cache adapter's routing, keys, and replay metadata intact.
+Kizlo's API responses use `Cache-Control: private, no-store`. Framework route parameters are not
+platform context. Authorize private resources inside their server handlers.
 
-This build-only entry requires Vite 8 and Vinext's public `vinext/server/request-stage` and
-`vinext/server/response-stage` loaders. The verified consumer uses Vinext 1.2.1 and
-`@vinext/cloudflare` 1.1.1. Older adapters that do not use these loaders are unsupported.
-Import this plugin in Vite configuration, not Worker or browser code.
+## Opt pages into CDN caching
 
-## Wrap a single-entry Worker
+Enable native Workers Cache with `cache: { enabled: true }` in your Worker configuration.
+Responses stay uncached until you supply an explicit cache policy. Set it through Start's native
+route `headers` callback; loader data is available there for tag generation:
 
-For a deployment that renders inside the same invocation, wrap the complete framework handler,
-preserving your existing Worker bindings and execution context:
+```ts title="src/routes/product.$slug.tsx"
+import { createFileRoute } from "@tanstack/react-router"
+import { createCdnHeaders } from "kizlo/tanstack-start/cloudflare"
 
-```ts title="worker/index.ts"
-import { withCloudflareRequest } from "kizlo/cloudflare"
-import vinext from "vinext/server/app-router-entry"
-
-export default {
-  fetch(...args: Parameters<typeof vinext.fetch>) {
-    return withCloudflareRequest(args[0], () => vinext.fetch(...args))
+export const Route = createFileRoute("/product/$slug")({
+  loader: ({ params }) => ({ productId: params.slug }),
+  headers: ({ loaderData }) => {
+    if (!loaderData) return { "Cache-Control": "no-store" }
+    return createCdnHeaders({
+      maxAge: "1 hour",
+      staleWhileRevalidate: "5 minutes",
+      tags: [`product:${loaderData.productId}`],
+    })
   },
-}
+})
 ```
 
-Point Wrangler's `main` at this entry only for this single-entry setup. With another framework, wrap
-its complete fetch handler the same way. For staged Vinext caching, retain the cache adapter's generated
-entry and use the build plugin above. Keep an outer wrapper too if your custom Worker makes Kizlo calls
-before dispatching. Wrapping only Kizlo's API route leaves page rendering outside the context.
+Replace the example loader with your product lookup and derive tags from its result.
+Durations accept seconds as numbers or strings such as `"1 hour"`; `staleIfError` defaults to zero.
+The browser revalidates while Cloudflare uses the edge policy.
 
-```jsonc title="wrangler.jsonc (relevant fields)"
-{
-  "main": "./worker/index.ts",
-  "compatibility_date": "2026-08-04",
-  "compatibility_flags": ["nodejs_compat"]
-}
+## Cache response variants
+
+Add `vary` when a request header changes the public response, such as language selection:
+
+```ts
+createCdnHeaders({
+  maxAge: "1 hour",
+  vary: ["Accept-Language"],
+})
 ```
 
-The wrapper uses `node:async_hooks`. Enable Node.js compatibility on earlier compatibility dates;
-dates from `2026-08-04` enable it by default. See [Cloudflare's runtime requirements](https://developers.cloudflare.com/workers/runtime-apis/nodejs/asynclocalstorage/).
-Import `kizlo/cloudflare` only in server and Worker code. Browser clients and other platform entries
-do not load its AsyncLocalStorage implementation.
+Cloudflare stores a separate variant for each header value. No `Vary` is added by default;
+preserve framework-required values when composing headers. Keep private cart and account responses
+uncached instead of varying public responses by session cookies.
 
-## Resolve connection information
+## Own the response policy
 
-`geoCloudflare()` is also exported for custom integrations. It reads an explicit `Request` first,
-or the active Worker context for direct server calls. It reads `CF-Connecting-IP`, `CF-IPCountry`,
-and `User-Agent`; unavailable fields are `null`, including special country codes `XX` and `T1`.
-It never calls `next/headers` or trusts incoming `x-real-ip` or `x-forwarded-for`.
+Kizlo preserves your explicit policy and `Vary` fields, including cacheable policies supplied to
+cart or account routes by a layout or middleware. It does not veto caching based on cookies,
+authorization, response status or render errors. Cookie handling, credential variance and failure
+policies are application choices. Cloudflare's own cache eligibility rules still apply.
 
-Concurrent visitors and streamed response production keep their own context. Context clears when the
-body completes, fails, or is cancelled, or immediately for bodyless responses and handler errors.
-Builds and context-free jobs have no visitor IP. Request-driven revalidation uses its own active
-context; replayed regeneration without visitor headers has no visitor IP, even if another request is
-active. Background work after completion cannot reuse that visitor. WebSocket upgrades pass through
-with no retained connection context.
-
-## Keep public output cacheable
-
-Capturing connection info does not introduce a Next.js request dependency or change cache headers,
-cookies, or revalidation policy. Visitor-independent pages can retain their existing public cache policy.
-
-<Callout type="warn">
-  Keep cart, checkout, account, and session output private. If rendered output depends on the visitor's
-  IP or location, use the framework's dynamic/private rendering controls. AsyncLocalStorage is invisible
-  to automatic dependency tracking, so forwarding does not make personalized output safe to share.
+<Callout>
+  Shared caching reuses the entire response, including serialized provider state. Keep user-specific
+  UI client-side on those pages, and choose their headers accordingly. There is no cache-policy middleware.
 </Callout>
 
-## Trust ingress and check the origin
+## Select where Clerk middleware runs
 
-<Callout type="warn">
-  Use this integration only behind trusted Cloudflare ingress that supplies `CF-Connecting-IP` and
-  prevents callers from bypassing it or forging the header. Kizlo validates address syntax, not the sender.
-</Callout>
+Clerk's Start provider serializes middleware-provided auth state into HTML. Use `matchMiddleware()`
+to make the server authentication boundary explicit, while keeping Clerk's browser provider on public pages:
 
-The existing transport forwards valid IPv4/IPv6 addresses as `x-real-ip`, including WooCommerce calls,
-only to the configured WordPress origin. Authentication, timeouts, aborts, and redirect protection remain
-in place. Use the final WordPress URL, since requests carrying a visitor IP reject redirects.
+```ts title="src/start.ts"
+import { clerkMiddleware } from "@clerk/tanstack-react-start/server"
+import { createCsrfMiddleware, createStart } from "@tanstack/react-start"
+import { matchMiddleware } from "kizlo/tanstack-start/server"
 
-For Cloudflare-proxied WordPress, use a frontend custom domain in the **same Cloudflare zone**.
-Same-zone subrequests can derive `CF-Connecting-IP` from `x-real-ip`; cross-zone subrequests use a shared
-Worker IP. Check `workers.dev` separately from that setup. A non-Cloudflare origin applies its own trust
-and protection rules. Forwarding cannot guarantee that a host or WAF accepts a request.
-See [Cloudflare's subrequest rules](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip-in-worker-subrequests).
+export const startInstance = createStart(() => ({
+  requestMiddleware: [
+    createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === "serverFn" }),
+    matchMiddleware(clerkMiddleware(), [
+      "/account(.*)",
+      "/checkout(.*)",
+      "/orders(.*)",
+      "/sign-in(.*)",
+      "/sign-up(.*)",
+      "/api/(.*)",
+      "/_serverFn/(.*)",
+      "/__clerk/(.*)",
+    ]),
+  ],
+}))
+```
 
-## Migrate after a compatible release
+- **Patterns:** pass a string or array of [path-to-regexp patterns](https://nextjs.org/docs/app/api-reference/file-conventions/proxy#matcher), such as `/privacy`, `/orders(.*)` or `/account/:path*`. Matching is case-insensitive, accepts a trailing slash and ignores query strings.
+- **Advanced matching:** use negative lookaheads for exclusions, or a synchronous `(request) => boolean` callback for header and query checks. Native ordering and dependencies are preserved.
+- **Server functions:** include their base path when they use Clerk's `auth()` helper; `/_serverFn` is Start's default. Private resources must still check authentication and ownership independently.
 
-Kizlo `0.27.1` does not export `kizlo/cloudflare`. Install a release or PR preview containing this entry
-before changing imports. Replace your custom integration using `geoCloudflareNext()` with `cloudflare()`
-and add the Vite plugin for staged Vinext caching, or the Worker wrapper for a single-entry deployment.
-The old adapter keeps its existing `next/headers` fallback; other geo adapters remain compatible.
-Remove any global fetch patch and its initialization together when adopting this setup.
+Selecting middleware does not set cache policy.
 
-Before rollout, verify WordPress IPs for SSR and API calls, public cache hits and revalidation, private
-responses, streaming, and concurrent visitors. Check the same-zone custom domain separately from cross-zone
-and `workers.dev` traffic. Keep Umahra and Lazoey migrations separate from this release.
+## Authenticate without Clerk middleware
+
+With middleware, use Clerk's Start `auth()` helper. Without middleware, that helper throws:
+authenticate through [`clerkClient().authenticateRequest(request)`](https://clerk.com/docs/reference/backend/authenticate-request),
+handle handshake headers or redirects, then authorize using `.toAuth()`. Fetch a full user only after
+verifying identity with `clerkClient().users.getUser(userId)`.
+
+## Revalidate public responses
+
+Call these helpers from an independently authorized server route, webhook or server function:
+
+```ts
+import { revalidateTag, revalidateUrl } from "kizlo/tanstack-start/cloudflare"
+
+await revalidateTag("catalog")
+await revalidateUrl("/collections")
+await revalidateUrl(new URL("https://shop.example/product/shirt?size=m"))
+```
+
+The active Start execution context must provide native `cache.invalidate()`.
+Both helpers mark matching responses stale; the next request refreshes them under their stored
+stale-while-revalidate policy. They do not regenerate pages immediately. Missing support and provider failures throw.
+
+URLs accept an absolute pathname or a same-origin HTTP(S) URL. Queries and fragments are ignored:
+revalidating `/collections?page=1` selects every query variant of `/collections`, without selecting
+`/collections/featured`. Cross-origin URLs and embedded credentials are rejected. Tags are scoped to the request host.
+
+## Migrate and verify
+
+Replace `kizlo/cloudflare` and `kizlo/cloudflare/vinext` imports with the Start-specific entry point.
+Remove Vinext configuration and compatibility patches. Keep existing stored resources until their
+retirement is authorized. Use `geoCloudflare()` only behind trusted ingress that prevents forged
+`CF-Connecting-IP` headers; it validates syntax, not the sender.
+
+Verify public MISS/HIT behavior on an isolated deployment, then test tag invalidation, private guards
+and signed-in versus signed-out public HTML. A local build or dry-run does not prove edge caching,
+account permissions or live Clerk behavior. No R2, Durable Objects or Worker response-cache implementation is installed.
