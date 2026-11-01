@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { introspection } from "../../../introspection"
 import { authMock } from "./adapters/auth"
@@ -6,8 +7,12 @@ import { Context, type ProcedureContext } from "./context"
 import * as publicApi from "./index"
 import { createKizlo, integrationEnv, Kizlo, resolveKizloConfig, wordPressConnectionComplete } from "./kizlo"
 import { CORE_PROCEDURES } from "./procedures"
+import { RPC_PROTOCOL_HEADER } from "./shared/constants"
+import { KizloError } from "./shared/error"
 import { createIntegration } from "./shared/integration"
 import { createProcedure, schemaType } from "./shared/procedure"
+import { getKizloClientTestInstance } from "./test/client"
+import { testRequestContext } from "./test/request-context.test-helper"
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -393,6 +398,59 @@ describe("request error interceptor", () => {
 })
 
 describe("response headers", () => {
+	test.each(["api", "remote"] as const)("keeps unwrapped %s responses private, including errors and unmatched routes", async (scope) => {
+		const server = new Kizlo({
+			baseUrl: "https://app.example/api/kizlo",
+			siteSecret: "site-secret",
+			credentials,
+			integrations: [
+				createIntegration({
+					id: "probe",
+					procedures: {
+						who: createProcedure({ scope, method: "GET", path: "/who", output: schemaType<string | null>() }, async ({ context }) => {
+							for (const name of ["Cache-Control", "CDN-Cache-Control", "Cloudflare-CDN-Cache-Control"]) {
+								context.headers?.set(name, "public, max-age=3600")
+							}
+							context.headers?.set("Cache-Tag", "private-session")
+							context.headers?.append("Set-Cookie", "one=1; HttpOnly")
+							context.headers?.append("Set-Cookie", "two=2; HttpOnly")
+							return context.request?.headers.get("cookie") ?? null
+						}),
+						failure: createProcedure({ scope, method: "GET", path: "/failure", output: schemaType<never>() }, async () => {
+							throw new KizloError("FORBIDDEN", { message: "Private failure" })
+						}),
+						crash: createProcedure({ scope, method: "GET", path: "/crash", output: schemaType<never>() }, async () => {
+							throw new Error("Unexpected failure")
+						}),
+					},
+				}),
+			] as const,
+		})
+		const responses: Response[] = []
+		const invoke = async (request: Request) => {
+			request.headers.set("Cookie", "session=alice")
+			const response = await server.handler(request)
+			responses.push(response)
+			return response
+		}
+		const { client } = await getKizloClientTestInstance(server, { url: "https://app.example/api/kizlo", fetch: invoke })
+		const probe = client.probe
+		if (!probe) throw new Error("Expected registered probe procedures")
+		expect(await probe.who()).toMatchObject({ success: true, data: "session=alice" })
+		expect(await probe.failure()).toMatchObject({ success: false, error: { status: 403, message: "Private failure" } })
+		expect(await probe.crash()).toMatchObject({ success: false, error: { status: 500 } })
+		const missing = await invoke(
+			new Request("https://app.example/api/kizlo/missing", { headers: scope === "remote" ? { [RPC_PROTOCOL_HEADER]: "1" } : {} }),
+		)
+		expect(await missing.text()).toBe("Not Found")
+		expect(responses.map(({ status }) => status)).toEqual([200, 403, 500, 404])
+		for (const response of responses) {
+			expect(response.headers.get("Cache-Control")).toBe("private, no-store")
+			for (const name of ["CDN-Cache-Control", "Cloudflare-CDN-Cache-Control", "Cache-Tag"]) expect(response.headers.has(name)).toBe(false)
+			if (response.status === 200) expect(response.headers.getSetCookie()).toEqual(["one=1; HttpOnly", "two=2; HttpOnly"])
+		}
+	})
+
 	test("forwards each cookie once when a response sets multiple cookies", async () => {
 		const kizlo = new Kizlo({
 			baseUrl: "https://app.example",
@@ -480,5 +538,115 @@ describe("configured WordPress access", () => {
 		expect(publicApi).not.toHaveProperty("createWordPressClient")
 		expect(publicApi.wpEndpoint).toBeTypeOf("function")
 		expect(publicApi.buildWordPressRequest).toBeTypeOf("function")
+	})
+})
+
+describe("native request context", () => {
+	const scope = testRequestContext()
+	const runtime = createIntegration({ id: "test-runtime", adapters: { requestContext: scope } })
+	type Values = { env?: { SITE: string }; executionCtx?: { waitUntil: (work: Promise<unknown>) => void } }
+	const createServer = () => {
+		const server = new Kizlo({
+			baseUrl: "https://app.example/api",
+			siteSecret: "secret",
+			credentials,
+			integrations: [
+				runtime,
+				createIntegration({
+					id: "probe",
+					procedures: {
+						info: createProcedure(
+							{
+								scope: "api",
+								method: "GET",
+								path: "/info",
+								output: schemaType<{ site: string | null; url: string | null; native: boolean }>(),
+							},
+							async ({ context }) => {
+								const values = context as ProcedureContext & Values
+								await Promise.resolve()
+								return { site: values.env?.SITE ?? null, url: context.request?.url ?? null, native: !!values.executionCtx }
+							},
+						),
+					},
+				}),
+			] as const,
+		})
+		const probe = server.client.probe
+		if (!probe) throw new Error("Expected registered probe procedures")
+		return { server, probe }
+	}
+	test("handler values reach HTTP procedures in isolation without changing the server instance", async () => {
+		const { server, probe } = createServer()
+		await Promise.all(
+			["first", "second"].map(async (SITE) => {
+				const executionCtx = { waitUntil: vi.fn() }
+				const request = new Request(`https://app.example/api/info?site=${SITE}`)
+				const response = await server.handler(request, { env: { SITE }, executionCtx })
+				expect(await response.json()).toEqual({ site: SITE, url: request.url, native: true })
+			}),
+		)
+		expect((await probe.info()).data).toEqual({ site: null, url: null, native: false })
+	})
+	test("an optional runtime adapter supplies ambient values and allows explicit HTTP overrides", async () => {
+		const { server, probe } = createServer()
+		let later!: () => ReturnType<typeof probe.info>
+		const request = new Request("https://app.example/page")
+		const response = await scope.run(request, { env: { SITE: "outer" }, executionCtx: { waitUntil: vi.fn() } }, async () => {
+			later = AsyncLocalStorage.bind(() => probe.info())
+			expect((await probe.info()).data).toEqual({ site: "outer", url: request.url, native: true })
+			const api = new Request("https://app.example/api/info")
+			const response = await server.handler(api, { env: { SITE: "override" } })
+			expect(await response.json()).toEqual({ site: "override", url: api.url, native: true })
+			expect((await probe.info()).data?.site).toBe("outer")
+			return new Response("rendered")
+		})
+		expect(await response.text()).toBe("rendered")
+		expect((await later()).data).toEqual({ site: null, url: null, native: false })
+	})
+
+	test("explicit HTTP values reach nested server-client invocations", async () => {
+		let callInner!: () => Promise<string | null>
+		const server = new Kizlo({
+			baseUrl: "https://app.example/api",
+			siteSecret: "secret",
+			credentials,
+			integrations: [
+				runtime,
+				createIntegration({
+					id: "probe",
+					procedures: {
+						inner: createProcedure(
+							{ scope: "internal", output: schemaType<string | null>() },
+							async ({ context }) => (context as ProcedureContext & Values).env?.SITE ?? null,
+						),
+						outer: createProcedure({ scope: "api", method: "GET", path: "/outer", output: schemaType<string | null>() }, async () =>
+							callInner(),
+						),
+					},
+				}),
+			] as const,
+		})
+		const probe = server.client.probe
+		if (!probe) throw new Error("Expected registered probe procedures")
+		callInner = async () => {
+			const result = await probe.inner()
+			if (result.error) throw result.error
+			return result.data ?? null
+		}
+		const response = await server.handler(new Request("https://app.example/api/outer"), { env: { SITE: "nested" } })
+		expect(await response.json()).toBe("nested")
+		expect(await callInner()).toBeNull()
+	})
+	test("caller additions cannot overwrite Kizlo-owned context fields", async () => {
+		const { server } = createServer()
+		const request = new Request("https://app.example/api/info")
+		const response = await server.handler(request, { env: { SITE: "safe" }, request: null, wordpress: null, headers: null })
+		expect(await response.json()).toEqual({ site: "safe", url: request.url, native: false })
+	})
+	test.each([null, "invalid", []])("rejects malformed request additions: %j", async (values) => {
+		const { server } = createServer()
+		// @ts-expect-error request additions are objects, even without augmentation
+		await expect(server.handler(new Request("https://app.example/api/info"), values)).rejects.toThrow("Request context must be an object")
 	})
 })

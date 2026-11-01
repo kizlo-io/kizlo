@@ -3,6 +3,7 @@ import type { AuthAdapter } from "./auth"
 import type { CaptchaAdapter } from "./captcha"
 import type { GeoAdapter } from "./geo"
 import type { LoggerAdapter } from "./logger"
+import type { RequestContextAdapter } from "./request-context"
 
 /** The service contracts Kizlo integrations can provide at runtime. */
 export interface ServiceAdapters {
@@ -11,6 +12,7 @@ export interface ServiceAdapters {
 	geo?: GeoAdapter
 	logger?: LoggerAdapter
 	cookies?: CookiesAdapter
+	requestContext?: RequestContextAdapter
 }
 
 /** Merge adapter contributions in order without letting `undefined` erase an earlier value. */
@@ -24,6 +26,7 @@ export function mergeServiceAdapters(...contributions: (ServiceAdapters | undefi
 		if (contribution.geo !== undefined) adapters.geo = contribution.geo
 		if (contribution.logger !== undefined) adapters.logger = contribution.logger
 		if (contribution.cookies !== undefined) adapters.cookies = contribution.cookies
+		if (contribution.requestContext !== undefined) adapters.requestContext = contribution.requestContext
 	}
 
 	return adapters

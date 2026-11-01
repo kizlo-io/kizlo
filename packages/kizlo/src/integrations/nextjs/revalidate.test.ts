@@ -1,12 +1,16 @@
-import { AsyncLocalStorage } from "node:async_hooks"
 import { afterEach, expect, test, vi } from "vitest"
+import { geoCloudflareNext } from "../../adapters/geo.cloudflare"
 import type { ProcedureContext } from "../../context"
 import { WordPressTransport } from "../../wordpress/transport"
-import { geoCloudflare, withCloudflareRequest } from "../cloudflare"
 import { nextjs } from "./integration"
 import { nextRevalidation } from "./revalidate"
 
-afterEach(() => vi.unstubAllGlobals())
+const { currentHeaders } = vi.hoisted(() => ({ currentHeaders: { value: new Headers() } }))
+vi.mock("next/headers", () => ({ headers: () => currentHeaders.value }))
+afterEach(() => {
+	vi.unstubAllGlobals()
+	currentHeaders.value = new Headers()
+})
 
 test("a WooCommerce settings change revalidates the whole layout", async () => {
 	const revalidatePath = vi.fn()
@@ -18,8 +22,8 @@ test("a WooCommerce settings change revalidates the whole layout", async () => {
 	expect(revalidatePath).toHaveBeenCalledWith("/", "layout")
 })
 
-test("the real revalidation handler uses its own request IP and clears it after completion", async () => {
-	const geo = geoCloudflare()
+test("the revalidation handler reads the current Next.js request headers", async () => {
+	const geo = geoCloudflareNext()
 	const getClientIp = async () => (await geo.getConnInfo(null)).ip
 	const transport = new WordPressTransport({
 		credentials: { url: "https://wp.example", username: "admin", password: "secret" },
@@ -41,15 +45,11 @@ test("the real revalidation handler uses its own request IP and clears it after 
 	const revalidateTag = vi.fn()
 	const [event] = nextjs({ env: {}, revalidate: { paths: regenerate, revalidatePath, revalidateTag } }).events ?? []
 	if (!event) throw new Error("Expected Next.js revalidation to be enabled")
-	let afterCompletion!: () => Promise<string | null>
 	for (const ip of ["203.0.113.1", "2001:db8::2"]) {
-		await withCloudflareRequest(new Request("https://app.example/webhooks", { headers: { "cf-connecting-ip": ip } }), async () => {
-			await event.handler({ type: "settings.site.updated", data: null }, {} as ProcedureContext)
-			afterCompletion = AsyncLocalStorage.bind(getClientIp)
-			return new Response(null)
-		})
-		expect(await afterCompletion()).toBeNull()
+		currentHeaders.value = new Headers({ "cf-connecting-ip": ip })
+		await event.handler({ type: "settings.site.updated", data: null }, {} as ProcedureContext)
 	}
+	currentHeaders.value = new Headers()
 	await event.handler({ type: "settings.site.updated", data: null }, {} as ProcedureContext)
 	expect(forwarded).toEqual(["203.0.113.1", "2001:db8::2", null])
 	expect(revalidatePath).toHaveBeenCalledWith("/", "layout")
