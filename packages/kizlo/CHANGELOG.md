@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.30.0
+
+### Minor Changes
+
+- [#303](https://github.com/kizlo-io/kizlo/pull/303) [`7001ec0`](https://github.com/kizlo-io/kizlo/commit/7001ec00aa9e96f58734943babb9050325faa5a0) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Replace the generic Cloudflare and Vinext APIs with `kizlo/tanstack-start/react/cloudflare`, add native React Start context on `kizlo/tanstack-start/react/server`, and provide explicit CDN headers with optional variance, native pathname-prefix revalidation and resource-tag revalidation while preserving framework-neutral Start helpers.
+
 ## 0.29.0
 
 ### Minor Changes
