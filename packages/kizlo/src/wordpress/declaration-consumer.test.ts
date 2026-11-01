@@ -352,7 +352,7 @@ function compile(dir: string, entries: readonly string[] = ["introspection.ts", 
 			"@kizlo/woocommerce": [WOOCOMMERCE_TYPES],
 			kizlo: [KIZLO_TYPES],
 			"kizlo/nextjs/server": [fileURLToPath(new URL("../../dist/nextjs/server.d.ts", import.meta.url))],
-			"kizlo/tanstack-start/react/cloudflare": [fileURLToPath(new URL("../../dist/tanstack-start/react/cloudflare.d.ts", import.meta.url))],
+			"kizlo/tanstack-start/cloudflare": [fileURLToPath(new URL("../../dist/tanstack-start/cloudflare.d.ts", import.meta.url))],
 			"kizlo/tanstack-start/server": [fileURLToPath(new URL("../../dist/tanstack-start/server.d.ts", import.meta.url))],
 			"kizlo/tanstack-start/react/server": [fileURLToPath(new URL("../../dist/tanstack-start/react/server.d.ts", import.meta.url))],
 			"@tanstack/react-start": [fileURLToPath(new URL("../../node_modules/@tanstack/react-start/dist/esm/index.d.ts", import.meta.url))],
@@ -698,8 +698,8 @@ test("published declarations expose trusted client IP configuration", () => {
 			`
 			import { createIntegration, createKizlo, createGeoAdapter, geoCloudflareNext, geoVercelNext, WordPressTransport } from "kizlo"
 			import { nextjs, toNextJsHandler } from "kizlo/nextjs/server"
-			import { createCdnHeaders, cloudflare, geoCloudflare, revalidateTag, revalidateUrl, withCloudflare } from "kizlo/tanstack-start/react/cloudflare"
-			import * as cloudflareApi from "kizlo/tanstack-start/react/cloudflare"
+			import { createCdnHeaders, cloudflare, geoCloudflare, revalidateTag, revalidateUrl, withCloudflare, revalidator } from "kizlo/tanstack-start/cloudflare"
+			import * as cloudflareApi from "kizlo/tanstack-start/cloudflare"
 			import { matchMiddleware, tanstackStart } from "kizlo/tanstack-start/react/server"
 			import { createMiddleware, createStart } from "@tanstack/react-start"
 			const { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD } = toNextJsHandler(async (_request: Request) => new Response(null))
@@ -714,7 +714,24 @@ test("published declarations expose trusted client IP configuration", () => {
             startWorker.fetch(new Request("https://app.example"), { SITE: "store" }, { waitUntil: () => {} })
             // @ts-expect-error preserve the Start worker binding types
             startWorker.fetch(new Request("https://app.example"), { SITE: 1 }, { waitUntil: () => {} })
-			const publicHeaders: Record<string, string> = createCdnHeaders({ maxAge: 60, tags: ["catalog"] })
+			revalidator({
+                postTypes: { guide: { resourceTag: (id) => "guide:" + id, collectionTags: (data) => (data.affected_terms.topic ?? []).map((id) => "topic:" + id) } },
+                taxonomies: { topic: { resourceTag: (id) => "topic:" + id, collectionTags: (id, data) => ["topic:" + id + ":" + data.taxonomy] } },
+                settings: {
+                    "settings.taxonomy.updated": (event) => [event.data.key],
+                    "settings.brand.updated": (event) => {
+                        const value: null = event.data
+                        return ["brand"]
+                    },
+                },
+            })
+            // @ts-expect-error callback tag results must be strings
+            revalidator({ postTypes: { product: { resourceTag: () => 4 } } })
+            // @ts-expect-error revalidation is synchronous selection before provider effects
+            revalidator({ postTypes: { product: { resourceTag: async () => "tag" } } })
+            // @ts-expect-error removed provider import has no deprecated alias
+            import type * as oldProvider from "kizlo/tanstack-start/react/cloudflare"
+            const publicHeaders: Record<string, string> = createCdnHeaders({ maxAge: 60, tags: ["catalog"] })
 			const middleware = createMiddleware().server(({ next }) => next({ context: { userId: "alice" } }))
 			const selected = matchMiddleware(middleware, ["/account(.*)", "/_serverFn/(.*)"])
 			const start = createStart(() => ({ requestMiddleware: [selected] }))
@@ -853,8 +870,11 @@ test("published shared Start entry points do not require React in a Solid-only c
 		)
 		const shared = new URL("../../dist/tanstack-start.js", import.meta.url).href
 		const server = new URL("../../dist/tanstack-start/server.js", import.meta.url).href
+		const provider = new URL("../../dist/tanstack-start/cloudflare.js", import.meta.url).href
 		const program = `import { createKizloClient, resolvePageHead } from ${JSON.stringify(shared)};
 			import { tanstackStart, createApiHandlers, resolveRootHead } from ${JSON.stringify(server)};
+            import { createCdnHeaders, revalidator } from ${JSON.stringify(provider)};
+            if (createCdnHeaders({ maxAge: 60 })["Cache-Control"] !== "no-cache" || revalidator().id !== "revalidator") throw Error("Neutral provider failed");
 			if ([createKizloClient, resolvePageHead, createApiHandlers, resolveRootHead].some(value => typeof value !== "function")) throw Error("Missing shared helpers");
 			if (tanstackStart({ env: {} }).adapters) throw Error("Shared integration installed React adapters");
 			console.log("framework-neutral Start passed");`
@@ -870,7 +890,7 @@ test("published shared Start entry points do not require React in a Solid-only c
 
 test("published React Start entries load with the supported native runtime", () => {
 	const server = new URL("../../dist/tanstack-start/react/server.js", import.meta.url).href
-	const cloudflare = new URL("../../dist/tanstack-start/react/cloudflare.js", import.meta.url).href
+	const cloudflare = new URL("../../dist/tanstack-start/cloudflare.js", import.meta.url).href
 	const program = `import { tanstackStart, matchMiddleware } from ${JSON.stringify(server)};
 		import { createCdnHeaders, revalidateUrl, revalidateTag, withCloudflare } from ${JSON.stringify(cloudflare)};
 		const adapters = tanstackStart({ env: {} }).adapters;

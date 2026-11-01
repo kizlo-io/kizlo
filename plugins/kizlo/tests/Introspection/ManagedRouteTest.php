@@ -246,6 +246,39 @@ class ManagedRouteTest extends IntrospectionTestCase
     // THE SERVED SURFACE IS THE DESCRIBED SURFACE
     // ============================================================
 
+    public function test_custom_taxonomy_ids_remain_available_without_dependency_enrichment(): void
+    {
+        register_post_type('cache_guide', ['public' => true, 'show_in_rest' => true, 'supports' => ['title', 'author']]);
+        register_taxonomy('cache_topic', ['cache_guide'], ['public' => true, 'show_in_rest' => true, 'rest_base' => 'cache_topics']);
+        $includePosts = static fn(array $types): array => [...$types, 'cache_guide'];
+        $includeTaxonomies = static fn(array $types): array => [...$types, 'cache_topic'];
+        add_filter('kizlo_included_post_types', $includePosts);
+        add_filter('kizlo_included_taxonomies', $includeTaxonomies);
+        \Kizlo\Modules\Settings\Settings::invalidateCache();
+
+        try {
+            $this->boot();
+            $term = self::factory()->term->create(['taxonomy' => 'cache_topic']);
+            $post = self::factory()->post->create(['post_type' => 'cache_guide', 'post_status' => 'publish']);
+            wp_set_object_terms($post, [$term], 'cache_topic');
+            $single = $this->dispatch('GET', '/kizlo/v1/post-types/cache_guide/' . $post);
+            $list = $this->dispatch('GET', '/kizlo/v1/post-types/cache_guide');
+            $this->assertSame(200, $single->get_status());
+            $this->assertSame(200, $list->get_status());
+            foreach ([$single->get_data(), $list->get_data()[0]] as $data) {
+                $this->assertSame([$term], $data['cache_topics']);
+                $this->assertArrayNotHasKey('terms', $data['kizlo']);
+                $this->assertArrayNotHasKey('term_ancestors', $data['kizlo']);
+            }
+        } finally {
+            remove_filter('kizlo_included_post_types', $includePosts);
+            remove_filter('kizlo_included_taxonomies', $includeTaxonomies);
+            unregister_taxonomy('cache_topic');
+            unregister_post_type('cache_guide');
+            \Kizlo\Modules\Settings\Settings::invalidateCache();
+        }
+    }
+
     public function test_every_described_managed_path_is_registered_with_the_same_methods(): void
     {
         $this->boot();

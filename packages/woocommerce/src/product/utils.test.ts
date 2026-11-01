@@ -1,7 +1,13 @@
 import { expect, test } from "vitest"
 import { ListProductInput, Product, ProductFilters } from "./schema"
 import type { WCSK_Product, WCSK_ProductCollectionData, WCSK_ProductDetail, WCSK_ProductSummary } from "./types"
-import { deserializeProductFilters, deserializeProductRecommendations, deserializeStoreProduct, serializeProductListInput } from "./utils"
+import {
+	deserializeProductFilters,
+	deserializeProductRecommendations,
+	deserializeProductSummary,
+	deserializeStoreProduct,
+	serializeProductListInput,
+} from "./utils"
 
 function rawProduct(): WCSK_Product {
 	return {
@@ -104,6 +110,24 @@ function rawProduct(): WCSK_Product {
 		} as WCSK_Product["extensions"],
 	}
 }
+
+test("existing taxonomy fields supply cache-tag identities without dependency enrichment", () => {
+	const raw = rawProduct()
+	raw.attributes.push({
+		id: 8,
+		name: "Color",
+		taxonomy: "pa_color",
+		has_variations: false,
+		terms: [{ id: 12, name: "Blue", slug: "blue", default: false }],
+	})
+	const product = deserializeProductSummary(raw)
+	expect(product.categories.map(({ id }) => id)).toEqual([2])
+	expect(product.tags.map(({ id }) => id)).toEqual([3])
+	expect(product.brands.map(({ id }) => id)).toEqual([4])
+	expect(product.attributes.filter(({ taxonomy }) => taxonomy).flatMap(({ terms }) => terms.map(({ id }) => id))).toEqual([12])
+	expect(product).not.toHaveProperty("terms")
+	expect(product).not.toHaveProperty("termAncestors")
+})
 
 test("Store products normalize the complete public model without losing custom product types or extensions", () => {
 	const result = deserializeStoreProduct(rawProduct(), null)

@@ -106,10 +106,10 @@
 				"default": "./dist/tanstack-start/react/server.js"
 			}
 		},
-		"./tanstack-start/react/cloudflare": {
+		"./tanstack-start/cloudflare": {
 			"import": {
-				"types": "./dist/tanstack-start/react/cloudflare.d.ts",
-				"default": "./dist/tanstack-start/react/cloudflare.js"
+				"types": "./dist/tanstack-start/cloudflare.d.ts",
+				"default": "./dist/tanstack-start/cloudflare.js"
 			}
 		}
 	},
@@ -153,6 +153,8 @@
 		"zod": "catalog:"
 	},
 	"devDependencies": {
+		"@tanstack/start-client-core": "1.170.34",
+		"@tanstack/start-server-core": "1.169.39",
 		"@tooling/typescript": "workspace:*",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:react19",
@@ -169,6 +171,8 @@
 	"peerDependencies": {
 		"@tanstack/react-router": "^1.170.41",
 		"@tanstack/react-start": "^1.168.60",
+		"@tanstack/start-client-core": "^1.170.34",
+		"@tanstack/start-server-core": "^1.169.39",
 		"astro": "^7.0.0",
 		"next": "^14.0.0 || ^15.0.0 || ^16.0.0",
 		"react": "^18.0.0 || ^19.0.0",
@@ -180,6 +184,12 @@
 			"optional": true
 		},
 		"@tanstack/react-start": {
+			"optional": true
+		},
+		"@tanstack/start-client-core": {
+			"optional": true
+		},
+		"@tanstack/start-server-core": {
 			"optional": true
 		},
 		"astro": {

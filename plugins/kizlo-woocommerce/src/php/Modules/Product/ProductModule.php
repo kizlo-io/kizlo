@@ -23,6 +23,7 @@ class ProductModule
 
     public function register(): void
     {
+        add_filter('kizlo_dependency_taxonomies', static fn(array $names): array => array_merge($names, \Kizlo\WooCommerce\Modules\Integration\CoreIntegration::publicTaxonomies()));
         add_action('woocommerce_blocks_loaded', [$this, 'extendStoreApiProductSchema']);
         add_action('woocommerce_product_options_shipping', [$this, 'renderHsCodeField']);
         add_action('woocommerce_admin_process_product_object', [$this, 'saveHsCode']);

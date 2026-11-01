@@ -51,7 +51,17 @@ class CoreIntegration
 
     public function addWatchedTaxonomies(array $defaults): array
     {
-        return array_values(array_unique(array_merge($defaults, ['product_cat', 'product_tag'])));
+        return array_values(array_unique(array_merge($defaults, self::publicTaxonomies())));
+    }
+
+    /** Public Store/REST relationships, including globally defined attribute options. */
+    public static function publicTaxonomies(): array
+    {
+        $names = wc_get_attribute_taxonomy_names();
+        foreach (get_object_taxonomies('product', 'objects') as $taxonomy) {
+            if ($taxonomy->public && $taxonomy->show_in_rest) $names[] = $taxonomy->name;
+        }
+        return array_values(array_unique($names));
     }
 
     /**

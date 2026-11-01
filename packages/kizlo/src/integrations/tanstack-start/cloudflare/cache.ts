@@ -3,7 +3,7 @@ import { type Duration, seconds as durationSeconds } from "@kizlo/shared"
 import { getStartRequestContext } from "../request-context"
 import { EDGE_HEADERS, validateTags } from "./cache-policy"
 
-function getCacheContext() {
+export function getCacheContext() {
 	const context = getStartRequestContext()
 	const values = context?.values as { executionCtx?: { cache?: CloudflareCacheBinding } } | undefined
 	const cache = values?.executionCtx?.cache
@@ -22,6 +22,7 @@ export interface CloudflareCacheResult {
 /** Native Workers Cache control surface, not the separate caches.default API. */
 export interface CloudflareCacheBinding {
 	invalidate?(options: { tags?: string[]; pathPrefixes?: string[] }): Promise<CloudflareCacheResult>
+	purge?(options: { purgeEverything: true }): Promise<CloudflareCacheResult>
 }
 
 export interface CdnHeadersOptions {
@@ -81,14 +82,31 @@ export async function revalidateUrl(url: string | URL): Promise<void> {
 
 /** Mark responses carrying this host-scoped tag stale under their stored cache policy. */
 export async function revalidateTag(tag: string): Promise<void> {
+	await revalidateTags([tag])
+}
+
+/** Submit every dependency, independently of the response storage budget. */
+export async function revalidateTags(tags: readonly string[]): Promise<void> {
+	const unique = validateTags(tags)
 	const state = getCacheContext()
-	validateTags([tag])
-	await invalidate(state.cache, { tags: [resourceTag(state.url, tag)] })
+	for (let index = 0; index < unique.length; index += 100) {
+		await invalidate(state.cache, { tags: unique.slice(index, index + 100).map((tag) => resourceTag(state.url, tag)) })
+	}
+}
+
+/** Remove every cached response owned by the calling Worker entrypoint. */
+export async function purgeCache(): Promise<void> {
+	const { cache } = getCacheContext()
+	if (typeof cache.purge !== "function") throw new Error("The Worker runtime does not support cache.purge().")
+	assertCacheResult(await cache.purge({ purgeEverything: true }))
 }
 
 async function invalidate(cache: CloudflareCacheBinding, targets: { tags?: string[]; pathPrefixes?: string[] }): Promise<void> {
 	if (typeof cache.invalidate !== "function") throw new Error("The Worker runtime does not support cache.invalidate().")
-	const result = await cache.invalidate(targets)
+	assertCacheResult(await cache.invalidate(targets))
+}
+
+function assertCacheResult(result: CloudflareCacheResult): void {
 	if (result?.success !== true) {
 		const detail = result?.errors?.map(({ code, message }) => `${code}: ${message}`).join("; ")
 		throw new Error(`Cloudflare CDN revalidation failed${detail ? `: ${detail}` : "."}`)
@@ -104,8 +122,26 @@ export function applyCloudflareHeaders(request: Request, response: Response): Re
 	if (authoredTags !== null) {
 		const url = new URL(request.url)
 		const resources = validateTags(authoredTags.split(",").map((tag) => tag.trim()))
-		const tagHeader = resources.map((tag) => resourceTag(url, tag)).join(",")
-		if (tagHeader.length > MAX_TAG_HEADER_BYTES) throw new RangeError("Encoded CDN tags exceed Cloudflare's 16 KB header limit.")
+		const encoded = resources.map((tag) => resourceTag(url, tag))
+		const retained: string[] = []
+		let bytes = 0
+		for (const tag of encoded) {
+			const next = bytes + tag.length + (retained.length ? 1 : 0)
+			if (retained.length === 1000 || next > MAX_TAG_HEADER_BYTES) break
+			retained.push(tag)
+			bytes = next
+		}
+		if (retained.length < resources.length)
+			console.warn({
+				code: "KIZLO_CDN_TAGS_TRIMMED",
+				pathname: url.pathname,
+				requested: resources.length,
+				retained: retained.length,
+				dropped: resources.length - retained.length,
+				maxBytes: MAX_TAG_HEADER_BYTES,
+				maxTags: 1000,
+			})
+		const tagHeader = retained.join(",")
 		result.set("Cache-Tag", tagHeader)
 	}
 	return new Response(response.body, { status: response.status, statusText: response.statusText, headers: result })

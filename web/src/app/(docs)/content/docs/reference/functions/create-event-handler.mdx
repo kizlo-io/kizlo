@@ -8,8 +8,8 @@ deleted, or a custom event from your own plugin. Put the result in an
 [integration](/docs/reference/functions/create-integration)'s `events` array. Kizlo dispatches each incoming
 event to every handler that matches.
 
-Events are one-way and fire-and-forget. The handler runs server-side after WordPress notifies Kizlo, returns
-nothing, and a throw is caught and logged, never surfaced to a caller.
+Handlers run server-side. By default, failures are logged and the request succeeds. Required handlers can
+opt into failed acknowledgements so the sender retries. All matching handlers are awaited.
 
 ## Parameters
 
@@ -80,3 +80,27 @@ export const onReview = createEventHandler(
   },
 )
 ```
+
+## Require success before acknowledging
+
+Set `failureMode: "retry"` on an `EventHandler`; the default is `"log"`:
+
+```ts
+const requiredHandler = {
+  ...createEventHandler(async (event, context) => {
+    if (!event) return
+    await updateSearchIndex(event)
+  }),
+  failureMode: "retry" as const,
+}
+```
+
+Every matching handler finishes even when another fails. A required failure returns 503, or 429 with
+`Retry-After` when rate limiting is identified; detailed errors stay in server logs. For retry-mode handlers
+with explicit schemas, the type matches first and that schema validates before permissive built-in schemas.
+Malformed matched data returns 422 rather than a successful no-op. Default handlers retain legacy validation.
+
+The [optional Cloudflare revalidator](/docs/quickstarts/cloudflare#revalidate-on-wordpress-changes) opts into
+this mode. A retried request can rerun successful handlers too. Make side effects idempotent and use the
+logical ID from `context.request?.headers.get("webhook-id")` when needed. See
+[delivery and recovery](/docs/php/functions/emit-event#delivery-and-recovery) for sender guarantees.

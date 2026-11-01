@@ -619,12 +619,12 @@ function kizlo_include_taxonomy(string $taxonomy): void
  *
  * Sends the event to every configured webhook URL so matching `createEventHandler`
  * handlers in your Kizlo app receive the `{ type, data }` payload. Delivery is
- * non-blocking and best-effort. Thin wrapper over \Kizlo\Modules\Webhook\Webhook::sendEvent().
+ * asynchronous and retried through WP-Cron after durable insertion. Thin wrapper over \Kizlo\Modules\Webhook\Webhook::sendEvent().
  *
  * @param string     $type The event type, e.g. 'review.created'. Handlers match on this.
  * @param array|null $data Optional payload merged into the event's `data`. Default null.
  *
- * @return bool False when no site secret or webhook URLs are configured; otherwise true once dispatched.
+ * @return bool True when every target job is durably enqueued; false on configuration, pre-init or storage failure.
  *
  * @example
  * kizlo_emit_event('review.created', [

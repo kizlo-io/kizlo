@@ -20,9 +20,9 @@ kizlo_emit_event(string $type, array|null $data = null): bool
 
 ## Returns
 
-`bool`. Returns `false` when the plugin has no site secret or no configured webhook URLs, otherwise `true` once the
-event is dispatched. Delivery is **non-blocking and best-effort**: the call returns without waiting for the app to
-respond.
+`true` means every configured target's job was stored and scheduled, not delivered. Missing targets/secret,
+storage/scheduling failure or a call before Kizlo initializes its private delivery records returns `false` and logs a diagnostic.
+Call after `init` priority 0; built-in listeners wait for initialization. Delivery runs asynchronously.
 
 ## Examples
 
@@ -52,3 +52,55 @@ createEventHandler(
   `kizlo_emit_event` wraps the underlying `\Kizlo\Modules\Webhook\Webhook::sendEvent()` method. Use whichever
   you prefer; the function is the idiomatic, hook-friendly form.
 </Callout>
+
+## Delivery and recovery
+
+The core plugin uses native WP-Cron and private delivery records in WordPress, without a queue dependency
+or custom table. It requires WordPress 6.9+ (PHP 8.2+). Each target receives an independent record with an
+immutable body and logical `webhook-id`. Only the record ID is stored in the cron event.
+Each attempt uses the current secret, current timestamp and a fresh signature; it uses blocking HTTP
+with a 10-second timeout and does not follow redirects. Any 2xx acknowledges that destination.
+
+| After failed attempt | Next delay, plus up to 20% positive jitter |
+| --- | --- |
+| 1, 2, 3 | 1 minute, 5 minutes, 15 minutes |
+| 4, 5 | 1 hour, 3 hours |
+| 6, 7 | 6 hours, 12 hours |
+| 8 | Automatic attempts stop |
+
+A valid longer `Retry-After` is respected up to 24 hours. Network failures, timeouts and every non-2xx
+response, including permanent 4xx, use this bounded retry cycle. A minute recovery sweep repairs missing cron events and expired two-minute worker leases in batches of 50. One target's retry does not intentionally resend an acknowledged target.
+
+### Inspect and replay failures
+
+List delivery IDs, status, attempts, targets and the last error through WP-CLI. Diagnostic logs omit secrets
+and target query strings. Completed, cancelled and failed records are retained for 30 days. After repairing
+the receiver or configuration, replay a failed target:
+
+```bash
+wp kizlo webhooks list --limit=20
+wp kizlo webhooks retry <delivery-id>
+```
+
+Replay preserves the body and message ID and starts a new bounded attempt cycle. Removed targets are
+cancelled. An irreparably incomplete historical dependency map cannot be fixed by retrying: choose an
+appropriate broader low-level invalidation, then repair the dependency reader before sending new changes.
+
+### Keep the runner progressing
+
+Low-traffic/headless sites need a real server cron calling `wp-cron.php` or a regular
+`wp cron event run --due-now` runner. Scheduling alone does not guarantee wall-clock delivery when
+WP-Cron/loopbacks are unavailable. Deactivation removes Kizlo cron events while retaining delivery records;
+reactivation restores progress in bounded batches. Other plugins' events are unchanged.
+
+### Handle duplicates and source failures
+
+A timeout or process failure after the receiver acts can repeat delivery, including previously successful
+custom handlers at that receiver. Make handlers idempotent; `context.request.headers.get("webhook-id")`
+exposes the stable logical ID. Out-of-order invalidations retain each event's affected IDs; signature
+timestamps describe attempts, not mutation ordering. No exactly-once or transactional-outbox guarantee is made.
+
+Content persistence and job insertion are separate writes. A crash before the complete-change collector
+flushes or before enqueue can miss a signal; durable retry begins only after insertion. Keep ordinary TTLs
+appropriate for this remaining source-delivery window. Receiver failure behavior is documented with
+[`createEventHandler`](/docs/reference/functions/create-event-handler#require-success-before-acknowledging).

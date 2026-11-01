@@ -212,8 +212,18 @@ namespace Kizlo\Modules\Webhook {
         const POST_UPDATED_EVENT = 'post.updated';
         const POST_DELETED_EVENT = 'post.deleted';
         const POST_TRASHED_EVENT = 'post.trashed';
+        const SETTINGS_TAXONOMY_UPDATED_EVENT = 'settings.taxonomy.updated';
 
         /** @param array<string, mixed>|null $data */
         public static function sendEvent(string $type, array|null $data = null) {}
+    }
+}
+
+namespace Kizlo\Modules\Post {
+    final class ContentChanges
+    {
+        public static function capturePost(int $id): void {}
+        public static function post(\WP_Post $post, string $type = 'post.updated'): void {}
+        public static function flush(): void {}
     }
 }

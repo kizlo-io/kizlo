@@ -29,6 +29,8 @@ export interface WebhookOptions {
 }
 
 export interface EventHandler {
+	/** Required handlers fail acknowledgement so the sender can retry. Defaults to log-only. */
+	failureMode?: "log" | "retry"
 	events?: AnyEvents
 	handler: EventHandlerFn<AnyEvents>
 }
@@ -64,8 +66,8 @@ export function createWebhookRouter(options?: WebhookOptions) {
 				}
 
 				const results = await Promise.allSettled(
-					(options?.events ?? []).map(async ({ events, handler }) => {
-						const event = await validateEvent(events, input.body)
+					(options?.events ?? []).map(async ({ events, handler, failureMode }) => {
+						const event = await validateEvent(events, input.body, failureMode)
 						if (!event) return
 						await handler(event as never, context)
 					}),
@@ -75,6 +77,15 @@ export function createWebhookRouter(options?: WebhookOptions) {
 					if (result.status === "rejected") {
 						context.logger.error("Webhook handler failed", result.reason as Error)
 					}
+				}
+				const required = results.find((result, index) => result.status === "rejected" && options?.events?.[index]?.failureMode === "retry")
+				if (required?.status === "rejected") {
+					if (required.reason instanceof KizloError && required.reason.status === 422) throw required.reason
+					const limited = required.reason instanceof KizloError && required.reason.status === 429
+					if (limited) context.headers?.set("Retry-After", "60")
+					throw new KizloError(limited ? "TOO_MANY_REQUESTS" : "SERVICE_UNAVAILABLE", {
+						message: "Required webhook work failed. Retry delivery.",
+					})
 				}
 			},
 		),

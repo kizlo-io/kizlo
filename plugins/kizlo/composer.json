@@ -32,7 +32,8 @@
 		"phpunit/phpunit": "^9.6",
 		"wp-phpunit/wp-phpunit": "^6.4",
 		"yoast/phpunit-polyfills": "^3.0",
-		"php-stubs/wordpress-stubs": "v7.1.0 as 6.9.4"
+		"php-stubs/wordpress-stubs": "v7.1.0 as 6.9.4",
+		"php-stubs/wp-cli-stubs": "^2.12"
 	},
 	"config": {
 		"platform": {
