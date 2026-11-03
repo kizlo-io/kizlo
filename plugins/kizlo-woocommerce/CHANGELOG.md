@@ -4,6 +4,17 @@ All notable changes to the Kizlo WooCommerce plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-11-03
+### Added
+- Add authenticated paginated order history with shared order numbers and UTC creation dates.
+- Require updated Kizlo core content-dependency APIs and emit content changes from persisted product, variation and attribute-definition writes.
+
+### Removed
+- Remove checkout cart rebuilding; read current cart data through the cart API.
+
+### Fixed
+- Resolve missing authenticated customers without requiring a cart request and coordinate customer creation across requests.
+
 ## [0.13.1] - 2026-10-11
 ### Fixed
 - Identify the registered billing Tax ID in checkout retry validation errors.
@@ -133,6 +144,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release. Extracted from Kizlo core.
 
+[0.14.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.13.1...kizlo-woocommerce-v0.14.0
 [0.13.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.13.0...kizlo-woocommerce-v0.13.1
 [0.13.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.12.0...kizlo-woocommerce-v0.13.0
 [0.12.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-woocommerce-v0.11.0...kizlo-woocommerce-v0.12.0

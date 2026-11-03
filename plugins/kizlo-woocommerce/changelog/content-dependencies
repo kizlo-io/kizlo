@@ -1,4 +1,0 @@
-Significance: minor
-Type: added
-
-Require updated Kizlo core content-dependency APIs and emit content changes from persisted product, variation and attribute-definition writes.
