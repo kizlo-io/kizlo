@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.31.0
+
+### Minor Changes
+
+- [#304](https://github.com/kizlo-io/kizlo/pull/304) [`cd5e8d6`](https://github.com/kizlo-io/kizlo/commit/cd5e8d684c259a8ad5f7e82fc9283f9c0a155390) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Add dependency-aware content revalidation with descendant term history, native global settings purges, a neutral Cloudflare entry and bounded response tags while preserving cache policy.
+
 ## 0.30.0
 
 ### Minor Changes
