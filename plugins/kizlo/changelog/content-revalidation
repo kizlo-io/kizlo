@@ -1,5 +1,0 @@
-Significance: minor
-Type: changed
-
-Require WordPress 6.9 and deliver dependency-aware content webhooks through native WP-Cron and private WordPress delivery records with bounded retries and manual replay.
-Retain affected subtrees for term changes without changing post taxonomy assignments.

@@ -4,6 +4,11 @@ All notable changes to the Kizlo plugin are documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-11-03
+### Changed
+- Require WordPress 6.9 and deliver dependency-aware content webhooks through native WP-Cron and private WordPress delivery records with bounded retries and manual replay.
+  Retain affected subtrees for term changes without changing post taxonomy assignments.
+
 ## [0.19.0] - 2026-09-27
 ### Added
 - Allow sites and integrations to opt REST namespaces into automatic contract discovery.
@@ -223,6 +228,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 - Initial release.
 
+[0.20.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.19.0...kizlo-v0.20.0
 [0.19.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.18.0...kizlo-v0.19.0
 [0.18.0]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.17.1...kizlo-v0.18.0
 [0.17.1]: https://github.com/kizlo-io/kizlo/compare/kizlo-v0.17.0...kizlo-v0.17.1
