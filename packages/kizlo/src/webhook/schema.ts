@@ -14,6 +14,7 @@ export const SETTINGS_SIMPLE_EVENT_TYPES = [
 	"settings.identity.updated",
 	"settings.authors.updated",
 	"settings.crawling.updated",
+	"settings.headless.updated",
 	"settings.integration.updated",
 	"settings.woocommerce.updated",
 ] as const
@@ -36,8 +37,15 @@ export type EventType = z.infer<typeof EventType>
 // POST
 // ====================================================
 
+export const TermDependencies = z.record(
+	z.string().min(1),
+	z.array(z.number().int().positive().max(Number.MAX_SAFE_INTEGER)).transform((ids) => [...new Set(ids)]),
+)
+export type TermDependencies = z.infer<typeof TermDependencies>
+
 export const PostEventData = z.object({
-	post_id: z.number(),
+	post_id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+	affected_terms: TermDependencies.nullable().optional(),
 	post_type: z.string(),
 	url: z.string().optional(),
 })
@@ -51,7 +59,8 @@ export type PostEvent = z.infer<typeof PostEvent>
 // ====================================================
 
 export const TermEventData = z.object({
-	term_id: z.number(),
+	term_id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+	affected_terms: TermDependencies.nullable().optional(),
 	taxonomy: z.string(),
 	post_types: z.array(z.string()),
 	count: z.number().nonnegative(),

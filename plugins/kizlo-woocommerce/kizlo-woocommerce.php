@@ -64,6 +64,15 @@ add_action('kizlo_loaded', function (): void {
         return;
     }
 
+    // The coordinated release must not boot against a core lacking its dependency contract.
+    if (!class_exists(Kizlo\Modules\Post\ContentDependencies::class) || !class_exists(Kizlo\Modules\Post\ContentChanges::class)) {
+        add_action('admin_notices', static function (): void {
+            if (!current_user_can('activate_plugins')) return;
+            echo '<div class="notice notice-error"><p><strong>Kizlo WooCommerce</strong> requires an updated Kizlo core with content dependency webhooks. Update Kizlo before activating this version.</p></div>';
+        });
+        return;
+    }
+
     kizlo_extension(KIZLO_WOOCOMMERCE_FILE, function (): void {
         Kizlo\WooCommerce\Plugin::instance()->boot();
     });

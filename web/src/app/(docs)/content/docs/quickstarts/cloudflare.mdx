@@ -11,7 +11,7 @@ for the Vite plugin, Worker configuration and bindings. WordPress can run on any
 
 ```ts title="src/lib/kizlo/server/index.ts"
 import { createKizlo } from "kizlo"
-import { cloudflare } from "kizlo/tanstack-start/react/cloudflare"
+import { cloudflare } from "kizlo/tanstack-start/cloudflare"
 import { tanstackStart } from "kizlo/tanstack-start/react/server"
 import { introspection } from "./generated"
 
@@ -29,7 +29,7 @@ Neither installs an application data cache or requires a second async-storage sc
 
 ```ts title="src/server.ts"
 import app from "@tanstack/react-start/server-entry"
-import { withCloudflare } from "kizlo/tanstack-start/react/cloudflare"
+import { withCloudflare } from "kizlo/tanstack-start/cloudflare"
 
 export default withCloudflare(app)
 ```
@@ -87,7 +87,7 @@ route `headers` callback; loader data is available there for tag generation:
 
 ```ts title="src/routes/product.$slug.tsx"
 import { createFileRoute } from "@tanstack/react-router"
-import { createCdnHeaders } from "kizlo/tanstack-start/react/cloudflare"
+import { createCdnHeaders } from "kizlo/tanstack-start/cloudflare"
 
 export const Route = createFileRoute("/product/$slug")({
   loader: ({ params }) => ({ productId: params.slug }),
@@ -178,7 +178,7 @@ verifying identity with `clerkClient().users.getUser(userId)`.
 Call these helpers from an independently authorized server route, webhook or server function:
 
 ```ts
-import { revalidateTag, revalidateUrl } from "kizlo/tanstack-start/react/cloudflare"
+import { revalidateTag, revalidateUrl } from "kizlo/tanstack-start/cloudflare"
 
 await revalidateTag("catalog")
 await revalidateUrl("/collections")
@@ -194,12 +194,119 @@ URLs accept an absolute pathname or a same-origin HTTP(S) URL; queries and fragm
 `/collections/featured` and `/collections-sale`, while `/` selects every path in the current Worker entrypoint.
 No automatic page tags are needed. Cross-origin URLs and embedded credentials are rejected; explicit resource tags remain scoped to the request host.
 
+For global changes, call `purgeCache()` from the same export. It requires native `cache.purge()`
+and removes every cached response in the Worker entrypoint, across its hosts. The next request is a
+cold miss. Authorize this operation independently; provider failures throw.
+
+## Revalidate on WordPress changes
+
+Update Kizlo core before the WooCommerce extension, then deploy both event-producing plugin updates before enabling `revalidator()`. The WooCommerce extension refuses to start against core versions missing the dependency APIs.
+It uses the existing signed `/webhooks` route and never makes a response cacheable:
+
+```ts title="src/lib/kizlo/server/revalidation.ts"
+import { revalidator } from "kizlo/tanstack-start/cloudflare"
+
+export const tags = {
+  product: (id: number) => `product:${id}`,
+  category: (id: number) => `category:${id}`,
+}
+
+export const contentRevalidation = revalidator({
+  postTypes: {
+    product: {
+      resourceTag: tags.product,
+      collectionTags: ({ affected_terms }) =>
+        (affected_terms.product_cat ?? []).map(tags.category),
+    },
+  },
+  taxonomies: { product_cat: { resourceTag: tags.category } },
+  settings: "purge",
+})
+```
+
+Put `contentRevalidation` alongside `tanstackStart()` and `cloudflare()` in `integrations`.
+Mount the webhook on the configured public origin and the **same cache-owning Worker entrypoint**
+as the cached pages. Origin mismatch fails; matching origins alone cannot prove entrypoint ownership.
+`settings: "purge"` handles every supported settings event with a full Worker cache purge. Use this
+boundary for URL structures, branding and other global configuration instead of calculating affected content.
+Existing per-event settings callbacks remain available when you deliberately want selected tags.
+
+### Choose dependencies for each response
+
+Reuse your tag functions in `createCdnHeaders`. Build tags from existing taxonomy fields and term IDs.
+For a WooCommerce product, use `product.categories`, `product.tags`, `product.brands` and global
+attribute terms. Managed WordPress post-type responses retain their taxonomy ID arrays.
+
+```ts
+createCdnHeaders({
+  maxAge: "1 hour",
+  tags: [tags.product(product.id), ...product.categories.map(({ id }) => tags.category(id))],
+})
+```
+
+Put the product's own tag first. Term-change events include affected descendants, so changing a
+parent URL reaches responses tagged with child terms without changing product assignments. Add other
+resource tags when the response separately loads their data.
+
+- **Product detail:** tag its product ID and the assigned terms it renders. Product-local attribute options are not shared terms.
+- **Category listing:** tag its category ID even when empty. Pagination, search, filters, sort and counts declare their collection scope independently of the returned product IDs and retain distinct cache keys.
+- **Shared category tags:** moving a product from A to B invalidates its product tag and configured A/B scopes. Renaming a category reaches every response carrying that category tag without enumerating products. Use a separate `category-products:id` tag only when you want narrower collection invalidation.
+- **Custom content:** configure actual post-type/taxonomy slugs with the same callbacks. For example, a dedicated `policy` post type can invalidate `policy:id` without invalidating unrelated policies.
+
+### Understand supported change signals
+
+| Change | Signal and capture boundary |
+| --- | --- |
+| Publish or published edit | `post.created` / `post.updated`, `wp_after_insert_post`, finalized after late REST enrichment |
+| Unpublish, trash or delete | `transition_post_status`, `trashed_post`, `before_delete_post` / `deleted_post` with retained identity |
+| Assign or remove terms | `set_object_terms`, `delete_term_relationships` / `deleted_term_relationships` with previous/current ancestry |
+| Rename, reparent or delete a term | `edit_terms` / `saved_term`, `pre_delete_term` / `delete_term`, with previous/current subtree and ancestry; `edit_term_taxonomies` / `edited_term_taxonomies` also capture children reparented by deletion |
+| Exposed metadata, Kizlo custom fields and SEO | `added_*_meta`, `updated_*_meta`, `deleted_*_meta`, filtered to exposed fields |
+| Product/variation writes | `woocommerce_after_{product,product_variation}_object_save`, before/after delete and variation trash hooks |
+| Global attribute definitions | `woocommerce_attribute_added`, `woocommerce_attribute_updated`, `woocommerce_attribute_deleted`; indexed settings event with old/new `pa_*` keys |
+
+No dedicated stock listener or stock-only suppression is installed. Ordinary watched content events
+still run; use TTL or a separate request for stock-only writes, including stock-dependent counts and
+filters. Direct SQL, arbitrary plugin tables and writes bypassing these hooks need their own event integration.
+Variation reparenting invalidates both parent resources; WooCommerce remains responsible for synchronizing
+its own product children and lookup data before a fresh response reads them.
+
+Configured post/term rules require a complete `affected_terms` map. Missing or unknown dependency
+history returns 422; unconfigured types remain ignored. The map is an affected union, not the current
+assignments or a before/after snapshot. Invalid callback outputs fail before provider calls; invalidation
+submits every selected tag in sequential batches of at most 100 and fails acknowledgement on rejection.
+
+### Keep dependency headers within the budget
+
+Response tags retain caller order after deduplication. The wrapper keeps the longest whole-tag prefix
+within 1,000 tags and 16,384 encoded bytes, including commas. The unchanged host-scoped SHA-256 format
+(`kizlo:t:` plus 64 hexadecimal characters) fits **224** unique tags. Overflow logs
+`KIZLO_CDN_TAGS_TRIMMED` with the pathname, counts and budgets; malformed individual tags still error.
+
+<Callout>
+  Trimming preserves your exact cache policy. A change targeting only a dropped dependency can remain
+  stale until the normal refresh policy or another retained tag refreshes it. Put essential dependencies
+  first. Event maps and invalidation batches are never trimmed to this response budget.
+</Callout>
+
+### Operate delivery and check freshness
+
+See [webhook delivery and recovery](/docs/php/functions/emit-event#delivery-and-recovery) for retries,
+native delivery records, manual replay and WP-Cron setup. A successful acknowledgement means every required
+handler and provider batch accepted its work. It does not prove that a cached response existed or that
+all locations immediately show fresh content. Custom handlers may run again and must be idempotent.
+
+Native invalidation marks responses stale under their stored TTL/SWR/stale-on-error policy. A render
+or cache fill already in flight can cross invalidation; no generation fence or atomic worldwide replacement
+is provided. Check that race and host/entrypoint isolation on your deployed preview, including Start's
+actual cached representations. Local provider mocks do not establish native behavior.
+
 ## Migrate and verify
 
 Move React runtime imports to `kizlo/tanstack-start/react/server` and Cloudflare imports to
-`kizlo/tanstack-start/react/cloudflare`. Shared browser, metadata and structural route helpers remain
+`kizlo/tanstack-start/cloudflare`. Shared browser, metadata and structural route helpers remain
 on `kizlo/tanstack-start` and `kizlo/tanstack-start/server`; these entries do not require React.
-Replace `kizlo/cloudflare` and `kizlo/cloudflare/vinext` imports with the React Start Cloudflare entry point.
+Replace the removed `kizlo/tanstack-start/react/cloudflare` import with `kizlo/tanstack-start/cloudflare`; no alias is provided. The shared provider has no runtime React dependency.
 Remove Vinext configuration and compatibility patches. Keep existing stored resources until their
 retirement is authorized. Use `geoCloudflare()` only behind trusted ingress that prevents forged
 `CF-Connecting-IP` headers; it validates syntax, not the sender.

@@ -26,7 +26,7 @@ export default defineConfig({
 		"tanstack-start": "src/integrations/tanstack-start/index.ts",
 		"tanstack-start/server": "src/integrations/tanstack-start/server.ts",
 		"tanstack-start/react/server": "src/integrations/tanstack-start/react/server.ts",
-		"tanstack-start/react/cloudflare": "src/integrations/tanstack-start/react/cloudflare.ts",
+		"tanstack-start/cloudflare": "src/integrations/tanstack-start/cloudflare.ts",
 	},
 	copy: [{ from: "src/cli/wp/compose", to: "dist/cli/wp/compose" }],
 	dts: { tsconfig: "tsconfig.build.json" },

@@ -1,12 +1,12 @@
-import { cloudflareConnInfo } from "../../../adapters/cloudflare-connection"
-import type { GeoAdapter } from "../../../adapters/geo"
-import { FRAMEWORK_INTEGRATION_ORDER } from "../../../shared/constants"
-import { createIntegration } from "../../../shared/integration"
+import { cloudflareConnInfo } from "../../adapters/cloudflare-connection"
+import type { GeoAdapter } from "../../adapters/geo"
+import { FRAMEWORK_INTEGRATION_ORDER } from "../../shared/constants"
+import { createIntegration } from "../../shared/integration"
 import { applyCloudflareHeaders, type CloudflareCacheBinding } from "./cloudflare/cache"
 import { getStartRequestContext } from "./request-context"
 
 export type { CdnHeadersOptions, CloudflareCacheBinding, CloudflareCacheResult } from "./cloudflare/cache"
-export { createCdnHeaders, revalidateTag, revalidateUrl } from "./cloudflare/cache"
+export { createCdnHeaders, purgeCache, revalidateTag, revalidateUrl } from "./cloudflare/cache"
 
 interface ExecutionContext {
 	cache?: CloudflareCacheBinding
@@ -37,3 +37,12 @@ export function withCloudflare<Env, Context extends ExecutionContext = Execution
 		},
 	}
 }
+export type {
+	RevalidationPostData,
+	RevalidationPostRule,
+	RevalidationSettingsEvent,
+	RevalidationTaxonomyRule,
+	RevalidationTermData,
+	RevalidatorOptions,
+} from "./cloudflare/revalidator"
+export { revalidator } from "./cloudflare/revalidator"

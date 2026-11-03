@@ -7,10 +7,11 @@ import {
 	cloudflare,
 	createCdnHeaders,
 	geoCloudflare,
+	purgeCache,
 	revalidateTag,
 	revalidateUrl,
 	withCloudflare,
-} from "./cloudflare"
+} from "../cloudflare"
 import { tanstackStart } from "./integration"
 
 const native = await vi.hoisted(async () => {
@@ -22,16 +23,18 @@ const native = await vi.hoisted(async () => {
 		deleteCookie: vi.fn(),
 	}
 })
-vi.mock("@tanstack/react-start", async (original) => ({
-	...(await original<typeof import("@tanstack/react-start")>()),
+vi.mock("@tanstack/start-client-core", async (original) => ({
+	...(await original<typeof import("@tanstack/start-client-core")>()),
 	getGlobalStartContext: () => native.storage.getStore()?.values,
 }))
-vi.mock("@tanstack/react-start/server", () => ({
+vi.mock("@tanstack/start-server-core/request-response", () => ({
 	getRequest: () => {
 		const request = native.storage.getStore()?.request
 		if (!request) throw new Error("No native Start request")
 		return request
 	},
+}))
+vi.mock("@tanstack/react-start/server", () => ({
 	getCookies: native.getCookies,
 	setCookie: native.setCookie,
 	deleteCookie: native.deleteCookie,
@@ -54,6 +57,7 @@ const request = (path = "/product/shirt", init?: RequestInit) => new Request(`ht
 const publicPage = () => new Response("page", { headers: createCdnHeaders({ maxAge: "1 hour", tags: ["product:23"] }) })
 const binding = () => ({
 	invalidate: vi.fn<NonNullable<CloudflareCacheBinding["invalidate"]>>(async () => ({ success: true })),
+	purge: vi.fn<NonNullable<CloudflareCacheBinding["purge"]>>(async () => ({ success: true })),
 })
 const tags = (response: Response) => response.headers.get("Cache-Tag")?.split(",") ?? []
 
@@ -287,4 +291,79 @@ test("reports missing cache capabilities and provider failures without falling b
 		},
 		cache,
 	)
+})
+
+test("purges the Worker cache and reports unsupported runtimes and provider failures", async () => {
+	const cache = binding()
+	await invoke(
+		request(),
+		async () => {
+			await purgeCache()
+			expect(cache.purge).toHaveBeenCalledExactlyOnceWith({ purgeEverything: true })
+			expect(cache.invalidate).not.toHaveBeenCalled()
+			cache.purge.mockResolvedValueOnce({ success: false, errors: [{ code: 1134, message: "rate limited" }] })
+			await expect(purgeCache()).rejects.toThrow("1134: rate limited")
+			cache.purge.mockRejectedValueOnce(new Error("network failure"))
+			await expect(purgeCache()).rejects.toThrow("network failure")
+			return new Response(null)
+		},
+		cache,
+	)
+	await invoke(
+		request(),
+		async () => {
+			await expect(purgeCache()).rejects.toThrow("cache.purge()")
+			return new Response(null)
+		},
+		{ invalidate: cache.invalidate },
+	)
+	await expect(purgeCache()).rejects.toThrow("TanStack Start request")
+})
+
+test.each([224, 225, 1001])("retains a whole encoded prefix for %i dependencies without changing policy", async (count) => {
+	const warning = vi.spyOn(console, "warn").mockImplementation(() => {})
+	const authored = Array.from({ length: count }, (_, id) => `term:${id}`)
+	const response = await invoke(
+		request("/large?secret=hidden"),
+		() =>
+			new Response("stream", {
+				status: 201,
+				headers: {
+					...createCdnHeaders({ maxAge: 12, staleWhileRevalidate: 34, staleIfError: 56, tags: [...authored, "term:0"] }),
+					Vary: "Accept",
+				},
+			}),
+	)
+	expect(tags(response)).toHaveLength(Math.min(count, 224))
+	expect(response.headers.get("Cache-Tag")?.length).toBeLessThanOrEqual(16384)
+	expect(response.headers.get("Cloudflare-CDN-Cache-Control")).toBe("public, max-age=12, stale-while-revalidate=34, stale-if-error=56")
+	expect(response.headers.get("Vary")).toBe("Accept")
+	expect(response.status).toBe(201)
+	expect(await response.text()).toBe("stream")
+	if (count > 224)
+		expect(warning).toHaveBeenCalledExactlyOnceWith({
+			code: "KIZLO_CDN_TAGS_TRIMMED",
+			pathname: "/large",
+			requested: count,
+			retained: 224,
+			dropped: count - 224,
+			maxBytes: 16384,
+			maxTags: 1000,
+		})
+	else expect(warning).not.toHaveBeenCalled()
+	warning.mockRestore()
+})
+
+test("validates beyond the retained prefix and trims manual headers in caller order", async () => {
+	const authored = Array.from({ length: 225 }, (_, id) => `tag:${id}`)
+	expect(() => createCdnHeaders({ maxAge: 1, tags: [...authored, "bad tag"] })).toThrow()
+	const warning = vi.spyOn(console, "warn").mockImplementation(() => {})
+	const response = await invoke(
+		request(),
+		() => new Response(null, { headers: { "Cache-Tag": authored.join(","), "Cache-Control": "public, max-age=90" } }),
+	)
+	const first = await invoke(request(), () => new Response(null, { headers: createCdnHeaders({ maxAge: 90, tags: ["tag:0"] }) }))
+	expect(tags(response)[0]).toBe(tags(first)[0])
+	expect(response.headers.get("Cache-Control")).toBe("public, max-age=90")
+	warning.mockRestore()
 })

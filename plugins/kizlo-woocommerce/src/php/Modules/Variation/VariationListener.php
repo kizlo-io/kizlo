@@ -2,71 +2,91 @@
 
 namespace Kizlo\WooCommerce\Modules\Variation;
 
+use Kizlo\Modules\Post\ContentChanges;
 use Kizlo\Modules\Webhook\Webhook;
+use WC_Product;
 
-/**
- * Emits a Kizlo "post updated" webhook for WC product variations changing via
- * the admin's ajax endpoints. Listens to the variation-modification actions WC
- * fires from the product editor and resolves the parent product id from the
- * incoming $_POST shape.
- */
+/** Persisted data-store hooks also cover API, scheduled and programmatic writes. */
 class VariationListener
 {
-    private const ACTIONS = [
-        'woocommerce_save_attributes',
-        'woocommerce_save_variations',
-        'woocommerce_remove_variations',
-        'woocommerce_add_variation',
-        'woocommerce_bulk_edit_variations',
-        'woocommerce_delete_variations',
-        'woocommerce_link_all_variations',
-    ];
+    private array $parents = [];
+    private array $deletions = [];
 
     public function register(): void
     {
-        foreach (self::ACTIONS as $action) {
-            add_action("wp_ajax_{$action}", [$this, 'onVariationChanged']);
+        foreach (['product', 'product_variation'] as $kind) {
+            add_action("woocommerce_before_{$kind}_object_save", [$this, 'capture'], 10, 1);
+            add_action("woocommerce_after_{$kind}_object_save", [$this, 'saved'], PHP_INT_MAX, 1);
+            add_action("woocommerce_before_delete_{$kind}", [$this, 'beforeDelete']);
+            add_action("woocommerce_delete_{$kind}", [$this, 'deleted'], PHP_INT_MAX);
+        }
+        add_action('woocommerce_trash_product_variation', [$this, 'trashed']);
+        add_action('woocommerce_attribute_added', [$this, 'attributeAdded'], PHP_INT_MAX, 2);
+        add_action('woocommerce_attribute_updated', [$this, 'attributeUpdated'], PHP_INT_MAX, 3);
+        add_action('woocommerce_attribute_deleted', [$this, 'attributeDeleted'], PHP_INT_MAX, 3);
+    }
+
+    public function capture(WC_Product $product): void
+    {
+        $id = $product->get_id();
+        $old = $id ? get_post($id) : null;
+        $parents = $product->is_type('variation') ? array_filter([$old?->post_parent, $product->get_parent_id()]) : [$id];
+        foreach (array_unique($parents) as $parent) {
+            ContentChanges::capturePost((int) $parent);
+            $this->parents[spl_object_id($product)][] = (int) $parent;
         }
     }
 
-    public function onVariationChanged(): void
+    public function saved(WC_Product $product): void
     {
-        $post_id = 0;
-
-        if (empty($_POST)) return;
-
-        // 1. Direct post_id (most consistent)
-        if (!empty($_POST['post_id'])) {
-            $post_id = (int) $_POST['post_id'];
+        $parents = $this->parents[spl_object_id($product)] ?? [];
+        $parents[] = $product->is_type('variation') ? $product->get_parent_id() : $product->get_id();
+        foreach (array_unique(array_filter($parents)) as $id) {
+            $post = get_post($id);
+            if ($post) ContentChanges::post($post);
         }
+        unset($this->parents[spl_object_id($product)]);
+        if (!wp_is_serving_rest_request() && !wp_doing_ajax()) ContentChanges::flush();
+    }
 
-        // 2. product_id (used in some actions)
-        if (!empty($_POST['product_id'])) {
-            $post_id = (int) $_POST['product_id'];
-        }
+    public function beforeDelete(int $id): void
+    {
+        $post = get_post($id);
+        if (!$post || $post->post_type !== 'product_variation') return;
+        $this->deletions[$id] = (int) $post->post_parent;
+        ContentChanges::capturePost((int) $post->post_parent);
+    }
 
-        // 3. variation_ids → resolve parent (remove_variations)
-        if (!empty($_POST['variation_ids'])) {
-            $variation_id = (int) $_POST['variation_ids'][0];
-            $post_id = (int) wp_get_post_parent_id($variation_id);
-        }
+    public function deleted(int $id): void
+    {
+        $parent = $this->deletions[$id] ?? null;
+        unset($this->deletions[$id]);
+        if (!$parent || get_post($id)) return;
+        $post = get_post($parent);
+        if ($post) ContentChanges::post($post);
+        if (!wp_is_serving_rest_request() && !wp_doing_ajax()) ContentChanges::flush();
+    }
 
-        // 4. variable_post_id (extra safety for save_variations)
-        if (!empty($_POST['variable_post_id'])) {
-            $variation_id = (int) $_POST['variable_post_id'][0];
-            $post_id = (int) wp_get_post_parent_id($variation_id);
-        }
+    public function trashed(int $id): void
+    {
+        $variation = get_post($id);
+        if (!$variation || $variation->post_status !== 'trash') return;
+        $parent = get_post($variation->post_parent);
+        if ($parent) ContentChanges::post($parent);
+    }
 
-        $post = get_post($post_id);
-        if (!$post) return;
+    public function attributeAdded(int $id, array $data): void
+    {
+        Webhook::sendEvent(Webhook::SETTINGS_TAXONOMY_UPDATED_EVENT, ['key' => wc_attribute_taxonomy_name($data['attribute_name'])]);
+    }
 
-        if ($post->post_status !== 'publish') {
-            return;
-        }
+    public function attributeUpdated(int $id, array $data, string $old): void
+    {
+        foreach (array_unique([$old, $data['attribute_name']]) as $name) Webhook::sendEvent(Webhook::SETTINGS_TAXONOMY_UPDATED_EVENT, ['key' => wc_attribute_taxonomy_name($name)]);
+    }
 
-        Webhook::sendEvent(Webhook::POST_UPDATED_EVENT, [
-            'post_id'   => $post_id,
-            'post_type' => 'product'
-        ]);
+    public function attributeDeleted(int $id, string $name, string $taxonomy): void
+    {
+        Webhook::sendEvent(Webhook::SETTINGS_TAXONOMY_UPDATED_EVENT, ['key' => $taxonomy]);
     }
 }

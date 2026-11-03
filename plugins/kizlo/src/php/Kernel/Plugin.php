@@ -38,6 +38,7 @@ class Plugin
      * @var array<int, class-string>
      */
     private array $modules = [
+        \Kizlo\Modules\Webhook\WebhookModule::class,
         ExtensionModule::class,
         AdminModule::class,
         SettingsModule::class,

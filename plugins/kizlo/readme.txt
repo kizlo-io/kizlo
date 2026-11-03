@@ -1,7 +1,7 @@
 === Kizlo ===
 Contributors: kizlo
 Tags: headless, woocommerce, seo
-Requires at least: 5.0
+Requires at least: 6.9
 Tested up to: 6.7
 Requires PHP: 8.2
 Stable tag: 0.19.0
