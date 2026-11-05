@@ -45,6 +45,23 @@ Set a product's Harmonized System code under **Product data → Shipping → HS 
 
 When an order line is created, the plugin stores the HS code on that line. `OrderItem.hsCode` therefore keeps the value used at order time even if the product is later edited or deleted. Orders created before this field was available return `null` instead of using the product's current value.
 
+## Barcode assignment and labels
+
+Use the existing **GTIN, UPC, EAN, or ISBN** field in each product or variation's inventory controls for its one active barcode value. Enter an existing barcode there, or choose a type, check **Generate barcode**, and save to fill an empty field. SKU stays independent. Configure supported formats and A4/thermal print defaults under **WooCommerce → Settings → Products → Barcodes**; changing the default never rewrites existing assignments.
+
+1. Select **Generate barcodes** from Products bulk actions. The confirmation modal shows how many selected products and variations will get a barcode and how many already have one. Confirm to fill missing values on the same page; existing numbers and types stay unchanged.
+2. Select **Regenerate barcodes** to deliberately replace existing numbers, including manufacturer identifiers. Confirm the warning in the modal on the current page. Printed labels need replacing after regeneration. Cancel makes no changes. Previous values are not active aliases; update integrations that use them.
+3. Select **Print barcode labels**, choose each item's count (zero omits it), and preview an A4 sheet or thermal labels. Batches allow 200 sellable items and 2,000 labels. Defaults are 50 × 30 mm labels, 10 mm A4 margins and 2 mm gaps. Wider formats such as Code 39 can require larger labels.
+4. Print at actual size / 100%, disable browser headers and footers, and match the printer paper size. Check a test sheet first. Each label includes the item name, symbol and readable value. Invalid check digits, incompatible types and layouts too small for readable bars or quiet zones are rejected.
+
+### Identifier stability and API access
+
+New numbers use a store-local sequence and check digit: EAN-13 uses prefix `04` plus ten padded sequence digits, UPC-A uses `4` plus ten digits, and EAN-8 uses `2` plus six digits. Code 128 and Code 39 encode the same numeric form as EAN-13. These are store-scoped restricted-circulation identifiers, not globally allocated GTINs. Exhausted formats fail without truncation. Regeneration assigns a different number; repeated or stale submissions cannot replace it again without a fresh confirmation.
+
+Authenticated WooCommerce REST v3 product and variation responses expose the active value in `global_unique_id`, with `_kizlo_barcode_type` in `meta_data` for the rendering enum (`ean13`, `upc_a`, `ean8`, `code128`, or `code39`). Barcode values preserve leading zeroes, remain stable across routine saves and reprints, and are cleared when products or variations are duplicated. Existing eight-digit values require an explicit printing type because length alone cannot distinguish EAN-8 from UPC-E. A draft installation using `_kizlo_barcode` must migrate compatible values unchanged to the native field before assignment; values that native validation would alter must be reviewed rather than silently stripped.
+
+Preview and printing do not assign identifiers or change inventory. The five print formats have scanner fixtures; physical A4/thermal prints still need iPhone and Android acceptance checks. Mobile POS, UPC-E/Code 93 printing and external lookup are outside this feature.
+
 ## Auth
 
 The companion plugin uses Kizlo core's administrator Application Password guard for identity-sensitive routes. Missing or invalid Application Password authentication returns `401`; valid non-administrator credentials return `403`.

@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add native product and variation barcode assignment, confirmed regeneration, format overrides, and bulk A4 or thermal label printing.

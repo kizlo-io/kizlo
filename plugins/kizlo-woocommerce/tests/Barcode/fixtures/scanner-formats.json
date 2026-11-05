@@ -1,0 +1,7 @@
+[
+	{ "type": "ean13", "scannerType": "ean13", "value": "0400000001234" },
+	{ "type": "upc_a", "scannerType": "upc_a", "value": "400000001234", "equivalentEan13": "0400000001234" },
+	{ "type": "ean8", "scannerType": "ean8", "value": "20001230" },
+	{ "type": "code128", "scannerType": "code128", "value": "0400000001234" },
+	{ "type": "code39", "scannerType": "code39", "value": "0400000001234" }
+]

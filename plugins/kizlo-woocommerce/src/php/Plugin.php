@@ -3,6 +3,7 @@
 namespace Kizlo\WooCommerce;
 
 use Kizlo\WooCommerce\Modules\Admin\AttributeSwatch;
+use Kizlo\WooCommerce\Modules\Barcode\BarcodeModule;
 use Kizlo\WooCommerce\Modules\Cart\CartModule;
 use Kizlo\WooCommerce\Modules\Checkout\CheckoutRedirectModule;
 use Kizlo\WooCommerce\Modules\Checkout\AdditionalFieldsModule;
@@ -30,6 +31,7 @@ class Plugin
         WooCommerceModule::class,
         ContractModule::class,
         ProductModule::class,
+        BarcodeModule::class,
         OrderModule::class,
         CustomerModule::class,
         TaxIdModule::class,
