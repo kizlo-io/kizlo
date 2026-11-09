@@ -469,6 +469,49 @@ importers:
 
   plugins/kizlo-cf7: {}
 
+  plugins/kizlo-pos:
+    dependencies:
+      react-router-dom:
+        specifier: ^7.14.1
+        version: 7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
+    devDependencies:
+      '@tooling/typescript':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      '@wordpress/api-fetch':
+        specifier: ^7.44.0
+        version: 7.48.1
+      '@wordpress/element':
+        specifier: ^6.44.0
+        version: 6.46.0
+      '@wordpress/scripts':
+        specifier: ^32.0.0
+        version: 32.4.1(@playwright/test@1.61.0)(@types/node@25.9.3)(@typescript-eslint/eslint-plugin@8.62.0(@typescript-eslint/parser@8.62.0(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/parser@8.62.0(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3))(babel-plugin-macros@3.1.0)(esbuild@0.28.1)(jiti@2.7.0)(lightningcss@1.33.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(stylelint-scss@6.14.0(stylelint@16.26.1(typescript@5.9.3)))(type-fest@4.41.0)(typescript@5.9.3)
+      jsdom:
+        specifier: ^26.1.0
+        version: 26.1.0
+      react:
+        specifier: catalog:react19
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:react19
+        version: 19.2.7(react@19.2.7)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@25.9.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.33.0)(sass@1.101.0)(terser@5.48.0)(yaml@2.9.0)
+
   plugins/kizlo-woocommerce:
     devDependencies:
       '@playwright/test':

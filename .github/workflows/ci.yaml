@@ -57,8 +57,8 @@ jobs:
       - name: Setup
         uses: ./tooling/gh-actions/setup
 
-      - name: Build packages
-        run: pnpm turbo --filter "./packages/*" build
+      - name: Build packages and POS assets
+        run: pnpm turbo --filter "./packages/*" --filter @kizlo/plugin-pos build
 
       - name: Boot + seed WordPress stack + run tests
         run: pnpm kizlo test
