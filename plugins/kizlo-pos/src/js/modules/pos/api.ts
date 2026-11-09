@@ -21,7 +21,10 @@ export function configureApi(data: Bootstrap): void {
 		try {
 			return await next(options)
 		} catch (error) {
-			window.dispatchEvent(new CustomEvent<ApiProblem>("kizlo-pos-api-error", { detail: apiProblem(error) }))
+			const problem = apiProblem(error)
+			if (!options.signal?.aborted && problem.action) {
+				window.dispatchEvent(new CustomEvent<ApiProblem>("kizlo-pos-api-error", { detail: problem }))
+			}
 			throw error
 		}
 	})

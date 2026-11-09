@@ -6,7 +6,7 @@ export type ScreenId = z.infer<typeof screenId>
 
 const bootstrapSchema = z.object({
 	version: z.string().min(1),
-	urls: z.object({ pos: url, wordpress: url, account: url, login: url, logout: url }),
+	urls: z.object({ pos: url, wordpress: url, account: url, settings: url, login: url, logout: url }),
 	restRoot: url,
 	nonce: z.string().min(1),
 	user: z.object({ id: z.number().int().positive(), name: z.string() }),

@@ -199,6 +199,7 @@ final class PosPageTest extends WP_UnitTestCase
         $this->assertSame(PosPage::url(), $logout['redirect_to']);
         $this->assertNotFalse(wp_verify_nonce($logout['_wpnonce'], 'log-out'));
         $this->assertSame(['id', 'name'], array_keys($data['user']));
+        $this->assertStringContainsString('page=wc-settings&tab=kizlo&section=pos', $data['urls']['settings']);
         $this->assertSame($id, $data['user']['id']);
         $this->assertNotFalse(wp_verify_nonce($data['nonce'], 'wp_rest'));
         $inline = Asset::inlineData($data);

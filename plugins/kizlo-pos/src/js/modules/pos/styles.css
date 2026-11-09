@@ -1,3 +1,44 @@
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css" source(none);
+@import "tw-animate-css";
+@source "../../components";
+@source ".";
+
+@layer base {
+	button,
+	input,
+	textarea {
+		border: 0 solid;
+	}
+}
+
+@theme inline {
+	--color-background: var(--pos-surface);
+	--color-foreground: var(--pos-text);
+	--color-primary: var(--pos-text);
+	--color-primary-foreground: var(--pos-inverse);
+	--color-secondary: var(--pos-active);
+	--color-secondary-foreground: var(--pos-text);
+	--color-accent: var(--pos-active);
+	--color-accent-foreground: var(--pos-text);
+	--color-muted: var(--pos-active);
+	--color-muted-foreground: var(--pos-muted);
+	--color-border: var(--pos-line);
+	--color-input: var(--pos-line);
+	--color-ring: var(--pos-text);
+	--color-destructive: #b91c1c;
+	--color-destructive-foreground: #fff;
+}
+
+:root {
+	--pos-bg: #f7f7f7;
+	--pos-surface: #fff;
+	--pos-text: #171717;
+	--pos-muted: #666;
+	--pos-line: #e5e5e5;
+	--pos-active: #eee;
+	--pos-inverse: #fff;
+}
 .kizlo-pos-document {
 	margin: 0;
 	padding: 0;
@@ -10,13 +51,6 @@
 	min-height: 100dvh;
 }
 .kizlo-pos-app {
-	--pos-bg: #f7f7f7;
-	--pos-surface: #fff;
-	--pos-text: #171717;
-	--pos-muted: #666;
-	--pos-line: #e5e5e5;
-	--pos-active: #eee;
-	--pos-inverse: #fff;
 	color-scheme: light;
 	background: var(--pos-bg);
 	color: var(--pos-text);
@@ -53,8 +87,7 @@
 	text-decoration: none;
 }
 .kizlo-pos-app button {
-	color: inherit;
-	font: inherit;
+	font-family: inherit;
 	cursor: pointer;
 }
 .kizlo-pos-app :focus-visible {
@@ -408,7 +441,6 @@
 	margin-bottom: 24px;
 	border-radius: 8px;
 }
-.pos-error button,
 .pos-error a {
 	display: inline-block;
 	padding: 10px 14px;
@@ -426,15 +458,6 @@
 	color: #171717;
 	background: #fff;
 	font: 16px / 1.6 sans-serif;
-}
-.pos-startup-error button {
-	min-height: 44px;
-	padding: 10px 16px;
-	background: #171717;
-	color: #fff;
-	border: 0;
-	border-radius: 6px;
-	cursor: pointer;
 }
 @media (min-width: 700px) and (max-width: 1099px) {
 	.pos-sidebar {
@@ -525,5 +548,269 @@
 	}
 	.pos-settings h2 {
 		font-size: 28px;
+	}
+}
+
+.pos-catalog {
+	flex: 1;
+}
+.pos-catalog-intro h2 {
+	font-size: clamp(24px, 3vw, 32px);
+	font-weight: 500;
+	letter-spacing: -1px;
+	margin: 8px 0 28px;
+}
+.pos-catalog-tools {
+	display: flex;
+	align-items: end;
+	gap: 12px;
+}
+.pos-search {
+	flex: 1;
+	max-width: 600px;
+}
+.kizlo-pos-app .pos-search > span {
+	display: block;
+	font-size: 12px;
+	margin-bottom: 8px;
+	color: var(--pos-muted);
+}
+.pos-catalog-count {
+	font-size: 12px;
+	color: var(--pos-muted);
+	padding: 22px 0 16px;
+}
+.pos-product-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 205px), 1fr));
+	gap: 20px;
+}
+.pos-product-card {
+	border: 1px solid var(--pos-line);
+	border-radius: 12px;
+	overflow: hidden;
+	background: var(--pos-surface);
+	display: flex;
+	flex-direction: column;
+}
+.pos-product-card:hover {
+	border-color: var(--pos-muted);
+}
+.pos-product-image {
+	aspect-ratio: 1;
+	background: var(--pos-active);
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+}
+.pos-product-image img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+.kizlo-pos-app .pos-product-image > span {
+	display: grid;
+	justify-items: center;
+	gap: 10px;
+	font-size: 11px;
+	color: var(--pos-muted);
+}
+.pos-product-image svg {
+	width: 28px;
+	height: 28px;
+}
+.pos-product-info {
+	padding: 18px 18px 22px;
+	flex: 1;
+}
+.kizlo-pos-app .pos-product-info > span {
+	font-size: 10px;
+	color: var(--pos-muted);
+}
+.pos-product-info h3 {
+	margin: 8px 0;
+	font-size: 15px;
+	font-weight: 550;
+	overflow-wrap: anywhere;
+}
+.pos-product-info p {
+	font-size: 14px;
+}
+.pos-card-action {
+	border-top: 1px solid var(--pos-line);
+	padding: 12px 18px;
+	display: flex;
+	justify-content: space-between;
+	font-size: 11px;
+	color: var(--pos-muted);
+}
+.pos-load-more {
+	display: block;
+	margin: 28px auto 8px;
+}
+.pos-catalog-empty {
+	min-height: 280px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	border: 1px solid var(--pos-line);
+	border-radius: 12px;
+	padding: 24px;
+	background: var(--pos-surface);
+}
+.pos-catalog-empty h3 {
+	font-weight: 500;
+	margin-bottom: 8px;
+}
+.pos-catalog-empty p {
+	color: var(--pos-muted);
+	font-size: 13px;
+}
+.pos-product-dialog {
+	position: fixed;
+	inset: 0 0 0 auto;
+	margin: 0;
+	width: min(100%, 520px);
+	max-width: 100%;
+	height: 100dvh;
+	max-height: 100dvh;
+	padding: 24px 28px max(28px, env(safe-area-inset-bottom));
+	border: 0;
+	border-left: 1px solid var(--pos-line);
+	background: var(--pos-surface);
+	color: var(--pos-text);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.pos-detail-header {
+	padding-right: 48px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 24px;
+}
+.pos-product-dialog .pos-product-image {
+	border-radius: 12px;
+	max-height: 340px;
+	width: 100%;
+}
+.pos-detail-heading {
+	margin-top: 28px;
+}
+.pos-detail-heading h2 {
+	font-size: 27px;
+	line-height: 1.25;
+	font-weight: 500;
+	letter-spacing: -0.7px;
+	margin: 10px 0 14px;
+	overflow-wrap: anywhere;
+}
+.pos-detail-price {
+	font-size: 20px;
+}
+.pos-detail-meta {
+	margin: 24px 0;
+}
+.pos-detail-meta > div {
+	display: flex;
+	justify-content: space-between;
+	gap: 20px;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--pos-line);
+	font-size: 13px;
+}
+.pos-detail-meta dt {
+	color: var(--pos-muted);
+}
+.pos-detail-meta dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+.pos-variations {
+	margin: 28px 0;
+	padding: 16px;
+	border: 1px solid var(--pos-line);
+	border-radius: 8px;
+}
+.pos-variations legend {
+	font-size: 13px;
+	padding: 0 6px;
+}
+.pos-variations label {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 48px;
+	padding: 8px 0;
+	font-size: 13px;
+	cursor: pointer;
+}
+.pos-variations input {
+	accent-color: var(--pos-text);
+}
+.pos-variations small {
+	display: block;
+	color: var(--pos-muted);
+	margin-top: 3px;
+}
+.pos-description {
+	margin: 24px 0;
+}
+.pos-description h3 {
+	font-size: 14px;
+	font-weight: 550;
+}
+.pos-description p {
+	white-space: pre-line;
+	overflow-wrap: anywhere;
+	color: var(--pos-muted);
+	font-size: 14px;
+	line-height: 1.8;
+}
+.pos-detail-actions {
+	display: grid;
+	gap: 10px;
+	margin-top: 28px;
+}
+.pos-share-status,
+.pos-manual-link {
+	display: block;
+	font-size: 12px;
+	margin-top: 14px !important;
+	color: var(--pos-muted);
+}
+.pos-manual-link textarea {
+	min-height: 120px;
+	resize: vertical;
+}
+@media (max-width: 699px) {
+	.pos-product-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 12px;
+	}
+	.pos-product-info {
+		padding: 14px 12px;
+	}
+	.pos-product-info h3 {
+		font-size: 13px;
+	}
+	.pos-product-info p {
+		font-size: 12px;
+	}
+	.pos-card-action {
+		padding: 10px 12px;
+	}
+	.pos-catalog-tools {
+		flex-wrap: wrap;
+	}
+	.pos-search {
+		flex-basis: 100%;
+	}
+	.pos-product-dialog {
+		width: 100%;
+		padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
 	}
 }

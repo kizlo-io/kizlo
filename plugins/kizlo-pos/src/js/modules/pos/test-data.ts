@@ -6,6 +6,7 @@ export const data: Bootstrap = {
 		pos: "https://store.test/shop/pos/",
 		wordpress: "https://store.test/shop/",
 		account: "https://store.test/shop/wp-admin/profile.php",
+		settings: "https://store.test/shop/wp-admin/admin.php?page=wc-settings&tab=kizlo&section=pos",
 		login: "https://store.test/shop/wp-login.php?redirect_to=%2Fshop%2Fpos%2F",
 		logout: "https://store.test/shop/wp-login.php?action=logout",
 	},

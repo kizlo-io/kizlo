@@ -1,5 +1,5 @@
 {
 	"extends": "@tooling/typescript/base.json",
-	"compilerOptions": { "jsx": "react-jsx", "types": [] },
+	"compilerOptions": { "jsx": "react-jsx", "types": [], "paths": { "@/*": ["./src/js/*"] } },
 	"include": ["src/js/**/*"]
 }
