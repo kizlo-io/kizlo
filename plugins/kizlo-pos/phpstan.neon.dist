@@ -1,0 +1,15 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    phpVersion: 80200
+    dynamicConstantNames:
+        - KIZLO_POS_PATH
+        - KIZLO_POS_URL
+    paths:
+        - src/php
+    scanFiles:
+        - ../.stubs/kizlo-pos-constants.php
+        - ../.stubs/kizlo-api.php
+        - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php

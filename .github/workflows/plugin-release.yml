@@ -7,6 +7,7 @@ on:
       - 'kizlo-acf-v*'
       - 'kizlo-cf7-v*'
       - 'kizlo-woocommerce-v*'
+      - 'kizlo-pos-v*'
 
 permissions:
   contents: write

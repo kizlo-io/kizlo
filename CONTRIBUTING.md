@@ -65,7 +65,7 @@ CI doesn't build `web/` — the deployed site is built by Vercel on every PR.
 
 ```
 packages/   Published libraries (kizlo, @kizlo/*)
-plugins/    WordPress plugins (kizlo, kizlo-cf7, kizlo-woocommerce) — released by tag, not npm
+plugins/    WordPress plugins (kizlo, kizlo-cf7, kizlo-woocommerce, kizlo-pos) — released by tag, not npm
 tooling/    Internal config: TypeScript bases, GitHub Actions, WordPress dev stack
 web/        The kizlo.io site (a live Kizlo server; deployed by Vercel, not published)
 ```
@@ -183,7 +183,7 @@ The credentials artifact is anchored to the directory containing `kizlo.config.t
 so tests find it from any sub-directory with no configuration.
 
 The PHPUnit layer runs inside the container for every bind-mounted plugin that
-ships a `phpunit.xml`/`.dist` (today `kizlo` and `kizlo-woocommerce`), against an
+ships a `phpunit.xml`/`.dist` (today `kizlo`, `kizlo-woocommerce`, and `kizlo-pos`), against an
 isolated `wordpress_test` database that never touches the served WordPress data.
 Docker has to be running, and each plugin's Composer dev dependencies have to be
 installed so `vendor/bin/phpunit` exists (`pnpm install` does this when Composer
