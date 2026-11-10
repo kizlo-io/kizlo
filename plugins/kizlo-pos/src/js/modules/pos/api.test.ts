@@ -36,4 +36,17 @@ describe("POS API initialization", () => {
 		expect(apiProblem({ message: "Permission denied", data: { status: 403 } })).toEqual({ message: "Permission denied", action: null })
 		expect(apiProblem(null).message).toBe("The request failed. Please try again.")
 	})
+	it("keeps cancelled searches and ordinary request failures out of the session notice", async () => {
+		const dispatchEvent = vi.fn()
+		vi.stubGlobal("window", { dispatchEvent })
+		configureApi(data)
+		const middleware = fetchMock.use.mock.calls[2]?.[0]
+		const controller = new AbortController()
+		controller.abort()
+		await expect(
+			middleware({ signal: controller.signal }, () => Promise.reject(new DOMException("Aborted", "AbortError"))),
+		).rejects.toThrow()
+		await expect(middleware({}, () => Promise.reject(new Error("Product not found")))).rejects.toThrow("Product not found")
+		expect(dispatchEvent).not.toHaveBeenCalled()
+	})
 })

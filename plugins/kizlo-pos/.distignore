@@ -19,6 +19,8 @@ phpunit.xml.dist
 tsconfig.json
 vitest.config.ts
 webpack.config.js
+postcss.config.js
+components.json
 README.md
 .distignore
 build/modules/pos/index.js.map

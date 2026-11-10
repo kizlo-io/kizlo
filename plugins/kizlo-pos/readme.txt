@@ -13,8 +13,15 @@ A full-screen, responsive workspace for your WooCommerce store.
 == Description ==
 Open /pos/ on your WordPress site as an Administrator or Shop Manager.
 Products and Sell are primary destinations; Orders and Settings are secondary.
-This release provides navigation, account/store identity, and light/dark themes.
-Product browsing, order data, barcode scanning, and sales arrive in later updates.
+Browse and search published products by name or exact SKU/barcode, inspect
+variations, and share one main image with a caption built from a store-wide template.
+Configure caption tags in WooCommerce > Settings > Kizlo > POS. No public website
+is required. Text-only sharing and manual-copy fallbacks remain available. The
+responsive workspace includes account/store identity and light/dark themes. Order data, scanner capture,
+and sales arrive in later updates. Image sharing depends on browser/CORS support;
+images over 5 MiB are omitted. A variation's own main image takes precedence over
+the parent's main image. Browser limitations fall back to the caption alone.
+Products are not cached offline.
 
 == Installation ==
 1. Install and activate Kizlo 0.20.0 or newer and WooCommerce 11.0.1 or newer.

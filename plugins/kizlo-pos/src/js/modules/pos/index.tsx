@@ -1,5 +1,6 @@
 import { createRoot } from "@wordpress/element"
 import { HashRouter } from "react-router-dom"
+import { Button } from "@/components/ui/button"
 import App from "./App"
 import { configureApi } from "./api"
 import { readBootstrap } from "./bootstrap"
@@ -21,9 +22,9 @@ if (container) {
 			<main className="pos-startup-error" role="alert">
 				<h1>Kizlo POS could not start</h1>
 				<p>The initial store data is missing or invalid. Reload this page to try again.</p>
-				<button type="button" onClick={() => window.location.reload()}>
+				<Button type="button" onClick={() => window.location.reload()}>
 					Reload POS
-				</button>
+				</Button>
 			</main>,
 		)
 	}

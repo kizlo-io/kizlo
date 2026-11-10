@@ -3,6 +3,12 @@ import { MemoryRouter } from "react-router-dom"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import App, { ErrorNotice } from "./App"
 import { data } from "./test-data"
+
+vi.mock("./products-api", async (original) => ({
+	...(await original<typeof import("./products-api")>()),
+	getProducts: vi.fn(async () => ({ items: [], total: 0, page: 1, has_more: false })),
+}))
+
 import { readTheme, saveTheme, systemTheme } from "./theme"
 
 afterEach(() => vi.unstubAllGlobals())
@@ -29,10 +35,14 @@ describe("base navigation", () => {
 		expect(html).toContain('aria-label="Main navigation"')
 		expect(html).toContain('aria-label="Phone navigation"')
 		if (screen === "settings") {
+			expect(html).toContain("POS settings")
+			expect(html).toContain("tab=kizlo&amp;section=pos")
 			expect(html).toContain("Store Manager")
 			expect(html).toContain("Logging out ends your current WordPress session")
 		} else if (screen === "more") {
 			expect(html).toContain('aria-label="More destinations"')
+		} else if (screen === "products") {
+			expect(html).toContain("Search products")
 		} else {
 			expect(html).toContain("COMING NEXT")
 		}

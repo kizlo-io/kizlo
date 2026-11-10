@@ -6,6 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import App from "./App"
 import { data } from "./test-data"
 
+vi.mock("./products-api", async (original) => ({
+	...(await original<typeof import("./products-api")>()),
+	getProducts: vi.fn(async () => ({ items: [], total: 0, page: 1, has_more: false })),
+}))
+
 let root: Root
 let container: HTMLDivElement
 

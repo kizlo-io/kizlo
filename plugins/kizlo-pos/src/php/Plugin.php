@@ -15,6 +15,8 @@ final class Plugin
 
         kizlo_extension(KIZLO_POS_FILE, static function (): void {
             (new PosPage())->register();
+            (new \Kizlo\Pos\Modules\Product\ProductModule())->register();
+            (new \Kizlo\Pos\Modules\Settings\Settings())->register();
         });
     }
 

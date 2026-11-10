@@ -23,6 +23,7 @@ final class Asset
                 'pos' => PosPage::url(),
                 'wordpress' => home_url('/'),
                 'account' => get_edit_profile_url($user->ID),
+                'settings' => \Kizlo\Pos\Modules\Settings\Settings::url(),
                 'login' => wp_login_url(PosPage::url()),
                 'logout' => html_entity_decode(wp_logout_url(PosPage::url()), ENT_QUOTES, 'UTF-8'),
             ],

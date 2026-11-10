@@ -1,16 +1,19 @@
+import { QueryClientProvider } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom"
+import { Button } from "@/components/ui/button"
 import type { ApiProblem } from "./api"
 import type { Bootstrap } from "./bootstrap"
+import { ErrorNotice } from "./ErrorNotice"
 import { Icon } from "./Icon"
+import { Products } from "./Products"
+
+export { ErrorNotice } from "./ErrorNotice"
+
+import { createQueryClient } from "./query"
 import { useTheme } from "./theme"
 
 const placeholder = {
-	products: {
-		title: "Your catalog, within reach.",
-		description: "Product browsing, search, and sharing are coming next. Your store’s products will appear here.",
-		label: "Product catalog",
-	},
 	sell: {
 		title: "A space for your next sale.",
 		description:
@@ -71,6 +74,9 @@ export function Settings({ data }: { data: Bootstrap }) {
 				</div>
 			</dl>
 			<div className="pos-account-actions">
+				<a href={data.urls.settings}>
+					POS settings <Icon name="arrow" />
+				</a>
 				<a href={data.urls.account}>
 					WordPress account <Icon name="arrow" />
 				</a>
@@ -83,25 +89,23 @@ export function Settings({ data }: { data: Bootstrap }) {
 	)
 }
 
-export function ErrorNotice({ problem, loginUrl }: { problem: ApiProblem; loginUrl: string }) {
+export default function App({ data }: { data: Bootstrap }) {
+	const [client] = useState(createQueryClient)
 	return (
-		<div className="pos-error" role="alert">
-			<p>{problem.message}</p>
-			{problem.action === "reload" && (
-				<button type="button" onClick={() => window.location.reload()}>
-					Reload POS
-				</button>
-			)}
-			{problem.action === "login" && <a href={loginUrl}>Sign in to WordPress</a>}
-		</div>
+		<QueryClientProvider client={client}>
+			<Workspace data={data} />
+		</QueryClientProvider>
 	)
 }
 
-export default function App({ data }: { data: Bootstrap }) {
+function Workspace({ data }: { data: Bootstrap }) {
 	const [theme, toggleTheme] = useTheme()
 	const [problem, setProblem] = useState<ApiProblem | null>(null)
 	const location = useLocation()
-	const current = data.navigation.find((item) => location.pathname === `/${item.id}`) ?? { id: "products", label: "Products" }
+	const current = data.navigation.find((item) => location.pathname === `/${item.id}` || location.pathname.startsWith(`/${item.id}/`)) ?? {
+		id: "products",
+		label: "Products",
+	}
 	const title = location.pathname === "/more" ? "More" : current.label
 	const secondary = current.id === "orders" || current.id === "settings" || location.pathname === "/more"
 	useEffect(() => {
@@ -122,7 +126,7 @@ export default function App({ data }: { data: Bootstrap }) {
 	)
 	return (
 		<div className="kizlo-pos-app" data-theme={theme}>
-			<button
+			<Button
 				type="button"
 				className="pos-skip"
 				onClick={() => {
@@ -130,7 +134,7 @@ export default function App({ data }: { data: Bootstrap }) {
 				}}
 			>
 				Skip to content
-			</button>
+			</Button>
 			<aside className="pos-sidebar">
 				<a className="pos-brand" href={data.urls.pos} aria-label="Kizlo POS home">
 					<span className="pos-brand-mark">k</span>
@@ -167,20 +171,23 @@ export default function App({ data }: { data: Bootstrap }) {
 					</div>
 					<div className="pos-header-actions">
 						<span className="pos-session">Store workspace</span>
-						<button
+						<Button
 							type="button"
+							variant="ghost"
+							size="icon"
 							className="pos-theme-button"
 							onClick={toggleTheme}
 							aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
 						>
 							<Icon name={theme === "light" ? "moon" : "sun"} />
-						</button>
+						</Button>
 					</div>
 				</header>
 				<main id="pos-main" tabIndex={-1}>
 					{problem && <ErrorNotice problem={problem} loginUrl={data.urls.login} />}
 					<Routes>
-						{(["products", "sell", "orders"] as const).map((screen) => (
+						<Route path="/products/*" element={<Products theme={theme} onToggleTheme={toggleTheme} loginUrl={data.urls.login} />} />
+						{(["sell", "orders"] as const).map((screen) => (
 							<Route key={screen} path={`/${screen}`} element={<Placeholder screen={screen} />} />
 						))}
 						<Route path="/settings" element={<Settings data={data} />} />

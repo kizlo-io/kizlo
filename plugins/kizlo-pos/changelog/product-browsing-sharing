@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add product browsing with TanStack Query caching and background updates, shadcn/ui controls, exact SKU and barcode search, variation details, and single-image sharing with configurable caption templates under WooCommerce > Settings > Kizlo > POS.
