@@ -29,6 +29,7 @@ import { BrandSettingsPage } from "./general/brand"
 import { CrawlingSettingsPage } from "./general/crawling"
 import { IdentitySettingsPage } from "./general/identity"
 import { SiteSettingsPage } from "./general/site"
+import { WhatsAppSettingsPage } from "./integrations/whatsapp"
 import { PostTypeSettingsPage } from "./post-type"
 import { CreatePostTypePage, CreateTaxonomyPage } from "./registration/create"
 import { HeadlessSettingsPage } from "./system/headless"
@@ -59,6 +60,7 @@ export default function App() {
 				<Route path="/system/webhooks" element={<WebhookSettingsPage />} />
 				<Route path="/system/uploads" element={<UploadsSettingsPage />} />
 				<Route path="/system/headless" element={<HeadlessSettingsPage />} />
+				<Route path="/integrations/whatsapp" element={<WhatsAppSettingsPage />} />
 
 				<Route path="/preview" element={<ComponentGallery />} />
 

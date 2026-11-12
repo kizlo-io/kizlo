@@ -11,12 +11,16 @@ use WP_UnitTestCase;
 
 final class ProductTest extends WP_UnitTestCase
 {
+    private array $cookies;
+
     protected function setUp(): void
     {
         parent::setUp();
+        $this->cookies = $_COOKIE;
         \WC_Install::create_roles();
         wp_roles()->init_roles();
         wp_set_current_user(self::factory()->user->create(['role' => 'shop_manager']));
+        \Kizlo\Pos\Tests\Support\UnlockedSession::start();
         global $wp_rest_server;
         $wp_rest_server = null;
         (new ProductModule())->register();
@@ -26,6 +30,7 @@ final class ProductTest extends WP_UnitTestCase
     protected function tearDown(): void
     {
         wp_set_current_user(0);
+        $_COOKIE = $this->cookies;
         parent::tearDown();
     }
 
@@ -52,6 +57,7 @@ final class ProductTest extends WP_UnitTestCase
         $product = $this->product('Staff catalog');
         foreach (['administrator', 'shop_manager', 'customer', 'subscriber'] as $role) {
             wp_set_current_user(self::factory()->user->create(['role' => $role]));
+            if (in_array($role, ['administrator', 'shop_manager'])) \Kizlo\Pos\Tests\Support\UnlockedSession::start();
             $before = current_user_can('manage_options');
             $response = $this->request('/' . $product->get_id());
             $this->assertSame(in_array($role, ['administrator', 'shop_manager']) ? 200 : 403, $response->get_status());
@@ -134,6 +140,68 @@ final class ProductTest extends WP_UnitTestCase
         $this->assertSame(404, $this->request('/' . $parent->get_id() . '/variations')->get_status());
     }
 
+    public function test_stock_quantities_include_zero_and_distinguish_untracked_inventory(): void
+    {
+        update_option('woocommerce_manage_stock', 'yes');
+        $product = $this->product('Counted stock');
+        $product->set_manage_stock(true);
+        foreach ([12, 0, -2] as $quantity) {
+            $product->set_backorders('yes');
+            $product->set_stock_quantity($quantity);
+            $product->save();
+            $this->assertSame($quantity, $this->request('/' . $product->get_id())->get_data()['stock_quantity']);
+            $items = $this->request('', ['search' => 'Counted stock'])->get_data()['items'];
+            $this->assertSame($quantity, $items[0]['stock_quantity']);
+        }
+        $product->set_manage_stock(false);
+        $product->save();
+        $this->assertNull($this->request('/' . $product->get_id())->get_data()['stock_quantity']);
+    }
+
+    public function test_stock_quantity_is_hidden_when_inventory_management_is_disabled_globally(): void
+    {
+        $previous = get_option('woocommerce_manage_stock');
+        try {
+            update_option('woocommerce_manage_stock', 'yes');
+            $product = $this->product('Globally disabled stock');
+            $product->set_manage_stock(true);
+            $product->set_stock_quantity(12);
+            $product->save();
+            $this->assertSame(12, $this->request('/' . $product->get_id())->get_data()['stock_quantity']);
+            update_option('woocommerce_manage_stock', 'no');
+            $this->assertNull($this->request('/' . $product->get_id())->get_data()['stock_quantity']);
+            $items = $this->request('', ['search' => 'Globally disabled stock'])->get_data()['items'];
+            $this->assertNull($items[0]['stock_quantity']);
+            update_option('woocommerce_manage_stock', 'yes');
+            $this->assertSame(12, $this->request('/' . $product->get_id())->get_data()['stock_quantity']);
+        } finally {
+            update_option('woocommerce_manage_stock', $previous);
+        }
+    }
+
+    public function test_variations_expose_their_own_or_inherited_parent_stock_quantity(): void
+    {
+        $parent = new WC_Product_Variable();
+        update_option('woocommerce_manage_stock', 'yes');
+        $parent->set_name('Counted variations');
+        $parent->set_status('publish');
+        $parent->set_manage_stock(true);
+        $parent->set_stock_quantity(20);
+        $parent->save();
+        $variation = new WC_Product_Variation();
+        $variation->set_parent_id($parent->get_id());
+        $variation->set_status('publish');
+        $variation->set_regular_price('10');
+        $variation->save();
+        $this->assertSame(20, $this->request('/' . $variation->get_id())->get_data()['stock_quantity']);
+        $variation->set_manage_stock(true);
+        $variation->set_stock_quantity(4);
+        $variation->save();
+        $this->assertSame(4, $this->request('/' . $variation->get_id())->get_data()['stock_quantity']);
+        $items = $this->request('/' . $parent->get_id() . '/variations')->get_data()['items'];
+        $this->assertSame(4, $items[0]['stock_quantity']);
+    }
+
     public function test_zero_missing_sale_prices_stock_and_plain_description(): void
     {
         $product = $this->product('Price example');
@@ -188,6 +256,47 @@ final class ProductTest extends WP_UnitTestCase
         $child->set_description('Variation description');
         $child->save();
         $this->assertSame('Variation description', $this->request('/' . $child->get_id())->get_data()['description']);
+    }
+
+    public function test_category_and_brand_filters_cover_search_exact_matches_and_descendants(): void
+    {
+        $category = wp_insert_term('Clothing', 'product_cat')['term_id'];
+        $child = wp_insert_term('Jackets', 'product_cat', ['parent' => $category])['term_id'];
+        $brand = wp_insert_term('Outdoor', 'product_brand')['term_id'];
+        $matching = $this->product('Filter jacket', 'publish', 'FILTER-SKU');
+        wp_set_object_terms($matching->get_id(), [$child], 'product_cat');
+        wp_set_object_terms($matching->get_id(), [$brand], 'product_brand');
+        $other = $this->product('Filter other', 'publish', 'OTHER-SKU');
+        $query = ['category' => $category, 'brand' => $brand];
+        $data = $this->request('', $query)->get_data();
+        $this->assertSame([$matching->get_id()], array_column($data['items'], 'id'));
+        $this->assertSame(1, $data['total']);
+        $this->assertContains(['id' => $brand, 'name' => 'Outdoor'], $data['filters']['brands']);
+        $this->assertSame([$matching->get_id()], array_column($this->request('', $query + ['search' => 'FILTER-SKU'])->get_data()['items'], 'id'));
+        $this->assertSame([], $this->request('', $query + ['search' => 'OTHER-SKU'])->get_data()['items']);
+        $this->assertSame(400, $this->request('', ['category' => -1])->get_status());
+        $this->assertSame(400, $this->request('', ['brand' => 'invalid'])->get_status());
+        $this->assertSame([], $this->request('', ['category' => 99999999])->get_data()['items']);
+    }
+
+    public function test_cards_expose_real_attribute_options_and_regular_sale_price(): void
+    {
+        $product = $this->product('Cotton shirt');
+        $attribute = new \WC_Product_Attribute();
+        $attribute->set_name('Size');
+        $attribute->set_options(['Small', 'Large']);
+        $attribute->set_visible(true);
+        $hidden = new \WC_Product_Attribute();
+        $hidden->set_name('Internal');
+        $hidden->set_options(['Hidden']);
+        $hidden->set_visible(false);
+        $product->set_attributes([$attribute, $hidden]);
+        $product->set_sale_price('8');
+        $product->save();
+        $data = $this->request('/' . $product->get_id())->get_data();
+        $this->assertSame([['name' => 'Size', 'options' => ['Small', 'Large']]], $data['attributes']);
+        $this->assertStringContainsString('10.00', $data['regular_price']);
+        $this->assertStringContainsString('8.00', $data['price']);
     }
 
     public function test_bad_query_parameters_are_rejected(): void

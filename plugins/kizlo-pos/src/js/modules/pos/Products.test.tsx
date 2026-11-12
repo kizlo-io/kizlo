@@ -6,9 +6,11 @@ import { createRoot, type Root } from "react-dom/client"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import App from "./App"
+import { checkoutConfig, quoteSale, scanCart } from "./checkout-api"
 import { getProduct, getProducts, getVariations, type Product, type ProductCard } from "./products-api"
+import { securityRequest } from "./security-api"
 import * as sharing from "./share"
-import { data } from "./test-data"
+import { checkout, data } from "./test-data"
 
 vi.mock("./products-api", async (original) => ({
 	...(await original<typeof import("./products-api")>()),
@@ -17,7 +19,18 @@ vi.mock("./products-api", async (original) => ({
 	getVariations: vi.fn(),
 }))
 
-const card: ProductCard = { id: 1, name: "Canvas shoe", type: "simple", price: "$20.00", stock: "instock", image: null }
+vi.mock("./security-api", async (original) => ({ ...(await original<typeof import("./security-api")>()), securityRequest: vi.fn() }))
+
+const decoder = vi.hoisted(() => ({ decodeFromConstraints: vi.fn() }))
+vi.mock("./barcode-decoder", () => ({ createBarcodeReader: () => decoder }))
+vi.mock("./checkout-api", async (original) => ({
+	...(await original<typeof import("./checkout-api")>()),
+	scanCart: vi.fn(),
+	quoteSale: vi.fn(),
+	checkoutConfig: vi.fn(),
+}))
+
+const card: ProductCard = { id: 1, name: "Canvas shoe", type: "simple", price: "$20.00", stock: "instock", stock_quantity: 12, image: null }
 const detail: Product = {
 	...card,
 	description: "Everyday canvas",
@@ -36,9 +49,34 @@ beforeEach(() => {
 	focusManager.setFocused(true)
 	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
 	vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+	vi.mocked(checkoutConfig).mockResolvedValue(checkout)
+	vi.mocked(securityRequest).mockResolvedValue({
+		configured: true,
+		locked: false,
+		idle_minutes: 15,
+		has_passkey: false,
+		passkey_available: false,
+	})
+	vi.mocked(quoteSale).mockResolvedValue({
+		items: [],
+		total: "2000",
+		subtotal: "2000",
+		discount: "0",
+		tax: "0",
+		shipping_total: "0",
+		currency: "USD",
+		decimals: 2,
+		fingerprint: "preview",
+		sources: { billing: "store", shipping: "store" },
+		rates: [],
+		chosen_rates: [],
+		cash: true,
+		online: [],
+	})
 	vi.mocked(getProducts).mockResolvedValue(page([card]))
 	vi.mocked(getProduct).mockResolvedValue(detail)
 	vi.mocked(getVariations).mockResolvedValue(page([]))
+	decoder.decodeFromConstraints.mockResolvedValue({ stop: vi.fn() })
 	window.localStorage.clear()
 	host = document.createElement("div")
 	document.body.append(host)
@@ -55,15 +93,26 @@ afterEach(async () => {
 	notifyManager.setScheduler((callback) => setTimeout(callback, 0))
 })
 
-async function mount(route = "/products") {
+async function mount(route = "/sell", security = data.security) {
 	await act(async () =>
 		root.render(
 			<MemoryRouter initialEntries={[route]}>
-				<App data={data} />
+				<App data={{ ...data, security }} />
 			</MemoryRouter>,
 		),
 	)
 	await tick()
+}
+async function shareCard() {
+	if (host.querySelector(".pos-sell")?.getAttribute("data-view") !== "products") await click("Products")
+	const button = host.querySelector<HTMLButtonElement>('[aria-label="View Canvas shoe"]')
+	expect(button).not.toBeNull()
+	await act(async () => button?.click())
+}
+async function mountShare(variation = 0) {
+	if (variation) vi.mocked(getProducts).mockResolvedValue(page([{ ...card, type: "variable", matched_variations: [variation] }]))
+	await mount()
+	await shareCard()
 }
 async function tick(ms = 350) {
 	await act(async () => {
@@ -71,11 +120,16 @@ async function tick(ms = 350) {
 	})
 }
 async function click(text: string) {
-	const element = [...host.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>("button, a")].find((node) =>
-		node.textContent?.includes(text),
-	)
+	const element = [...host.querySelectorAll<HTMLElement>('button, a, [role="menuitem"]')].find((node) => node.textContent?.includes(text))
 	expect(element, text).toBeTruthy()
 	await act(async () => element?.click())
+}
+async function openUserMenu() {
+	await act(async () =>
+		host
+			.querySelector(".pos-staff-account")
+			?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })),
+	)
 }
 async function search(value: string) {
 	const input = host.querySelector<HTMLInputElement>('input[type="search"]') as HTMLInputElement
@@ -90,20 +144,208 @@ async function focus(value: boolean) {
 }
 
 describe("Products requests and navigation", () => {
-	it("keeps loaded pages across navigation without a refetch and resets them on explicit refresh", async () => {
+	it.each(["/sell", "/products"])("requires PIN setup before opening %s, then permits the sales workspace", async (route) => {
+		await mount(route, { configured: false, locked: true, idle_minutes: 15, has_passkey: false, passkey_available: false })
+		expect(host.querySelector(".pos-user-settings")).not.toBeNull()
+		expect(host.querySelector(".pos-catalog, .pos-sidebar, .pos-sale-cart, .pos-lock-screen")).toBeNull()
+		expect(getProducts).not.toHaveBeenCalled()
+		for (const [selector, value] of [
+			["#pos-new-pin", "012345"],
+			["#pos-confirm-pin", "012345"],
+			["#pos-security-proof", "wordpress-password"],
+		] as const) {
+			await act(async () => {
+				const input = host.querySelector<HTMLInputElement>(selector)
+				Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value)
+				input?.dispatchEvent(new Event("input", { bubbles: true }))
+			})
+		}
+		await act(async () => host.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })))
+		await tick()
+		expect(securityRequest).toHaveBeenCalledWith("/settings", {
+			new_pin: "012345",
+			confirm_pin: "012345",
+			password: "wordpress-password",
+			idle_minutes: 15,
+		})
+		expect(host.querySelector(".pos-catalog")).not.toBeNull()
+		expect(getProducts).toHaveBeenCalledOnce()
+	})
+	it.each(["/sell", "/products"])("switches between compact cards and rows on %s without refetching", async (route) => {
+		vi.mocked(getProducts).mockResolvedValue(
+			page([
+				{
+					...card,
+					image: { url: "https://cdn.example/shoe.jpg", alt: "Canvas shoe photo" },
+					regular_price: "$25.00",
+					attributes: [{ name: "Size", options: ["Small", "Large"] }],
+				},
+			]),
+		)
+		await mount(route)
+		const product = host.querySelector(".pos-product-card")
+		expect(product?.querySelector("img")?.getAttribute("src")).toBe("https://cdn.example/shoe.jpg")
+		expect(product?.querySelector("h3")?.textContent).toBe(card.name)
+		expect(product?.querySelector(".pos-product-price")?.textContent).toBe(card.price)
+		expect(product?.querySelector(".pos-product-stock")?.textContent).toBe("Stock: 12")
+		expect(product?.textContent).not.toMatch(/On sale|Small|Large|\$25/)
+		expect(product?.querySelector(".pos-product-share, .pos-add-icon, .pos-product-attribute")).toBeNull()
+		const toggle = host.querySelector<HTMLButtonElement>('[aria-label="Switch to list view"]')
+		expect(host.querySelector(".pos-search")?.nextElementSibling).toBe(toggle)
+		expect(host.querySelector(".pos-product-grid")?.getAttribute("data-layout")).toBe("cards")
+		await act(async () => toggle?.click())
+		expect(host.querySelector(".pos-product-grid")?.getAttribute("data-layout")).toBe("list")
+		expect(host.querySelector(".pos-product-card")).toBe(product)
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Switch to card view"]')?.click())
+		expect(host.querySelector(".pos-product-grid")?.getAttribute("data-layout")).toBe("cards")
+		expect(getProducts).toHaveBeenCalledOnce()
+	})
+	it("remembers the selected layout after reload and across product browsing", async () => {
+		await mount()
+		await act(async () => host.querySelector<HTMLButtonElement>(".pos-layout-toggle")?.click())
+		expect(localStorage.getItem("kizlo-pos:product-layout")).toBe("list")
+		await click("Products")
+		expect(host.querySelector(".pos-product-grid")?.getAttribute("data-layout")).toBe("list")
+		await act(async () => root.unmount())
+		root = createRoot(host)
+		await mount()
+		expect(host.querySelector(".pos-product-grid")?.getAttribute("data-layout")).toBe("list")
+	})
+	it("switches layouts when browser storage is blocked", async () => {
+		vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+			throw new Error("Blocked")
+		})
+		vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+			throw new Error("Blocked")
+		})
+		await mount()
+		await act(async () => host.querySelector<HTMLButtonElement>(".pos-layout-toggle")?.click())
+		expect(host.querySelector(".pos-product-grid")?.getAttribute("data-layout")).toBe("list")
+	})
+	it.each(["cards", "list"])("shows stock quantities and hides untracked stock in %s view", async (layout) => {
+		localStorage.setItem("kizlo-pos:product-layout", layout)
+		vi.mocked(getProducts).mockResolvedValue(
+			page([
+				card,
+				{ ...card, id: 2, name: "Unavailable shoe", stock: "outofstock", stock_quantity: 0 },
+				{ ...card, id: 3, name: "Backorder shoe", stock: "onbackorder", stock_quantity: -2 },
+				{ ...card, id: 4, name: "Variable shoe", type: "variable" },
+				{ ...card, id: 5, name: "Unpriced shoe", price: null, stock_quantity: null },
+			]),
+		)
+		await mount()
+		expect([...host.querySelectorAll(".pos-product-stock")].map((node) => node.textContent)).toEqual([
+			"Stock: 12",
+			"Stock: 0",
+			"Stock: -2",
+			"Stock: 12",
+		])
+		expect(host.querySelector('[aria-label="Add Unpriced shoe"] .pos-product-stock')).toBeNull()
+		expect(host.textContent).not.toContain("Stock not tracked")
+		expect(host.querySelector<HTMLButtonElement>('[aria-label="Add Unavailable shoe"]')?.disabled).toBe(true)
+		expect(host.querySelector<HTMLButtonElement>('[aria-label="Add Unpriced shoe"]')?.disabled).toBe(true)
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Add Canvas shoe"]')?.click())
+		expect(host.querySelector(".pos-sale-line")?.textContent).toContain("Canvas shoe")
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Choose options for Variable shoe"]')?.click())
+		expect(host.querySelector(".pos-product-dialog")).not.toBeNull()
+	})
+	it("browses and shares products without adding them and preserves the current sale between views", async () => {
+		await mount()
+		await click("Canvas shoe")
+		await click("Walk-in customer")
+		await act(async () => {
+			const input = host.querySelector<HTMLInputElement>("#pos-customer-first_name") as HTMLInputElement
+			Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, "Taylor")
+			input.dispatchEvent(new Event("input", { bubbles: true }))
+		})
+		await click("Save customer")
+		await click("Products")
+		expect(host.querySelector(".pos-sell")?.getAttribute("data-view")).toBe("products")
+		expect(host.querySelector('[aria-label="Add Canvas shoe"]')).toBeNull()
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="View Canvas shoe"]')?.click())
+		expect(host.querySelector(".pos-product-dialog")?.textContent).toContain("Share")
+		await click("Close")
+		await click("Home")
+		expect(host.querySelector(".pos-sell")?.getAttribute("data-view")).toBe("sell")
+		expect(host.querySelector<HTMLInputElement>('.pos-sale-cart input[type="number"]')?.value).toBe("1")
+		expect(host.querySelector(".pos-customer-summary strong")?.textContent).toBe("Taylor")
+		expect(host.querySelectorAll('.pos-sidebar button[aria-label="Scan barcode"]')).toHaveLength(1)
+		expect(host.querySelector(".pos-mobile-scan")).toBeNull()
+	})
+	it("opens the mobile cart as a separate step and preserves items when returning to products", async () => {
+		await mount()
+		expect(host.querySelector(".pos-mobile-continue")).toBeNull()
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Add Canvas shoe"]')?.click())
+		expect(host.querySelector(".pos-mobile-continue")?.textContent).toContain("1 item")
+		await click("Continue")
+		expect(host.querySelector(".pos-sell")?.getAttribute("data-mobile-cart")).toBe("true")
+		expect(document.activeElement?.textContent).toBe("Cart")
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Back to products"]')?.click())
+		expect(host.querySelector(".pos-sell")?.getAttribute("data-mobile-cart")).toBe("false")
+		expect(document.activeElement).toBe(host.querySelector(".pos-mobile-continue"))
+		await click("Continue")
+		expect(host.querySelectorAll(".pos-sale-line")).toHaveLength(1)
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Increase quantity of Canvas shoe"]')?.click())
+		expect(host.querySelector(".pos-mobile-continue")?.textContent).toContain("2 items")
+		await click("Clear")
+		expect(host.querySelector(".pos-mobile-continue")).toBeNull()
+		expect(host.querySelector(".pos-sell")?.getAttribute("data-mobile-cart")).toBe("false")
+		expect(document.activeElement?.id).toBe("pos-main")
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Add Canvas shoe"]')?.click())
+		expect(host.querySelector(".pos-sell")?.getAttribute("data-mobile-cart")).toBe("false")
+		await click("Continue")
+		await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Remove Canvas shoe"]')?.click())
+		expect(host.querySelector(".pos-mobile-continue")).toBeNull()
+		expect(host.querySelector(".pos-sell")?.getAttribute("data-mobile-cart")).toBe("false")
+		expect(document.activeElement?.id).toBe("pos-main")
+		await act(async () => host.querySelector<HTMLButtonElement>(".pos-sidebar-scan")?.click())
+		expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Scan a barcode")
+	})
+	it("shows spinners until the initial catalog and product details arrive", async () => {
+		let finishCatalog = (_value: ReturnType<typeof page>) => {}
+		let finishProduct = (_value: Product) => {}
+		vi.mocked(getProducts).mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					finishCatalog = resolve
+				}),
+		)
+		vi.mocked(getProduct).mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					finishProduct = resolve
+				}),
+		)
+		await mount()
+		expect(host.querySelector('[role="status"][aria-label="Loading products"]')).not.toBeNull()
+		expect(host.textContent).not.toContain("Loading products")
+		await act(async () => finishCatalog(page([card])))
+		await tick()
+		expect(host.querySelector('[aria-label="Loading products"]')).toBeNull()
+		await shareCard()
+		expect(host.querySelector('.pos-product-dialog [role="status"][aria-label="Loading product"]')).not.toBeNull()
+		expect(host.querySelector("#pos-detail-title")?.classList.contains("sr-only")).toBe(true)
+		expect(host.textContent).not.toContain("Loading product")
+		await act(async () => finishProduct(detail))
+		await tick()
+		expect(host.querySelector('[aria-label="Loading product"]')).toBeNull()
+		expect(host.querySelector("#pos-detail-title")?.textContent).toBe(card.name)
+	})
+	it("keeps loaded pages while opening and closing sharing, and resets them on refresh", async () => {
 		vi.mocked(getProducts)
 			.mockResolvedValueOnce(page([card], 1, true))
 			.mockResolvedValueOnce(page([{ ...card, id: 2, name: "Second shoe" }], 2))
 			.mockResolvedValue(page([{ ...card, name: "Updated shoe" }]))
 		await mount()
 		await click("Load more")
-		await click("Sell")
-		await tick(5 * 60 * 1000)
-		await click("Products")
+		await shareCard()
+		await tick(30 * 1000)
+		await click("Close")
 		expect(getProducts).toHaveBeenCalledTimes(2)
 		expect(host.querySelectorAll(".pos-product-card")).toHaveLength(2)
 		expect(host.textContent).toContain("Canvas shoe")
 		expect(host.textContent).not.toContain("Loading products")
+		await openUserMenu()
 		await click("Refresh")
 		expect(getProducts).toHaveBeenCalledTimes(3)
 		expect(getProducts).toHaveBeenLastCalledWith("", 1, expect.any(AbortSignal))
@@ -124,17 +366,16 @@ describe("Products requests and navigation", () => {
 		await focus(false)
 		await tick(2 * 60 * 1000)
 		expect(getProducts).toHaveBeenCalledTimes(3)
-		await click("Sell")
 		await focus(true)
 		await tick(60 * 1000)
-		expect(getProducts).toHaveBeenCalledTimes(3)
+		expect(getProducts).toHaveBeenCalledTimes(5)
 	})
 	it("retains product details during background failures, refreshes the caption on focus, and does not poll the share image", async () => {
 		vi.stubGlobal("navigator", { share: vi.fn(), canShare: () => true })
 		const image = { url: "https://cdn.example/main.png", alt: "" }
 		vi.mocked(getProduct).mockResolvedValue({ ...detail, image })
 		const prepare = vi.spyOn(sharing, "prepareImage").mockResolvedValue(new File(["main"], "main.png"))
-		await mount("/products/1")
+		await mountShare()
 		vi.mocked(getProduct).mockRejectedValueOnce(new Error("Offline"))
 		await tick(60 * 1000)
 		expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Canvas shoe")
@@ -160,7 +401,7 @@ describe("Products requests and navigation", () => {
 		expect(host.textContent).not.toContain("Refresh failed")
 	})
 	it.each([401, 403, 404])("blocks sharing cached details after a background access failure (%s)", async (status) => {
-		await mount("/products/1")
+		await mountShare()
 		vi.mocked(getProduct).mockRejectedValueOnce({ message: "Access denied", data: { status } })
 		await focus(false)
 		await focus(true)
@@ -172,7 +413,7 @@ describe("Products requests and navigation", () => {
 	it("retries a background variations refresh without advancing its page", async () => {
 		vi.mocked(getProduct).mockResolvedValue({ ...detail, type: "variable" })
 		vi.mocked(getVariations).mockResolvedValue(page([{ ...card, id: 2, name: "Small" }], 1, true))
-		await mount("/products/1")
+		await mountShare()
 		vi.mocked(getVariations).mockRejectedValueOnce(new Error("Variations refresh failed"))
 		await focus(false)
 		await focus(true)
@@ -182,20 +423,20 @@ describe("Products requests and navigation", () => {
 		expect(getVariations).toHaveBeenLastCalledWith(1, 1, expect.any(AbortSignal))
 		expect(host.textContent).not.toContain("Variations refresh failed")
 	})
-	it("closes the shadcn sheet with Escape and restores focus to the opening product", async () => {
+	it("closes the sharing modal with Escape and restores focus to its product", async () => {
 		await mount()
-		await click("Canvas shoe")
+		await shareCard()
 		expect(host.querySelector('[role="dialog"]')).not.toBeNull()
 		await act(async () => {
 			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
 		})
 		await tick(0)
 		expect(host.querySelector('[role="dialog"]')).toBeNull()
-		expect(document.activeElement).toBe(host.querySelector(".pos-product-card"))
+		expect(document.activeElement).toBe(host.querySelector(".pos-product-add"))
 	})
 	it("rejects a variation from a different parent and recovers to the requested product", async () => {
 		vi.mocked(getProduct).mockImplementation(async (id) => (id === 1 ? detail : { ...detail, id, parent_id: 99, name: "Wrong product" }))
-		await mount("/products/1?variation=2")
+		await mountShare(2)
 		expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Canvas shoe")
 		expect(host.textContent).toContain("This variation is no longer available")
 		expect(host.textContent).not.toContain("Wrong product")
@@ -208,7 +449,7 @@ describe("Products requests and navigation", () => {
 		vi.mocked(getVariations).mockImplementation(async (_id, number) =>
 			page([{ ...card, id: number + 1, name: number === 1 ? "Small" : "Large" }], number, number === 1),
 		)
-		await mount("/products/1?variation=2")
+		await mountShare(2)
 		await click("More variations")
 		expect(host.textContent).toContain("Large")
 		caption = "New caption"
@@ -230,7 +471,7 @@ describe("Products requests and navigation", () => {
 					finish = resolve
 				}),
 		)
-		await mount("/products/1")
+		await mountShare()
 		await click("Preparing image")
 		expect(share).not.toHaveBeenCalled()
 		await act(async () => finish(file))
@@ -247,7 +488,7 @@ describe("Products requests and navigation", () => {
 		const file = new File(["main"], "main.png")
 		vi.mocked(getProduct).mockResolvedValue({ ...detail, image: { url: "https://cdn.example/main.png", alt: "" } })
 		vi.spyOn(sharing, "prepareImage").mockResolvedValue(file)
-		await mount("/products/1")
+		await mountShare()
 		await click("Share product")
 		expect(share).toHaveBeenCalledExactlyOnceWith({ text: detail.share_text, files: [file] })
 		expect(host.textContent).toContain("Sharing failed")
@@ -258,7 +499,7 @@ describe("Products requests and navigation", () => {
 	it("offers selectable caption text when clipboard access is denied, without a website link", async () => {
 		vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("Denied")) } })
 		vi.mocked(getProduct).mockResolvedValue({ ...detail, url: null })
-		await mount("/products/1")
+		await mountShare()
 		expect([...host.querySelectorAll("button")].some((button) => button.textContent === "Copy caption")).toBe(false)
 		await click("Share product")
 		expect(host.querySelector<HTMLTextAreaElement>(".pos-manual-link textarea")?.value).toBe(detail.share_text)
@@ -278,7 +519,7 @@ describe("Products requests and navigation", () => {
 					finish = resolve
 				}),
 		)
-		await mount("/products/1")
+		await mountShare()
 		await click("Copy link")
 		await act(async () => host.querySelector<HTMLInputElement>('input[name="variation"][value="2"]')?.click())
 		await act(async () => finish("manual"))
@@ -290,7 +531,7 @@ describe("Products requests and navigation", () => {
 		vi.mocked(getProduct)
 			.mockRejectedValueOnce({ data: { status: 401 } })
 			.mockRejectedValueOnce({ code: "rest_cookie_invalid_nonce" })
-		await mount("/products/1")
+		await mountShare()
 		expect(host.querySelector<HTMLAnchorElement>('[role="dialog"] .pos-error a')?.href).toBe(data.urls.login)
 		await click("Try again")
 		expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Reload POS")
@@ -308,6 +549,7 @@ describe("Products requests and navigation", () => {
 			.mockResolvedValueOnce(page([{ ...card, name: "Refreshed shoe" }]))
 		await mount()
 		await click("Load more")
+		await openUserMenu()
 		await click("Refresh")
 		await tick()
 		expect(vi.mocked(getProducts).mock.calls[1]?.[2].aborted).toBe(true)
@@ -321,7 +563,7 @@ describe("Products requests and navigation", () => {
 			.mockResolvedValueOnce(page([{ ...card, id: 2, name: "Small" }], 1, true))
 			.mockRejectedValueOnce(new Error("Offline variations"))
 			.mockResolvedValueOnce(page([{ ...card, id: 3, name: "Large" }], 2))
-		await mount("/products/1")
+		await mountShare()
 		await click("More variations")
 		expect(host.textContent).toContain("Small")
 		expect(host.textContent).toContain("Offline variations")
@@ -350,7 +592,7 @@ describe("Products requests and navigation", () => {
 		vi.mocked(getProduct)
 			.mockResolvedValueOnce({ ...detail, image: { url: "https://cdn.example/old.png", alt: "Old" } })
 			.mockResolvedValue({ ...detail, image: { url: "https://cdn.example/new.png", alt: "New" }, share_text: "Updated caption" })
-		await mount("/products/1")
+		await mountShare()
 		expect(host.textContent).toContain("Preparing image")
 		await click("Refresh details")
 		await act(async () => resolveImage(new File(["old"], "old.png")))
@@ -372,6 +614,7 @@ describe("Products requests and navigation", () => {
 		await click("Try again")
 		await tick()
 		expect(host.textContent).toContain("Your catalog is empty")
+		await openUserMenu()
 		await click("Refresh")
 		await tick()
 		expect(host.textContent).toContain("Canvas shoe")
@@ -420,17 +663,18 @@ describe("Products requests and navigation", () => {
 		await mount()
 		await search("CANVAS")
 		await tick()
+		await openUserMenu()
+		await act(async () => host.querySelector<HTMLButtonElement>(".pos-theme-button")?.click())
+		await tick(0)
 		await click("Canvas shoe")
 		expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Small shoe")
 		expect(host.querySelector('[role="dialog"]')?.textContent).toContain("$0.00")
-		const theme = host.querySelector<HTMLButtonElement>('[role="dialog"] .pos-theme-button')
-		await act(async () => theme?.click())
 		expect(host.querySelector(".kizlo-pos-app")?.getAttribute("data-theme")).toBe("dark")
 		await click("Close")
 		await tick(0)
 		expect(host.querySelector('[role="dialog"]')).toBeNull()
 		expect(host.querySelector<HTMLInputElement>('input[type="search"]')?.value).toBe("CANVAS")
-		expect(document.activeElement).toBe(host.querySelector(".pos-product-card"))
+		expect(document.activeElement).toBe(host.querySelector(".pos-product-add"))
 	})
 	it("recovers a removed variation and offers a selectable URL when clipboard is denied", async () => {
 		vi.mocked(getProduct).mockImplementation(async (id) => {
@@ -441,7 +685,7 @@ describe("Products requests and navigation", () => {
 			configurable: true,
 			value: { writeText: vi.fn().mockRejectedValue(new Error("Denied")) },
 		})
-		await mount("/products/1?variation=2")
+		await mountShare(2)
 		expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Canvas shoe")
 		expect(host.textContent).toContain("This variation is no longer available")
 		await click("Copy link")
@@ -455,7 +699,7 @@ describe("Products requests and navigation", () => {
 			return { ...detail, id: 2, parent_id: 1, type: "variation", name: "Small shoe", share_text: "Small caption" }
 		})
 		vi.mocked(getVariations).mockImplementation(async () => page(available ? [{ ...card, id: 2, name: "Small shoe" }] : []))
-		await mount("/products/1?variation=2")
+		await mountShare(2)
 		expect(host.querySelector("#pos-detail-title")?.textContent).toBe("Small shoe")
 		available = false
 		await focus(false)
@@ -469,4 +713,160 @@ describe("Products requests and navigation", () => {
 		await act(async () => choice?.click())
 		expect(host.querySelector("#pos-detail-title")?.textContent).toBe("Small shoe")
 	})
+})
+
+it.each(["/products", "/sell"])("keeps camera scans on %s and adds only validated products to the current sale", async (route) => {
+	vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+	let capture: (result: { getText: () => string }) => void = () => {}
+	decoder.decodeFromConstraints.mockImplementation(async (_constraints, _video, callback) => {
+		capture = callback
+		return { stop: vi.fn() }
+	})
+
+	vi.mocked(checkoutConfig).mockResolvedValue({
+		fields: { first_name: false, last_name: false, email: false, phone: false, billing: false, shipping: false },
+		handoff: { device: true, send: true, default: "device" },
+		store_address: { country: "US" },
+		countries: {},
+		states: {},
+		address_fields: { billing: {}, shipping: {} },
+		channels: [],
+		currency: "USD",
+	})
+	vi.mocked(scanCart).mockResolvedValue({ id: 1, name: "Canvas shoe", quantity: 1 })
+	await mount(route)
+	await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Scan barcode"]')?.click())
+	await tick()
+	await act(async () => capture({ getText: () => "CANVAS" }))
+	expect(scanCart).toHaveBeenCalledWith("CANVAS", [])
+	expect(host.querySelector(".pos-camera")?.getAttribute("data-feedback")).toBe("success")
+	expect(host.querySelector(".pos-camera-feedback")?.textContent).toContain("Added Canvas shoe · quantity 1")
+	expect(host.querySelector(".pos-product-sheet")).toBeNull()
+	vi.mocked(scanCart).mockRejectedValue(new Error("No product matches this code."))
+	await act(async () => capture({ getText: () => "MISSING" }))
+	expect(scanCart).toHaveBeenLastCalledWith("MISSING", [{ id: 1, name: "Canvas shoe", quantity: 1 }])
+	expect(host.querySelector(".pos-camera")?.getAttribute("data-feedback")).toBe("error")
+	expect(host.querySelector(".pos-camera-feedback")?.textContent).toContain("No product matches")
+	await click("Done")
+	await tick()
+	expect(host.querySelector('.pos-sale-cart input[type="number"]')?.getAttribute("value")).toBe("1")
+})
+
+it("adds simple products directly from their card without opening product information", async () => {
+	await mount()
+	await click("Canvas shoe")
+	expect(host.querySelector('[role="dialog"]')).toBeNull()
+	expect(host.querySelector('.pos-sale-cart input[type="number"]')?.getAttribute("value")).toBe("1")
+	expect(getProduct).not.toHaveBeenCalled()
+	await click("Canvas shoe")
+	expect(host.querySelector('.pos-sale-cart input[type="number"]')?.getAttribute("value")).toBe("2")
+})
+it("opens a centered variation chooser and adds only the selected available variation", async () => {
+	vi.mocked(getProducts).mockResolvedValue(page([{ ...card, type: "variable" }]))
+	vi.mocked(getProduct).mockImplementation(async (id) =>
+		id === 1 ? { ...detail, type: "variable" } : { ...detail, id: 2, type: "variation", parent_id: 1, name: "Small shoe" },
+	)
+	vi.mocked(getVariations).mockResolvedValue(
+		page([
+			{ ...card, id: 2, name: "Small shoe", type: "variation" },
+			{ ...card, id: 3, name: "Sold out", type: "variation", stock: "outofstock" },
+		]),
+	)
+	await mount()
+	await click("Canvas shoe")
+	expect(host.querySelector('.pos-sale-cart input[type="number"]')).toBeNull()
+	const add = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((b) => b.textContent === "Add to sale")
+	expect(add?.disabled).toBe(true)
+	expect(host.querySelector<HTMLInputElement>('input[name="variation"][value="3"]')?.disabled).toBe(true)
+	await act(async () => host.querySelector<HTMLInputElement>('input[name="variation"][value="2"]')?.click())
+	expect(add?.disabled).toBe(false)
+	await act(async () => add?.click())
+	expect(host.querySelector('[role="dialog"]')).toBeNull()
+	expect(host.querySelector(".pos-sale-cart label")?.textContent).toBe("Small shoe")
+	expect(host.querySelector('.pos-sale-cart input[type="number"]')?.id).toBe("pos-quantity-2")
+})
+it("shares through product browsing without adding an item", async () => {
+	await mount()
+	await shareCard()
+	expect(host.querySelector('[role="dialog"]')?.textContent).toContain("Share caption")
+	expect(host.querySelector('[role="dialog"]')?.textContent).not.toContain("Add to sale")
+	expect(host.querySelector('.pos-sale-cart input[type="number"]')).toBeNull()
+})
+it("reports a full cart instead of silently dropping a product-card addition", async () => {
+	localStorage.setItem(
+		`kizlo-pos:cart:${data.restRoot}:${data.user.id}`,
+		JSON.stringify({
+			saleId: "bd21eb6c-186d-45b9-aac2-0d7b49dc8b80",
+			submitted: false,
+			items: Array.from({ length: 100 }, (_, i) => ({ id: i + 2, quantity: 1 })),
+		}),
+	)
+	await mount()
+	await click("Canvas shoe")
+	expect(host.querySelector('.pos-catalog [role="alert"]')?.textContent).toContain("100 different items")
+	expect(host.querySelectorAll(".pos-sale-line")).toHaveLength(100)
+})
+
+it("searches the full catalog and restarts paging without category or brand filters", async () => {
+	const filters = { categories: [{ id: 7, name: "Clothing" }], brands: [{ id: 9, name: "Outdoor" }] }
+	vi.mocked(getProducts).mockResolvedValue({ ...page([card], 1, true), filters })
+	await mount()
+	expect(host.querySelector('[aria-label="Product categories"]')).toBeNull()
+	expect(host.querySelector('[aria-label="Filter products"]')).toBeNull()
+	await click("Load more")
+	expect(getProducts).toHaveBeenLastCalledWith("", 2, expect.any(AbortSignal))
+	await search("canvas")
+	await tick()
+	expect(getProducts).toHaveBeenLastCalledWith("canvas", 1, expect.any(AbortSignal))
+})
+
+it("shows item images and prices in the order panel and supports quantity buttons and clearing", async () => {
+	await mount()
+	await click("Canvas shoe")
+	const panel = host.querySelector(".pos-sale-cart") as HTMLElement
+	expect(panel.querySelector(".pos-line-bottom strong")?.textContent).toBe(card.price)
+	const button = (name: string) => panel.querySelector<HTMLButtonElement>(`button[aria-label="${name} Canvas shoe"]`) as HTMLButtonElement
+	await act(async () => button("Increase quantity of").click())
+	expect(panel.querySelector<HTMLInputElement>("input[type=number]")?.value).toBe("2")
+	await act(async () => button("Decrease quantity of").click())
+	expect(panel.querySelector<HTMLInputElement>("input[type=number]")?.value).toBe("1")
+	expect(button("Decrease quantity of").disabled).toBe(true)
+	await click("Clear")
+	expect(panel.querySelectorAll(".pos-sale-line")).toHaveLength(0)
+})
+
+it("keeps scanning behind the header control so the catalog toolbar stays in one row", async () => {
+	await mount()
+	expect(host.querySelector("#pos-barcode")).toBeNull()
+	expect(host.querySelector(".pos-catalog-tools .pos-theme-button")).toBeNull()
+	await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Scan barcode"]')?.click())
+	expect(host.querySelector(".pos-camera video")).not.toBeNull()
+	expect(host.querySelector("#pos-barcode, .pos-scanner-dialog")).toBeNull()
+})
+
+it("retains the product dialog through its exit animation before releasing it and restoring focus", async () => {
+	vi.stubGlobal("CSS", { escape: (value: string) => value })
+	const computedStyle = window.getComputedStyle.bind(window)
+	vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) => {
+		const style = computedStyle(element, pseudo)
+		if (element.classList.contains("pos-product-dialog")) {
+			// jsdom snapshots computed styles; browsers expose live animation names during state changes.
+			Object.defineProperty(style, "animationName", {
+				get: () => (element.getAttribute("data-state") === "closed" ? "dialog-exit" : "dialog-enter"),
+			})
+		}
+		return style
+	})
+	await mount()
+	await shareCard()
+	await click("Close")
+	const closing = host.querySelector('.pos-product-dialog[data-state="closed"]')
+	expect(closing).not.toBeNull()
+	expect(closing?.textContent).toContain("Canvas shoe")
+	const animationEnd = new Event("animationend", { bubbles: true })
+	Object.defineProperty(animationEnd, "animationName", { value: "dialog-exit" })
+	await act(async () => closing?.dispatchEvent(animationEnd))
+	await tick(0)
+	expect(host.querySelector(".pos-product-dialog")).toBeNull()
+	expect(document.activeElement).toBe(host.querySelector(".pos-product-add"))
 })

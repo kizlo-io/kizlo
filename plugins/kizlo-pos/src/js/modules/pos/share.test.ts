@@ -8,6 +8,7 @@ const product: Product = {
 	type: "variation",
 	price: "$0.00",
 	stock: "outofstock",
+	stock_quantity: null,
 	sku: "small",
 	description: "Not in the payload",
 	image: null,

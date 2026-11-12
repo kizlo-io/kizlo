@@ -24,7 +24,7 @@ final class ProductModule
     {
         $page = ['type' => 'integer', 'minimum' => 1, 'maximum' => 1000000, 'default' => 1];
         foreach ([
-            '/products' => ['callback' => 'collection', 'args' => ['page' => $page, 'search' => ['type' => 'string', 'maxLength' => 200, 'default' => '']]],
+            '/products' => ['callback' => 'collection', 'args' => ['page' => $page, 'search' => ['type' => 'string', 'maxLength' => 200, 'default' => ''], 'category' => ['type' => 'integer', 'minimum' => 0, 'default' => 0], 'brand' => ['type' => 'integer', 'minimum' => 0, 'default' => 0]]],
             '/products/(?P<id>\d+)' => ['callback' => 'detail', 'args' => ['id' => ['type' => 'integer', 'minimum' => 1]]],
             '/products/(?P<id>\d+)/variations' => ['callback' => 'variations', 'args' => ['id' => ['type' => 'integer', 'minimum' => 1], 'page' => $page]],
         ] as $route => $options) {
@@ -40,6 +40,11 @@ final class ProductModule
     {
         if (!isset($vars['kizlo_pos_search'])) return $args;
         $args['has_password'] = false;
+        foreach (['category' => 'product_cat', 'brand' => 'product_brand'] as $key => $taxonomy) {
+            if (!empty($vars['kizlo_pos_' . $key])) {
+                $args['tax_query'][] = ['taxonomy' => $taxonomy, 'field' => 'term_id', 'terms' => [(int) $vars['kizlo_pos_' . $key]]];
+            }
+        }
         $args['orderby'] = ['title' => 'ASC', 'ID' => 'ASC'];
         if ($vars['kizlo_pos_search'] !== '') {
             $args['s'] = $vars['kizlo_pos_search'];
@@ -66,7 +71,7 @@ final class ProductModule
     private function validateQuery(WP_REST_Request $request): ?WP_Error
     {
         foreach (array_keys($request->get_query_params()) as $key) {
-            if (!in_array($key, ['search', 'page', '_locale', '_wpnonce', 'rest_route'], true)) {
+            if (!in_array($key, ['search', 'page', 'category', 'brand', '_locale', '_wpnonce', 'rest_route'], true)) {
                 return new WP_Error('rest_invalid_param', 'Unsupported product query parameter.', ['status' => 400]);
             }
         }
@@ -93,6 +98,7 @@ final class ProductModule
                 $product = wc_get_product($id);
                 if (!$this->visible($product)) continue;
                 $parent = $product->is_type('variation') ? wc_get_product($product->get_parent_id()) : $product;
+                if (!$this->matchesFilters($parent, $request)) continue;
                 $key = $parent->get_id();
                 if (!isset($exact[$key])) $exact[$key] = $this->card($parent) + ['matched_variations' => []];
                 if ($product->is_type('variation')) $exact[$key]['matched_variations'][] = $id;
@@ -104,13 +110,36 @@ final class ProductModule
         $result = wc_get_products([
             'status' => 'publish', 'limit' => self::SIZE - count($first), 'offset' => max(0, $start - count($prefix)),
             'exclude' => array_keys($exact), 'paginate' => true, 'kizlo_pos_search' => $search,
+            'kizlo_pos_category' => (int) $request['category'], 'kizlo_pos_brand' => (int) $request['brand'],
         ]);
         $cards = [];
         foreach ($result->products as $product) {
             if ($this->visible($product)) $cards[] = $this->card($product) + ['matched_variations' => []];
         }
         return $this->response(['items' => array_merge($first, $cards), 'page' => $page, 'total' => $result->total + count($prefix),
-            'has_more' => $start + self::SIZE < $result->total + count($prefix)]);
+            'has_more' => $start + self::SIZE < $result->total + count($prefix),
+            'filters' => ['categories' => $this->terms('product_cat'), 'brands' => $this->terms('product_brand')]]);
+    }
+
+    /** @return array<int, array{id: int, name: string}> */
+    private function terms(string $taxonomy): array
+    {
+        if (!taxonomy_exists($taxonomy)) return [];
+        $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]);
+        if (is_wp_error($terms)) return [];
+        return array_map(fn($term) => ['id' => (int) $term->term_id, 'name' => $this->text($term->name)], $terms);
+    }
+
+    private function matchesFilters(WC_Product $product, WP_REST_Request $request): bool
+    {
+        foreach (['category' => 'product_cat', 'brand' => 'product_brand'] as $key => $taxonomy) {
+            $id = (int) $request[$key];
+            if (!$id) continue;
+            $children = get_term_children($id, $taxonomy);
+            $terms = is_wp_error($children) ? [$id] : array_merge([$id], $children);
+            if (!has_term($terms, $taxonomy, $product->get_id())) return false;
+        }
+        return true;
     }
 
     public function detail(WP_REST_Request $request): WP_REST_Response|WP_Error
@@ -180,6 +209,30 @@ final class ProductModule
         return $this->text($formatted . $product->get_price_suffix());
     }
 
+    /** @return array<int, array{name: string, options: array<int, string>}> */
+    private function attributes(WC_Product $product): array
+    {
+        $attributes = [];
+        if ($product instanceof \WC_Product_Variation) {
+            foreach ($product->get_attributes() as $name => $option) {
+                if ($option === '') continue;
+                $term = taxonomy_exists($name) ? get_term_by('slug', $option, $name) : false;
+                $attributes[] = ['name' => $this->text(wc_attribute_label($name)), 'options' => [$this->text($term ? $term->name : $option)]];
+            }
+            return $attributes;
+        }
+        foreach ($product->get_attributes() as $attribute) {
+            if (!$attribute instanceof \WC_Product_Attribute || !$attribute->get_visible()) continue;
+            $options = $attribute->is_taxonomy()
+                ? wc_get_product_terms($product->get_id(), $attribute->get_name(), ['fields' => 'names'])
+                : $attribute->get_options();
+            if (!$options) continue;
+            $attributes[] = ['name' => $this->text(wc_attribute_label($attribute->get_name())),
+                'options' => array_map(fn($option) => $this->text((string) $option), array_values($options))];
+        }
+        return $attributes;
+    }
+
     /** @return array<string, mixed> */
     private function card(WC_Product $product): array
     {
@@ -188,7 +241,11 @@ final class ProductModule
         $price = $this->price($product);
         return [
             'id' => $product->get_id(), 'name' => $this->text($product->get_name()), 'type' => $product->get_type(),
-            'price' => $price, 'stock' => $product->get_stock_status(),
+            'price' => $price,
+            'regular_price' => $product->is_on_sale() && !$product->is_type('variable')
+                ? $this->text(wc_price(wc_get_price_to_display($product, ['price' => $product->get_regular_price()])) . $product->get_price_suffix()) : null,
+            'attributes' => $this->attributes($product), 'stock' => $product->get_stock_status(),
+            'stock_quantity' => $product->managing_stock() ? $product->get_stock_quantity() : null,
             'image' => $image ? ['url' => wp_get_attachment_image_url($image, 'large') ?: null, 'alt' => $this->text((string) get_post_meta($image, '_wp_attachment_image_alt', true))] : null,
         ];
     }

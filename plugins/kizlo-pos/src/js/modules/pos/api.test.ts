@@ -50,3 +50,15 @@ describe("POS API initialization", () => {
 		expect(dispatchEvent).not.toHaveBeenCalled()
 	})
 })
+
+it("blocks product requests before PIN setup while allowing security setup requests", async () => {
+	const dispatchEvent = vi.fn()
+	vi.stubGlobal("window", { dispatchEvent })
+	configureApi({ ...data, security: { configured: false, locked: true, idle_minutes: 15, has_passkey: false, passkey_available: false } })
+	const middleware = fetchMock.use.mock.calls[2]?.[0]
+	const next = vi.fn().mockResolvedValue({ configured: true, locked: false })
+	await expect(middleware({ path: "/kizlo-pos/v1/products" }, next)).rejects.toMatchObject({ data: { status: 428 } })
+	expect(next).not.toHaveBeenCalled()
+	expect(dispatchEvent.mock.calls[0]?.[0].detail).toEqual({ configured: false })
+	await expect(middleware({ path: "/kizlo-pos/v1/security/settings" }, next)).resolves.toEqual({ configured: true, locked: false })
+})

@@ -22,30 +22,23 @@ function browser(preference: string | null = null, dark = false) {
 	return storage
 }
 
-describe("base navigation", () => {
-	it.each(["products", "sell", "orders", "settings", "more"])("renders %s with its selected navigation and screen", (screen) => {
+describe("single selling window", () => {
+	it("renders the product/cart split with an icon sidebar and no visible page heading", () => {
 		browser()
 		const html = renderToStaticMarkup(
-			<MemoryRouter initialEntries={[`/${screen}`]}>
+			<MemoryRouter initialEntries={["/sell"]}>
 				<App data={data} />
 			</MemoryRouter>,
 		)
-		expect(html).toContain(`>${screen[0]?.toUpperCase()}${screen.slice(1)}</h1>`)
-		expect(html).toContain(`aria-current="page"`)
-		expect(html).toContain('aria-label="Main navigation"')
-		expect(html).toContain('aria-label="Phone navigation"')
-		if (screen === "settings") {
-			expect(html).toContain("POS settings")
-			expect(html).toContain("tab=kizlo&amp;section=pos")
-			expect(html).toContain("Store Manager")
-			expect(html).toContain("Logging out ends your current WordPress session")
-		} else if (screen === "more") {
-			expect(html).toContain('aria-label="More destinations"')
-		} else if (screen === "products") {
-			expect(html).toContain("Search products")
-		} else {
-			expect(html).toContain("COMING NEXT")
-		}
+		expect(html).toContain('aria-label="Product catalog"')
+		expect(html).toContain('aria-label="Current sale"')
+		expect(html).toContain("Point of Sale")
+		expect(html).toContain('<h1 class="sr-only">Point of Sale</h1>')
+		expect(html).not.toContain("pos-workspace-heading")
+		expect(html).not.toContain("Experience a seamless purchasing journey")
+		expect(html).toContain('aria-label="POS navigation"')
+		expect(html).toContain('aria-label="Browse products"')
+		expect(html).not.toContain("View product")
 	})
 	it("renders explicit recovery actions instead of empty results", () => {
 		const reload = renderToStaticMarkup(<ErrorNotice problem={{ message: "Expired nonce", action: "reload" }} loginUrl={data.urls.login} />)
@@ -62,7 +55,7 @@ describe("appearance preference", () => {
 		expect(readTheme()).toBeNull()
 		expect(systemTheme()).toBe("dark")
 		const html = renderToStaticMarkup(
-			<MemoryRouter>
+			<MemoryRouter initialEntries={["/sell"]}>
 				<App data={data} />
 			</MemoryRouter>,
 		)
@@ -86,10 +79,10 @@ describe("appearance preference", () => {
 		expect(() => saveTheme("dark")).not.toThrow()
 		expect(
 			renderToStaticMarkup(
-				<MemoryRouter>
+				<MemoryRouter initialEntries={["/sell"]}>
 					<App data={data} />
 				</MemoryRouter>,
 			),
-		).toContain('aria-label="Switch to dark theme"')
+		).toContain('aria-label="User menu for')
 	})
 })

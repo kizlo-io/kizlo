@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Send explicit payment requests through the shared WhatsApp connection when enabled.

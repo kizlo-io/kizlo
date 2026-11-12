@@ -39,13 +39,47 @@ See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `C
 
 ## Auth
 
-Kizlo protects its own REST routes , everything under `/wp-json/kizlo/*` , with HTTP Basic auth using a WordPress [Application Password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/) belonging to an administrator. Missing or invalid Application Password authentication returns `401`; a valid non-administrator Application Password returns `403`. A WordPress login cookie alone is not sufficient for these routes.
+Kizlo's REST routes under `/wp-json/kizlo/*` require administrator access. External clients use HTTP Basic auth with a WordPress [Application Password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/); browser admin screens use a WordPress login cookie and REST nonce. Missing or invalid authentication returns `401`, and authenticated non-administrators receive `403`.
 
 Native WordPress routes such as `/wp/v2/*`, and third-party plugin routes, keep their own authentication and capability checks. The block editor, the admin dashboard, and other plugins therefore work normally while Kizlo is active , they authenticate their own REST requests with a login cookie and nonce as they always have.
 
 An integration may opt a sensitive route family back behind the administrator boundary. The WooCommerce integration does this for the entire Store API (`/wc/store/*` , cart, checkout, order, and product routes), because those routes act on an `X-Kizlo-User-Email` header that is trusted without cryptographic verification; WooCommerce's own admin and account routes (`/wc/v3/*`, `/wc-admin/*`) stay on their native permissions.
 
 Generate an Application Password at **WP Admin → Users → Profile → Application Passwords** and treat it like a server-side, rotatable service credential.
+
+## WhatsApp integration
+
+Open **Kizlo → Integrations → WhatsApp** as an administrator. Save your Meta phone
+number ID and API token, then use **Send test message** with a verified recipient.
+The test recipient number is remembered in this browser; clear the field to forget it.
+The token field shows dots when a token exists. Leave it blank to preserve the
+saved token, or enter a replacement. Tokens are encrypted with the site's
+authentication salt, omitted from API responses and browser bootstrap, and must
+be re-entered after salt rotation.
+
+Use the shared PHP client from another plugin:
+
+```php
+$whatsapp = kizlo_get_integrations()->whatsapp;
+$result = $whatsapp->sendText('+919876543210', 'Your payment link: https://example.org/pay');
+
+if (is_wp_error($result)) {
+    // Show the error to the operator. Reconcile unknown delivery before retrying.
+}
+```
+
+- `sendText($to, $text)` sends text within an open customer-service window.
+- `sendDocument($to, $source, $filename, $caption)` sends a Meta media ID or public HTTPS document URL. Invoice generation is separate.
+- `sendTemplate($to, $name, $language, $components)` sends an approved template. The default language is `en_US`.
+- Accessing `kizlo_get_integrations()` makes no provider request. Clients read the current site's saved connection when sending.
+- Successful sends return `['status' => 'accepted', 'provider_id' => '...']`. This confirms API acceptance, not delivery or payment. Delivery/read webhooks are not included; uncertain outcomes are not automatically retried.
+
+The administrator-only REST API exposes `POST /wp-json/kizlo/v1/whatsapp/send`
+with `to`, `type` (`text`, `document`, or `template`), and the corresponding fields.
+These operations are discoverable through Kizlo introspection. Connection settings
+use `GET`/`PUT /wp-json/kizlo/v1/settings/integrations/whatsapp`; `api_token` is
+write-only, and `clear_token: true` removes it. Browser/admin clients use normal
+WordPress authentication; external clients use an administrator Application Password.
 
 ## Development
 
