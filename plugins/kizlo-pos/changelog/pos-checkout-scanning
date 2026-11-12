@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add barcode scanning, recoverable POS checkout, paid counter cash, scoped online payment links, configurable customer fields, and extensible order notification channels.

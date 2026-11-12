@@ -814,3 +814,344 @@
 		padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
 	}
 }
+
+.pos-sell {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+	gap: 24px;
+	align-items: start;
+}
+.pos-sell-catalog {
+	min-width: 0;
+}
+.pos-sale-cart {
+	position: sticky;
+	top: 20px;
+	border: 1px solid var(--pos-line);
+	padding: 24px;
+	background: var(--pos-surface);
+	border-radius: 12px;
+}
+.pos-sale-cart h2 {
+	font-size: 24px;
+	margin-bottom: 20px;
+}
+.pos-sale-cart form,
+.pos-payment-handoff,
+.pos-sale-review {
+	display: grid;
+	gap: 16px;
+}
+.pos-sale-cart label,
+.pos-scan label,
+.pos-address {
+	display: grid;
+	gap: 8px;
+}
+.pos-sale-line {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 72px auto;
+	gap: 8px;
+	align-items: center;
+}
+.pos-sale-cart p,
+.pos-scan p {
+	font-size: 13px;
+	line-height: 1.6;
+}
+.pos-sale-cart select {
+	width: 100%;
+	min-height: 44px;
+	border: 1px solid var(--pos-line);
+	border-radius: 6px;
+	padding: 8px;
+	background: var(--pos-surface);
+	color: var(--pos-text);
+}
+.pos-sale-review {
+	border-top: 1px solid var(--pos-line);
+	padding-top: 20px;
+}
+.pos-sale-total {
+	font-size: 20px !important;
+	font-weight: 700;
+}
+.pos-address {
+	border: 1px solid var(--pos-line);
+	padding: 12px;
+}
+.pos-address legend {
+	padding: 0 8px;
+}
+.pos-scan {
+	margin-bottom: 20px;
+}
+.pos-scan-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 8px;
+	flex-wrap: wrap;
+}
+.pos-scan-actions input {
+	flex: 1;
+	min-width: 140px;
+}
+.pos-payment-sheet {
+	max-height: 90dvh;
+	overflow: auto;
+	background: var(--pos-surface);
+	color: var(--pos-text);
+}
+.kizlo-pos-app .pos-camera {
+	--scan-color: #fff;
+	inset: 0;
+	width: 100vw;
+	height: 100dvh;
+	max-width: none;
+	max-height: none;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	overflow: hidden;
+	background: #000;
+	color: #fff;
+}
+.pos-camera video {
+	position: absolute;
+	inset: 0;
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.pos-camera > button {
+	top: calc(env(safe-area-inset-top, 0px) + 12px);
+	right: calc(env(safe-area-inset-right, 0px) + 12px);
+	z-index: 3;
+	background: rgb(0 0 0 / 55%);
+	color: #fff;
+	border-radius: 50%;
+	opacity: 1;
+}
+.pos-camera > button:focus-visible {
+	outline-color: #fff;
+}
+.pos-camera-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	position: absolute;
+	top: calc(env(safe-area-inset-top, 0px) + 20px);
+	left: calc(env(safe-area-inset-left, 0px) + 20px);
+	right: 76px;
+	z-index: 2;
+	pointer-events: none;
+}
+.pos-camera-heading h2 {
+	color: #fff;
+	text-shadow: 0 1px 6px #000;
+}
+.pos-camera .pos-camera-torch {
+	width: 44px;
+	height: 44px;
+	flex-shrink: 0;
+	padding: 0;
+	pointer-events: auto;
+	background: rgb(0 0 0 / 75%);
+	color: #fff;
+	border-color: #fff;
+}
+.pos-camera .pos-camera-torch[aria-pressed="true"] {
+	color: #facc15;
+	border-color: currentColor;
+}
+.pos-camera-torch-error {
+	display: block;
+	margin-top: 8px;
+	color: #fff;
+}
+.pos-camera-guide {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: min(calc(100% - 48px), 640px);
+	height: clamp(120px, 24dvh, 240px);
+	border: 1px solid rgb(255 255 255 / 35%);
+	border-radius: 14px;
+	box-shadow: 0 0 0 100vmax rgb(0 0 0 / 55%);
+	z-index: 1;
+	pointer-events: none;
+}
+.pos-camera .pos-camera-guide > span {
+	position: absolute;
+	width: 28px;
+	height: 28px;
+	border: 3px solid var(--scan-color);
+	filter: drop-shadow(0 0 7px var(--scan-color));
+}
+.pos-camera-guide > span:nth-child(1) {
+	top: -2px;
+	left: -2px;
+	border-right: 0;
+	border-bottom: 0;
+	border-top-left-radius: 14px;
+}
+.pos-camera-guide > span:nth-child(2) {
+	top: -2px;
+	right: -2px;
+	border-left: 0;
+	border-bottom: 0;
+	border-top-right-radius: 14px;
+}
+.pos-camera-guide > span:nth-child(3) {
+	bottom: -2px;
+	left: -2px;
+	border-right: 0;
+	border-top: 0;
+	border-bottom-left-radius: 14px;
+}
+.pos-camera-guide > span:nth-child(4) {
+	bottom: -2px;
+	right: -2px;
+	border-left: 0;
+	border-top: 0;
+	border-bottom-right-radius: 14px;
+}
+.pos-camera-scanline {
+	position: absolute;
+	top: 50%;
+	left: 12px;
+	right: 12px;
+	height: 1px;
+	background: var(--scan-color);
+	box-shadow: 0 0 8px var(--scan-color);
+}
+.kizlo-pos-app .pos-camera-instructions {
+	position: absolute;
+	bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+	left: calc(env(safe-area-inset-left, 0px) + 20px);
+	right: calc(env(safe-area-inset-right, 0px) + 20px);
+	z-index: 2;
+	color: #fff;
+	text-align: center;
+	text-shadow: 0 1px 6px #000;
+	pointer-events: none;
+}
+.pos-camera .pos-camera-instructions span {
+	display: block;
+	margin-top: 8px;
+	font-size: 12px;
+	opacity: 0.8;
+}
+.pos-camera[data-feedback="success"] {
+	--scan-color: #4ade80;
+}
+.pos-camera[data-feedback="error"] {
+	--scan-color: #fb7185;
+}
+.pos-camera[data-feedback="loading"] {
+	--scan-color: #facc15;
+}
+.pos-camera-feedback {
+	position: absolute;
+	top: calc(env(safe-area-inset-top, 0px) + 70px);
+	left: calc(env(safe-area-inset-left, 0px) + 20px);
+	right: calc(env(safe-area-inset-right, 0px) + 20px);
+	z-index: 2;
+	padding: 12px;
+	border-radius: 12px;
+	background: rgb(0 0 0 / 75%);
+	color: var(--scan-color);
+	text-align: center;
+}
+.pos-camera-spinner {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	margin-right: 8px;
+	vertical-align: middle;
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: pos-camera-spin 0.7s linear infinite;
+}
+@keyframes pos-camera-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+.pos-camera-actions {
+	position: absolute;
+	bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+	left: calc(env(safe-area-inset-left, 0px) + 20px);
+	right: calc(env(safe-area-inset-right, 0px) + 20px);
+	z-index: 2;
+	display: flex;
+	justify-content: center;
+	gap: 12px;
+}
+.pos-camera .pos-camera-actions button {
+	min-height: 44px;
+	background: rgb(0 0 0 / 75%);
+	border-color: #fff;
+	color: #fff;
+}
+@media (max-height: 450px) {
+	.kizlo-pos-app .pos-camera-instructions {
+		display: none;
+	}
+	.pos-camera-feedback {
+		padding: 6px 12px;
+	}
+}
+.pos-payment-sheet iframe {
+	display: block;
+	width: 100%;
+	height: 65dvh;
+	border: 1px solid var(--pos-line);
+	margin-top: 12px;
+	background: white;
+}
+.pos-payment-handoff a,
+.pos-sale-cart > a {
+	text-decoration: underline;
+}
+.pos-cart-toggle {
+	display: none;
+}
+@media (max-width: 1100px) {
+	.pos-sell {
+		display: block;
+	}
+	.pos-cart-toggle {
+		display: flex;
+		position: sticky;
+		bottom: 80px;
+		width: 100%;
+		z-index: 10;
+		background: var(--pos-surface);
+		margin: 16px 0;
+	}
+	.pos-sale-cart {
+		display: none;
+		position: static;
+	}
+	.pos-sale-cart.is-open {
+		display: block;
+	}
+	.pos-sell:has(.pos-sale-cart.is-open) .pos-sell-catalog {
+		display: none;
+	}
+}
+
+.pos-sell .pos-product-grid {
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+@media (max-width: 699px) {
+	.pos-sell .pos-product-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}

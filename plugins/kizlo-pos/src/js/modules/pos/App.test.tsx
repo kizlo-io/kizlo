@@ -43,6 +43,8 @@ describe("base navigation", () => {
 			expect(html).toContain('aria-label="More destinations"')
 		} else if (screen === "products") {
 			expect(html).toContain("Search products")
+		} else if (screen === "sell") {
+			expect(html).toContain("Loading checkout")
 		} else {
 			expect(html).toContain("COMING NEXT")
 		}

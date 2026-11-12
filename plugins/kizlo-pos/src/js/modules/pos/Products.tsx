@@ -4,9 +4,12 @@ import { Link, useLocation, useMatch, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { apiProblem } from "./api"
+import { lookupBarcode } from "./checkout-api"
 import { Icon } from "./Icon"
 import { ProductDetails } from "./ProductDetails"
-import { getProducts, mergeProducts, type ProductCard, stockLabel } from "./products-api"
+import { getProduct, getProducts, mergeProducts, type ProductCard, stockLabel } from "./products-api"
+import { ScanInput } from "./ScanInput"
+import { useSaleCart } from "./sale-cart"
 
 export function ProductImage({ product }: { product: ProductCard }) {
 	const [failed, setFailed] = useState(false)
@@ -25,13 +28,27 @@ export function ProductImage({ product }: { product: ProductCard }) {
 	)
 }
 
-export function Products({ theme, onToggleTheme, loginUrl }: { theme: string; onToggleTheme: () => void; loginUrl: string }) {
+export function Products({
+	theme,
+	onToggleTheme,
+	loginUrl,
+	selling = false,
+	onSelect,
+}: {
+	theme: string
+	onToggleTheme: () => void
+	loginUrl: string
+	selling?: boolean
+	onSelect?: (product: ProductCard) => void
+}) {
 	const [input, setInput] = useState("")
 	const [search, setSearch] = useState("")
 	const openingCard = useRef<HTMLElement | null>(null)
+	const { addScanned } = useSaleCart()
 	const navigate = useNavigate()
 	const location = useLocation()
-	const match = useMatch("/products/:id")
+	const base = selling ? "/sell" : "/products"
+	const match = useMatch(`${base}/:id`)
 	const id = Number(match?.params.id)
 	const detailOpen = Boolean(match)
 	const client = useQueryClient()
@@ -58,13 +75,30 @@ export function Products({ theme, onToggleTheme, loginUrl }: { theme: string; on
 	useEffect(() => {
 		if (!detailOpen) openingCard.current?.focus()
 	}, [detailOpen])
-	const close = () => (location.state?.fromProducts ? navigate(-1) : navigate("/products", { replace: true }))
+	const close = () => (location.state?.fromProducts ? navigate(-1) : navigate(base, { replace: true }))
+	const scan = async (code: string, source?: "camera") => {
+		if (source === "camera") {
+			const item = await addScanned(code)
+			return `Added ${item.name} · quantity ${item.quantity}`
+		}
+		const match = await lookupBarcode(code)
+		if (selling && match.type !== "variable") {
+			const product = await getProduct(match.id, new AbortController().signal)
+			if (!["simple", "variation"].includes(product.type) || product.stock === "outofstock")
+				throw new Error("This item is unavailable for sale.")
+			onSelect?.(product)
+		} else
+			navigate(`${base}/${match.parent_id ?? match.id}${match.parent_id ? `?variation=${match.id}` : ""}`, {
+				state: { fromProducts: true },
+			})
+	}
 	return (
 		<section className="pos-catalog" aria-label="Product catalog">
 			<div className="pos-catalog-intro">
-				<p className="pos-eyebrow">FIND SOMETHING WORTH SHARING</p>
-				<h2>Your store, at a glance.</h2>
+				<p className="pos-eyebrow">{selling ? "BUILD YOUR NEXT SALE" : "FIND SOMETHING WORTH SHARING"}</p>
+				<h2>{selling ? "Scan or choose a product." : "Your store, at a glance."}</h2>
 			</div>
+			<ScanInput onScan={scan} autofocus={selling} />
 			<div className="pos-catalog-tools">
 				<label className="pos-search" htmlFor="pos-product-search">
 					<span>Search products</span>
@@ -104,7 +138,7 @@ export function Products({ theme, onToggleTheme, loginUrl }: { theme: string; on
 					<Link
 						className="pos-product-card"
 						key={product.id}
-						to={`/products/${product.id}${product.matched_variations?.length === 1 ? `?variation=${product.matched_variations[0]}` : ""}`}
+						to={`${base}/${product.id}${product.matched_variations?.length === 1 ? `?variation=${product.matched_variations[0]}` : ""}`}
 						state={{ fromProducts: true }}
 						onClick={(event) => {
 							openingCard.current = event.currentTarget
@@ -127,7 +161,17 @@ export function Products({ theme, onToggleTheme, loginUrl }: { theme: string; on
 					{loading ? "Loading…" : "Load more"}
 				</Button>
 			)}
-			{detailOpen && <ProductDetails key={id} id={id} onClose={close} theme={theme} onToggleTheme={onToggleTheme} loginUrl={loginUrl} />}
+			{detailOpen && (
+				<ProductDetails
+					key={id}
+					id={id}
+					onClose={close}
+					theme={theme}
+					onToggleTheme={onToggleTheme}
+					loginUrl={loginUrl}
+					onSelect={onSelect}
+				/>
+			)}
 		</section>
 	)
 }
