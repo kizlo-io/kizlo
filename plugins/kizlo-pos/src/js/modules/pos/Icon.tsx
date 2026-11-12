@@ -1,6 +1,6 @@
 import type { ScreenId } from "./bootstrap"
 
-export function Icon({ name }: { name: ScreenId | "more" | "sun" | "moon" | "arrow" }) {
+export function Icon({ name }: { name: ScreenId | "more" | "sun" | "moon" | "arrow" | "flashlight" }) {
 	const paths = {
 		products: <path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10M7.5 5l9 4" />,
 		sell: <path d="M5 5h2l2 11h10l2-8H8M10 20h.01M18 20h.01M14 3v6M11 6h6" />,
@@ -25,6 +25,7 @@ export function Icon({ name }: { name: ScreenId | "more" | "sun" | "moon" | "arr
 			</>
 		),
 		moon: <path d="M20 14A8.5 8.5 0 0110 4a8.5 8.5 0 1010 10z" />,
+		flashlight: <path d="M6 3h12v4l-3 4v10H9V11L6 7zM6 7h12M12 13v3" />,
 		arrow: <path d="M5 12h14M14 7l5 5-5 5" />,
 	}
 	return (

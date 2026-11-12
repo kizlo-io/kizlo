@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import App from "./App"
+import { checkoutConfig, scanCart } from "./checkout-api"
 import { getProduct, getProducts, getVariations, type Product, type ProductCard } from "./products-api"
 import * as sharing from "./share"
 import { data } from "./test-data"
@@ -15,6 +16,14 @@ vi.mock("./products-api", async (original) => ({
 	getProducts: vi.fn(),
 	getProduct: vi.fn(),
 	getVariations: vi.fn(),
+}))
+
+const decoder = vi.hoisted(() => ({ decodeFromConstraints: vi.fn() }))
+vi.mock("./barcode-decoder", () => ({ createBarcodeReader: () => decoder }))
+vi.mock("./checkout-api", async (original) => ({
+	...(await original<typeof import("./checkout-api")>()),
+	scanCart: vi.fn(),
+	checkoutConfig: vi.fn(),
 }))
 
 const card: ProductCard = { id: 1, name: "Canvas shoe", type: "simple", price: "$20.00", stock: "instock", image: null }
@@ -36,6 +45,7 @@ beforeEach(() => {
 	focusManager.setFocused(true)
 	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
 	vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+	vi.mocked(checkoutConfig).mockRejectedValue(new Error("Checkout configuration is not loaded by browsing tests."))
 	vi.mocked(getProducts).mockResolvedValue(page([card]))
 	vi.mocked(getProduct).mockResolvedValue(detail)
 	vi.mocked(getVariations).mockResolvedValue(page([]))
@@ -469,4 +479,42 @@ describe("Products requests and navigation", () => {
 		await act(async () => choice?.click())
 		expect(host.querySelector("#pos-detail-title")?.textContent).toBe("Small shoe")
 	})
+})
+
+it.each(["/products", "/sell"])("keeps camera scans on %s and adds only validated products to the current sale", async (route) => {
+	vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+	let capture: (result: { getText: () => string }) => void = () => {}
+	decoder.decodeFromConstraints.mockImplementation(async (_constraints, _video, callback) => {
+		capture = callback
+		return { stop: vi.fn() }
+	})
+
+	vi.mocked(checkoutConfig).mockResolvedValue({
+		fields: { first_name: false, last_name: false, email: false, phone: false, billing: false, shipping: false },
+		handoff: { device: true, send: true, default: "device" },
+		store_address: { country: "US" },
+		countries: {},
+		states: {},
+		address_fields: { billing: {}, shipping: {} },
+		channels: [],
+		currency: "USD",
+	})
+	vi.mocked(scanCart).mockResolvedValue({ id: 1, name: "Canvas shoe", quantity: 1 })
+	await mount(route)
+	await click("Use camera")
+	await tick()
+	await act(async () => capture({ getText: () => "CANVAS" }))
+	expect(scanCart).toHaveBeenCalledWith("CANVAS", [])
+	expect(host.querySelector(".pos-camera")?.getAttribute("data-feedback")).toBe("success")
+	expect(host.querySelector(".pos-camera-feedback")?.textContent).toContain("Added Canvas shoe · quantity 1")
+	expect(host.querySelector(".pos-product-sheet")).toBeNull()
+	vi.mocked(scanCart).mockRejectedValue(new Error("No product matches this code."))
+	await act(async () => capture({ getText: () => "MISSING" }))
+	expect(scanCart).toHaveBeenLastCalledWith("MISSING", [{ id: 1, name: "Canvas shoe", quantity: 1 }])
+	expect(host.querySelector(".pos-camera")?.getAttribute("data-feedback")).toBe("error")
+	expect(host.querySelector(".pos-camera-feedback")?.textContent).toContain("No product matches")
+	await click("Done")
+	if (route === "/products") await click("Sell")
+	await tick()
+	expect(host.querySelector('.pos-sale-cart input[type="number"]')?.getAttribute("value")).toBe("1")
 })

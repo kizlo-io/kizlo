@@ -8,7 +8,7 @@ import { apiProblem } from "./api"
 import { ErrorNotice } from "./ErrorNotice"
 import { Icon } from "./Icon"
 import { ProductImage } from "./Products"
-import { getProduct, getVariations, mergeProducts, stockLabel } from "./products-api"
+import { getProduct, getVariations, mergeProducts, type ProductCard, stockLabel } from "./products-api"
 import { copyLink, prepareImage, publicLink, shareFiles, shareProduct } from "./share"
 
 export function ProductDetails({
@@ -17,12 +17,14 @@ export function ProductDetails({
 	theme,
 	onToggleTheme,
 	loginUrl,
+	onSelect,
 }: {
 	id: number
 	onClose: () => void
 	theme: string
 	onToggleTheme: () => void
 	loginUrl: string
+	onSelect?: (product: ProductCard) => void
 }) {
 	const [portalHost, setPortalHost] = useState<HTMLElement | null>(null)
 	const client = useQueryClient()
@@ -192,6 +194,18 @@ export function ProductDetails({
 								<p className="pos-eyebrow">{stockLabel(shown.stock)}</p>
 								<SheetTitle id="pos-detail-title">{shown.name}</SheetTitle>
 								<p className="pos-detail-price">{shown.price ?? "Price not set"}</p>
+								{onSelect && (
+									<Button
+										type="button"
+										disabled={!["simple", "variation"].includes(shown.type) || shown.stock === "outofstock" || shown.price === null}
+										onClick={() => {
+											onSelect(shown)
+											onClose()
+										}}
+									>
+										Add to sale
+									</Button>
+								)}
 							</div>
 							<dl className="pos-detail-meta">
 								<div>

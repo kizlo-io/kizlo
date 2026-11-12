@@ -7,6 +7,8 @@ import type { Bootstrap } from "./bootstrap"
 import { ErrorNotice } from "./ErrorNotice"
 import { Icon } from "./Icon"
 import { Products } from "./Products"
+import { Sell } from "./Sell"
+import { SaleCartProvider } from "./sale-cart"
 
 export { ErrorNotice } from "./ErrorNotice"
 
@@ -93,7 +95,9 @@ export default function App({ data }: { data: Bootstrap }) {
 	const [client] = useState(createQueryClient)
 	return (
 		<QueryClientProvider client={client}>
-			<Workspace data={data} />
+			<SaleCartProvider key={`${data.restRoot}:${data.user.id}`} storageKey={`kizlo-pos:cart:${data.restRoot}:${data.user.id}`}>
+				<Workspace data={data} />
+			</SaleCartProvider>
 		</QueryClientProvider>
 	)
 }
@@ -187,9 +191,8 @@ function Workspace({ data }: { data: Bootstrap }) {
 					{problem && <ErrorNotice problem={problem} loginUrl={data.urls.login} />}
 					<Routes>
 						<Route path="/products/*" element={<Products theme={theme} onToggleTheme={toggleTheme} loginUrl={data.urls.login} />} />
-						{(["sell", "orders"] as const).map((screen) => (
-							<Route key={screen} path={`/${screen}`} element={<Placeholder screen={screen} />} />
-						))}
+						<Route path="/sell/*" element={<Sell theme={theme} onToggleTheme={toggleTheme} loginUrl={data.urls.login} />} />
+						<Route path="/orders" element={<Placeholder screen="orders" />} />
 						<Route path="/settings" element={<Settings data={data} />} />
 						<Route
 							path="/more"

@@ -17,6 +17,9 @@ final class Plugin
             (new PosPage())->register();
             (new \Kizlo\Pos\Modules\Product\ProductModule())->register();
             (new \Kizlo\Pos\Modules\Settings\Settings())->register();
+            (new \Kizlo\Pos\Modules\Checkout\CheckoutModule())->register();
+            (new \Kizlo\Pos\Modules\Checkout\PaymentPage())->register();
+            (new \Kizlo\Pos\Modules\Notification\Notifications())->register();
         });
     }
 
