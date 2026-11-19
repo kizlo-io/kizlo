@@ -114,11 +114,13 @@ describe("createWordPressClient", () => {
 		expectTypeOf(client.resolveList).toEqualTypeOf<WordPressTransport["resolveList"]>()
 	})
 
-	it("carries per-call headers alongside signal and timeout", async () => {
+	it("carries per-call headers alongside a caller signal", async () => {
 		expectTypeOf(await client.books.count({}, { headers: { "X-Kizlo-User-Id": "7" } })).toEqualTypeOf<List>()
 		expectTypeOf(
-			await client.books.retrieve({ params: { identifier: "dune" } }, { headers: {}, timeout: "5 seconds" }),
+			await client.books.retrieve({ params: { identifier: "dune" } }, { headers: {}, signal: AbortSignal.timeout(5_000) }),
 		).toEqualTypeOf<Retrieve>()
+		// @ts-expect-error timeouts are caller-owned signals
+		client.books.count({}, { timeout: "5 seconds" })
 		// @ts-expect-error the definition owns the path, not the caller
 		client.books.count({}, { path: "/elsewhere" })
 	})

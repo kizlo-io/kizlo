@@ -3,13 +3,18 @@ import type { NestedClient } from "@orpc/client"
 import { type DefinedErrorMapLike, type KizloError, toKizloError, type WithCommonErrorMap } from "./error"
 import type { AnyProcedure, AnyProcedureTree, Procedure } from "./procedure"
 
+export interface ProcedureCallOptions {
+	/** Cancel async work that observes or forwards this signal. */
+	signal?: AbortSignal
+}
+
 export type MaybeCallerOptions<UInput> = unknown extends UInput
-	? []
+	? [input?: UInput, options?: ProcedureCallOptions]
 	: [UInput] extends [undefined]
-		? []
+		? [input?: UInput, options?: ProcedureCallOptions]
 		: object extends UInput
-			? [input?: UInput]
-			: [input: UInput]
+			? [input?: UInput, options?: ProcedureCallOptions]
+			: [input: UInput, options?: ProcedureCallOptions]
 
 export type ProcedureMethod<UInput, UOutput, TError extends DefinedErrorMapLike> = {
 	(...rest: MaybeCallerOptions<UInput>): Promise<KizloResult<UOutput, TError>>

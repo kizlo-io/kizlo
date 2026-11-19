@@ -122,6 +122,28 @@ Same call, two ergonomics: `client.x()` for `{ data, error }` you branch on, `cl
 you `await` and let throw. Error codes stay typed end to end either way; see
 [Errors](/docs/concepts/integration#errors) for how a procedure declares them.
 
+## Cancel a call
+
+Pass an `AbortSignal` in the second argument on either client, including `.call()`:
+
+```ts
+const controller = new AbortController()
+const pending = client.posts.list({ query: {} }, { signal: controller.signal })
+controller.abort()
+const result = await pending
+
+// Callers own timeouts too.
+await client.posts.list.call({ query: {} }, { signal: AbortSignal.timeout(5_000) })
+
+// For a procedure with no input, pass undefined before the options.
+await client.woocommerce.products.list(undefined, { signal: AbortSignal.timeout(5_000) })
+```
+
+The browser signal cancels its HTTP request. Direct server cancellation is cooperative: your procedure and
+middleware receive `signal` in their handler options and must observe it or forward it to async work.
+A browser abort does not guarantee that server work has stopped. For WordPress cancellation, pass the signal
+through the endpoint's [call options](/docs/reference/types/wp-call-options).
+
 ## Scope on the client
 
 A procedure's [scope](/docs/concepts/integration#scope), set when you author it, decides how it shows up here:

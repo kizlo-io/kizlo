@@ -1,4 +1,4 @@
-import type { Duration, SearchParamsLike } from "@kizlo/shared"
+import type { SearchParamsLike } from "@kizlo/shared"
 import type { WP_Error } from "./error"
 import type { WordPressTransport } from "./transport"
 
@@ -25,7 +25,7 @@ export interface WP_Endpoint<TInput, TResult> extends WP_EndpointDefinition {
  * rather than replacing it. It is for the parameters WordPress answers for every route — `_embed`,
  * `_fields` — which belong to no route's contract and so can never appear in a generated input.
  */
-export type WP_CallOptions = Pick<WP_RequestInput, "signal" | "timeout" | "headers" | "searchParams">
+export type WP_CallOptions = Pick<WP_RequestInput, "signal" | "headers" | "searchParams">
 
 /**
  * The callable shape of an endpoint tree: every definition leaf becomes the request it runs. `any`
@@ -214,7 +214,6 @@ export interface WP_RequestInput {
 	responseContentTypes?: Record<string, WP_ResponseContentType | undefined>
 	dataResponseStatuses?: string[]
 	signal?: AbortSignal
-	timeout?: Duration
 }
 
 /**

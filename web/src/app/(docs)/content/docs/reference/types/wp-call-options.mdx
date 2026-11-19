@@ -1,7 +1,7 @@
 ---
 title: WP_CallOptions
 icon: Cube
-description: Override headers, cancellation, or timeout for one generated endpoint call.
+description: Override headers or cancellation for one generated endpoint call.
 types: [WP_CallOptions]
 ---
 
@@ -17,7 +17,6 @@ to that request.
 | --- | --- | --- |
 | `headers` | `Record<string, string>` | Add or override request headers. |
 | `signal` | `AbortSignal` | Cancel the request from an existing controller or signal. |
-| `timeout` | `Duration` | Override the transport timeout with milliseconds or a duration string such as `"5 seconds"`. |
 
 ```ts
 const controller = new AbortController()
@@ -27,9 +26,11 @@ await context.wordpress.kizlo.postTypes.post.retrieve(
   {
     headers: { "X-Request-Source": "homepage" },
     signal: controller.signal,
-    timeout: "5 seconds",
   },
 )
 ```
 
 Pass an empty input object first when an endpoint has no required input but still needs call options.
+
+Kizlo adds no timeout signal by default, so framework fetch deduplication can apply to eligible reads.
+To set a deadline, pass `{ signal: AbortSignal.timeout(5_000) }`. This replaces the removed `timeout` option.

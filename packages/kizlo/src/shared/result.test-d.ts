@@ -12,6 +12,7 @@ import type {
 	InferProcedureError,
 	InferProcedureInput,
 	InferProcedureResult,
+	ProcedureMethod,
 	ResultClient,
 } from "./result"
 
@@ -126,5 +127,31 @@ describe("an unaugmented KizloProcedureRegistry", () => {
 		expectTypeOf<InferClientData<any>>().toBeAny()
 		expectTypeOf<InferClientError<any>>().toBeAny()
 		expectTypeOf<InferClientResult<any>>().toBeAny()
+	})
+})
+
+describe("procedure cancellation options", () => {
+	const client = null as unknown as Client
+	const options = { signal: new AbortController().signal }
+
+	it("accepts caller signals without changing required or no-input calls", async () => {
+		const input = { productId: 1, quantity: 2 }
+		expectTypeOf(await client.cart.add(input, options)).toEqualTypeOf<InferProcedureResult<typeof add>>()
+		expectTypeOf(await client.cart.add.call(input, options)).toEqualTypeOf<InferProcedureData<typeof add>>()
+		expectTypeOf(await client.cart.clear()).toEqualTypeOf<InferProcedureResult<typeof clear>>()
+		expectTypeOf(await client.cart.clear(undefined, options)).toEqualTypeOf<InferProcedureResult<typeof clear>>()
+		expectTypeOf(await client.cart.clear.call(undefined, options)).toEqualTypeOf<InferProcedureData<typeof clear>>()
+		const optional = null as unknown as ProcedureMethod<{ search?: string }, string, Record<never, never>>
+		expectTypeOf(await optional(undefined, options)).toEqualTypeOf<InferClientResult<typeof optional>>()
+		expectTypeOf(await optional({ search: "book" }, options)).toEqualTypeOf<InferClientResult<typeof optional>>()
+		expectTypeOf(await optional.call({}, options)).toEqualTypeOf<string>()
+		// @ts-expect-error required input remains required
+		client.cart.add()
+		// @ts-expect-error options do not replace required input
+		client.cart.add(undefined, options)
+		// @ts-expect-error the signal must be an AbortSignal
+		client.cart.clear(undefined, { signal: "cancel" })
+		// @ts-expect-error cancellation is a call option, not procedure input
+		client.cart.add({ ...input, signal: options.signal })
 	})
 })
