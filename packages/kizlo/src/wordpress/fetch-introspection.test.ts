@@ -72,3 +72,26 @@ describe("fetchIntrospection", () => {
 		expect((error as IntrospectionFetchError).unreachable).toBe(unreachable)
 	})
 })
+
+test("introspection forwards only caller-owned signals", async () => {
+	for (const signal of [undefined, new AbortController().signal]) {
+		const fetch = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => Response.json(INTROSPECTION_FIXTURE))
+		await fetchIntrospection(CREDENTIALS, { fetch: fetch as unknown as typeof globalThis.fetch, signal })
+		const init = fetch.mock.calls[0]?.[1]
+		if (signal) expect(init?.signal).toBe(signal)
+		else expect(init).not.toHaveProperty("signal")
+	}
+})
+
+test("introspection retains its transport error contract when cancelled", async () => {
+	const signal = AbortSignal.abort(new Error("cancelled"))
+	const fetch = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async (_url, init) => {
+		init?.signal?.throwIfAborted()
+		return Response.json(INTROSPECTION_FIXTURE)
+	})
+	await expect(fetchIntrospection(CREDENTIALS, { fetch: fetch as unknown as typeof globalThis.fetch, signal })).rejects.toMatchObject({
+		name: "IntrospectionFetchError",
+		unreachable: true,
+		message: expect.stringContaining("cancelled"),
+	})
+})

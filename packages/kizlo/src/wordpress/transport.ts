@@ -1,6 +1,4 @@
 import {
-	type Duration,
-	milliseconds,
 	type Promisify,
 	type SearchParamsLike,
 	stringifyQueryString,
@@ -10,7 +8,7 @@ import {
 	tryCatchSync,
 } from "@kizlo/shared"
 import { z } from "zod"
-import { SAFE_REQUEST_TIMEOUT, UNEXPECTED_BODY_SNIPPET_LENGTH, WP_AUTH_HEADER_KEY, WP_AUTH_TYPE } from "./constants"
+import { UNEXPECTED_BODY_SNIPPET_LENGTH, WP_AUTH_HEADER_KEY, WP_AUTH_TYPE } from "./constants"
 import { WP_Error } from "./error"
 import type { WordPressCredentials, WP_List, WP_ListMetadata, WP_RequestContentType, WP_RequestInput, WP_Result } from "./types"
 import { isWordPressResourceError } from "./utils"
@@ -21,7 +19,6 @@ export interface WordPressTransportOptions {
 	/** Resolve a trusted IP for this invocation. Missing or invalid IPs are omitted. */
 	getClientIp?: () => Promisify<string | null>
 	credentials: WordPressCredentials
-	timeout?: Duration
 	onResponse?: (headers: Headers) => void
 	onResult?: (result: WordPressTransportResult) => void
 }
@@ -36,7 +33,6 @@ export class WordPressTransport {
 	private readonly getClientIp?: WordPressTransportOptions["getClientIp"]
 	private readonly siteBase: string
 	private readonly authHeader: string
-	private readonly defaultTimeout: Duration
 	/** Called with the response headers of every non-transport-error response, so callers can observe
 	 * per-response signals (e.g. the plugin version header) without threading them through every method. */
 	private readonly onResponse?: (headers: Headers) => void
@@ -50,7 +46,6 @@ export class WordPressTransport {
 		const encoded = btoa(binary)
 		this.authHeader = `${WP_AUTH_TYPE} ${encoded}`
 		this.siteBase = context.credentials.url.endsWith("/") ? context.credentials.url : `${context.credentials.url}/`
-		this.defaultTimeout = context.timeout ?? SAFE_REQUEST_TIMEOUT
 		this.onResponse = context.onResponse
 		this.onResult = context.onResult
 		this.getClientIp = context.getClientIp
@@ -64,7 +59,6 @@ export class WordPressTransport {
 			headers?: Record<string, string>
 			searchParams?: SearchParamsLike
 			signal?: AbortSignal
-			timeout?: Duration
 		},
 	): Promise<WP_Result<TData, TCode>> {
 		return this.request<TData, TCode>({ ...input, path, method: "POST" })
@@ -77,7 +71,6 @@ export class WordPressTransport {
 			headers?: Record<string, string>
 			searchParams?: SearchParamsLike
 			signal?: AbortSignal
-			timeout?: Duration
 		},
 	): Promise<WP_Result<TData, TCode>> {
 		return this.request<TData, TCode>({ ...input, path, method: "GET" })
@@ -91,7 +84,6 @@ export class WordPressTransport {
 			headers?: Record<string, string>
 			searchParams?: SearchParamsLike
 			signal?: AbortSignal
-			timeout?: Duration
 		},
 	): Promise<WP_Result<TData, TCode>> {
 		return this.request<TData, TCode>({ ...input, path, method: "PUT" })
@@ -105,7 +97,6 @@ export class WordPressTransport {
 			headers?: Record<string, string>
 			searchParams?: SearchParamsLike
 			signal?: AbortSignal
-			timeout?: Duration
 		},
 	): Promise<WP_Result<TData, TCode>> {
 		return this.request<TData, TCode>({ ...input, path, method: "PATCH" })
@@ -119,7 +110,6 @@ export class WordPressTransport {
 			headers?: Record<string, string>
 			searchParams?: SearchParamsLike
 			signal?: AbortSignal
-			timeout?: Duration
 		},
 	): Promise<WP_Result<TData, TCode>> {
 		return this.request<TData, TCode>({ ...input, path, method: "DELETE" })
@@ -265,25 +255,28 @@ export class WordPressTransport {
 			[WP_AUTH_HEADER_KEY]: this.authHeader,
 		}
 
-		const signal = this.#resolveSignal(input)
+		const { signal } = input
+		signal?.throwIfAborted()
 		let clientIp: string | undefined
 		if (this.getClientIp && url.origin === new URL(this.siteBase).origin) {
 			// Header names are case-insensitive; a caller must not override the trusted resolver.
 			for (const name of Object.keys(headers)) if (name.toLowerCase() === "x-real-ip") delete headers[name]
 			let onAbort = () => {}
 			try {
-				signal.throwIfAborted()
-				const value = await Promise.race([
-					Promise.resolve().then(() => this.getClientIp?.()),
-					new Promise<never>((_, reject) => {
-						onAbort = () => reject(signal.reason)
-						signal.addEventListener("abort", onAbort, { once: true })
-					}),
-				])
+				const resolving = Promise.resolve().then(() => this.getClientIp?.())
+				const value = await (signal
+					? Promise.race([
+							resolving,
+							new Promise<never>((_, reject) => {
+								onAbort = () => reject(signal.reason)
+								signal.addEventListener("abort", onAbort, { once: true })
+							}),
+						])
+					: resolving)
 				const parsed = clientIpSchema.safeParse(value)
 				if (parsed.success) clientIp = parsed.data
 			} finally {
-				signal.removeEventListener("abort", onAbort)
+				signal?.removeEventListener("abort", onAbort)
 			}
 			if (clientIp) headers["x-real-ip"] = clientIp
 		}
@@ -293,7 +286,7 @@ export class WordPressTransport {
 		const response = await fetch(url.toString(), {
 			headers,
 			method: input.method,
-			signal,
+			...(signal ? { signal } : {}),
 			// Do not let fetch carry the visitor IP to a redirect destination.
 			...(clientIp ? { redirect: "manual" as const } : {}),
 			...(hasBody && body !== undefined ? { body } : {}),
@@ -338,11 +331,6 @@ export class WordPressTransport {
 			return
 		}
 		form.append(prefix, String(value))
-	}
-
-	#resolveSignal(input: WP_RequestInput): AbortSignal {
-		const timeoutSignal = AbortSignal.timeout(milliseconds(input.timeout ?? this.defaultTimeout))
-		return input.signal ? AbortSignal.any([input.signal, timeoutSignal]) : timeoutSignal
 	}
 
 	public resolveUrl(requestConfig: WP_RequestInput) {

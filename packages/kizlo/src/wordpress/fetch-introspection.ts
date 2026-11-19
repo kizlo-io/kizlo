@@ -55,7 +55,7 @@ export async function fetchIntrospection(
 				authorization: authorization(credentials),
 				...(options.etag ? { "If-None-Match": options.etag } : {}),
 			},
-			signal: options.signal ?? AbortSignal.timeout(30_000),
+			...(options.signal ? { signal: options.signal } : {}),
 		})
 	} catch (error) {
 		throw new IntrospectionFetchError(`Could not fetch ${url}: ${error instanceof Error ? error.message : String(error)}`, {

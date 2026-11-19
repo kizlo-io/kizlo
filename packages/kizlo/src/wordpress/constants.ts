@@ -1,5 +1,3 @@
-import type { Duration } from "@kizlo/shared"
-
 /**
  * Base paths for the two APIs still reached without a generated endpoint: WordPress core, which
  * fixtures and tests seed directly, and the Kizlo plugin's own, which the CLI calls before a client
@@ -12,5 +10,3 @@ export const WP_AUTH_TYPE = "Basic"
 export const WP_AUTH_HEADER_KEY = "authorization"
 
 export const UNEXPECTED_BODY_SNIPPET_LENGTH = 500
-
-export const SAFE_REQUEST_TIMEOUT: Duration = "30 seconds"

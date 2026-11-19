@@ -57,6 +57,8 @@ export type ExtractProcedureByScope<
 
 /** The base options passed to every procedure handler and middleware. */
 export interface BaseHandlerOptions<TInput, TContext, TError extends DefinedErrorMapLike> {
+	/** Observe cancellation or forward it to downstream async work. */
+	signal?: AbortSignal
 	/** The validated, typed request. For `api`, the merged `{ params, query, body, headers }`; for `remote`/`internal`, the `input` schema's type. */
 	input: TInput
 	/** Server-side services and adapters, including the WordPress client, logger, cookies, and auth, plus anything middleware adds. */
@@ -280,9 +282,9 @@ export function buildProcedure(procedure: AnyProcedure) {
 
 	for (const middleware of uses) {
 		chain = chain.use(
-			builder.middleware(async ({ next, context }, input) => {
+			builder.middleware(async ({ next, context, signal }, input) => {
 				try {
-					return await middleware({ input, next: next as any, context: context as any, errors })
+					return await middleware({ input, next: next as any, context: context as any, errors, signal })
 				} catch (error) {
 					handleUnexpectedError(error, options.errors)
 				}
@@ -325,9 +327,9 @@ export function buildProcedure(procedure: AnyProcedure) {
 
 	if (options.output) chain = chain.output(options.output) as any
 
-	return chain.handler(async ({ context, input }: { context: any; input: any }) => {
+	return chain.handler(async ({ context, input, signal }: { context: any; input: any; signal?: AbortSignal }) => {
 		try {
-			return await handler({ context, input, errors })
+			return await handler({ context, input, errors, signal })
 		} catch (error) {
 			handleUnexpectedError(error, options.errors)
 		}

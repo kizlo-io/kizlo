@@ -28,7 +28,10 @@ function definition(overrides: Partial<WP_EndpointDefinition> = {}): WP_Endpoint
 	}
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+	vi.restoreAllMocks()
+	vi.unstubAllGlobals()
+})
 
 describe("generated endpoints", () => {
 	test("substitutes encoded path input and sends the remainder as GET query", async () => {
@@ -289,13 +292,58 @@ describe("trusted client IP forwarding", () => {
 		expect(fetch).not.toHaveBeenCalled()
 	})
 
-	test("times out an unresolved IP lookup", async () => {
+	test("honors a caller timeout during an unresolved IP lookup", async () => {
 		const fetch = vi.fn<FetchFn>()
 		vi.stubGlobal("fetch", fetch)
 		const transport = new WordPressTransport({ credentials, getClientIp: () => new Promise(() => {}) })
-		const result = await transport.get("wp-json/kizlo/v1/settings", { timeout: 5 })
+		const result = await transport.get("wp-json/kizlo/v1/settings", { signal: AbortSignal.timeout(5) })
 		expect(result.status).toBe(0)
 		expect(result.error).not.toBeNull()
 		expect(fetch).not.toHaveBeenCalled()
+	})
+})
+
+describe("caller-owned cancellation", () => {
+	test("leaves ordinary reads eligible for framework fetch deduplication", async () => {
+		const timeout = vi.spyOn(AbortSignal, "timeout")
+		const fetch = vi.fn<FetchFn>(async () => Response.json({ ok: true }))
+		vi.stubGlobal("fetch", fetch)
+		const transport = new WordPressTransport({ credentials, getClientIp: async () => "203.0.113.10" })
+		const result = await transport.get("wp-json/kizlo/v1/settings", {})
+		expect(result.error).toBeNull()
+		expect(fetch.mock.calls[0]?.[1]).not.toHaveProperty("signal")
+		expect(timeout).not.toHaveBeenCalled()
+	})
+
+	test.each([false, true])("rejects a pre-aborted signal before resolving IP or fetching (IP forwarding: %s)", async (forwardIp) => {
+		const fetch = vi.fn<FetchFn>()
+		vi.stubGlobal("fetch", fetch)
+		const getClientIp = vi.fn(() => "203.0.113.10")
+		const transport = new WordPressTransport({ credentials, getClientIp: forwardIp ? getClientIp : undefined })
+		const result = await transport.get("wp-json/kizlo/v1/settings", { signal: AbortSignal.abort(new Error("cancelled")) })
+		expect(result).toMatchObject({ status: 0, error: { message: "cancelled" } })
+		expect(getClientIp).not.toHaveBeenCalled()
+		expect(fetch).not.toHaveBeenCalled()
+	})
+
+	test.each([false, true])("removes the IP resolver abort listener after settlement (failure: %s)", async (fail) => {
+		const controller = new AbortController()
+		const add = vi.spyOn(controller.signal, "addEventListener")
+		const remove = vi.spyOn(controller.signal, "removeEventListener")
+		vi.stubGlobal(
+			"fetch",
+			vi.fn<FetchFn>(async () => Response.json({})),
+		)
+		const transport = new WordPressTransport({
+			credentials,
+			getClientIp: async () => {
+				if (fail) throw new Error("resolver failed")
+				return "203.0.113.10"
+			},
+		})
+		await transport.get("wp-json/kizlo/v1/settings", { signal: controller.signal })
+		const listener = add.mock.calls[0]?.[1]
+		expect(listener).toBeTypeOf("function")
+		expect(remove).toHaveBeenCalledWith("abort", listener)
 	})
 })

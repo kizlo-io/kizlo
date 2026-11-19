@@ -177,8 +177,9 @@ describe("createWordPressClient", () => {
 
 		await client().books.retrieve({ params: { identifier: "dune" } }, { signal: controller.signal })
 
-		// The transport composes the caller's signal with its own timeout, so it governs without being it.
+		// The caller owns cancellation; the transport forwards the same signal.
 		const signal = fetch.mock.calls[0]?.[1]?.signal
+		expect(signal).toBe(controller.signal)
 		expect(signal?.aborted).toBe(false)
 		controller.abort()
 		expect(signal?.aborted).toBe(true)
