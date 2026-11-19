@@ -1,5 +1,11 @@
 # kizlo
 
+## 0.32.0
+
+### Minor Changes
+
+- [#310](https://github.com/kizlo-io/kizlo/pull/310) [`e3af4a9`](https://github.com/kizlo-io/kizlo/commit/e3af4a912b162ef6648fd4262bfd96bf2b31c99b) Thanks [@IDJGILL](https://github.com/IDJGILL)! - Replace automatic WordPress timeouts with caller-owned cancellation signals on server and browser clients.
+
 ## 0.31.0
 
 ### Minor Changes
