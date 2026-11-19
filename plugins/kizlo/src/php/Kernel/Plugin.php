@@ -51,6 +51,7 @@ class Plugin
         UserModule::class,
         SeoModule::class,
         EmailModule::class,
+        \Kizlo\Modules\Integrations\IntegrationsModule::class,
         AppearanceModule::class,
         RestApiModule::class,
         TaxonomyModule::class,

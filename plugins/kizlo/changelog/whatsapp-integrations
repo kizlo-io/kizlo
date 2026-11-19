@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add shared WhatsApp settings, encrypted token storage, a reusable integrations client, and discoverable messaging APIs.

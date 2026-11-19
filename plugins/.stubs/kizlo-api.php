@@ -22,6 +22,8 @@ namespace {
     /** @return string */
     function kizlo_get_path($filename = '') {}
 
+    function kizlo_get_integrations(): \Kizlo\Modules\Integrations\Integrations {}
+
     /** @return void */
     function kizlo_include($filename = '') {}
 
@@ -90,6 +92,21 @@ namespace {
     function kizlo_include_post_type(string $post_type): void {}
 
     function kizlo_include_taxonomy(string $taxonomy): void {}
+}
+
+namespace Kizlo\Modules\Integrations {
+    final class Integrations
+    {
+        public readonly WhatsApp $whatsapp;
+    }
+
+    final class WhatsApp
+    {
+        public function isConfigured(): bool {}
+        public function sendText(string $to, string $text): array|\WP_Error {}
+        public function sendDocument(string $to, string $source, string $filename = 'invoice.pdf', string $caption = ''): array|\WP_Error {}
+        public function sendTemplate(string $to, string $name, string $language = 'en_US', array $components = []): array|\WP_Error {}
+    }
 }
 
 namespace Kizlo\Support {

@@ -1,220 +1,110 @@
 import { QueryClientProvider } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
-import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom"
+import { Navigate, Route, Routes } from "react-router-dom"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { ApiProblem } from "./api"
 import type { Bootstrap } from "./bootstrap"
 import { ErrorNotice } from "./ErrorNotice"
-import { Icon } from "./Icon"
-import { Products } from "./Products"
-
-export { ErrorNotice } from "./ErrorNotice"
-
 import { createQueryClient } from "./query"
+import { SecurityLockScreen, SecurityProvider, UserSettings, useSecurity } from "./Security"
+import { Sell } from "./Sell"
+import { SaleCartProvider } from "./sale-cart"
 import { useTheme } from "./theme"
 
-const placeholder = {
-	sell: {
-		title: "A space for your next sale.",
-		description:
-			"Your selling workspace is on its way. Product selection, barcode scanning, and the sale flow will arrive in a later update.",
-		label: "Selling workspace",
-	},
-	orders: {
-		title: "Every order, in one place.",
-		description: "Order browsing and details are coming in a later update. You can continue managing orders in WordPress.",
-		label: "Store orders",
-	},
-}
-
-export function Placeholder({ screen }: { screen: keyof typeof placeholder }) {
-	const content = placeholder[screen]
-	return (
-		<section className="pos-placeholder" aria-label={content.label}>
-			<div className="pos-placeholder-icon">
-				<Icon name={screen} />
-			</div>
-			<p className="pos-eyebrow">COMING NEXT</p>
-			<h2>{content.title}</h2>
-			<p>{content.description}</p>
-			<span className="pos-status">
-				<span className="pos-status-dot" /> Foundation ready
-			</span>
-		</section>
-	)
-}
-
-export function Settings({ data }: { data: Bootstrap }) {
-	return (
-		<section className="pos-settings" aria-label="Store and account">
-			<div>
-				<p className="pos-eyebrow">YOUR WORKSPACE</p>
-				<h2>
-					A familiar store.
-					<br />A focused workspace.
-				</h2>
-				<p>Connected to this WordPress store and your current account.</p>
-			</div>
-			<dl>
-				<div>
-					<dt>Store</dt>
-					<dd>{data.store.name}</dd>
-				</div>
-				<div>
-					<dt>Currency</dt>
-					<dd>{data.store.currency}</dd>
-				</div>
-				<div>
-					<dt>Signed in as</dt>
-					<dd>{data.user.name}</dd>
-				</div>
-				<div>
-					<dt>POS version</dt>
-					<dd>{data.version}</dd>
-				</div>
-			</dl>
-			<div className="pos-account-actions">
-				<a href={data.urls.settings}>
-					POS settings <Icon name="arrow" />
-				</a>
-				<a href={data.urls.account}>
-					WordPress account <Icon name="arrow" />
-				</a>
-				<a href={data.urls.logout}>
-					Log out of WordPress <Icon name="arrow" />
-				</a>
-				<p>Logging out ends your current WordPress session in this browser.</p>
-			</div>
-		</section>
-	)
-}
+export { ErrorNotice } from "./ErrorNotice"
 
 export default function App({ data }: { data: Bootstrap }) {
 	const [client] = useState(createQueryClient)
 	return (
 		<QueryClientProvider client={client}>
-			<Workspace data={data} />
+			<SecurityProvider data={data}>
+				<SaleCartProvider key={`${data.restRoot}:${data.user.id}`} storageKey={`kizlo-pos:cart:${data.restRoot}:${data.user.id}`}>
+					<Workspace data={data} />
+				</SaleCartProvider>
+			</SecurityProvider>
 		</QueryClientProvider>
 	)
 }
 
 function Workspace({ data }: { data: Bootstrap }) {
 	const [theme, toggleTheme] = useTheme()
+	const { status: security } = useSecurity()
+	useEffect(() => {
+		try {
+			localStorage.removeItem("kizlo-pos:camera-prompt-seen")
+		} catch {
+			// Discard the obsolete startup hint when browser storage is available.
+		}
+	}, [])
+	useEffect(() => {
+		document.documentElement.dataset.posTheme = theme
+		document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#111111" : "#f8f8f8")
+
+		return () => document.documentElement.removeAttribute("data-pos-theme")
+	}, [theme])
 	const [problem, setProblem] = useState<ApiProblem | null>(null)
-	const location = useLocation()
-	const current = data.navigation.find((item) => location.pathname === `/${item.id}` || location.pathname.startsWith(`/${item.id}/`)) ?? {
-		id: "products",
-		label: "Products",
-	}
-	const title = location.pathname === "/more" ? "More" : current.label
-	const secondary = current.id === "orders" || current.id === "settings" || location.pathname === "/more"
 	useEffect(() => {
 		const receive = (event: Event) => setProblem((event as CustomEvent<ApiProblem>).detail)
 		window.addEventListener("kizlo-pos-api-error", receive)
 		return () => window.removeEventListener("kizlo-pos-api-error", receive)
 	}, [])
 	useEffect(() => {
-		document.title = `${title} — ${data.store.name} — Kizlo POS`
-		document.getElementById("pos-title")?.focus()
-	}, [title, data.store.name])
-
-	const link = (item: Bootstrap["navigation"][number]) => (
-		<NavLink key={item.id} to={`/${item.id}`} className={({ isActive }) => (isActive ? "pos-nav-link is-active" : "pos-nav-link")}>
-			<Icon name={item.id} />
-			<span>{item.label}</span>
-		</NavLink>
+		document.title = `POS — ${data.store.name}`
+	}, [data.store.name])
+	const sellingScreen = (
+		<Sell
+			theme={theme}
+			onToggleTheme={toggleTheme}
+			loginUrl={data.urls.login}
+			userName={data.user.name}
+			storeName={data.store.name}
+			accountUrl={data.urls.account}
+		/>
 	)
 	return (
-		<div className="kizlo-pos-app" data-theme={theme}>
+		<div
+			className={cn(
+				"kizlo-pos-app scheme-light data-[theme=dark]:scheme-dark min-h-dvh bg-canvas font-normal font-sans text-[15px]/normal text-foreground",
+				"[--pos-bottom-nav-height:calc(72px+env(safe-area-inset-bottom))] [&_:focus-visible]:outline-2 [&_:focus-visible]:outline-primary",
+				"[&_:focus-visible]:outline-offset-4 [&_a]:[-webkit-tap-highlight-color:transparent] [&_button]:cursor-pointer",
+				"[&_button]:[-webkit-tap-highlight-color:transparent] [&_h1:focus]:outline-none [&_input:focus]:border-muted-foreground [&_input:focus]:shadow-none",
+				"touch:[&_input:not([type=checkbox],[type=radio])]:text-base [&_input:not([type=radio],[type=checkbox]):focus]:outline-none [&_main:focus]:outline-none",
+				"[&_select:focus]:border-muted-foreground [&_select:focus]:shadow-none [&_select:focus]:outline-none touch:[&_select]:text-base",
+				"[&_textarea:focus]:border-muted-foreground [&_textarea:focus]:shadow-none [&_textarea:focus]:outline-none touch:[&_textarea]:text-base",
+			)}
+			data-theme={theme}
+		>
 			<Button
 				type="button"
-				className="pos-skip"
-				onClick={() => {
-					document.getElementById("pos-main")?.focus()
-				}}
+				className="pos-skip fixed -top-25 left-4 z-60 rounded-lg bg-foreground px-4.5 py-3 text-inverse! focus:top-4"
+				onClick={() => document.getElementById("pos-main")?.focus()}
 			>
 				Skip to content
 			</Button>
-			<aside className="pos-sidebar">
-				<a className="pos-brand" href={data.urls.pos} aria-label="Kizlo POS home">
-					<span className="pos-brand-mark">k</span>
-					<span>
-						Kizlo <strong>POS</strong>
-					</span>
-				</a>
-				<div className="pos-store">
-					<span className="pos-store-mark">{data.store.name.charAt(0).toUpperCase() || "K"}</span>
-					<div>
-						<strong>{data.store.name}</strong>
-						<span>Your store workspace</span>
-					</div>
-				</div>
-				<nav aria-label="Main navigation">
-					<div className="pos-primary">{data.navigation.filter((item) => item.id === "products" || item.id === "sell").map(link)}</div>
-					<div className="pos-secondary">{data.navigation.filter((item) => item.id === "orders" || item.id === "settings").map(link)}</div>
-				</nav>
-				<div className="pos-sidebar-footer">
-					<span className="pos-avatar">{data.user.name.charAt(0).toUpperCase() || "U"}</span>
-					<div>
-						<strong>{data.user.name}</strong>
-						<span>WordPress account</span>
-					</div>
-				</div>
-			</aside>
-			<div className="pos-workspace">
-				<header className="pos-header">
-					<div>
-						<p className="pos-eyebrow">{data.store.name}</p>
-						<h1 id="pos-title" tabIndex={-1}>
-							{title}
-						</h1>
-					</div>
-					<div className="pos-header-actions">
-						<span className="pos-session">Store workspace</span>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							className="pos-theme-button"
-							onClick={toggleTheme}
-							aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-						>
-							<Icon name={theme === "light" ? "moon" : "sun"} />
-						</Button>
-					</div>
-				</header>
-				<main id="pos-main" tabIndex={-1}>
-					{problem && <ErrorNotice problem={problem} loginUrl={data.urls.login} />}
+			<main
+				id="pos-main"
+				style={security.locked && security.configured ? { display: "none" } : undefined}
+				inert={security.locked && security.configured}
+				tabIndex={-1}
+				className={cn(
+					"flex min-h-dvh flex-col gap-3.5 mobile:gap-4 tablet:gap-5 wide:gap-7.5 bg-canvas compact:px-4 mobile:px-3 py-4 compact:pt-[calc(16px+env(safe-area-inset-top))] mobile:pt-[calc(12px+env(safe-area-inset-top))] pr-4 compact:pb-[calc(16px+var(--pos-bottom-nav-height))] mobile:pb-[calc(12px+var(--pos-bottom-nav-height))] pl-22",
+					!security.configured && "pb-4! pl-4!",
+				)}
+			>
+				{problem && <ErrorNotice problem={problem} loginUrl={data.urls.login} />}
+				{!security.configured ? (
+					<UserSettings accountUrl={data.urls.account} />
+				) : (
 					<Routes>
-						<Route path="/products/*" element={<Products theme={theme} onToggleTheme={toggleTheme} loginUrl={data.urls.login} />} />
-						{(["sell", "orders"] as const).map((screen) => (
-							<Route key={screen} path={`/${screen}`} element={<Placeholder screen={screen} />} />
-						))}
-						<Route path="/settings" element={<Settings data={data} />} />
-						<Route
-							path="/more"
-							element={
-								<section className="pos-more" aria-label="More destinations">
-									<p className="pos-eyebrow">MORE FROM YOUR STORE</p>
-									{data.navigation.filter((item) => item.id === "orders" || item.id === "settings").map(link)}
-								</section>
-							}
-						/>
-						<Route path="*" element={<Navigate to="/products" replace />} />
+						<Route path="/sell" element={sellingScreen} />
+						<Route path="/products" element={sellingScreen} />
+						<Route path="/settings" element={sellingScreen} />
+						<Route path="*" element={<Navigate to="/sell" replace />} />
 					</Routes>
-					<footer className="pos-content-footer">
-						<span>Built for the way you work.</span>
-						<span>Kizlo POS · {data.version}</span>
-					</footer>
-				</main>
-			</div>
-			<nav className="pos-bottom-nav" aria-label="Phone navigation">
-				{data.navigation.filter((item) => item.id === "products" || item.id === "sell").map(link)}
-				<Link to="/more" className={secondary ? "pos-nav-link is-active" : "pos-nav-link"} aria-current={secondary ? "page" : undefined}>
-					<Icon name="more" />
-					<span>More</span>
-				</Link>
-			</nav>
+				)}
+			</main>
+			<SecurityLockScreen data={data} />
 		</div>
 	)
 }

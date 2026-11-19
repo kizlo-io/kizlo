@@ -1,5 +1,12 @@
 <?php
 
+/** Shared site integration clients. Accessing them makes no provider requests. */
+function kizlo_get_integrations(): \Kizlo\Modules\Integrations\Integrations
+{
+    static $integrations;
+    return $integrations ??= new \Kizlo\Modules\Integrations\Integrations();
+}
+
 /**
  * Returns the plugin path to a specified file.
  *

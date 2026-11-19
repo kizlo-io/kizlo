@@ -12,11 +12,12 @@ describe("WordPress bootstrap", () => {
 		{},
 		{ ...data, nonce: "" },
 		{ ...data, urls: { ...data.urls, account: "javascript:alert(1)" } },
-		{ ...data, navigation: Array(4).fill(data.navigation[0]) },
+		{ ...data, user: { ...data.user, id: 0 } },
 	])("rejects missing or invalid initial data: %j", (value) => {
 		expect(readBootstrap(value)).toBeNull()
 	})
 	it("does not copy unrelated server fields into app state", () => {
 		expect(readBootstrap({ ...data, password: "must not be consumed" })).not.toHaveProperty("password")
+		expect(readBootstrap({ ...data, navigation: [{ id: "orders", label: "Orders" }] })).not.toHaveProperty("navigation")
 	})
 })

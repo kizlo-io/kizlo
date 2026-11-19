@@ -50,6 +50,13 @@ class SettingsNav
                 'label' => 'System',
                 'items' => $this->systemPages(),
             ],
+            [
+                'label' => 'Integrations',
+                'items' => [$this->page('integrations/whatsapp', 'WhatsApp', '/integrations/whatsapp', 'link', [
+                    $this->section('connection', 'WhatsApp connection', 'Connect this site to Meta Cloud API. Your other Kizlo features can use this sender.', 'link'),
+                    $this->section('test-message', 'Send a test message', 'Send the Hello world template to a recipient verified for your Meta test number.', 'share-network'),
+                ])],
+            ],
         ];
     }
 

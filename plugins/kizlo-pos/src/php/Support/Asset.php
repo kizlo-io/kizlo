@@ -30,13 +30,9 @@ final class Asset
             'restRoot' => rest_url(),
             'nonce' => wp_create_nonce('wp_rest'),
             'user' => ['id' => $user->ID, 'name' => $user->display_name],
+            'security' => \Kizlo\Pos\Modules\Security\Security::status(),
             'store' => ['name' => wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES), 'currency' => get_woocommerce_currency()],
-            'navigation' => [
-                ['id' => 'products', 'label' => 'Products'],
-                ['id' => 'sell', 'label' => 'Sell'],
-                ['id' => 'orders', 'label' => 'Orders'],
-                ['id' => 'settings', 'label' => 'Settings'],
-            ],
+
         ];
     }
 

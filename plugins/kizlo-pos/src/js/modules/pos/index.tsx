@@ -19,7 +19,10 @@ if (container) {
 		)
 	} else {
 		root.render(
-			<main className="pos-startup-error" role="alert">
+			<main
+				className="pos-startup-error mx-auto my-15 max-w-150 bg-white p-6 font-sans text-base/[1.6] text-neutral-900 [&_h1]:my-[0.67em] [&_h1]:font-bold [&_h1]:text-[2em] [&_p]:my-4"
+				role="alert"
+			>
 				<h1>Kizlo POS could not start</h1>
 				<p>The initial store data is missing or invalid. Reload this page to try again.</p>
 				<Button type="button" onClick={() => window.location.reload()}>

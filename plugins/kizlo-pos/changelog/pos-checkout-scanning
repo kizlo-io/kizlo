@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add a single-screen POS with divided product/cart panes, direct-add products, centered variation and sharing dialogs, barcode scanning, recoverable POS checkout, paid counter cash, scoped online payment links, configurable customer fields, and extensible order notification channels.
