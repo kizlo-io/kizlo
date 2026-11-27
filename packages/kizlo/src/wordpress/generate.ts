@@ -5,6 +5,7 @@ import type {
 	IntrospectionResponse,
 	IntrospectionSchema,
 } from "./introspection"
+import { projectBrowserIntrospection } from "./project"
 import { WordPressTransport } from "./transport"
 import type { WP_EndpointDefinition } from "./types"
 
@@ -594,12 +595,12 @@ function assertUniqueClientMembers(node: WordPressEndpointNode, path: string[] =
 
 const RUNTIME_TYPES = ["WP_Failure", "WP_Success", "WP_TransportFailure"]
 
-function renderRegistries(tree: WordPressEndpointNode, document: IntrospectionDocument): string {
+function renderRegistries(tree: WordPressEndpointNode, document: IntrospectionDocument, browser = false): string {
 	const endpoints = renderEndpointRegistry(tree)
 	const customFields = renderCustomFieldsRegistry(document)
 	return [
 		`declare module "kizlo" {`,
-		`\tinterface WordPressClientRegistry {`,
+		`\tinterface ${browser ? "BrowserClientRegistry" : "WordPressClientRegistry"} {`,
 		`\t\tintrospection: typeof introspection`,
 		`\t}`,
 		`\tinterface WordPressEndpointRegistry {`,
@@ -648,7 +649,11 @@ export interface GeneratedModule {
 
 const DECLARATION_SEPARATOR = "\n\n"
 
-export function generateWordPressModule(document: IntrospectionDocument): GeneratedModule {
+export function generateWordPressModule(
+	document: IntrospectionDocument,
+	options: { audience?: "browser" | "server" } = {},
+): GeneratedModule {
+	if (options.audience === "browser") document = projectBrowserIntrospection(document)
 	const tree = endpointTree(document)
 	assertUniqueClientMembers(tree)
 	assertUniqueGeneratedNames(document)
@@ -673,10 +678,10 @@ export function generateWordPressModule(document: IntrospectionDocument): Genera
 		body,
 		`export const introspection = ${endpointBody}`,
 		`export type WordPressClient = WP_Client<typeof introspection>`,
-		renderRegistries(tree, document),
+		renderRegistries(tree, document, options.audience === "browser"),
 	].join(DECLARATION_SEPARATOR)
 
-	const imports = `import { ${kizloImports(moduleBody, endpointBody !== "{}")} } from "kizlo"`
+	const imports = `import { ${kizloImports(moduleBody, endpointBody !== "{}")} } from "${options.audience === "browser" ? "kizlo/browser" : "kizlo"}"`
 	// `moduleBody` opens with `body`, so the preamble's length is where the first declaration starts.
 	const preamble = `${GENERATED_HEADER}// Introspection ${document.hash}\n\n${imports}\n\n`
 

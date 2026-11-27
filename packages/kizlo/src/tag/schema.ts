@@ -2,7 +2,7 @@ import { arrayable, BooleanLike, lenient, Metadata, NumberLike } from "@kizlo/sh
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import type { WP_CustomFields } from "../wordpress"
+import type { WP_CustomFields, WP_EndpointData } from "../wordpress"
 
 const WP_TAG_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs", "term_group", "description", "count"] as const
 
@@ -10,7 +10,10 @@ const WP_TAG_ORDER_BYS = ["id", "include", "name", "slug", "include_slugs", "ter
 // TAG
 // ====================================================
 
-export type TagCustomFields = WP_CustomFields<"kizlo.taxonomies.postTag">
+type PublicTag = WP_EndpointData<"tags.retrieve">
+export type TagCustomFields = [PublicTag] extends [never]
+	? WP_CustomFields<"kizlo.taxonomies.postTag">
+	: NonNullable<PublicTag["kizlo"]>["custom"]
 
 export const TagCustomFieldsSchema: z.ZodType<TagCustomFields, TagCustomFields> = customFieldsSchema<TagCustomFields>()
 

@@ -39,13 +39,9 @@ See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `C
 
 ## Auth
 
-Kizlo protects its own REST routes , everything under `/wp-json/kizlo/*` , with HTTP Basic auth using a WordPress [Application Password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/) belonging to an administrator. Missing or invalid Application Password authentication returns `401`; a valid non-administrator Application Password returns `403`. A WordPress login cookie alone is not sufficient for these routes.
+Routes declare their access policy. Public content, site, menu and SEO reads are available directly to browsers. Administrative routes retain WordPress capability checks with native cookie+nonce or service Application Password authentication.
 
-Native WordPress routes such as `/wp/v2/*`, and third-party plugin routes, keep their own authentication and capability checks. The block editor, the admin dashboard, and other plugins therefore work normally while Kizlo is active , they authenticate their own REST requests with a login cookie and nonce as they always have.
-
-An integration may opt a sensitive route family back behind the administrator boundary. The WooCommerce integration does this for the entire Store API (`/wc/store/*` , cart, checkout, order, and product routes), because those routes act on an `X-Kizlo-User-Email` header that is trusted without cryptographic verification; WooCommerce's own admin and account routes (`/wc/v3/*`, `/wc-admin/*`) stay on their native permissions.
-
-Generate an Application Password at **WP Admin → Users → Profile → Application Passwords** and treat it like a server-side, rotatable service credential.
+Configure Clerk, Kinde or Custom JWT under **System → Authentication**. WordPress verifies user tokens and permits only exact configured frontend origins. External tokens do not grant WordPress administrator capabilities. Keep Application Passwords private; see [authentication setup](https://kizlo.io/docs/concepts/authentication) and [direct clients](https://kizlo.io/docs/concepts/client).
 
 ## Development
 

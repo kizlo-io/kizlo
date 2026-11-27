@@ -1,5 +1,5 @@
 import type { Seo, SeoSchema, Sitemap, SitemapUrl } from "./schema"
-import type { WPK_Seo } from "./types"
+import type { WPK_Seo, WPK_Sitemap, WPK_SitemapUrl } from "./types"
 
 export function deserializeSeo(data: WPK_Seo): Seo {
 	return {
@@ -111,4 +111,13 @@ export function xmlResponse(body: string): Response {
 			"Content-Type": "application/xml; charset=utf-8",
 		},
 	})
+}
+
+/** Normalize optional WordPress sitemap presentation values for XML rendering. */
+export function deserializeSitemaps(items: WPK_Sitemap[]): Sitemap[] {
+	return items.map((item) => ({ ...item, lastmod: item.lastmod ?? "" }))
+}
+
+export function deserializeSitemapUrls(items: WPK_SitemapUrl[]): SitemapUrl[] {
+	return items.map((item) => ({ ...item, images: item.images.map((image) => ({ ...image, title: image.title ?? "" })) }))
 }

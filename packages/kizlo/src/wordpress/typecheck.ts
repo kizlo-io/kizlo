@@ -89,7 +89,7 @@ function compilerOptions(ts: TypeScript, kizloTypes: string): import("typescript
 		module: ts.ModuleKind.ESNext,
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		noEmit: true,
-		paths: { kizlo: [kizloTypes] },
+		paths: { kizlo: [kizloTypes], "kizlo/browser": [path.join(path.dirname(kizloTypes), "browser.d.ts")] },
 		skipLibCheck: true,
 		strict: true,
 		target: ts.ScriptTarget.ES2022,

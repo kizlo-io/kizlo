@@ -18,9 +18,20 @@ const clientIpSchema = z.union([z.ipv4(), z.ipv6()])
 export interface WordPressTransportOptions {
 	/** Resolve a trusted IP for this invocation. Missing or invalid IPs are omitted. */
 	getClientIp?: () => Promisify<string | null>
-	credentials: WordPressCredentials
+	credentials?: WordPressCredentials
+	/** Public WordPress origin for direct clients without service credentials. */
+	url?: string
+	/** Supplies a fresh user token for this request. Null represents a guest. */
+	getToken?: () => Promisify<string | null>
+	cartSession?: CartSession
 	onResponse?: (headers: Headers) => void
 	onResult?: (result: WordPressTransportResult) => void
+}
+
+/** Caller-owned storage. Clear it on logout/account changes; customer tokens are also owner-checked by WordPress. */
+export interface CartSession {
+	get(): string | null
+	set(token: string | null): void
 }
 
 export interface WordPressTransportResult {
@@ -33,6 +44,8 @@ export class WordPressTransport {
 	private readonly getClientIp?: WordPressTransportOptions["getClientIp"]
 	private readonly siteBase: string
 	private readonly authHeader: string
+	private readonly getToken?: WordPressTransportOptions["getToken"]
+	private readonly cartSession?: CartSession
 	/** Called with the response headers of every non-transport-error response, so callers can observe
 	 * per-response signals (e.g. the plugin version header) without threading them through every method. */
 	private readonly onResponse?: (headers: Headers) => void
@@ -40,12 +53,23 @@ export class WordPressTransport {
 	private readonly onResult?: (result: WordPressTransportResult) => void
 
 	constructor(context: WordPressTransportOptions) {
-		const credentialBytes = new TextEncoder().encode(`${context.credentials.username}:${context.credentials.password}`)
+		if (context.credentials && context.getToken) throw new TypeError("Choose service credentials or a user token, not both")
+		const siteUrl = context.credentials?.url ?? context.url
+		if (!siteUrl) throw new TypeError("A WordPress URL is required")
+		const parsedUrl = new URL(siteUrl)
+		if (!["http:", "https:"].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+			throw new TypeError("Use an HTTP(S) WordPress URL without embedded credentials")
+		}
+		const credentialBytes = new TextEncoder().encode(
+			context.credentials ? `${context.credentials.username}:${context.credentials.password}` : "",
+		)
 		let binary = ""
 		for (const byte of credentialBytes) binary += String.fromCharCode(byte)
 		const encoded = btoa(binary)
-		this.authHeader = `${WP_AUTH_TYPE} ${encoded}`
-		this.siteBase = context.credentials.url.endsWith("/") ? context.credentials.url : `${context.credentials.url}/`
+		this.authHeader = context.credentials ? `${WP_AUTH_TYPE} ${encoded}` : ""
+		this.getToken = context.getToken
+		this.cartSession = context.cartSession
+		this.siteBase = siteUrl.endsWith("/") ? siteUrl : `${siteUrl}/`
 		this.onResponse = context.onResponse
 		this.onResult = context.onResult
 		this.getClientIp = context.getClientIp
@@ -246,16 +270,48 @@ export class WordPressTransport {
 	}
 
 	async #send(input: WP_RequestInput, url: URL): Promise<Response> {
+		if (url.origin !== new URL(this.siteBase).origin) throw new TypeError("Requests must stay on the configured WordPress origin")
 		const body = this.#serializeBody(input.body, input.requestContentType)
 		const isFormData = body instanceof FormData
 
 		const headers: Record<string, string> = {
 			...(body !== undefined && !isFormData && { "Content-Type": input.requestContentType ?? "application/json" }),
 			...input.headers,
-			[WP_AUTH_HEADER_KEY]: this.authHeader,
+		}
+		if (this.authHeader || this.getToken) {
+			for (const name of Object.keys(headers)) if (name.toLowerCase() === WP_AUTH_HEADER_KEY) delete headers[name]
+			if (this.authHeader) headers[WP_AUTH_HEADER_KEY] = this.authHeader
+			if (this.getToken) {
+				input.signal?.throwIfAborted()
+				let onAbort = () => {}
+				try {
+					const resolving = Promise.resolve().then(() => this.getToken?.())
+					const token = await (input.signal
+						? Promise.race([
+								resolving,
+								new Promise<never>((_, reject) => {
+									onAbort = () => reject(input.signal?.reason)
+									input.signal?.addEventListener("abort", onAbort, { once: true })
+								}),
+							])
+						: resolving)
+					if (token !== null) {
+						if (typeof token !== "string" || !/^[A-Za-z0-9_.-]+$/.test(token)) throw new TypeError("The session token is invalid")
+						headers[WP_AUTH_HEADER_KEY] = `Bearer ${token}`
+					}
+				} finally {
+					input.signal?.removeEventListener("abort", onAbort)
+				}
+			}
 		}
 
 		const { signal } = input
+		const cartRequest = /\/wc\/store\/v\d+\/(?:cart|checkout|order)(?:\/|$)/.test(url.pathname)
+		if (cartRequest && this.cartSession) {
+			for (const name of Object.keys(headers)) if (name.toLowerCase() === "cart-token") delete headers[name]
+			const token = this.cartSession.get()
+			if (token) headers["Cart-Token"] = token
+		}
 		signal?.throwIfAborted()
 		let clientIp: string | undefined
 		if (this.getClientIp && url.origin === new URL(this.siteBase).origin) {
@@ -285,12 +341,20 @@ export class WordPressTransport {
 
 		const response = await fetch(url.toString(), {
 			headers,
+			credentials: "omit",
+			...(cartRequest || Object.keys(headers).some((name) => ["authorization", "cart-token", "nonce"].includes(name.toLowerCase()))
+				? { cache: "no-store" as const, redirect: "error" as const }
+				: {}),
 			method: input.method,
 			...(signal ? { signal } : {}),
 			// Do not let fetch carry the visitor IP to a redirect destination.
 			...(clientIp ? { redirect: "manual" as const } : {}),
 			...(hasBody && body !== undefined ? { body } : {}),
 		})
+		if (cartRequest && response.ok) {
+			const token = response.headers.get("Cart-Token")
+			if (token) this.cartSession?.set(token)
+		}
 		if (clientIp && [301, 302, 303, 307, 308].includes(response.status)) {
 			await response.body?.cancel()
 			throw new TypeError("WordPress redirects are not allowed when forwarding a client IP")

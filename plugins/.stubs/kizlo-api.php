@@ -227,3 +227,28 @@ namespace Kizlo\Modules\Post {
         public static function flush(): void {}
     }
 }
+
+namespace Kizlo\Modules\Auth {
+    final class Identity {
+        public readonly string $issuer;
+        public readonly string $subject;
+        public readonly ?string $email;
+        public readonly bool $emailVerified;
+        public readonly ?string $firstName;
+        public readonly ?string $lastName;
+    }
+    final class AuthModule {
+        public static function identity(\WP_REST_Request $request): Identity|\WP_Error|null {}
+    }
+}
+
+namespace Kizlo\Modules\Auth {
+    final class RequestMetadata {
+        public static function ip(): string {}
+    }
+}
+namespace Kizlo\Modules\Captcha {
+    final class Captcha {
+        public static function verify(?string $token): true|\WP_Error {}
+    }
+}

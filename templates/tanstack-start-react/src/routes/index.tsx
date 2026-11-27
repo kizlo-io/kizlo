@@ -1,20 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
+import { deserializeSeo, requireData } from "kizlo"
 import { renderJsonLd, resolvePageHead } from "kizlo/tanstack-start"
-import { client } from "@/lib/kizlo/server"
+import { client } from "@/lib/kizlo/client"
 
-// The server-to-server client runs only on the server, so the data fetch lives in a server function; the
-// loader calls it on the server during SSR and over RPC on client navigation. Return only what the page
-// needs — a lean, serializable payload (the SEO head plus a pre-rendered JSON-LD string), not the whole
-// WordPress post.
-const getHome = createServerFn({ method: "GET" }).handler(async () => {
-	const [{ items }, seo] = await Promise.all([client.posts.list.call({ query: { perPage: 10 } }), client.seo.homepage.call()])
+async function getHome() {
+	const [postsResult, seoResult] = await Promise.all([
+		client.kizlo.content.post.list({ query: { per_page: 10 } }),
+		client.kizlo.seo.homepage.retrieve(),
+	])
+	const items = requireData(postsResult)
+	const seo = deserializeSeo(requireData(seoResult))
 	return {
-		posts: items.map((post) => ({ id: post.id, slug: post.slug, title: post.title })),
+		posts: items.map((post) => ({ id: post.id, slug: post.slug, title: post.title.rendered })),
 		head: seo.head,
 		jsonLd: renderJsonLd(seo.schema),
 	}
-})
+}
 
 export const Route = createFileRoute("/")({
 	loader: () => getHome(),

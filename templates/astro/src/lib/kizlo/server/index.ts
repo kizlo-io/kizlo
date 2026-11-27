@@ -1,6 +1,2 @@
-import { getSecret } from "astro:env/server"
-import { createKizlo } from "kizlo"
-import { astro } from "kizlo/astro/server"
-import { introspection } from "./generated"
-
-export const { procedures, client, wordpress, handler } = createKizlo({ integrations: [astro({ env: getSecret })], introspection })
+// Public SSR reads use the same APIs and credentials-free client as the browser.
+export { client } from "../client"

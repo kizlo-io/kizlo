@@ -2,15 +2,13 @@ import fs from "node:fs"
 import path from "node:path"
 import z from "zod/v4"
 import type { KizloGlobalConfig } from "../../config"
-import { node } from "../../integrations/node/integration"
-import { integrationEnv, resolveWordPressConnection, wordPressConnectionComplete } from "../../kizlo"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { detectPackageManager, loadEnvFiles, type PackageManager } from "../utils"
 import { DEFAULT_WORDPRESS_TAG, INTROSPECTION_META_REL, LOCAL_DIR_REL } from "../wp/constants"
 import type { Fixture } from "../wp/types"
 import { credentialsPath, findConfigDir } from "../wp/utils"
 import { WORDPRESS_TAG_PATTERN } from "../wp/version"
-import { importIgnoringVirtualModules } from "./jiti"
+import { importConfigModule } from "./jiti"
 import { log } from "./logger"
 
 const fixtureSchema = z.custom<Fixture>(
@@ -34,14 +32,9 @@ const versionSchema = z
  */
 const removedKey = (message: string) => z.undefined({ error: message }).optional()
 
-const dirSchema = z.union([
-	z.string(),
-	z.object({
-		server: z.string().optional(),
-		contract: z.string().optional(),
-		introspection: z.string().optional(),
-	}),
-])
+const dirSchema = z.string({
+	error: "`dir` now selects the output directory directly. Replace the server/contract/introspection object with a directory string.",
+})
 
 const devStackSchema = z.object({
 	enable: z.boolean().optional(),
@@ -79,11 +72,12 @@ const localSchema = z.union([
 /** Runtime shape of `kizlo.config.*` — mirrors {@link KizloGlobalConfig}. */
 const configSchema = z.object({
 	dir: dirSchema.optional(),
-	alias: z.string().optional(),
+	alias: removedKey("`alias` has been removed. Generated endpoints use package imports directly."),
+	wordpress: z.object({ url: z.url(), username: z.string().min(1), password: z.string().min(1) }).optional(),
 	local: localSchema.optional(),
 	mcp: mcpSchema.optional(),
 	// Keys removed in the config redesign, each failing with the replacement to move to.
-	wordpressClientDir: removedKey("`wordpressClientDir` has been removed. Use `dir: { introspection }` instead."),
+	wordpressClientDir: removedKey("`wordpressClientDir` has been removed. Use a `dir` directory string instead."),
 	name: removedKey("`name` is no longer a config root key. Move it under `local.name`."),
 	worktrees: removedKey("`worktrees` is no longer a config root key. Move it under `local.worktrees`."),
 	dev: removedKey("`dev` is no longer a config root key. Move it under `local.dev`."),
@@ -131,27 +125,9 @@ function resolveLocal(fileConfig?: LoadedConfig): ResolvedLocal {
 	}
 }
 
-/** The server sources a project has, when `dir` resolves one: watched, and the source of the contract. */
-export interface ResolvedServer {
-	/** Server sources directory (watched by `kizlo dev`). */
-	dir: string
-	/** The server entry (`index.ts`) whose `procedures` export builds the contract. */
-	entry: string
-	/** Directory `contract.json` and the generated barrel are written to. */
-	contractDir: string
-	contractPath: string
-	barrelPath: string
-}
-
 export interface ResolvedConfig {
 	cwd: string
-	/**
-	 * The server layout, present only when `dir` resolves a `server` path: the string form always does,
-	 * the object form only when `server` is set. Absent means introspection-only: nothing to watch, no
-	 * contract to build.
-	 */
-	server?: ResolvedServer
-	/** The generated `introspection.ts`, always written whether or not a server is present. */
+	/** Service definitions; the browser projection is introspection.browser.ts beside it. */
 	introspectionPath: string
 	/** Fetch cache, under `.kizlo/` rather than the generated dir: it is local state, not an artifact. */
 	introspectionMetaPath: string
@@ -188,7 +164,7 @@ async function loadConfigFile(cwd: string): Promise<LoadedConfig | undefined> {
 
 	let raw: unknown
 	try {
-		const mod = await importIgnoringVirtualModules<{ default?: KizloGlobalConfig } & KizloGlobalConfig>(cwd, file)
+		const mod = await importConfigModule<{ default?: KizloGlobalConfig } & KizloGlobalConfig>(cwd, file)
 		raw = mod.default ?? mod
 	} catch (error) {
 		log.error(`Could not load ${path.basename(file)}:`, error)
@@ -203,64 +179,12 @@ async function loadConfigFile(cwd: string): Promise<LoadedConfig | undefined> {
 	return result.data
 }
 
-/**
- * Resolve what Kizlo generates and watches from `dir`: the `--dir` flag or `dir` in `kizlo.config.*`.
- * A string is the home Kizlo owns the layout under (sources in `<dir>/server`, generated files under
- * `<dir>/server/generated`); the object form sets `server` / `contract` / `introspection` independently.
- *
- * The introspection is always generated at its resolved path, so a project with no server still gets it.
- * `server` is present only when `dir` resolves a server path (the string form always does, the object
- * form only when `server` is set), and its absence means there is nothing to watch and no contract to
- * build. Returns `undefined` only when nothing at all is configured (no `dir`, or an object naming
- * neither a server nor an introspection path): there is then nothing to generate.
- */
+/** `dir` is the generated output directory; no application entry is imported. */
 export async function resolveConfig(cwd: string, flags?: { dir?: string }): Promise<ResolvedConfig | undefined> {
 	const fileConfig = await loadConfigFile(cwd)
-	const raw = flags?.dir ?? fileConfig?.dir
-	if (raw === undefined) return undefined
-
-	if (typeof raw === "string") {
-		const home = normalizeDir(raw)
-		const serverDir = path.join(home, "server")
-		const contractDir = path.join(serverDir, "generated")
-		return {
-			cwd,
-			server: {
-				dir: serverDir,
-				entry: path.join(serverDir, "index.ts"),
-				contractDir,
-				contractPath: path.join(contractDir, "contract.json"),
-				barrelPath: path.join(contractDir, "index.ts"),
-			},
-			introspectionPath: path.join(contractDir, INTROSPECTION_FILE),
-			introspectionMetaPath: INTROSPECTION_META_REL,
-		}
-	}
-
-	const serverDir = raw.server ? normalizeDir(raw.server) : undefined
-	const contractDir = serverDir ? (raw.contract ? normalizeDir(raw.contract) : path.join(serverDir, "generated")) : undefined
-	const server: ResolvedServer | undefined =
-		serverDir && contractDir
-			? {
-					dir: serverDir,
-					entry: path.join(serverDir, "index.ts"),
-					contractDir,
-					contractPath: path.join(contractDir, "contract.json"),
-					barrelPath: path.join(contractDir, "index.ts"),
-				}
-			: undefined
-
-	// Where the introspection lands: an explicit `introspection` dir wins, else it sits beside the
-	// contract under a server's `generated/`. With neither there is nothing to generate.
-	const introspectionDir = raw.introspection ? normalizeDir(raw.introspection) : contractDir
-	if (!introspectionDir) return undefined
-
-	return {
-		cwd,
-		server,
-		introspectionPath: path.join(introspectionDir, INTROSPECTION_FILE),
-		introspectionMetaPath: INTROSPECTION_META_REL,
-	}
+	const dir = flags?.dir ?? fileConfig?.dir
+	if (dir === undefined) return undefined
+	return { cwd, introspectionPath: path.join(normalizeDir(dir), INTROSPECTION_FILE), introspectionMetaPath: INTROSPECTION_META_REL }
 }
 
 /**
@@ -440,18 +364,20 @@ export async function usesLocalWordPress(cwd: string): Promise<boolean> {
 	return resolveLocal(await loadConfigFile(findConfigDir(cwd))).devEnabled
 }
 
-/**
- * WordPress credentials for the dev/generate watcher, or `undefined` when there is nothing to introspect:
- * the active profile is `local` but no local dev stack is enabled, or the active profile's connection
- * envs are incomplete. Callers then generate the contract with introspection skipped rather than fetching
- * from a WordPress that is not there. Unlike {@link resolveWordPressConnection}, this never throws.
- */
+/** Explicit service credentials, or the active WordPress environment profile for local tooling. */
 export async function resolveWatchCredentials(cwd: string): Promise<WordPressCredentials | undefined> {
 	loadEnvFiles(cwd)
-	const env = integrationEnv([node()])
-	if (env("mode")?.trim() === "local" && !(await usesLocalWordPress(cwd))) return undefined
-	if (!wordPressConnectionComplete(env)) return undefined
-	return resolveWordPressConnection(env).credentials
+	const config = await loadConfigFile(findConfigDir(cwd))
+	if (config?.wordpress) return config.wordpress
+	const mode = process.env.KIZLO_MODE?.trim()
+	if (mode && mode !== "local" && mode !== "remote") throw new Error('KIZLO_MODE must be "local" or "remote"')
+	const local = mode === "local"
+	if (local && !resolveLocal(config).devEnabled) return undefined
+	const prefix = local ? "KIZLO_LOCAL_WP_" : "KIZLO_WP_"
+	const url = process.env[`${prefix}URL`]?.trim()
+	const username = process.env[`${prefix}USERNAME`]?.trim()
+	const password = process.env[`${prefix}APP_PASSWORD`]?.trim()
+	return url && username && password ? { url, username, password } : undefined
 }
 
 /** The MCP server's settings, resolved from `mcp` in `kizlo.config.*`. */

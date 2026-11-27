@@ -39,7 +39,7 @@ export function cf7(opts: { plugins?: DevPluginSource[] } = {}) {
 			const formB64 = Buffer.from(CF7_FORM).toString("base64")
 			const php =
 				`$form = WPCF7_ContactForm::get_template(['title' => '${CF7_TITLE}']); ` +
-				`$form->set_properties(['form' => base64_decode('${formB64}')]); ` +
+				`$form->set_properties(['form' => base64_decode('${formB64}'), 'additional_settings' => 'skip_mail: on']); ` +
 				`echo $form->save();`
 			const id = await wpCli(["eval", php])
 			return { cf7FormId: Number(id) }

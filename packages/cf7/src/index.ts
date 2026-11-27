@@ -1,55 +1,9 @@
-import type { Schema, SchemaInput } from "@kizlo/shared"
-import { createIntegration, createProcedure, KizloError, schemaType } from "kizlo"
-import { CaptchaInput, type SubmitFormResult } from "./schema"
+import type { WP_EndpointData } from "kizlo"
+import type { SubmitFormResult } from "./schema"
 
-export interface ContactFormSevenOptions {
-	id: number
-	fields: Schema
-}
+export * from "./schema"
 
-export function contactFormSeven<TId extends string, TOptions extends ContactFormSevenOptions>(id: TId, options: TOptions) {
-	return createIntegration({
-		id,
-		requires: {
-			plugins: [{ name: "kizlo-cf7", version: "0.2.0" }],
-			endpoints: ["cf7.forms.submit"],
-		},
-		procedures: {
-			submit: createProcedure(
-				{
-					scope: "remote",
-					method: "POST",
-					input: schemaType<SchemaInput<TOptions["fields"]> & CaptchaInput>(),
-					output: schemaType<SubmitFormResult>(),
-				},
-				async ({ context, input }) => {
-					const captchaResult = await CaptchaInput["~standard"].validate(input)
-
-					if ("issues" in captchaResult) {
-						throw new KizloError("BAD_REQUEST", { message: "Missing or invalid captcha token", data: captchaResult.issues })
-					}
-
-					const isValid = await context.verifyCaptcha(captchaResult.value.captchaToken)
-					if (!isValid) throw new KizloError("FORBIDDEN", { message: "Captcha verification failed" })
-
-					const formResult = await options.fields["~standard"].validate(input)
-					if ("issues" in formResult) {
-						throw new KizloError("BAD_REQUEST", { message: "Invalid form data", data: formResult.issues })
-					}
-
-					const response = await context.wordpress.cf7.forms.submit({
-						params: { form_id: options.id },
-						body: { ...(formResult.value as Record<string, unknown>) },
-					})
-					if (response.error) throw response.error
-
-					return {
-						message: response.data.message,
-						invalidFields: response.data.invalid_fields,
-						success: response.data.status === "mail_sent",
-					}
-				},
-			),
-		},
-	})
+/** Present the result after WordPress and CF7 validate and process the submitted form. */
+export function deserializeSubmission(data: WP_EndpointData<"cf7.forms.submit">): SubmitFormResult {
+	return { message: data.message, invalidFields: data.invalid_fields, success: data.status === "mail_sent" }
 }

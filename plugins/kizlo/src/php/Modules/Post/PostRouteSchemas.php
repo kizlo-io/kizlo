@@ -48,6 +48,7 @@ final class PostRouteSchemas
             $properties['kizlo'] = [
                 'type'       => 'object',
                 'required'   => true,
+                'nullable'   => true,
                 'properties' => $envelope,
             ];
 

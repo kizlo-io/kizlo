@@ -41,7 +41,9 @@ See [Local WordPress stacks](../../CONTRIBUTING.md#local-wordpress-stacks) in `C
 
 ## Auth
 
-The companion plugin's REST endpoints use the same Application Password auth as Kizlo core. See [Kizlo core's auth section](../kizlo/README.md#auth) for setup.
+Submit directly to `/wp-json/kizlo/v1/cf7/{form_id}` with the form fields and `captcha_token`. Configure the CAPTCHA provider and its private secret in WordPress. The endpoint verifies that proof, then runs native CF7 validation and spam checks. Validation failures remain a 200 response with `status: "validation_failed"`.
+
+Configure exact frontend origins in [Kizlo authentication settings](https://kizlo.io/docs/concepts/authentication). No administrator credentials belong in the browser.
 
 ## Development
 

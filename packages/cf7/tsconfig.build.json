@@ -1,4 +1,4 @@
 {
 	"extends": "@tooling/typescript/build.json",
-	"include": ["src/**/*", "*.ts"]
+	"include": ["src/**/*", "*.ts", "../../introspection.ts"]
 }

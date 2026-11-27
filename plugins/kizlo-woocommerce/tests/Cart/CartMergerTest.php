@@ -35,13 +35,13 @@ class CartMergerTest extends TestCase
             $this->cartItem($product->get_id(), 2),
         ]);
 
-        $first = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer());
+        $first = CartMerger::merge($guestToken, $this->customerId, fn(): true => $this->initializeCustomer());
         $this->assertTrue($first);
         $this->assertSame(2, WC()->cart->get_cart_contents_count());
         $this->assertNull($this->storedSession($guestToken));
         $this->assertNotNull($this->storedSession((string) $this->customerId));
 
-        $second = CartMerger::merge($guestToken, static fn(): true => true);
+        $second = CartMerger::merge($guestToken, $this->customerId, static fn(): true => true);
         $this->assertTrue($second);
         $this->assertSame(2, WC()->cart->get_cart_contents_count());
     }
@@ -55,7 +55,7 @@ class CartMergerTest extends TestCase
             $this->cartItem(99999999, 1),
         ]);
 
-        $result = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer());
+        $result = CartMerger::merge($guestToken, $this->customerId, fn(): true => $this->initializeCustomer());
         $errors = new WP_Error();
         CartMerger::addErrors($errors);
 
@@ -77,7 +77,7 @@ class CartMergerTest extends TestCase
             ? [$saved->get_id() => 3]
             : [$saved->get_id() => 1, $guest->get_id() => 2];
 
-        $result = CartMerger::merge($guestToken, function (): true {
+        $result = CartMerger::merge($guestToken, $this->customerId, function (): true {
             $this->initializeCustomer();
             $this->assertSame(0, did_action('woocommerce_load_cart_from_session'));
             $this->assertSame([], WC()->cart->get_cart_contents());
@@ -91,7 +91,7 @@ class CartMergerTest extends TestCase
         $this->assertSame($expected, array_column(maybe_unserialize($stored['cart']), 'quantity', 'product_id'));
         $this->assertNull($this->storedSession($guestToken));
 
-        $retry = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer());
+        $retry = CartMerger::merge($guestToken, $this->customerId, fn(): true => $this->initializeCustomer());
         $this->assertTrue($retry);
         $this->assertSame($expected, array_column(WC()->cart->get_cart(), 'quantity', 'product_id'));
     }
@@ -102,20 +102,22 @@ class CartMergerTest extends TestCase
         return ['distinct products' => [false], 'overlapping product' => [true]];
     }
 
-    public function test_a_contended_advisory_lock_leaves_the_guest_session_unconsumed(): void
+    /** @dataProvider provide_merge_locks */
+    public function test_a_contended_advisory_lock_leaves_the_guest_session_unconsumed(bool $customerLock): void
     {
         $product    = $this->product('Locked merge product');
         $guestToken = $this->guestToken($product->get_id());
         $this->seedCart($guestToken, [$this->cartItem($product->get_id(), 1)]);
 
         $other    = new \wpdb(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST);
-        $lockName = 'kizlo_cart_' . substr(hash('sha256', $guestToken), 0, 48);
+        $lockName = 'kizlo_cart_' . substr(hash('sha256', $customerLock ? 'customer:' . $this->customerId : $guestToken), 0, 48);
         $locked   = $other->get_var($other->prepare('SELECT GET_LOCK(%s, 0)', $lockName));
         $this->assertSame('1', (string) $locked);
 
         try {
             $result = CartMerger::merge(
                 $guestToken,
+                $this->customerId,
                 static function (): true {
                     throw new \RuntimeException('Initialization must not run without the lock.');
                 }
@@ -129,10 +131,15 @@ class CartMergerTest extends TestCase
         $this->assertSame('kizlo_cart_merge_lock_unavailable', $result->get_error_code());
         $this->assertNotNull($this->storedSession($guestToken));
 
-        $retry = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer());
+        $retry = CartMerger::merge($guestToken, $this->customerId, fn(): true => $this->initializeCustomer());
         $this->assertTrue($retry);
         $this->assertSame(1, WC()->cart->get_cart_contents_count());
         $this->assertNull($this->storedSession($guestToken));
+    }
+
+    public function provide_merge_locks(): array
+    {
+        return ['guest lock' => [false], 'customer lock' => [true]];
     }
 
     public function test_headless_session_expiration_is_exactly_48_hours(): void
@@ -160,13 +167,13 @@ class CartMergerTest extends TestCase
             }
         };
 
-        $result = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer($session));
+        $result = CartMerger::merge($guestToken, $this->customerId, fn(): true => $this->initializeCustomer($session));
 
         $this->assertInstanceOf(WP_Error::class, $result);
         $this->assertSame('kizlo_cart_merge_persistence_failed', $result->get_error_code());
         $this->assertNotNull($this->storedSession($guestToken));
 
-        $retry = CartMerger::merge($guestToken, fn(): true => $this->initializeCustomer());
+        $retry = CartMerger::merge($guestToken, $this->customerId, fn(): true => $this->initializeCustomer());
         $this->assertTrue($retry);
         $this->assertSame(1, WC()->cart->get_cart_contents_count());
         $this->assertNull($this->storedSession($guestToken));

@@ -19,7 +19,7 @@ function fail(message: string, error: unknown): never {
 export const generate = defineCommand({
 	meta: {
 		name: "generate",
-		description: "Generate the Kizlo contract once (for builds and CI)",
+		description: "Generate WordPress browser and server endpoints (for builds and CI)",
 	},
 	args: {
 		dir: {
@@ -54,8 +54,11 @@ export const generate = defineCommand({
 			const credentials = await resolveWatchCredentials(cwd)
 			if (credentials) options = { credentials, strict }
 			else {
-				log.info("No WordPress connection configured; generating the contract only, introspection skipped.")
-				options = { skipIntrospection: true, strict }
+				log.error(
+					"WordPress service credentials are required. Configure wordpress in kizlo.config.ts or the KIZLO_WP_* environment values.",
+				)
+				process.exitCode = 1
+				return
 			}
 		}
 
@@ -69,25 +72,11 @@ export const generate = defineCommand({
 		try {
 			result = await generateOnce(cfg, options)
 		} catch (error) {
-			fail("Failed to generate the Kizlo contract:", error)
+			fail("Failed to generate the WordPress endpoints:", error)
 		}
 
-		if (result.contract === "empty" && cfg.server) {
-			log.error(`No Kizlo server found in ${cfg.server.entry}`)
-			process.exit(1)
-		}
-
-		// Introspection-only: a package that ships procedures but no server. Name the file, since there is
-		// no contract line to imply the generation happened. Nothing to report when it was skipped — the
-		// note above already said so, and no file was touched.
-		if (result.contract === "none") {
-			if (result.introspection === "skipped") return
-			const file = path.resolve(cwd, cfg.introspectionPath)
-			log.success(`WordPress introspection ${result.introspection === "generated" ? "written to" : "already current at"} ${file}`)
-			return
-		}
-
-		if (result.introspection === "generated") log.success("WordPress introspection generated")
-		log.success("Contract generated")
+		if (result.introspection === "skipped") return
+		const file = path.resolve(cwd, cfg.introspectionPath)
+		log.success(`WordPress endpoint definitions ${result.introspection === "generated" ? "written to" : "already current at"} ${file}`)
 	},
 })

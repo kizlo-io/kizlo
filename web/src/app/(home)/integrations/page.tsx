@@ -3,11 +3,12 @@ import type { Metadata } from "next"
 import { cache, Suspense } from "react"
 import { IntegrationsCatalog } from "@/components/integrations-catalog"
 import { JsonLd } from "@/components/json-ld"
-import { client } from "@/lib/kizlo/server"
+import { getContent } from "@/lib/kizlo/content"
+import { listIntegrations } from "@/lib/kizlo/integrations"
 import { createMetadata } from "@/lib/metadata"
 
 /** The catalog copy below is hand-written, but its head and JSON-LD come from the WordPress page. */
-const getCatalogPage = cache(() => client.pages.get({ params: { identifier: "integrations" } }))
+const getCatalogPage = cache(() => getContent("page", { params: { identifier: "integrations" } }))
 
 export async function generateMetadata(): Promise<Metadata> {
 	const { data } = await getCatalogPage()
@@ -21,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function IntegrationsPage() {
-	const [{ data }, page] = await Promise.all([client.integrations.list(), getCatalogPage()])
+	const [data, page] = await Promise.all([listIntegrations(), getCatalogPage()])
 	const integrations = data ?? []
 
 	return (

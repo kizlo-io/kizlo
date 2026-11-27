@@ -1,10 +1,5 @@
 import type { CookieOptions, CookieWithOptions } from "@kizlo/shared"
-import type { NestedClient } from "@orpc/client"
 import type { ListMetadata } from "./schema"
-
-export type AnyContext = Record<PropertyKey, any>
-
-export type AnyNestedClient = NestedClient<any>
 
 export type HTTPMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD"
 

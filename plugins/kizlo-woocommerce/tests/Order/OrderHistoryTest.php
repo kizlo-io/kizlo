@@ -129,7 +129,7 @@ class OrderHistoryTest extends TestCase
 
         (new WooCommerceModule())->register();
         $request = new WP_REST_Request('GET', '/wc/store/v1/order/' . $order->get_id());
-        $request->set_header(SessionHandler::HEADER_USER_EMAIL, $this->email);
+        $this->signRequest($request, $this->email);
         $get = rest_do_request($request);
         $get = apply_filters('rest_post_dispatch', $get, rest_get_server(), $request);
         $this->assertSame(200, $get->get_status());
@@ -157,12 +157,12 @@ class OrderHistoryTest extends TestCase
         $this->order($this->customerId);
         foreach ([null, 'not-an-email'] as $email) {
             $response = $this->history(['customer_id' => $this->customerId, 'email' => $this->email], $email);
-            $this->assertSame($email === null ? 403 : 401, $response->get_status());
+            $this->assertSame(403, $response->get_status());
             $this->assertSame('private, no-store', $response->get_headers()['Cache-Control']);
         }
         unset($GLOBALS['wp_rest_application_password_uuid']);
         wp_set_current_user(0);
-        $this->assertSame(401, $this->history()->get_status());
+        $this->assertSame(200, $this->history()->get_status());
     }
 
     public function test_pagination_bounds_are_validated_by_the_route(): void
@@ -186,7 +186,7 @@ class OrderHistoryTest extends TestCase
     {
         $request = new WP_REST_Request('GET', '/kizlo/v1/woocommerce/orders');
         $request->set_query_params($params);
-        if ($email !== null) $request->set_header(SessionHandler::HEADER_USER_EMAIL, $email);
+        if ($email !== null) $this->signRequest($request, $email);
         $serviceUser = get_current_user_id();
         try {
             $response = rest_do_request($request);

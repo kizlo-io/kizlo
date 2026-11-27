@@ -1,0 +1,36 @@
+---
+title: Migrate to v1
+description: Replace the application RPC layer with direct WordPress endpoints.
+---
+
+Upgrade the WordPress core and companion plugins together with the SDK. Deploy the changed plugins before switching frontend traffic; an older CMS does not serve the new content, auth, or public settings endpoints.
+
+## Replace setup and clients
+
+Install `kizlo` in your existing framework app and follow [Installation](/docs/installation). `create` and `init` are removed; the repository templates remain runnable examples. `dir` now names the output directory directly. Remove `alias` and the old `dir` object.
+
+Generate `introspection.ts` and `introspection.browser.ts`. Delete the old `contract.json` and generated procedure barrel. Remove `createKizlo`, `createIntegration`, custom procedures/middleware, and application API proxy routes. Import `createBrowserClient` from `kizlo/browser` and service operations from `kizlo/server`.
+
+## Update calls
+
+| Before | Direct API |
+| --- | --- |
+| `client.posts.get(...)` | `client.kizlo.content.post.retrieve(...)` |
+| `client.pages.get(...)` | `client.kizlo.content.page.retrieve(...)` |
+| `client.settings.get()` | `client.kizlo.site.retrieve()` for public settings |
+| `client.seo.homepage()` | `client.kizlo.seo.homepage.retrieve()` |
+| `client.woocommerce.cart.get()` | `client.woocommerce.store.cart.retrieve()` |
+| `client.woocommerce.checkout.confirm(...)` | `client.woocommerce.store.checkout.create(...)` |
+| `client.cf7.submit(...)` | `client.cf7.forms.submit(...)` |
+
+Inputs and output fields now follow the generated WordPress wire contract: `per_page`, `preview_token`, `billing_address`, `additional_fields`, and `expected_total`. Rendered post fields are at `title.rendered` and `content.rendered`. Protected content can have `kizlo: null`; post/page presentation formatters consequently return `custom: null` while locked. Pure DTO formatters remain available for the payload shapes they accept; no automatic procedure mapping runs.
+
+Results use `{ data, error, status, headers }`. Failures have `data: null`; codes are native WordPress/plugin codes instead of the former uppercase procedure aliases. Replace `.call()` with `requireData(await endpoint(...))`. Endpoint options carry cancellation and native headers. Rich RPC serialization and custom TypeScript procedure registration are removed.
+
+## Move trust to WordPress
+
+Configure [JWT verification](/docs/concepts/authentication), allowed origins, and CAPTCHA in WordPress. Remove forwarded user-email, unsigned guest-ID, geo, and caller-supplied comment attribution headers. App user creation may allow unverified email, but that identity cannot acquire an existing customer.
+
+Old frontend-owned guest cookies cannot establish a signed WooCommerce Cart-Token session. Start a fresh guest cart during cutover; schedule the change around active checkouts. Verified customers recover their saved cart by verified email. Provider mappings and profile webhooks are no longer login dependencies.
+
+Native WordPress cookie+nonce and Application Password operations remain available to authorized callers. Customer checkout rejects provider-driven WordPress account creation; use the auth provider's signup flow. Optional app webhooks and framework SEO/cache helpers remain standalone server utilities.

@@ -12,6 +12,7 @@
 			"!!**/tooling/typescript",
 			"!!**/generated",
 			"!!introspection.ts",
+			"!!introspection.browser.ts",
 			"!!**/.kizlo",
 			"!!**/.changeset",
 			"!!**/*.php",

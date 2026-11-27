@@ -39,6 +39,7 @@ class StorefrontModule
         kizlo_register_route([
             'id'        => 'woocommerce.kizlo.storefront',
             'operation' => 'retrieve',
+            'access'    => 'public',
             'method'    => 'GET',
             'route'     => '/woocommerce/storefront',
             'summary'   => 'The store settings a storefront renders with',

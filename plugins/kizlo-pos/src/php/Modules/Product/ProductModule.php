@@ -184,7 +184,7 @@ final class ProductModule
     private function card(WC_Product $product): array
     {
         $parent = $product->is_type('variation') ? wc_get_product($product->get_parent_id()) : null;
-        $image = absint($product->get_image_id() ?: ($parent ? $parent->get_image_id() : 0));
+        $image = (int) absint($product->get_image_id() ?: ($parent ? $parent->get_image_id() : 0));
         $price = $this->price($product);
         return [
             'id' => $product->get_id(), 'name' => $this->text($product->get_name()), 'type' => $product->get_type(),

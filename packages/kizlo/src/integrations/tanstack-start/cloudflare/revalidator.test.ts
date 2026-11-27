@@ -1,9 +1,7 @@
 import { signWebhook } from "@kizlo/shared"
 import { expect, test, vi } from "vitest"
 import z from "zod/v4"
-import { Kizlo } from "../../../kizlo"
-import { createIntegration } from "../../../shared/integration"
-import { createEventHandler } from "../../../webhook"
+import { createEventHandler, createWebhookHandler } from "../../../webhook"
 import { SETTINGS_EVENT_TYPES, SETTINGS_INDEXED_EVENT_TYPES } from "../../../webhook/schema"
 import { createCdnHeaders, withCloudflare } from "../cloudflare"
 import { type RevalidatorOptions, revalidator } from "./revalidator"
@@ -37,11 +35,10 @@ async function send(
 	origin = "https://shop.example",
 	cache = { invalidate: vi.fn(async (_targets: { tags?: string[] }) => ({ success: true })) },
 ) {
-	const server = new Kizlo({
-		baseUrl: "https://shop.example/api",
-		siteSecret: "secret",
-		credentials: { url: "https://wp.example", username: "a", password: "b" },
-		integrations: [revalidator(config), createIntegration({ id: "custom", events: extras })],
+	const handler = createWebhookHandler({
+		secret: "secret",
+		logger: { error() {} },
+		events: [revalidator({ origin: "https://shop.example", ...config }), ...extras],
 	})
 	const payload = JSON.stringify(event)
 	const timestamp = new Date()
@@ -59,7 +56,7 @@ async function send(
 		fetch: async (request: Request, { context }: { context: object }) => {
 			storage.current = { request, values: context }
 			try {
-				return await server.handler(request)
+				return await handler(request)
 			} finally {
 				storage.current = undefined
 			}

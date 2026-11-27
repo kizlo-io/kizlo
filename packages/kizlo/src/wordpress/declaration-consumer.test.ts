@@ -5,8 +5,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import ts from "typescript"
 import { expect, test } from "vitest"
-import { CONTRACT_BARREL, INTROSPECTION_STUB } from "../cli/daemon/generate"
-import { generateWordPressClient } from "./generate"
+import { generateWordPressClient, generateWordPressModule } from "./generate"
 import type { IntrospectionDocument, IntrospectionSchema } from "./introspection"
 
 const KIZLO_TYPES = fileURLToPath(new URL("../../dist/index.d.ts", import.meta.url))
@@ -103,243 +102,46 @@ function introspection(prefix: string): IntrospectionDocument {
 }
 
 function usage(prefix: string): string {
-	return `import type {
-		Category,
-		CommonErrorCode,
-		CoreProcedures,
-		InferIntegrationProcedures,
-		InferProcedureData,
-		InferProcedureError,
-		InferProcedureInput,
-		InferProcedureResult,
-		KizloResult,
-		Page,
-		Post,
-		Procedure,
-		ResultClient,
-		Tag,
-		WP_EndpointData,
-		WP_EndpointInput,
-		WP_EndpointPath,
-		WP_EndpointResult,
-	} from "kizlo"
-	import { type Product, type Cart, type Checkout, type UpdateCartAddressInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
-	import type { WP_Schema } from "kizlo"
-	import { createKizlo } from "kizlo"
-	import { introspection } from "./introspection"
-	// @ts-expect-error independent client initialization is internal
-	import { createWordPressClient } from "kizlo"
-
-	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
-	type Assert<T extends true> = T
-	type IsAny<T> = 0 extends 1 & T ? true : false
-	type IsNever<T> = [T] extends [never] ? true : false
-	type IncludesUndefined<T> = undefined extends T ? true : false
-
-	const server = createKizlo({ introspection })
-	const { wordpress } = server
-	type Retrieve = typeof wordpress.kizlo.postTypes.post.retrieve
-	type InputIsExact = Assert<Equal<Parameters<Retrieve>[0], { params: { identifier: string } }>>
-	type ResultIsExact = Assert<Equal<Awaited<ReturnType<Retrieve>>, WP_EndpointResult<"kizlo.postTypes.post.retrieve">>>
-	wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: "hello" } })
-	// @ts-expect-error generated identifiers are strings
-	wordpress.kizlo.postTypes.post.retrieve({ params: { identifier: 7 } })
-	// @ts-expect-error server context is internal
-	server.context
-	// @ts-expect-error configured client is read-only
-	server.wordpress = wordpress
-
-	type PostFields = Post["custom"]
-	type PageFields = Page["custom"]
-	type CategoryFields = Category["custom"]
-	type TagFields = Tag["custom"]
-	type ProductFields = Product["custom"]
-	type NamedSchema = Assert<Equal<WP_Schema<"acme.reference">, { "${prefix}/opt-in"?: boolean }>>
-	const emptySchema: WP_Schema<"acme.empty"> = {}
-	// @ts-expect-error an empty registered schema rejects invented fields
-	const badEmpty: WP_Schema<"acme.empty"> = { invented: true }
-	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
-	type AddressField = Assert<Equal<Cart["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
-	type NativeTaxId = Assert<Equal<Cart["billingAddress"]["taxId"], string>>
-	type ProjectedBillingKey = Assert<Equal<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"], undefined>>
-	// @ts-expect-error published declarations retain the single-value billing projection
-	const duplicateTaxId: UpdateCartAddressInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
-	type ShippingField = Assert<Equal<Cart["shippingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
-	type CustomerBillingField = Assert<Equal<Customer["billing"]["additionalFields"]["${prefix}/reference"], string | undefined>>
-	type CustomerShippingField = Assert<Equal<Customer["shipping"]["additionalFields"]["${prefix}/reference"], string | undefined>>
-	type ContactField = Assert<Equal<Checkout["additionalFields"]["${prefix}/opt-in"], boolean | undefined>>
-	type SlotField = Assert<Equal<Order["additionalFields"]["${prefix}/slot"], "" | "morning" | "afternoon" | undefined>>
-	type CheckoutBillingField = Assert<Equal<Checkout["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
-	declare const checkout: Checkout
-	// @ts-expect-error cart is a separate resource in published declarations
-	checkout.cart
-	const updateAddress: UpdateCartAddressInput = { shippingAddress: { additionalFields: { "${prefix}/reference": "" } } }
-	const updateFields: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": false, "${prefix}/slot": "" } }
-	// @ts-expect-error contact fields cannot be assigned to an address bucket
-	const wrongLocation: UpdateCartAddressInput = { billingAddress: { additionalFields: { "${prefix}/opt-in": true } } }
-	// @ts-expect-error known checkbox fields reject string values
-	const wrongType: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": "false" } }
-	// @ts-expect-error registered select fields retain their enum
-	const wrongSlot: UpdateCheckoutInput = { additionalFields: { "${prefix}/slot": "evening" } }
-	const confirmFields: ConfirmCheckoutInput["additionalFields"] = { "${prefix}/opt-in": false }
-	const retryFields: RetryCheckoutInput["additionalFields"] = { "${prefix}/slot": "morning" }
-
-	const protectedCheckout = woocommerce({ allowGuest: false })
-	const guestCheckout = woocommerce({ allowGuest: true })
-	const defaultCheckout = woocommerce()
-	// @ts-expect-error allowGuest accepts only a boolean
-	woocommerce({ allowGuest: "false" })
-	type SameCheckoutContract = Assert<Equal<typeof protectedCheckout, typeof guestCheckout>>
-	type SameDefaultContract = Assert<Equal<typeof protectedCheckout, typeof defaultCheckout>>
-	type WooCommerceProcedures = InferIntegrationProcedures<[typeof protectedCheckout]>
-	type Customer = InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>
-	type WooCommerceClient = ResultClient<WooCommerceProcedures>
-	type ProductGetResult = Awaited<ReturnType<WooCommerceClient["woocommerce"]["products"]["get"]>>
-	type CustomerProcedureField = Assert<Equal<InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>["billing"]["additionalFields"]["${prefix}/reference"], string | undefined>>
-	type ProcedureContactField = Assert<Equal<InferProcedureData<WooCommerceProcedures["woocommerce"]["checkout"]["get"]>["additionalFields"]["${prefix}/opt-in"], boolean | undefined>>
-	type ProcedureInputField = Assert<Equal<NonNullable<InferProcedureInput<WooCommerceProcedures["woocommerce"]["checkout"]["update"]>["body"]["additionalFields"]>["${prefix}/opt-in"], boolean | undefined>>
-	type ProductGetFields = NonNullable<ProductGetResult["data"]>["custom"]
-	type ProductListFields = InferProcedureData<
-		WooCommerceProcedures["woocommerce"]["products"]["list"]
-	>["items"][number]["custom"]
-	type PostGetFields = InferProcedureData<CoreProcedures["posts"]["get"]>["custom"]
-	type PostListFields = InferProcedureData<CoreProcedures["posts"]["list"]>["items"][number]["custom"]
-	type PageGetFields = InferProcedureData<CoreProcedures["pages"]["get"]>["custom"]
-	type CategoryGetFields = InferProcedureData<CoreProcedures["categories"]["get"]>["custom"]
-	type TagGetFields = InferProcedureData<CoreProcedures["tags"]["get"]>["custom"]
-
-	type PostIsExact = Assert<Equal<PostFields, { ${prefix}Post: string }>>
-	type PageIsExact = Assert<Equal<PageFields, { ${prefix}Page: string }>>
-	type CategoryIsExact = Assert<Equal<CategoryFields, { ${prefix}Category: string }>>
-	type TagIsExact = Assert<Equal<TagFields, { ${prefix}Tag: string }>>
-	type ProductIsExact = Assert<Equal<ProductFields, { ${prefix}Product: string }>>
-	type ProductGetIsExact = Assert<Equal<ProductGetFields, { ${prefix}Product: string }>>
-	type ProductListIsExact = Assert<Equal<ProductListFields, { ${prefix}Product: string }>>
-	type PostGetIsExact = Assert<Equal<PostGetFields, { ${prefix}Post: string }>>
-	type PostListIsExact = Assert<Equal<PostListFields, { ${prefix}Post: string }>>
-	type PageGetIsExact = Assert<Equal<PageGetFields, { ${prefix}Page: string }>>
-	type CategoryGetIsExact = Assert<Equal<CategoryGetFields, { ${prefix}Category: string }>>
-	type TagGetIsExact = Assert<Equal<TagGetFields, { ${prefix}Tag: string }>>
-	type PostIsNotAny = Assert<Equal<IsAny<PostFields>, false>>
-	type PostIsNotNever = Assert<Equal<IsNever<PostFields>, false>>
-	type PostIsNotUndefined = Assert<Equal<IncludesUndefined<PostFields>, false>>
-	type ProductIsNotAny = Assert<Equal<IsAny<ProductFields>, false>>
-	type ProductIsNotNever = Assert<Equal<IsNever<ProductFields>, false>>
-	type ProductIsNotUndefined = Assert<Equal<IncludesUndefined<ProductFields>, false>>
-
-	type RawPathIsExact = Assert<Equal<WP_EndpointPath, "kizlo.postTypes.post.retrieve">>
-	type RawInputIsExact = Assert<Equal<WP_EndpointInput<"kizlo.postTypes.post.retrieve">, { params: { identifier: string } }>>
-	type RawDataIsNotAny = Assert<Equal<IsAny<WP_EndpointData<"kizlo.postTypes.post.retrieve">>, false>>
-	type RawResultIsNotAny = Assert<Equal<IsAny<WP_EndpointResult<"kizlo.postTypes.post.retrieve">>, false>>
-	// @ts-expect-error procedure names are not raw WordPress operation paths
-	type FakeRawPath = WP_EndpointData<"woocommerce.products.get">
-
-	type InvoiceProcedure = Procedure<"api", { params: { id: string } }, { total: number }, { INVOICE_MISSING: { status: 404 } }>
-	type ProcedureInputIsExact = Assert<Equal<InferProcedureInput<InvoiceProcedure>, { params: { id: string } }>>
-	type ProcedureDataIsExact = Assert<Equal<InferProcedureData<InvoiceProcedure>, { total: number }>>
-	type ProcedureErrorsAreExact = Assert<
-		Equal<InferProcedureError<InvoiceProcedure>["code"], CommonErrorCode | "INVOICE_MISSING">
-	>
-	type ProcedureResultIsExact = Assert<
-		Equal<
-			InferProcedureResult<InvoiceProcedure>,
-			KizloResult<{ total: number }, { INVOICE_MISSING: { status: 404 } }>
-		>
-	>
-
-	export type {
-		CategoryIsExact,
-		CategoryGetIsExact,
-		FakeRawPath,
-		PageIsExact,
-		PageGetIsExact,
-		PostIsExact,
-		PostGetIsExact,
-		PostListIsExact,
-		PostIsNotAny,
-		PostIsNotNever,
-		PostIsNotUndefined,
-		ProcedureDataIsExact,
-		ProcedureErrorsAreExact,
-		ProcedureInputIsExact,
-		ProcedureResultIsExact,
-		ProductIsExact,
-		ProductGetIsExact,
-		ProductListIsExact,
-		ProductIsNotAny,
-		ProductIsNotNever,
-		ProductIsNotUndefined,
-		RawDataIsNotAny,
-		RawInputIsExact,
-		RawPathIsExact,
-		RawResultIsNotAny,
-		TagIsExact,
-		TagGetIsExact,
-	}
-	`
+	return `import type { Category, Page, Post, Tag, WP_Schema, WP_EndpointInput, WP_EndpointResult } from "kizlo"
+ import type { Product, Cart, Checkout, UpdateCartAddressInput, UpdateCheckoutInput, ConfirmCheckoutInput, RetryCheckoutInput, Order } from "@kizlo/woocommerce"
+ import { createServerClient } from "kizlo/server"
+ import { introspection } from "./introspection"
+ type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+ type Assert<T extends true> = T
+ type IsAny<T> = 0 extends 1 & T ? true : false
+ const client = createServerClient({ credentials: { url: "https://wp.example", username: "a", password: "b" }, endpoints: introspection })
+ type Retrieve = typeof client.kizlo.postTypes.post.retrieve
+ type Input = Assert<Equal<Parameters<Retrieve>[0], { params: { identifier: string } }>>
+ type Result = Assert<Equal<Awaited<ReturnType<Retrieve>>, WP_EndpointResult<"kizlo.postTypes.post.retrieve">>>
+ // @ts-expect-error identifiers are strings
+ client.kizlo.postTypes.post.retrieve({ params: { identifier: 7 } })
+ // @ts-expect-error unknown namespaces are never accepted
+ client.future
+ type PostFields = Assert<Equal<NonNullable<Post["custom"]>, { ${prefix}Post: string }>>
+ type PageFields = Assert<Equal<NonNullable<Page["custom"]>, { ${prefix}Page: string }>>
+ type CategoryFields = Assert<Equal<Category["custom"], { ${prefix}Category: string }>>
+ type TagFields = Assert<Equal<Tag["custom"], { ${prefix}Tag: string }>>
+ type ProductFields = Assert<Equal<Product["custom"], { ${prefix}Product: string }>>
+ type NotAny = Assert<Equal<IsAny<Post["custom"]>, false>>
+ type Named = Assert<Equal<WP_Schema<"acme.reference">, { "${prefix}/opt-in"?: boolean }>>
+ const empty: WP_Schema<"acme.empty"> = {}
+ // @ts-expect-error closed empty schemas reject invented fields
+ const invented: WP_Schema<"acme.empty"> = { invented: true }
+ type Address = Assert<Equal<Cart["billingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+ type Shipping = Assert<Equal<Cart["shippingAddress"]["additionalFields"]["${prefix}/reference"], string | undefined>>
+ type Contact = Assert<Equal<Checkout["additionalFields"]["${prefix}/opt-in"], boolean | undefined>>
+ type Slot = Assert<Equal<Order["additionalFields"]["${prefix}/slot"], "" | "morning" | "afternoon" | undefined>>
+ const update: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": false, "${prefix}/slot": "" } }
+ // @ts-expect-error checkbox fields reject strings
+ const wrongType: UpdateCheckoutInput = { additionalFields: { "${prefix}/opt-in": "false" } }
+ // @ts-expect-error registered enum is preserved
+ const wrongSlot: UpdateCheckoutInput = { additionalFields: { "${prefix}/slot": "evening" } }
+ // @ts-expect-error native billing projection rejects a duplicate raw tax ID
+ const duplicate: UpdateCartAddressInput = { billingAddress: { taxId: "GB", additionalFields: { "kizlo/tax-id": "GB" } } }
+ const confirm: ConfirmCheckoutInput["additionalFields"] = { "${prefix}/opt-in": false }
+ const retry: RetryCheckoutInput["additionalFields"] = { "${prefix}/slot": "morning" }
+ `
 }
-
-const STUB_USAGE = `import type { Category, CoreProcedures, InferIntegrationProcedures, InferProcedureData, Page, Post, ResultClient, Tag } from "kizlo"
-	import { type Product, type Cart, type Checkout, type UpdateCartAddressInput, type UpdateCheckoutInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type Order, woocommerce } from "@kizlo/woocommerce"
-	import type { WP_Schema } from "kizlo"
-	import "./introspection"
-
-	import { createKizlo } from "kizlo"
-	const { wordpress } = createKizlo()
-	wordpress.future.nested.endpoint({ future: true })
-
-	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
-	type Assert<T extends true> = T
-	type PostCompiles = Assert<Equal<Post["custom"], Record<string, unknown>>>
-	type PageCompiles = Assert<Equal<Page["custom"], Record<string, unknown>>>
-	type CategoryCompiles = Assert<Equal<Category["custom"], Record<string, unknown>>>
-	type TagCompiles = Assert<Equal<Tag["custom"], Record<string, unknown>>>
-	type ProductCompiles = Assert<Equal<Product["custom"], Record<string, unknown>>>
-	type StubAddressFields = Assert<Equal<Cart["billingAddress"]["additionalFields"]["future/field"], string | boolean | undefined>>
-	type StubProjectedField = Assert<Equal<Cart["billingAddress"]["additionalFields"]["kizlo/tax-id"], undefined>>
-	const fallback: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "future/field": "future" }
-	const partialFallback: UpdateCartAddressInput = { billingAddress: { additionalFields: { "future/flag": false } } }
-	// @ts-expect-error unregistered fallback still excludes raw billing projections
-	const rawFallback: ConfirmCheckoutInput["billingAddress"]["additionalFields"] = { "kizlo/tax-id": "GB" }
-	type StubCheckoutFields = Assert<Equal<Checkout["additionalFields"], Record<string, string | boolean | undefined>>>
-	type MissingSchema = Assert<Equal<WP_Schema<"missing", string>, string>>
-	const protectedCheckout = woocommerce({ allowGuest: false })
-	const guestCheckout = woocommerce({ allowGuest: true })
-	const defaultCheckout = woocommerce()
-	// @ts-expect-error allowGuest accepts only a boolean
-	woocommerce({ allowGuest: "false" })
-	type SameCheckoutContract = Assert<Equal<typeof protectedCheckout, typeof guestCheckout>>
-	type SameDefaultContract = Assert<Equal<typeof protectedCheckout, typeof defaultCheckout>>
-	type WooCommerceProcedures = InferIntegrationProcedures<[typeof protectedCheckout]>
-	type Customer = InferProcedureData<WooCommerceProcedures["woocommerce"]["customers"]["get"]>
-	type WooCommerceClient = ResultClient<WooCommerceProcedures>
-	type ProductGetResult = Awaited<ReturnType<WooCommerceClient["woocommerce"]["products"]["get"]>>
-	type ProductGetCompiles = Assert<Equal<NonNullable<ProductGetResult["data"]>["custom"], Record<string, unknown>>>
-	type ProductListCompiles = Assert<
-		Equal<
-			InferProcedureData<WooCommerceProcedures["woocommerce"]["products"]["list"]>["items"][number]["custom"],
-			Record<string, unknown>
-		>
-	>
-	type PostGetCompiles = Assert<
-		Equal<InferProcedureData<CoreProcedures["posts"]["get"]>["custom"], Record<string, unknown>>
-	>
-	type PostListCompiles = Assert<
-		Equal<InferProcedureData<CoreProcedures["posts"]["list"]>["items"][number]["custom"], Record<string, unknown>>
-	>
-
-	export type {
-		CategoryCompiles,
-		PageCompiles,
-		PostCompiles,
-		PostGetCompiles,
-		PostListCompiles,
-		ProductCompiles,
-		ProductGetCompiles,
-		ProductListCompiles,
-		TagCompiles,
-	}
-`
 
 function compile(dir: string, entries: readonly string[] = ["introspection.ts", "usage.ts"]): string[] {
 	const options: ts.CompilerOptions = {
@@ -351,6 +153,8 @@ function compile(dir: string, entries: readonly string[] = ["introspection.ts", 
 		paths: {
 			"@kizlo/woocommerce": [WOOCOMMERCE_TYPES],
 			kizlo: [KIZLO_TYPES],
+			"kizlo/server": [fileURLToPath(new URL("../../dist/server.d.ts", import.meta.url))],
+			"kizlo/browser": [fileURLToPath(new URL("../../dist/browser.d.ts", import.meta.url))],
 			"kizlo/nextjs/server": [fileURLToPath(new URL("../../dist/nextjs/server.d.ts", import.meta.url))],
 			"kizlo/tanstack-start/cloudflare": [fileURLToPath(new URL("../../dist/tanstack-start/cloudflare.d.ts", import.meta.url))],
 			"kizlo/tanstack-start/server": [fileURLToPath(new URL("../../dist/tanstack-start/server.d.ts", import.meta.url))],
@@ -375,10 +179,6 @@ test("published declarations retain generated registries across regeneration", (
 
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-declaration-consumer-"))
 	try {
-		fs.writeFileSync(path.join(dir, "introspection.ts"), INTROSPECTION_STUB)
-		fs.writeFileSync(path.join(dir, "usage.ts"), STUB_USAGE)
-		expect(compile(dir)).toEqual([])
-
 		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(introspection("initial")))
 		fs.writeFileSync(path.join(dir, "usage.ts"), usage("initial"))
 		expect(compile(dir)).toEqual([])
@@ -388,100 +188,6 @@ test("published declarations retain generated registries across regeneration", (
 		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressClient(introspection("updated")))
 		fs.writeFileSync(path.join(dir, "usage.ts"), usage("updated"))
 		expect(compile(dir)).toEqual([])
-	} finally {
-		fs.rmSync(dir, { force: true, recursive: true })
-	}
-}, 30_000)
-
-const SERVER_PROCEDURES = `import type { Procedure } from "kizlo"
-
-export const procedures = {} as {
-	billing: {
-		invoices: {
-			get: Procedure<"api", { params: { id: string } }, { total: number }, { INVOICE_MISSING: { status: 404 } }>
-		}
-	}
-	seo: {
-		robots: Procedure<"internal", void, { rules: string }>
-	}
-}
-`
-
-const REGISTERED_USAGE = `import { type CommonErrorCode, createKizloClient } from "kizlo"
-	import { contract } from "./generated"
-
-	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
-	type Assert<T extends true> = T
-	type IsAny<T> = 0 extends 1 & T ? true : false
-
-	const client = createKizloClient(contract).client
-
-	type Invoice = typeof client.billing.invoices.get
-	type InvoiceData = NonNullable<Awaited<ReturnType<Invoice>>["data"]>
-
-	type ClientIsNotAny = Assert<Equal<IsAny<typeof client>, false>>
-	type InputIsExact = Assert<Equal<Parameters<Invoice>[0], { params: { id: string } }>>
-	type DataIsExact = Assert<Equal<InvoiceData, { total: number }>>
-	type ErrorIsExact = Assert<
-		Equal<NonNullable<Awaited<ReturnType<Invoice>>["error"]>["code"], CommonErrorCode | "INVOICE_MISSING">
-	>
-
-	// @ts-expect-error internal procedures never reach the browser client
-	const internalIsAbsent = client.seo
-	// @ts-expect-error a namespace the registered procedures do not declare
-	const unknownIsAbsent = client.reviews
-
-	export type { ClientIsNotAny, DataIsExact, ErrorIsExact, InputIsExact }
-	export { internalIsAbsent, unknownIsAbsent }
-	`
-
-const UNREGISTERED_USAGE = `import { createKizloClient } from "kizlo"
-
-	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
-	type Assert<T extends true> = T
-	type IsAny<T> = 0 extends 1 & T ? true : false
-
-	const client = createKizloClient({}).client
-
-	type ClientIsAny = Assert<Equal<IsAny<typeof client>, true>>
-
-	// A second property access is what distributing \`any\` through the mapped types used to break.
-	const nested = client.woocommerce.cart.items.add
-
-	export type { ClientIsAny }
-	export { nested }
-	`
-
-/**
- * The registry has to resolve against the app's own generated barrel, not the contract this repo
- * happens to hold, so the proof has to be a separate program compiled against the built declarations.
- * An unregistered app is a second program for the same reason: a module augmentation is global to the
- * program it appears in, so one program cannot be both registered and unregistered.
- */
-test("published declarations type the browser client from the app's own registered procedures", () => {
-	expect(fs.existsSync(KIZLO_TYPES)).toBe(true)
-
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-procedure-registry-"))
-	try {
-		fs.mkdirSync(path.join(dir, "generated"))
-		fs.writeFileSync(path.join(dir, "index.ts"), SERVER_PROCEDURES)
-		fs.writeFileSync(path.join(dir, "generated", "index.ts"), CONTRACT_BARREL)
-		fs.writeFileSync(path.join(dir, "generated", "contract.json"), "{}\n")
-		fs.writeFileSync(path.join(dir, "generated", "introspection.ts"), INTROSPECTION_STUB)
-		fs.writeFileSync(path.join(dir, "usage.ts"), REGISTERED_USAGE)
-		expect(compile(dir, ["usage.ts"])).toEqual([])
-	} finally {
-		fs.rmSync(dir, { force: true, recursive: true })
-	}
-}, 30_000)
-
-test("published declarations leave an app without a generated barrel compiling on `any`", () => {
-	expect(fs.existsSync(KIZLO_TYPES)).toBe(true)
-
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-procedure-registry-empty-"))
-	try {
-		fs.writeFileSync(path.join(dir, "usage.ts"), UNREGISTERED_USAGE)
-		expect(compile(dir, ["usage.ts"])).toEqual([])
 	} finally {
 		fs.rmSync(dir, { force: true, recursive: true })
 	}
@@ -518,87 +224,14 @@ test("empty registered buckets keep scalar reads and reject invented literal wri
 	}
 }, 30_000)
 
-test("registered browser checkout errors retain references through published declarations", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-checkout-registry-"))
-	try {
-		fs.mkdirSync(path.join(dir, "generated"))
-		fs.writeFileSync(
-			path.join(dir, "index.ts"),
-			`import type { InferIntegrationProcedures } from "kizlo"
-		import { woocommerce } from "@kizlo/woocommerce"
-		export declare const procedures: InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
-		`,
-		)
-		fs.writeFileSync(path.join(dir, "generated", "index.ts"), CONTRACT_BARREL)
-		fs.writeFileSync(path.join(dir, "generated", "contract.json"), "{}\n")
-		fs.writeFileSync(path.join(dir, "generated", "introspection.ts"), INTROSPECTION_STUB)
-		fs.writeFileSync(
-			path.join(dir, "usage.ts"),
-			`import { createKizloClient, type ActiveKizloClient } from "kizlo"
-		import type { Cart, ConfirmCheckoutInput, CheckoutValidationIssue, CheckoutRegisteredFieldReference } from "@kizlo/woocommerce"
-		import { contract } from "./generated"
-		type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
-		type Assert<T extends true> = T
-		const client = createKizloClient(contract).client
-		type Result = Awaited<ReturnType<typeof client.woocommerce.checkout.confirm>>
-		type ReviewedTotal = Assert<Equal<ConfirmCheckoutInput["expectedTotal"], string | undefined>>
-		type ClientReviewedTotal = Assert<Equal<Parameters<typeof client.woocommerce.checkout.confirm>[0]["body"]["expectedTotal"], string | undefined>>
-		const reviewedTotal: ConfirmCheckoutInput["expectedTotal"] = "0"
-		// @ts-expect-error minor-unit totals reject numeric input
-		const numericTotal: ConfirmCheckoutInput["expectedTotal"] = 1250
-		type Mismatch = Extract<NonNullable<Result["error"]>, { code: "CHECKOUT_TOTAL_MISMATCH" }>
-		type ExpectedAmount = Assert<Equal<Mismatch["data"]["expectedTotal"], string | undefined>>
-		type ActualAmount = Assert<Equal<Mismatch["data"]["actualTotal"], string | undefined>>
-		declare const mismatch: Mismatch
-		const cart: Cart | null = mismatch.data.cart
-		const status: number = mismatch.status
-		declare const result: Result
-		if (!result.success && result.error.code === "CHECKOUT_TOTAL_MISMATCH") {
-			const expected: string | undefined = result.error.data.expectedTotal
-			const actual: string | undefined = result.error.data.actualTotal
-		}
-		type Error = Extract<NonNullable<Result["error"]>, { code: "CHECKOUT_VALIDATION_FAILED" }>
-		type Issue = Error["data"]["issues"][number]
-		declare const issue: Issue
-		const sdkIssue: CheckoutValidationIssue = issue
-		declare const standalone: CheckoutValidationIssue
-		const clientIssue: Issue = standalone
-		if (issue.scope === "unresolved") {
-			const unresolved: null = issue.target
-		} else {
-			const target: string[] = issue.target
-		}
-		type SameBucket = Assert<Equal<Issue["registeredFields"][number]["bucket"], CheckoutRegisteredFieldReference["bucket"]>>
-		type LiteralId = Assert<Equal<Issue["registeredFields"][number]["id"], string>>
-		const clientReference: Issue["registeredFields"][number] = { id: "plugin/a.b[0]", bucket: "billingAddress" }
-		// @ts-expect-error consumer references reject WooCommerce bucket names
-		const wireReference: Issue["registeredFields"][number] = { id: "plugin/id", bucket: "billing_address" }
-		type SameActiveClient = Assert<Equal<typeof client, ActiveKizloClient>>
-		declare const error: Error
-		const references: CheckoutRegisteredFieldReference[] = error.data.issues[0]!.registeredFields
-		// @ts-expect-error the legacy dictionary is removed
-		const fields = error.data.fields
-		// @ts-expect-error raw WooCommerce payloads are private
-		const upstream = error.data.upstream
-		// @ts-expect-error target paths are literal segments
-		const dotted: string = error.data.issues[0]!.target
-		`,
-		)
-		expect(compile(dir, ["usage.ts"])).toEqual([])
-	} finally {
-		fs.rmSync(dir, { force: true, recursive: true })
-	}
-}, 30_000)
-
-const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartAddressInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type CheckoutBillingAddressInput, type CheckoutShippingAddressInput, woocommerce } from "@kizlo/woocommerce"
-	import type { InferIntegrationProcedures, InferProcedureInput, WP_Schema } from "kizlo"
+const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, CartBillingAddressSubmission, type UpdateCartAddressInput, type ConfirmCheckoutInput, type RetryCheckoutInput, type CheckoutBillingAddressInput, type CheckoutShippingAddressInput } from "@kizlo/woocommerce"
+	import type { WP_Schema } from "kizlo"
 	import "./introspection"
 
 	type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 	type Assert<T extends true> = T
-	type Procedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>["woocommerce"]
-	type ConfirmFields = InferProcedureInput<Procedures["checkout"]["confirm"]>["body"]["billingAddress"]["additionalFields"]
-	type RetryFields = InferProcedureInput<Procedures["checkout"]["retry"]>["body"]["billingAddress"]["additionalFields"]
+	type ConfirmFields = ConfirmCheckoutInput["billingAddress"]["additionalFields"]
+	type RetryFields = RetryCheckoutInput["billingAddress"]["additionalFields"]
 	type ConfirmAlias = Assert<Equal<ConfirmFields, ConfirmCheckoutInput["billingAddress"]["additionalFields"]>>
 	type RetryAlias = Assert<Equal<RetryFields, RetryCheckoutInput["billingAddress"]["additionalFields"]>>
 	type AddressAlias = Assert<Equal<ConfirmFields, CartBillingAddressInput["additionalFields"]>>
@@ -607,8 +240,8 @@ const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, 
 	const partialShipping: CheckoutShippingAddressInput = { city: "London", additionalFields: { "billing/choice": "office", "kizlo/tax-id": "excluded" } }
 	const partialConfirm: ConfirmCheckoutInput = { billingAddress: partialBilling, shippingAddress: partialShipping, paymentMethod: "bacs" }
 	const partialRetry: RetryCheckoutInput = { billingAddress: partialBilling, paymentMethod: "bacs", key: "key", orderId: 42 }
-	const inferredConfirm: InferProcedureInput<Procedures["checkout"]["confirm"]>["body"] = partialConfirm
-	const inferredRetry: InferProcedureInput<Procedures["checkout"]["retry"]>["body"] = partialRetry
+	const inferredConfirm: ConfirmCheckoutInput = partialConfirm
+	const inferredRetry: RetryCheckoutInput = partialRetry
 	// @ts-expect-error a partial core address still requires registered answers
 	const missingAnswer: CheckoutBillingAddressInput = { additionalFields: {} }
 	// @ts-expect-error a supplied shipping address retains registered requirements
@@ -652,7 +285,7 @@ const BILLING_FIELDS_USAGE = `import { type Cart, type CartBillingAddressInput, 
 	// @ts-expect-error partial updates also reject a raw projected key
 	const duplicatePartial: UpdateCartAddressInput = { billingAddress: { additionalFields: { "kizlo/tax-id": "GB" } } }
 
-	type ShippingFields = NonNullable<InferProcedureInput<Procedures["checkout"]["confirm"]>["body"]["shippingAddress"]>["additionalFields"]
+	type ShippingFields = NonNullable<ConfirmCheckoutInput["shippingAddress"]>["additionalFields"]
 	type ShippingChoice = Assert<Equal<ShippingFields["billing/choice"], "home" | "office">>
 	type CheckoutFlag = Assert<Equal<NonNullable<ConfirmCheckoutInput["additionalFields"]>["billing/opt-in"], boolean | undefined>>
 	declare const cart: Cart
@@ -696,11 +329,11 @@ test("published declarations expose trusted client IP configuration", () => {
 		fs.writeFileSync(
 			path.join(dir, "usage.ts"),
 			`
-			import { createIntegration, createKizlo, createGeoAdapter, geoCloudflareNext, geoVercelNext, WordPressTransport } from "kizlo"
-			import { nextjs, toNextJsHandler } from "kizlo/nextjs/server"
-			import { createCdnHeaders, cloudflare, geoCloudflare, revalidateTag, revalidateUrl, withCloudflare, revalidator } from "kizlo/tanstack-start/cloudflare"
+			import { createGeoAdapter, geoCloudflareNext, geoVercelNext, WordPressTransport } from "kizlo/server"
+			import { toNextJsHandler } from "kizlo/nextjs/server"
+			import { createCdnHeaders, geoCloudflare, revalidateTag, revalidateUrl, withCloudflare, revalidator } from "kizlo/tanstack-start/cloudflare"
 			import * as cloudflareApi from "kizlo/tanstack-start/cloudflare"
-			import { matchMiddleware, tanstackStart } from "kizlo/tanstack-start/react/server"
+			import { matchMiddleware } from "kizlo/tanstack-start/react/server"
 			import { createMiddleware, createStart } from "@tanstack/react-start"
 			const { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD } = toNextJsHandler(async (_request: Request) => new Response(null))
             const nextRoute: (request: Request, route: { params: Promise<{ rest: string[] }> }) => Response | Promise<Response> = GET
@@ -755,14 +388,9 @@ test("published declarations expose trusted client IP configuration", () => {
 			type LegacyTargets = cloudflareApi.CdnTargets
 			// @ts-expect-error duration strings use explicit units
 			createCdnHeaders({ maxAge: "forever" })
-			createKizlo({ integrations: [tanstackStart(), cloudflare()] })
 			geoCloudflare().getConnInfo(null)
 
-			createKizlo({ integrations: [nextjs(), createIntegration({ id: "cloudflare", adapters: { geo: geoCloudflareNext() } })] })
-			createKizlo({ integrations: [nextjs(), createIntegration({ id: "vercel", adapters: { geo: geoVercelNext() } })] })
 			new WordPressTransport({ credentials: { url: "https://wp.example", username: "admin", password: "secret" }, getClientIp: () => "2001:db8::1" })
-			// @ts-expect-error IP forwarding uses the geo adapter, not a separate framework option
-			nextjs({ clientIp: "cloudflare" })
 			// @ts-expect-error geo adapters return connection info rather than just an IP
 			createGeoAdapter({ getConnInfo: () => "203.0.113.1" })
 		`,
@@ -773,85 +401,28 @@ test("published declarations expose trusted client IP configuration", () => {
 	}
 })
 
-test("published ProcedureContext augmentation types flat handler values and every procedure context", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-platform-context-"))
-	try {
-		fs.writeFileSync(
-			path.join(dir, "usage.ts"),
-			`
-   import {Kizlo,createProcedure,createEventHandler,createMiddleware,schemaType,type ProcedureContext} from "kizlo"
-   import {toNextJsHandler} from "kizlo/nextjs/server"
-   declare module "kizlo" {
-    interface ProcedureContext {
-     env: { SITE: string; DB: { query(sql:string):Promise<string[]> } }
-     executionCtx: { waitUntil(work:Promise<unknown>):void }
-    }
-   }
-   const server=new Kizlo({baseUrl:"https://app.example/api",siteSecret:"secret",credentials:{url:"https://wp.example",username:"a",password:"b"}})
-   const env={SITE:"shop",DB:{query:async (_sql:string)=>["row"]}}
-   const executionCtx={waitUntil:(_work:Promise<unknown>)=>{}}
-   server.handler(new Request("https://app.example/api"),{env,executionCtx})
-   server.handler(new Request("https://app.example/api")) // Inherit a surrounding Worker request scope.
-   const {GET}=toNextJsHandler(server.handler)
-   GET(new Request("https://app.example/api"))
-   // @ts-expect-error an augmented field must have its registered type
-   server.handler(new Request("https://app.example/api"),{env:{SITE:123},executionCtx})
-   // @ts-expect-error explicit values must supply the registered required fields
-   server.handler(new Request("https://app.example/api"),{env})
-   // @ts-expect-error Kizlo owns request; it is not a platform addition
-   server.handler(new Request("https://app.example/api"),{env,executionCtx,request:null})
-   createProcedure({scope:"internal",output:schemaType<string[]>()},async ({context})=>{
-    const site:string=context.env.SITE
-    context.executionCtx.waitUntil(Promise.resolve())
-    // @ts-expect-error bindings keep the registered member types
-    const bad:number=context.env.SITE
-    return context.env.DB.query("select 1")
-   })
-   createMiddleware(async ({context,next})=>{
-    const site:string=context.env.SITE
-    context.executionCtx.waitUntil(Promise.resolve())
-    return next()
-   })
-   createEventHandler(async (_event,context)=>{
-    context.executionCtx.waitUntil(context.env.DB.query("select 1"))
-   })
-  `,
-		)
-		expect(compile(dir, ["usage.ts"])).toEqual([])
-	} finally {
-		fs.rmSync(dir, { force: true, recursive: true })
-	}
-})
-
-test("published core handles explicit HTTP context without async storage support", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-portable-context-"))
+test("published browser entry imports without Node or framework dependencies", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-browser-import-"))
 	try {
 		const loader = path.join(dir, "loader.mjs")
 		fs.writeFileSync(
 			loader,
 			`export async function resolve(name, context, next) {
-			if (name === "node:async_hooks" || name === "async_hooks") throw new Error("Async storage unavailable")
-			return next(name, context)
-		}`,
+   if (name.startsWith("node:") || ["react", "next", "@tanstack/"].some(prefix => name.startsWith(prefix))) throw Error("Server dependency: " + name)
+   return next(name, context)
+  }`,
 		)
 		const entry = new URL("../../dist/index.js", import.meta.url).href
-		const program = `import { Kizlo, createIntegration, createProcedure, schemaType } from ${JSON.stringify(entry)};
-			const server = new Kizlo({ baseUrl: "https://app.example/api", siteSecret: "secret",
-			credentials: { url: "https://wp.example", username: "a", password: "b" },
-			integrations: [createIntegration({ id: "probe", procedures: {
-				info: createProcedure({ scope: "api", method: "GET", path: "/info", output: schemaType() },
-				async ({ context }) => ({ site: context.env.SITE, url: context.request.url }))
-			} })] });
-			const response = await server.handler(new Request("https://app.example/api/info"), { env: { SITE: "portable" } });
-			const data = await response.json();
-			if (response.status !== 200 || data.site !== "portable" || data.url !== "https://app.example/api/info") throw Error("Context lost");
-			if (response.headers.get("Cache-Control") !== "private, no-store") throw Error("API privacy lost");
-			console.log("portable context passed");`
+		const browser = new URL("../../dist/browser.js", import.meta.url).href
+		const program = `import { createBrowserClient } from ${JSON.stringify(entry)};
+   import { createBrowserClient as direct } from ${JSON.stringify(browser)};
+   if (typeof createBrowserClient !== "function" || typeof direct !== "function") throw Error("Missing browser client");
+   console.log("browser import passed");`
 		expect(
 			execFileSync(process.execPath, ["--no-warnings", "--experimental-loader", loader, "--input-type=module", "-e", program], {
 				encoding: "utf8",
 			}),
-		).toContain("portable context passed")
+		).toContain("browser import passed")
 	} finally {
 		fs.rmSync(dir, { recursive: true, force: true })
 	}
@@ -872,11 +443,10 @@ test("published shared Start entry points do not require React in a Solid-only c
 		const server = new URL("../../dist/tanstack-start/server.js", import.meta.url).href
 		const provider = new URL("../../dist/tanstack-start/cloudflare.js", import.meta.url).href
 		const program = `import { createKizloClient, resolvePageHead } from ${JSON.stringify(shared)};
-			import { tanstackStart, createApiHandlers, resolveRootHead } from ${JSON.stringify(server)};
+			import { resolveRootHead } from ${JSON.stringify(server)};
             import { createCdnHeaders, revalidator } from ${JSON.stringify(provider)};
-            if (createCdnHeaders({ maxAge: 60 })["Cache-Control"] !== "no-cache" || revalidator().id !== "revalidator") throw Error("Neutral provider failed");
-			if ([createKizloClient, resolvePageHead, createApiHandlers, resolveRootHead].some(value => typeof value !== "function")) throw Error("Missing shared helpers");
-			if (tanstackStart({ env: {} }).adapters) throw Error("Shared integration installed React adapters");
+            if (createCdnHeaders({ maxAge: 60 })["Cache-Control"] !== "no-cache" || typeof revalidator().handler !== "function") throw Error("Neutral provider failed");
+			if ([createKizloClient, resolvePageHead, resolveRootHead].some(value => typeof value !== "function")) throw Error("Missing shared helpers");
 			console.log("framework-neutral Start passed");`
 		expect(
 			execFileSync(process.execPath, ["--no-warnings", "--experimental-loader", loader, "--input-type=module", "-e", program], {
@@ -891,13 +461,64 @@ test("published shared Start entry points do not require React in a Solid-only c
 test("published React Start entries load with the supported native runtime", () => {
 	const server = new URL("../../dist/tanstack-start/react/server.js", import.meta.url).href
 	const cloudflare = new URL("../../dist/tanstack-start/cloudflare.js", import.meta.url).href
-	const program = `import { tanstackStart, matchMiddleware } from ${JSON.stringify(server)};
+	const program = `import { matchMiddleware } from ${JSON.stringify(server)};
 		import { createCdnHeaders, revalidateUrl, revalidateTag, withCloudflare } from ${JSON.stringify(cloudflare)};
-		const adapters = tanstackStart({ env: {} }).adapters;
-		if (typeof adapters.requestContext.get !== "function" || typeof adapters.cookies.getAll !== "function") throw Error("Missing native adapters");
 		if ([matchMiddleware, createCdnHeaders, revalidateUrl, revalidateTag, withCloudflare].some(value => typeof value !== "function")) throw Error("Missing React helpers");
 		console.log("native React Start passed");`
 	expect(execFileSync(process.execPath, ["--input-type=module", "-e", program], { encoding: "utf8" })).toContain(
 		"native React Start passed",
 	)
+})
+
+test("published browser declarations expose only the explicit browser projection", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-direct-browser-consumer-"))
+	try {
+		const document = introspection("browser")
+		const operation = document.apis["kizlo.post-types.post"]?.paths["/post-types/post/{identifier}"]?.retrieve
+		if (!operation) throw Error("Missing test operation")
+		operation.access = "public"
+		document.apis["admin.secrets"] = {
+			namespace: "kizlo/v1",
+			paths: { "/private-secrets": { retrieve: { ...operation, access: "admin" } } },
+		}
+		fs.writeFileSync(path.join(dir, "introspection.ts"), generateWordPressModule(document, { audience: "browser" }).source)
+		fs.writeFileSync(
+			path.join(dir, "usage.ts"),
+			`
+   import { createBrowserClient } from "kizlo/browser"
+   import type { ActiveKizloClient } from "kizlo"
+   import { introspection } from "./introspection"
+   const client = createBrowserClient({ url: "https://wp.example", endpoints: introspection })
+   const registered: ActiveKizloClient = client
+   registered.kizlo.postTypes.post.retrieve({ params: { identifier: "hello" } })
+   // @ts-expect-error the projection never exposes admin operations
+   client.admin
+   // @ts-expect-error browser options never accept service credentials
+   createBrowserClient({ url: "https://wp.example", endpoints: introspection, credentials: { username: "admin", password: "secret" } })
+  `,
+		)
+		expect(compile(dir)).toEqual([])
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true })
+	}
+})
+
+test("missing generation cannot silently make browser hooks or endpoint data any", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-missing-contract-consumer-"))
+	try {
+		fs.writeFileSync(
+			path.join(dir, "usage.ts"),
+			`
+   import type { ActiveKizloClient, WP_EndpointData } from "kizlo"
+   declare const client: ActiveKizloClient
+   // @ts-expect-error generation is required before a hook has callable endpoints
+   client.future.anything()
+   type IsAny<T> = 0 extends 1 & T ? true : false
+   const exact: IsAny<WP_EndpointData<"future.anything">> = false
+  `,
+		)
+		expect(compile(dir, ["usage.ts"])).toEqual([])
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true })
+	}
 })

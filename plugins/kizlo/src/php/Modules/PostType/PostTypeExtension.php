@@ -98,7 +98,7 @@ class PostTypeExtension
             ], $tags);
         }
 
-        $author_id = (int) $data['author'];
+        $author_id = (int) ($data['author'] ?? 0);
         if ($author_id) {
             $base['author'] = [
                 'id'         => $author_id,

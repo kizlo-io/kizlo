@@ -2,7 +2,7 @@ import { arrayable, BooleanLike, lenient, MediaImage, Metadata, NumberLike } fro
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import type { WP_CustomFields } from "../wordpress"
+import type { WP_CustomFields, WP_EndpointData } from "../wordpress"
 
 const WP_POST_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
 const WP_POST_FORMATS = ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"] as const
@@ -41,7 +41,10 @@ export const PostTagRef = z.object({
 })
 export type PostTagRef = z.infer<typeof PostTagRef>
 
-export type PostCustomFields = WP_CustomFields<"kizlo.postTypes.post">
+type PublicPost = WP_EndpointData<"kizlo.content.post.retrieve">
+export type PostCustomFields = [PublicPost] extends [never]
+	? WP_CustomFields<"kizlo.postTypes.post">
+	: NonNullable<PublicPost["kizlo"]>["custom"]
 
 export const PostCustomFieldsSchema: z.ZodType<PostCustomFields, PostCustomFields> = customFieldsSchema<PostCustomFields>()
 
@@ -64,12 +67,12 @@ export const Post = z.object({
 	categories: z.array(PostCategoryRef),
 	tags: z.array(PostTagRef),
 	seo: Seo.nullable(),
-	custom: PostCustomFieldsSchema,
+	custom: PostCustomFieldsSchema.nullable(),
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	meta: Metadata,
 })
-export type Post = Omit<z.output<typeof Post>, "custom"> & { custom: PostCustomFields }
+export type Post = Omit<z.output<typeof Post>, "custom"> & { custom: PostCustomFields | null }
 
 // ====================================================
 // RETRIEVE

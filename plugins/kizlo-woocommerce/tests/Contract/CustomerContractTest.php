@@ -45,7 +45,7 @@ class CustomerContractTest extends TestCase
         $this->assertTrue($properties['date_modified_gmt']['nullable']);
 
         $request = new \WP_REST_Request('GET');
-        $request->set_header('X-Kizlo-User-Email', 'contract-customer@example.com');
+        $this->signRequest($request, 'contract-customer@example.com');
         $id = self::factory()->user->create(['role' => 'customer', 'user_email' => 'contract-customer@example.com']);
         update_user_meta($id, 'billing_email', 'contract-customer@example.com');
         wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));

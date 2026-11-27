@@ -27,13 +27,13 @@ export interface PagePropsLike {
 
 export interface ParsedPageProps {
 	params: { identifier: string }
-	query: { previewToken?: string }
+	query: { preview_token?: string }
 }
 
 /**
  * Await a page's `params`/`searchParams` and shape them into the argument a
  * Kizlo `get` call expects: the dynamic route segment as `identifier` and the
- * `preview_token` search param as `previewToken`.
+ * `preview_token` search param as `preview_token`.
  *
  * By default the single dynamic segment is used as the identifier; pass
  * `paramKey` when a route has more than one segment.
@@ -49,6 +49,6 @@ export async function parsePageProps(props: PagePropsLike, paramKey?: string): P
 
 	return {
 		params: { identifier: identifier ?? "" },
-		query: { previewToken },
+		query: { preview_token: previewToken },
 	}
 }

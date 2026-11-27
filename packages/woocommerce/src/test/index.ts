@@ -1,5 +1,5 @@
-import { type DevPluginSource, defineFixture, kizloRelease, type SeedContext, type SettleContext } from "kizlo/test"
-import { WC_CORE_BASE, WC_STORE_BASE } from "../constants"
+import { type DevPluginSource, defineFixture, kizloRelease, type SeedContext, type SettleContext, wpCli } from "kizlo/test"
+import { WC_CORE_BASE } from "../constants"
 import type { WC_Product, WC_ProductCreateInput } from "../product/types.wc"
 
 type SeedProduct = Pick<WC_ProductCreateInput, "slug" | "name" | "regular_price"> &
@@ -206,7 +206,7 @@ export function woocommerce(opts: { plugins?: DevPluginSource[] } = {}) {
 		},
 		async cleanup({ service, userId }) {
 			await deleteAllOrdersFor(service, userId)
-			await resetCart(service, userId)
+			await resetCart(userId)
 		},
 	})
 }
@@ -219,13 +219,10 @@ async function deleteAllOrdersFor(service: SeedContext["service"], customerId: n
 	await Promise.all(orders.data.map((o) => service.delete(`${WC_CORE_BASE}/orders/${o.id}`, { searchParams: { force: true } })))
 }
 
-async function resetCart(service: SeedContext["service"], customerId: number): Promise<void> {
-	// Identity is email-only now, so look up the customer's email to key the
-	// session at the same row the tests wrote to.
-	const customer = await service.get<{ email: string }>(`${WC_CORE_BASE}/customers/${customerId}`, {})
-	const email = customer.data?.email
-	if (!email) return
-	await service.delete(`${WC_STORE_BASE}/cart/items`, {
-		headers: { "X-Kizlo-User-Email": email },
-	})
+async function resetCart(customerId: number): Promise<void> {
+	if (!Number.isSafeInteger(customerId) || customerId <= 0) throw new TypeError("A seeded customer ID is required")
+	await wpCli([
+		"eval",
+		`$session = new WC_Session_Handler(); $session->delete_session("${customerId}"); delete_user_meta(${customerId}, "_woocommerce_persistent_cart_" . get_current_blog_id());`,
+	])
 }

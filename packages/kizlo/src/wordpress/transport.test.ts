@@ -242,7 +242,7 @@ describe("trusted client IP forwarding", () => {
 			headers: { "X-Real-Ip": "spoofed" },
 		})
 		expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).has("x-real-ip")).toBe(false)
-		expect(fetch.mock.calls[0]?.[1]?.redirect).toBeUndefined()
+		expect(fetch.mock.calls[0]?.[1]?.redirect).toBe("error")
 	})
 
 	test("does not forward when disabled or resolve an IP for another origin", async () => {

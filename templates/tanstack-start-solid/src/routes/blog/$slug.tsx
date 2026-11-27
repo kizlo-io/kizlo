@@ -1,26 +1,22 @@
 import { createFileRoute, notFound } from "@tanstack/solid-router"
-import { createServerFn } from "@tanstack/solid-start"
+import { deserializeSeo } from "kizlo"
 import { renderJsonLd, resolvePageHead } from "kizlo/tanstack-start"
-import { client } from "@/lib/kizlo/server"
+import { client } from "@/lib/kizlo/client"
 
-// Return only what the page renders (title, content, SEO) — a lean, serializable payload, not the whole
-// WordPress post. JSON-LD is rendered to a string here so the loader payload stays serializable.
-const getPost = createServerFn({ method: "GET" })
-	.validator((slug: string) => slug)
-	.handler(async ({ data: slug }) => {
-		const { data } = await client.posts.get({ params: { identifier: slug } })
-		if (!data) return null
-		return {
-			title: data.title,
-			content: data.content,
-			head: data.seo?.head ?? null,
-			jsonLd: data.seo ? renderJsonLd(data.seo.schema) : null,
-		}
-	})
+async function getPost(slug: string) {
+	const { data } = await client.kizlo.content.post.retrieve({ params: { identifier: slug } })
+	if (!data) return null
+	return {
+		title: data.title.rendered,
+		content: data.content.rendered,
+		head: data.kizlo?.seo ? deserializeSeo(data.kizlo.seo).head : null,
+		jsonLd: data.kizlo?.seo ? renderJsonLd(deserializeSeo(data.kizlo.seo).schema) : null,
+	}
+}
 
 export const Route = createFileRoute("/blog/$slug")({
 	loader: async ({ params }) => {
-		const post = await getPost({ data: params.slug })
+		const post = await getPost(params.slug)
 		if (!post) throw notFound()
 		return post
 	},

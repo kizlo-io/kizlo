@@ -66,28 +66,30 @@ Preview and printing do not assign identifiers or change inventory. The five pri
 
 ## Auth
 
-The companion plugin uses Kizlo core's administrator Application Password guard for identity-sensitive routes. Missing or invalid Application Password authentication returns `401`; valid non-administrator credentials return `403`.
+Storefront, cart and checkout calls go directly to WordPress. A fresh provider Bearer token identifies a user; only a verified email may find or lazily create a customer. Unverified users retain permitted guest shopping. Administrator credentials do not impersonate a customer. Native WooCommerce administrative routes retain their own capability checks.
 
-The protected families are `/wc/store/v1/cart`, `/wc/store/v1/checkout`, `/wc/store/v1/order`, `/wc/v3/customers`, and `/wc/v3/orders`, including their descendants. Other WooCommerce routes use their native permissions, so public Store API product and catalog requests remain anonymous and ignore Kizlo identity headers.
+Start a guest cart with `GET /wc/store/v1/cart`, then return its signed `Cart-Token` on subsequent requests. Customer cart tokens require the matching verified identity. Unsigned user-email and guest-ID headers are rejected. The store's guest-checkout policy still applies; sign up through your auth provider rather than creating a WordPress account at checkout.
 
-Cart and checkout requests carry identity headers (`X-Kizlo-User-Email` as the sole user identity, plus `X-Kizlo-Guest-Token`) that the headless session handler validates before selecting a cart. An email with no WordPress account resolves to a customer created on demand. When a user signs in with a guest cart, the plugin merges line items during that original request. It does not merge coupons, addresses, or shipping selections. Rejected guest lines are returned in the Store API cart's existing `errors` field.
+### Session lifecycle
 
-Guest tokens, the signed Kizlo cookie, and WooCommerce's server session all expire after 48 hours. The cookie uses `Path=/`, `HttpOnly`, and `SameSite=Lax`. Cookie deletion is optional cleanup after a successful writable cart or checkout response; repeated requests remain safe when a Server Component cannot emit `Set-Cookie`.
+When a verified user presents a guest cart, line items merge into that customer's saved cart exactly once. Merges into one customer are serialized; coupons, addresses and shipping selections are not merged. Rejected lines remain visible in the Store API cart's `errors` field.
+
+Clear client cart storage on logout and account switches. WordPress checks token ownership on every request. Existing frontend-owned guest cookies cannot establish the new signed session; see [v1 migration](https://kizlo.io/docs/concepts/migration-v1).
 
 ## Redirecting after checkout
 
-When a Kizlo Site URL is configured, the plugin sends the shopper back to the headless storefront once checkout finishes. There is no admin setting: the storefront chooses each destination per checkout by sending relative `successPath` and `cancelPath` when it confirms or retries checkout, and the plugin stamps them on the order.
+When a Kizlo Site URL is configured, the plugin sends the shopper back to the headless storefront once checkout finishes. There is no admin setting: the storefront chooses each destination per checkout by sending relative `extensions.kizlo.success_path` and `extensions.kizlo.cancel_path` when it confirms or retries checkout, and the plugin stamps them on the order.
 
-- **Success.** After payment completes, the order-received redirect resolves `successPath` against the Site URL and appends `order_id` and `key`. Without a `successPath` it falls back to `/checkout/order-received`.
-- **Cancel.** Aborting an off-site payment still runs WooCommerce's cancel-order endpoint, so the order is cancelled and stock is freed, then lands the shopper on `cancelPath`. Without a `cancelPath` it falls back to `/cart`.
+- **Success.** After payment completes, the order-received redirect resolves `success_path` against the Site URL and appends `order_id` and `key`. Without a `success_path` it falls back to `/checkout/order-received`.
+- **Cancel.** Aborting an off-site payment still runs WooCommerce's cancel-order endpoint, so the order is cancelled and stock is freed, then lands the shopper on `cancel_path`. Without a `cancel_path` it falls back to `/cart`.
 
 Both paths are relative only. A value carrying a scheme or a `//` prefix is rejected and the default is used, so a checkout request cannot redirect the shopper off-site. The Site URL host is already trusted for these redirects; nothing happens when no Site URL is set.
 
-Some order-pay exits return the browser to the WordPress `/checkout` page rather than the cancel-order endpoint. With an empty native cart, WooCommerce redirects that request to `/cart` before any order filter runs, and it carries no order id or key. To keep `cancelPath` across that gap, the order-pay page stamps a short-lived, one-time context in the WooCommerce session, and only that empty-checkout redirect reads it back to reach `cancelPath`. This changes nothing else: it never alters the order's status, stock, or any provider-owned cancellation behaviour, and ordinary cart links and checkout navigation are untouched. When two order-pay pages are open in one session, the final request cannot say which order it belongs to, so the redirect keeps WooCommerce's `/cart`.
+Some order-pay exits return the browser to the WordPress `/checkout` page rather than the cancel-order endpoint. With an empty native cart, WooCommerce redirects that request to `/cart` before any order filter runs, and it carries no order id or key. To keep `cancel_path` across that gap, the order-pay page stamps a short-lived, one-time context in the WooCommerce session, and only that empty-checkout redirect reads it back to reach `cancel_path`. This changes nothing else: it never alters the order's status, stock, or any provider-owned cancellation behaviour, and ordinary cart links and checkout navigation are untouched. When two order-pay pages are open in one session, the final request cannot say which order it belongs to, so the redirect keeps WooCommerce's `/cart`.
 
 ## Embedding the order-pay page
 
-Starting a payment returns a `redirectUrl` to WooCommerce's order-pay page, where the gateway loads. WooCommerce protects checkout responses with `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, so a headless storefront on a different origin cannot present that page inside a modal iframe.
+Starting a payment returns a `payment_result.redirect_url` to WooCommerce's order-pay page, where the gateway loads. WooCommerce protects checkout responses with `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`, so a headless storefront on a different origin cannot present that page inside a modal iframe.
 
 When a Kizlo Site URL is configured, the order-pay response permits that one exact origin (scheme, host, and port) to frame it. No setting gates this; the configured Site URL is the trusted storefront. Every other response, including account pages, ordinary checkout, and unrelated WordPress routes, keeps WooCommerce's framing protection unchanged, and nothing changes at all when no Site URL is set.
 

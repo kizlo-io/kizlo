@@ -38,9 +38,11 @@
 pnpm add @kizlo/cf7
 ```
 
-## Documentation
+## Submit forms directly
 
-See the [docs](https://kizlo.io/docs) for setup and usage.
+Install the matching Kizlo CF7 plugin and run `kizlo generate`. Submit through `client.cf7.forms.submit(...)` using the generated native input, including `captcha_token`. Configure CAPTCHA verification in WordPress; CF7 retains its validation and spam checks.
+
+This package exports result schemas and `deserializeSubmission` for presenting a successful native response. The former `cf7()` application integration is removed. See [direct clients](https://kizlo.io/docs/concepts/client) and the [v1 migration](https://kizlo.io/docs/concepts/migration-v1).
 
 ## License
 

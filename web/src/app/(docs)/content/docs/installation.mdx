@@ -1,45 +1,44 @@
 ---
 title: Installation
-icon: DownloadSimple
-description: Install the Kizlo plugin on WordPress, then pick your framework.
+description: Install the WordPress plugin and generate a direct browser client.
 ---
 
-import { brandIcons } from "@/components/icons"
-import { QuickstartCard } from "@/components/quickstart-card"
+## Prepare WordPress
 
-Kizlo talks to WordPress. Install the plugin on the WordPress you want to use, then pick your
-framework below to wire it into your app.
-
-<Callout>
-  Just trying it out? For local dev, the CLI runs WordPress in Docker with the plugin and
-  credentials set up for you, so you can skip the steps below.
-</Callout>
-
-## Install the WordPress plugin
-
-Download the latest Kizlo plugin, then in WP Admin go to **Plugins → Add New → Upload Plugin**,
-choose the zip, and **Activate**.
+Install and activate the Kizlo plugin on your CMS. Activate companion plugins for WooCommerce or CF7 when you need those APIs.
 
 <DownloadButton plugin="kizlo" />
 
-Once activated, the plugin keeps itself up to date from within WordPress, so there's no need to
-come back here for future versions. The CLI handles credentials from here.
+Create an Application Password for an authorized WordPress service user under **Users → Profile**. Keep it private. In **System → Authentication**, allow your frontend's exact origin, even when external authentication is disabled.
 
-## Quickstarts
+## Install and generate
 
-Now pick your framework of choice to wire Kizlo into your app and make your first call. More are
-on the way.
+```bash
+npm install kizlo
+```
 
-<Cards>
-  <QuickstartCard href="/docs/quickstarts/nextjs" icon={<brandIcons.NextJs />} title="Next.js" />
-  <QuickstartCard href="/docs/quickstarts/astro" icon={<brandIcons.Astro />} title="Astro" />
-  <QuickstartCard href="/docs/quickstarts/tanstack-start/react" icon={<brandIcons.TanStackStart />} title="TanStack Start (React)" />
-  <QuickstartCard href="/docs/quickstarts/tanstack-start/solid" icon={<brandIcons.TanStackStart />} title="TanStack Start (Solid)" />
-  <QuickstartCard icon={<brandIcons.React />} title="React" comingSoon />
-  <QuickstartCard icon={<brandIcons.Vue />} title="Vue" comingSoon />
-  <QuickstartCard icon={<brandIcons.SvelteKit />} title="SvelteKit" comingSoon />
-  <QuickstartCard icon={<brandIcons.SolidStart />} title="SolidStart" comingSoon />
-    <QuickstartCard icon={<brandIcons.Node />} title="Node.js" comingSoon />
-  <QuickstartCard icon={<brandIcons.Bun />} title="Bun" comingSoon />
-  <QuickstartCard icon={<brandIcons.Deno />} title="Deno" comingSoon />
-</Cards>
+```ts title="kizlo.config.ts"
+import { defineConfig } from "kizlo/config"
+
+export default defineConfig({ dir: "src/lib/kizlo/generated" })
+```
+
+```bash title=".env"
+KIZLO_WP_URL=https://cms.example.com
+KIZLO_WP_USERNAME=service-user
+KIZLO_WP_APP_PASSWORD=your-private-application-password
+```
+
+```bash
+npx kizlo generate
+```
+
+The output contains `introspection.ts` for trusted service operations and `introspection.browser.ts` for explicitly exposed APIs. Commit both files. Add `kizlo check` to CI.
+
+## Use the client
+
+Follow your framework's quickstart: [Next.js](/docs/quickstarts/nextjs), [Astro](/docs/quickstarts/astro), [TanStack React](/docs/quickstarts/tanstack-start/react), or [TanStack Solid](/docs/quickstarts/tanstack-start/solid). A static frontend needs no Kizlo application backend.
+
+For local WordPress, set `local: true` in your config and run `npx kizlo dev` with Docker running. The CLI manages local credentials; point your frontend's public CMS URL at the local WordPress URL it prints. See [CLI configuration](/docs/concepts/cli#configuration).
+
+Upgrading an existing app? Read [Migrate to v1](/docs/concepts/migration-v1) before removing the old RPC server.

@@ -164,38 +164,29 @@ describe("resolveConfig", () => {
 	}
 
 	test("returns undefined when nothing is configured to generate", async () => {
-		writeConfig('{ alias: "@/" }')
+		writeConfig("{}")
 		expect(await resolveConfig(dir)).toBeUndefined()
 	})
 
-	test("resolves the server layout and introspection from a `dir` string", async () => {
-		writeConfig('{ dir: "src/lib/kizlo" }')
-		const cfg = await resolveConfig(dir)
-		expect(cfg?.server).toEqual({
-			dir: path.join("src/lib/kizlo", "server"),
-			entry: path.join("src/lib/kizlo", "server", "index.ts"),
-			contractDir: path.join("src/lib/kizlo", "server", "generated"),
-			contractPath: path.join("src/lib/kizlo", "server", "generated", "contract.json"),
-			barrelPath: path.join("src/lib/kizlo", "server", "generated", "index.ts"),
-		})
-		expect(cfg?.introspectionPath).toBe(path.join("src/lib/kizlo", "server", "generated", "introspection.ts"))
+	test("uses dir directly as the endpoint output directory", async () => {
+		writeConfig('{ dir: "src/generated" }')
+		expect(await resolveConfig(dir)).toMatchObject({ introspectionPath: path.join("src/generated", "introspection.ts") })
 	})
 
-	test("resolves an introspection path with no server from `dir: { introspection }`", async () => {
-		writeConfig('{ dir: { introspection: "." } }')
-		const cfg = await resolveConfig(dir)
-		expect(cfg?.server).toBeUndefined()
-		expect(cfg?.introspectionPath).toBe("introspection.ts")
+	test("supports output in the project root", async () => {
+		writeConfig('{ dir: "." }')
+		expect((await resolveConfig(dir))?.introspectionPath).toBe("introspection.ts")
 	})
 
-	test("takes the `--dir` flag over the config `dir`", async () => {
-		writeConfig('{ dir: { introspection: "." } }')
-		const cfg = await resolveConfig(dir, { dir: "packages/api" })
-		expect(cfg?.server?.dir).toBe(path.join("packages/api", "server"))
+	test("takes --dir over the configured output directory", async () => {
+		writeConfig('{ dir: "." }')
+		expect((await resolveConfig(dir, { dir: "packages/api" }))?.introspectionPath).toBe(path.join("packages/api", "introspection.ts"))
 	})
 
 	test.each([
-		["wordpressClientDir", '{ wordpressClientDir: "." }', "dir: { introspection }"],
+		["wordpressClientDir", '{ wordpressClientDir: "." }', "directory string"],
+		["alias", '{ alias: "@/" }', "alias` has been removed"],
+		["server contract layout", '{ dir: { server: "src/server" } }', "output directory directly"],
 		["root dev", "{ dev: { enable: true } }", "local.dev"],
 		["root test", "{ test: { enable: true } }", "local.test"],
 		["root name", '{ name: "shop" }', "local.name"],

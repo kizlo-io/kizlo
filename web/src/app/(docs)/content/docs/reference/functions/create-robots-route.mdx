@@ -5,7 +5,7 @@ description: Serve robots.txt from the rules and sitemaps configured in WordPres
 
 `createRobotsRoute` builds a `Request` to `Response` handler that serves `robots.txt`. It reads the user-agent
 rules and sitemap URLs from your WordPress content through the server-to-server `client` returned by
-[`createKizlo`](/docs/reference/functions/create-kizlo), and renders them as plain text. Mount the returned handler
+[the direct client](/docs/concepts/client), and renders them as plain text. Mount the returned handler
 at `/robots.txt`.
 
 <Callout>
@@ -21,7 +21,7 @@ createRobotsRoute(client)
 
 ### `client`
 
-The server-to-server `client` from [`createKizlo`](/docs/reference/functions/create-kizlo). The handler calls
+The direct public client. The handler calls
 `client.seo.robots` for the configured `Allow`/`Disallow` rules and the sitemap URLs to advertise.
 
 ## Returns

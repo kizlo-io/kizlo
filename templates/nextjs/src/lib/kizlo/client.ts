@@ -1,4 +1,4 @@
-import { createKizloClient } from "kizlo/nextjs"
-import { contract } from "./server/generated"
+import { createBrowserClient } from "kizlo/browser"
+import { introspection } from "./generated/introspection.browser"
 
-export const client = createKizloClient(contract)
+export const client = createBrowserClient({ url: process.env.NEXT_PUBLIC_KIZLO_WP_URL ?? "", endpoints: introspection })

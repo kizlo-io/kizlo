@@ -22,7 +22,7 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
 
 /**
  * Shape of the credentials artifact written by `runSeeds` and consumed by
- * `getKizloTestInstance`. The contract between the CLI writer and the test reader
+ * `getTestCredentials`. The contract between the CLI writer and the test reader
  * is this JSON file — neither side imports the other at runtime.
  */
 export interface TestCredentials {

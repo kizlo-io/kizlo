@@ -1,8 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest"
 import { geoCloudflareNext } from "../../adapters/geo.cloudflare"
-import type { ProcedureContext } from "../../context"
+import type { WebhookContext } from "../../webhook"
 import { WordPressTransport } from "../../wordpress/transport"
-import { nextjs } from "./integration"
 import { nextRevalidation } from "./revalidate"
 
 const { currentHeaders } = vi.hoisted(() => ({ currentHeaders: { value: new Headers() } }))
@@ -15,9 +14,9 @@ afterEach(() => {
 test("a WooCommerce settings change revalidates the whole layout", async () => {
 	const revalidatePath = vi.fn()
 	const revalidateTag = vi.fn()
-	const [handler] = nextRevalidation({ revalidatePath, revalidateTag, sitemap: false }).events ?? []
+	const handler = nextRevalidation({ revalidatePath, revalidateTag, sitemap: false })
 
-	await handler?.handler({ type: "settings.woocommerce.updated", data: null }, {} as ProcedureContext)
+	await handler?.handler({ type: "settings.woocommerce.updated", data: null }, {} as WebhookContext)
 
 	expect(revalidatePath).toHaveBeenCalledWith("/", "layout")
 })
@@ -43,14 +42,14 @@ test("the revalidation handler reads the current Next.js request headers", async
 	}
 	const revalidatePath = vi.fn()
 	const revalidateTag = vi.fn()
-	const [event] = nextjs({ env: {}, revalidate: { paths: regenerate, revalidatePath, revalidateTag } }).events ?? []
+	const event = nextRevalidation({ paths: regenerate, revalidatePath, revalidateTag })
 	if (!event) throw new Error("Expected Next.js revalidation to be enabled")
 	for (const ip of ["203.0.113.1", "2001:db8::2"]) {
 		currentHeaders.value = new Headers({ "cf-connecting-ip": ip })
-		await event.handler({ type: "settings.site.updated", data: null }, {} as ProcedureContext)
+		await event.handler({ type: "settings.site.updated", data: null }, {} as WebhookContext)
 	}
 	currentHeaders.value = new Headers()
-	await event.handler({ type: "settings.site.updated", data: null }, {} as ProcedureContext)
+	await event.handler({ type: "settings.site.updated", data: null }, {} as WebhookContext)
 	expect(forwarded).toEqual(["203.0.113.1", "2001:db8::2", null])
 	expect(revalidatePath).toHaveBeenCalledWith("/", "layout")
 	expect(revalidateTag).toHaveBeenCalledWith("kizlo:robots", { expire: 0 })

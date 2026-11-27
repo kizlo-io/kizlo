@@ -2,19 +2,19 @@ import { createPageMetadata } from "kizlo/nextjs/server"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { JsonLd } from "@/components/json-ld"
-import { client } from "@/lib/kizlo/server"
+import { getContent } from "@/lib/kizlo/content"
 import { createMetadata } from "@/lib/metadata"
 import { parsePageProps } from "@/lib/shared"
 
 export async function generateMetadata(props: PageProps<"/[slug]">): Promise<Metadata> {
-	const { data } = await client.pages.get(await parsePageProps(props))
+	const { data } = await getContent("page", await parsePageProps(props))
 	if (!data?.seo?.head) return createMetadata({ alternates: { canonical: "/" } })
 	return createPageMetadata(data.seo?.head)
 }
 
 export default async function Page(props: PageProps<"/[slug]">) {
-	const { data, error } = await client.pages.get(await parsePageProps(props))
-	if (error) notFound()
+	const { data } = await getContent("page", await parsePageProps(props))
+	if (!data) notFound()
 
 	return (
 		<main>

@@ -1,4 +1,4 @@
-import type { S2SClient } from "../../kizlo"
+import type { PublicApiClient } from "../../public-api"
 import { type CreateSitemapRouteOptions, createSitemapRoute as createCoreSitemapRoute, SITEMAP_BASE } from "../../seo/sitemap"
 import { xmlResponse } from "../../seo/utils"
 
@@ -16,7 +16,7 @@ interface NextRouteContext {
 	params: Promise<{ sitemap: string }>
 }
 
-export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitemapRouteOptions) {
+export function createSitemapRoute(client: PublicApiClient, options?: CreateSitemapRouteOptions) {
 	const handler = createCoreSitemapRoute(client, options)
 
 	let getCached: ((url: string) => Promise<{ status: number; body: string }>) | undefined

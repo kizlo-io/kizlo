@@ -71,6 +71,7 @@ export interface IntrospectionOperationInput {
 }
 
 export interface IntrospectionOperation {
+	access?: "public" | "authenticated" | "session" | "preview" | "admin"
 	method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
 	summary?: string
 	description?: string
@@ -165,6 +166,7 @@ const operationInput: z.ZodType<IntrospectionOperationInput> = z
 
 const operation: z.ZodType<IntrospectionOperation> = z
 	.object({
+		access: z.enum(["public", "authenticated", "session", "preview", "admin"]).optional(),
 		method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]),
 		summary: z.string().optional(),
 		description: z.string().optional(),

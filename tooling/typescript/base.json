@@ -4,7 +4,9 @@
 	"compilerOptions": {
 		"paths": {
 			"kizlo": ["${configDir}/../kizlo/src/index.ts"],
-			"kizlo/react": ["${configDir}/../kizlo/src/react.tsx"],
+			"kizlo/browser": ["${configDir}/../kizlo/src/browser.ts"],
+ "kizlo/server": ["${configDir}/../kizlo/src/server.ts"],
+ "kizlo/react": ["${configDir}/../kizlo/src/react.tsx"],
 			"kizlo/config": ["${configDir}/../kizlo/src/config.ts"],
 			"kizlo/test": ["${configDir}/../kizlo/src/test/index.ts"],
 			// Not a published entry and cannot become one: it constructs the generated client, whose

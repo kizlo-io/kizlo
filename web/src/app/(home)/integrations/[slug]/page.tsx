@@ -6,8 +6,7 @@ import { cache } from "react"
 import { Command } from "@/components/command"
 import { DownloadButton } from "@/components/download-button"
 import { JsonLd } from "@/components/json-ld"
-import type { Integration } from "@/lib/kizlo/integrations"
-import { client } from "@/lib/kizlo/server"
+import { getIntegration as fetchIntegration, type Integration, listIntegrations } from "@/lib/kizlo/integrations"
 import { createMetadata } from "@/lib/metadata"
 import { getLatestRelease, isPluginSlug } from "@/lib/plugins"
 import { gitConfig } from "@/lib/shared"
@@ -19,14 +18,12 @@ const TYPE_LABELS = {
 } as const
 
 export async function generateStaticParams() {
-	const { data } = await client.integrations.list()
+	const data = await listIntegrations()
 	return (data ?? []).map((integration) => ({ slug: integration.slug }))
 }
 
 const getIntegration = cache(async (slug: string): Promise<Integration | null> => {
-	const { data, error } = await client.integrations.get({ params: { identifier: slug } })
-	if (error) return null
-	return data
+	return fetchIntegration(slug)
 })
 
 export async function generateMetadata(props: PageProps<"/integrations/[slug]">): Promise<Metadata> {

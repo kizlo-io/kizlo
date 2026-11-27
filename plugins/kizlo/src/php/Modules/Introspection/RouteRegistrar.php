@@ -3,6 +3,7 @@
 namespace Kizlo\Modules\Introspection;
 
 use InvalidArgumentException;
+use Kizlo\Modules\Auth\RoutePermissions;
 use Kizlo\Modules\RestApi\RestGuard;
 use WP_Error;
 use WP_REST_Request;
@@ -25,7 +26,7 @@ use WP_REST_Request;
 class RouteRegistrar
 {
     /** Fields that describe the contract rather than the WordPress route. */
-    private const SPEC_KEYS = ['id', 'operation', 'namespace', 'method', 'input', 'errors', 'responses', 'summary', 'description', 'deprecated'];
+    private const SPEC_KEYS = ['id', 'operation', 'namespace', 'method', 'input', 'errors', 'responses', 'summary', 'description', 'deprecated', 'access'];
 
     /**
      * @param array<string, mixed> $args
@@ -48,14 +49,25 @@ class RouteRegistrar
             return;
         }
 
-        // Reported rather than honoured: the admin-only boundary is the whole
-        // point of the namespace, so the supplied one is overwritten regardless.
-        if (isset($args['permission_callback'])) {
+        $access = $args['access'] ?? 'admin';
+        if (!is_string($access) || !in_array($access, RoutePermissions::ACCESS, true)) {
+            self::fail('kizlo_register_route', $location + ['keyword' => 'access'], 'Unknown route access policy.');
+            return;
+        }
+        if (isset($args['permission_callback']) && !isset($args['access'])) {
             self::fail(
                 'kizlo_register_route',
                 $location + ['keyword' => 'permission_callback'],
-                '"permission_callback" is not supported; every Kizlo route is admin-only and the check is attached for you.',
+                '"permission_callback" is not supported without an explicit access policy; the route remains admin-only.',
             );
+            unset($args['permission_callback']);
+        } elseif (isset($args['permission_callback']) && !is_callable($args['permission_callback'])) {
+            self::fail('kizlo_register_route', $location + ['keyword' => 'permission_callback'], 'The permission callback must be callable.');
+            return;
+        }
+        if (in_array($access, ['session', 'preview'], true) && !is_callable($args['permission_callback'] ?? null)) {
+            self::fail('kizlo_register_route', $location + ['keyword' => 'permission_callback'], 'Session and preview routes require a permission callback.');
+            return;
         }
 
         $method = self::method($args, 'kizlo_register_route', $location);
@@ -119,7 +131,7 @@ class RouteRegistrar
         $route = is_string($declaration['route'] ?? null) ? $declaration['route'] : '';
         $input = is_array($declaration['input'] ?? null) ? $declaration['input'] : [];
 
-        $args = ['method' => $declaration['method'] ?? null, 'callback' => $callback];
+        $args = ['method' => $declaration['method'] ?? null, 'callback' => $callback, 'access' => $declaration['access'] ?? 'admin'];
 
         if ($validator !== null) {
             $args['validate_callback'] = $validator;
@@ -291,7 +303,7 @@ class RouteRegistrar
             'responses' => $args['responses'] ?? [],
         ];
 
-        foreach (['summary', 'description', 'deprecated'] as $key) {
+        foreach (['summary', 'description', 'deprecated', 'access'] as $key) {
             if (isset($args[$key])) {
                 $declaration[$key] = $args[$key];
             }
@@ -309,23 +321,8 @@ class RouteRegistrar
         $routeArgs = array_diff_key($args, array_flip(array_merge(['route'], self::SPEC_KEYS)));
         $routeArgs['methods'] = $args['method'] ?? '';
 
-        $routeArgs['permission_callback'] = static function () {
-            if (! is_user_logged_in()) {
-                return new WP_Error(
-                    'kizlo_rest_unauthorized',
-                    'Administrator authentication required.',
-                    ['status' => 401]
-                );
-            }
-            if (! current_user_can('manage_options')) {
-                return new WP_Error(
-                    'kizlo_rest_forbidden',
-                    'Administrator privileges required.',
-                    ['status' => 403]
-                );
-            }
-            return true;
-        };
+        $permission = $args['permission_callback'] ?? null;
+        $routeArgs['permission_callback'] = static fn(WP_REST_Request $request) => RoutePermissions::check($request, $args['access'] ?? 'admin', $permission);
 
         $callback = $routeArgs['callback'];
 

@@ -63,6 +63,8 @@ final class OperationErrors
      */
     public const SHARED = [
         'invalid_param',
+        'kizlo_auth_unavailable',
+        'kizlo_invalid_token',
         'kizlo_rest_forbidden',
         'kizlo_rest_unauthorized',
         'rest_forbidden',
@@ -89,7 +91,7 @@ final class OperationErrors
      */
     public static function withGuard(array $declaration): array
     {
-        return self::merge($declaration, self::GUARD);
+        return self::merge($declaration, self::withAuthentication($declaration, self::GUARD));
     }
 
     /**
@@ -101,7 +103,17 @@ final class OperationErrors
      */
     public static function withNative(array $declaration): array
     {
-        return self::merge($declaration, self::NATIVE);
+        return self::merge($declaration, self::withAuthentication($declaration, self::NATIVE));
+    }
+
+    /** @param array<string, mixed> $declaration @param string[] $errors @return string[] */
+    private static function withAuthentication(array $declaration, array $errors): array
+    {
+        $namespace = $declaration['namespace'] ?? '';
+        if (in_array($namespace, ['wp/v2', 'kizlo/v1'], true) || str_starts_with($namespace, 'wc/store/')) {
+            return array_merge($errors, ['kizlo_invalid_token', 'kizlo_auth_unavailable']);
+        }
+        return $errors;
     }
 
     /**
@@ -132,8 +144,12 @@ final class OperationErrors
         $envelopes = [
             '400' => ['description' => 'The request was invalid.', 'body' => ['$ref' => CoreSchemas::ERROR]],
             '401' => ['description' => 'Authentication is required.', 'body' => ['$ref' => CoreSchemas::ERROR]],
-            '403' => ['description' => 'Administrator privileges are required.', 'body' => ['$ref' => CoreSchemas::ERROR]],
+            '403' => ['description' => 'Permission denied.', 'body' => ['$ref' => CoreSchemas::ERROR]],
         ];
+
+        if (in_array('kizlo_auth_unavailable', $shared, true)) {
+            $envelopes['503'] = ['description' => 'Authentication is temporarily unavailable.', 'body' => ['$ref' => CoreSchemas::ERROR]];
+        }
 
         foreach ($envelopes as $status => $response) {
             if (!array_key_exists($status, $responses)) {

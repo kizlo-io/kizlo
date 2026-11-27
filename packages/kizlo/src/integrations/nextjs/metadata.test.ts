@@ -1,15 +1,40 @@
 import type { BrandSettings } from "@kizlo/shared"
 import { describe, expect, test } from "vitest"
-import type { S2SClient } from "../../kizlo"
+import type { PublicApiClient } from "../../public-api"
 import type { SeoHead } from "../../seo/schema"
 import { createHomeMetadata, createRootViewport } from "./metadata"
 
-function clientWithBrand(brand: Partial<BrandSettings>): S2SClient<[]> {
-	return { settings: { get: { call: async () => ({ brand }) } } } as unknown as S2SClient<[]>
+function clientWithBrand(brand: Partial<BrandSettings>): PublicApiClient {
+	return { kizlo: { site: { retrieve: async () => ({ data: { brand }, error: null }) } } } as unknown as PublicApiClient
 }
 
-function clientWithHomepageHead(head: Partial<SeoHead>): S2SClient<[]> {
-	return { seo: { homepage: { call: async () => ({ head }) } } } as unknown as S2SClient<[]>
+function clientWithHomepageHead(head: Partial<SeoHead>): PublicApiClient {
+	return {
+		kizlo: {
+			seo: {
+				homepage: {
+					retrieve: async () => ({
+						data: {
+							head: {
+								...head,
+								og: { ...head.og, site_name: head.og?.siteName },
+								robots: {
+									index: head.robots?.index,
+									follow: head.robots?.follow,
+									"max-snippet": head.robots?.maxSnippet,
+									"max-image-preview": head.robots?.maxImagePreview,
+									"max-video-preview": head.robots?.maxVideoPreview,
+								},
+								twitter: { ...head.twitter, image_alt: head.twitter?.imageAlt },
+							},
+							schema: { "@context": "https://schema.org", "@graph": [] },
+						},
+						error: null,
+					}),
+				},
+			},
+		},
+	} as unknown as PublicApiClient
 }
 
 describe("createRootViewport", () => {

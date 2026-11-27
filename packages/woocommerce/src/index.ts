@@ -1,11 +1,3 @@
-import { createIntegration } from "kizlo"
-import { CART_PROCEDURES } from "./cart"
-import { createCheckoutProcedures } from "./checkout"
-import { CUSTOMER_PROCEDURES } from "./customer"
-import { ORDER_PROCEDURES } from "./order"
-import { PRODUCT_PROCEDURES } from "./product"
-import { STOREFRONT_PROCEDURES } from "./storefront"
-
 export type {
 	AddressAdditionalFields,
 	AddressAdditionalFieldsInput,
@@ -15,46 +7,22 @@ export type {
 	ContactAdditionalFields,
 } from "./additional-fields"
 export * from "./cart/schema"
+export * from "./cart/utils"
 export * from "./checkout/schema"
-export { CheckoutRegisteredFieldReference, CheckoutValidationData, CheckoutValidationIssue } from "./checkout/validation"
+export * from "./checkout/utils"
+export {
+	CheckoutRegisteredFieldReference,
+	CheckoutValidationData,
+	CheckoutValidationIssue,
+	checkoutValidationData,
+} from "./checkout/validation"
+export * from "./customer/schema"
+export * from "./customer/utils"
 export type { RegisteredFieldGroup, RegisteredFieldLocations, RegisteredFieldTarget } from "./field-projections"
 export { BillingFieldProjections, resolveRegisteredFieldTarget } from "./field-projections"
 export * from "./order/schema"
+export * from "./order/utils"
 export * from "./product/schema"
+export * from "./product/utils"
 export * from "./storefront/schema"
-
-export interface WooCommerceOptions {
-	/** Allow logged-out checkout, subject to the store's guest-checkout settings. @default true */
-	allowGuest?: boolean
-}
-
-export function woocommerce(options: WooCommerceOptions = {}) {
-	return createIntegration({
-		id: "woocommerce",
-		requires: {
-			plugins: [{ name: "kizlo-woocommerce", version: "0.11.0" }],
-			// The `wc/v3` and `wc/store/v1` operations this integration calls. WooCommerce serves them, but
-			// only the Kizlo WooCommerce plugin describes them, so an absent subtree means that plugin is
-			// missing or predates the contract rather than anything being wrong with WooCommerce.
-			endpoints: [
-				"woocommerce.customers",
-				"woocommerce.kizlo.customers",
-				"woocommerce.kizlo.orders.list",
-				"woocommerce.kizlo.storefront",
-				"woocommerce.products",
-				"woocommerce.store.cart",
-				"woocommerce.store.checkout",
-				"woocommerce.store.order",
-				"woocommerce.store.products",
-			],
-		},
-		procedures: {
-			cart: CART_PROCEDURES,
-			products: PRODUCT_PROCEDURES,
-			checkout: createCheckoutProcedures(options.allowGuest),
-			customers: CUSTOMER_PROCEDURES,
-			orders: ORDER_PROCEDURES,
-			storefront: STOREFRONT_PROCEDURES,
-		},
-	})
-}
+export * from "./storefront/utils"

@@ -1,4 +1,3 @@
-import { KizloError } from "../../shared/error"
 import type { CookiesAdapter } from "../../shared/types"
 
 export function createNextCookiesInterface(): CookiesAdapter {
@@ -43,14 +42,4 @@ export function createCachedTextRoute(handler: (request: Request) => Promise<Res
 
 		return new Response(await getBody(), { headers: { "Content-Type": contentType } })
 	}
-}
-
-export function getServerBaseUrl() {
-	const baseUrl = process.env.NEXT_PUBLIC_KIZLO_BASE_URL
-	if (!baseUrl) {
-		throw new KizloError("MISSING_ENV_VARIABLE", {
-			message: "Please define NEXT_PUBLIC_KIZLO_BASE_URL in your .env file.",
-		})
-	}
-	return baseUrl
 }

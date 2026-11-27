@@ -5,16 +5,11 @@ description: Build a custom geo adapter that describes the caller's connection.
 
 `createGeoAdapter` declares a custom geo adapter, typed against the `GeoAdapter` contract. Kizlo calls it to describe
 the connection (IP, location, and user agent) for the current request. Provide the result through an
-[integration](/docs/reference/functions/create-integration)'s `adapters.geo`.
+own server function.
 
-## Forward trusted IPs
+## Trusted connection metadata
 
-Registering a geo adapter also forwards its valid `ip` to WordPress as `x-real-ip`. Return only an address
-your platform verifies; use `null` when unavailable. There is no separate forwarding option. Existing geo
-configurations gain this behavior, including mocks with a non-null IP.
-
-Use `geoVercelNext()` on Vercel or the [Cloudflare integration](/docs/quickstarts/cloudflare) on Workers.
-Cloudflare's `geoCloudflare()` reads the Worker-entry context without a Next.js headers dependency.
+Only use IP headers your ingress validates. A direct browser request uses WordPress's observed IP; forwarded headers are ignored unless the WordPress deployment configures its trusted-proxy filter. Geo metadata is never an identity credential.
 
 ## Parameters
 
@@ -46,7 +41,7 @@ documented entry point.
 This example assumes your trusted ingress sets `x-ingress-verified-ip` and rejects spoofed values.
 
 ```ts title="src/lib/kizlo/adapters/geo.ts"
-import { createGeoAdapter } from "kizlo"
+import { createGeoAdapter } from "kizlo/server"
 
 export const geo = createGeoAdapter({
   getConnInfo(request) {
@@ -63,15 +58,4 @@ export const geo = createGeoAdapter({
 })
 ```
 
-Register it:
-
-```ts title="src/lib/kizlo/server/index.ts"
-import { createIntegration, createKizlo } from "kizlo"
-import { geo } from "../adapters/geo"
-
-const platform = createIntegration({ id: "platform", adapters: { geo } })
-
-export const { client, handler } = createKizlo({
-  integrations: [platform],
-})
-```
+Use this utility in your own server functions. Pass its result explicitly; there is no integration container.

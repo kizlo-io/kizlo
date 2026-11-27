@@ -17,6 +17,53 @@ namespace Kizlo\WooCommerce\Modules\Contract;
  */
 final class RouteCorrections
 {
+    /** Store API handler and session errors retained from the former procedure adapters. */
+    private const SESSION_ERRORS = [
+        'kizlo_cart_merge_lock_unavailable',
+        'kizlo_cart_merge_persistence_failed',
+        'kizlo_conflicting_identity',
+        'kizlo_invalid_guest_token',
+        'kizlo_session_unavailable',
+        'kizlo_user_required',
+        'kizlo_verified_account_required',
+        'woocommerce_rest_cart_coupon_disabled',
+        'woocommerce_rest_cart_coupon_error',
+        'woocommerce_rest_cart_coupon_invalid_code',
+        'woocommerce_rest_cart_empty',
+        'woocommerce_rest_cart_invalid_key',
+        'woocommerce_rest_cart_invalid_parent_product',
+        'woocommerce_rest_cart_invalid_product',
+        'woocommerce_rest_cart_item_error',
+        'woocommerce_rest_cart_item_exists',
+        'woocommerce_rest_cart_shipping_rate_not_found',
+        'woocommerce_rest_checkout_custom_validation_error',
+        'woocommerce_rest_checkout_invalid_payment_result',
+        'woocommerce_rest_checkout_missing_order',
+        'woocommerce_rest_checkout_missing_payment_method',
+        'woocommerce_rest_checkout_payment_method_disabled',
+        'woocommerce_rest_checkout_process_payment_error',
+        'woocommerce_rest_checkout_total_mismatch',
+        'woocommerce_rest_coupon_reserve_failed',
+        'woocommerce_rest_guest_checkout_disabled',
+        'woocommerce_rest_invalid_address',
+        'woocommerce_rest_invalid_address_country',
+        'woocommerce_rest_invalid_billing_email',
+        'woocommerce_rest_invalid_email_address',
+        'woocommerce_rest_invalid_order',
+        'woocommerce_rest_invalid_shipping_option',
+        'woocommerce_rest_invalid_user',
+        'woocommerce_rest_invalid_variation_data',
+        'woocommerce_rest_missing_attributes',
+        'woocommerce_rest_missing_email_address',
+        'woocommerce_rest_missing_variation_data',
+        'woocommerce_rest_product_invalid_quantity',
+        'woocommerce_rest_product_not_purchasable',
+        'woocommerce_rest_product_out_of_stock',
+        'woocommerce_rest_product_partially_out_of_stock',
+        'woocommerce_rest_shipping_disabled',
+        'woocommerce_rest_variation_id_from_variation_data',
+    ];
+
     /** The one route whose body is a bare JSON array rather than an object. */
     private const ZONE_LOCATIONS = '/locations';
 
@@ -213,6 +260,21 @@ final class RouteCorrections
     {
         if (!is_array($declaration)) {
             return $declaration;
+        }
+
+        if ($namespace === WooCommerceNamespaces::STORE) {
+            if ($method === 'GET' && preg_match('#^/(?:products|products/collection-data|products/categories|products/tags|products/attributes)(?:/|$)#', $route)) {
+                $declaration['access'] = 'public';
+            } elseif (preg_match('#^/(?:cart|checkout|order)(?:/|$)#', $route)) {
+                $declaration['access'] = 'session';
+                $declaration['errors'] = array_merge($declaration['errors'] ?? [], self::SESSION_ERRORS);
+                foreach ([409, 422, 500, 503] as $status) {
+                    $declaration['responses'][(string) $status] ??= [
+                        'description' => 'The cart, checkout, or session request failed.',
+                        'body' => ['$ref' => 'kizlo.error'],
+                    ];
+                }
+            }
         }
 
         return match ($namespace) {

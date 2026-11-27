@@ -248,10 +248,12 @@ class TaxIdModule
     public function removeStoreApiShippingCopies(mixed $response, mixed $server, mixed $request): mixed
     {
         if (! $response instanceof WP_HTTP_Response || $response->get_status() >= 400) return $response;
-        if (! $request instanceof WP_REST_Request) return $response;
+        if (! $request instanceof WP_REST_Request || $request->get_method() === 'OPTIONS') return $response;
         if (preg_match('#^/wc/store/v1/(?:cart|checkout|order)(?:/|$)#', $request->get_route()) !== 1) return $response;
 
-        $this->removeShippingCopy(WC()->customer);
+        $customer = WC()->customer;
+        // @phpstan-ignore instanceof.alwaysTrue
+        if ($customer instanceof WC_Customer) $this->removeShippingCopy($customer);
 
         $data = $response->get_data();
         if (is_array($data)) {

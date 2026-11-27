@@ -38,158 +38,49 @@
 pnpm add @kizlo/woocommerce
 ```
 
-## Documentation
+## Call WordPress directly
 
-See the [docs](https://kizlo.io/docs) for setup and usage.
-
-## Read cart separately from checkout
-
-Checkout get, update, confirm, and retry responses no longer include `cart`. Replace reads of `checkout.cart` with `cart.get`, or use the cart returned by a cart mutation:
+Install the matching Kizlo WooCommerce plugin, configure authentication in WordPress, and run `kizlo generate`. Browser calls use the generated public projection and native Store API inputs:
 
 ```ts
-const checkout = await kizlo.woocommerce.checkout.get.call()
-const cart = await kizlo.woocommerce.cart.get.call()
-```
+import { createBrowserClient } from "kizlo/browser"
+import { requireData } from "kizlo"
+import { deserializeCart } from "@kizlo/woocommerce"
+import { introspection } from "./generated/introspection.browser"
 
-Refresh cart separately after checkout changes when your UI needs current totals or items. Checkout conflict errors still carry `data.cart` evidence; see [reviewed total protection](#protect-a-reviewed-checkout-total). Update consumers before deploying the companion plugin update.
-
-## Require login for checkout
-
-Set `allowGuest: false` to require a session from your configured Kizlo auth adapter for `checkout.get`, `checkout.update`, `checkout.confirm`, and `checkout.retry`. Anonymous calls return `UNAUTHORIZED` (401) before changing guest cookies or contacting WooCommerce. Register the integration alongside your auth integration in `createKizlo`; commerce hooks need no auth-provider client state.
-
-```ts
-import { woocommerce } from "@kizlo/woocommerce"
-
-const commerce = woocommerce({ allowGuest: false })
-```
-
-`allowGuest` defaults to `true`, permitting logged-out checkout subject to WooCommerce's own guest-checkout settings and validation. Customer APIs such as `customers.get` always require login. Guest carts, product/storefront reads, and order ownership/key checks (including guest receipts) keep their existing behavior. After installing a release containing this option, replace your application checkout-auth wrapper with `woocommerce({ allowGuest: false })`; procedure inputs, outputs, and hooks stay the same.
-
-## Read a customer before loading a cart
-
-`customers.get()` resolves the signed-in user's email and creates a missing WooCommerce customer on demand. Account and address pages can call it directly after signup. Existing accounts and saved details are preserved; customer and cart requests share the same identity and creation lock.
-
-Install the matching companion plugin and regenerate your WordPress contract before upgrading the SDK. The contract must include `woocommerce.kizlo.customers.retrieve`. Provisioning or lock failures return `SERVICE_UNAVAILABLE` (503), which you can retry; they do not return an empty customer or require checkout first.
-
-## Submit partial checkout addresses
-
-Confirm and retry accept optional core address fields, including billing email. Send only the fields you collect. The billing address object is required; shipping is optional. Each supplied address must include `additionalFields`, with any registered required answers (or `{}` when none are required).
-
-```ts
-const billingAddress = {
-  firstName: "Ada", lastName: "Lovelace",
-  address1: "1 Store Street", city: "London", postcode: "SW1A 1AA", country: "GB",
-  email: "ada@example.com", additionalFields: {},
-}
-await kizlo.woocommerce.checkout.confirm.call({ body: { billingAddress, paymentMethod: "bacs" } })
-// For an existing unpaid order:
-await kizlo.woocommerce.checkout.retry.call({
-  params: { orderId },
-  body: { key: orderKey, billingAddress, paymentMethod: "bacs" },
-})
-```
-
-Omitted fields produce no wire keys; explicit empty strings request clearing where WooCommerce permits it. WooCommerce validates the resulting address against its live rules through the existing checkout errors. Full-address callers remain valid. See [Billing Tax IDs](#billing-tax-ids) for Tax ID omission and [additional checkout fields](https://kizlo.io/docs/concepts/additional-checkout-fields) for registered answer contracts and native billing-to-shipping mirroring.
-
-## Order history
-
-`client.woocommerce.orders.list({ query: { page: 1, perPage: 10 } })` returns `{ items: Order[], meta: ListMetadata }` for the signed-in customer. Both query inputs are optional positive integers; `perPage` is capped at 100. Orders are newest first, with descending ID breaking ties. Metadata includes `page`, `totalItems`, `totalPages`, `nextPage`, `prevPage`, `hasNextPage`, and `hasPrevPage`. Empty history and pages beyond the last page succeed with an empty `items` array.
-
-List items use the same normalized `Order` as `orders.get`, including items, additional fields, currency and totals. Both expose `number`, preserving the store's custom order numbering, and `createdAt`, the order's UTC creation time as Unix milliseconds (`0` when unavailable). Raw `status` values preserve custom statuses. Use the backend's `isPaid` and `needsPayment` flags for payment behavior; status labels do not define whether an order is paid.
-
-History always requires login, including when `allowGuest` is enabled. The server derives the customer from the authenticated session; caller-selected email/customer IDs cannot change ownership. Internal checkout drafts and trash are excluded. Anonymous calls return `UNAUTHORIZED`, backend access denial returns `FORBIDDEN`, and other backend failures remain errors rather than empty history. History HTTP responses use `Cache-Control: private, no-store`. The existing order-key/email checks still apply to guest `orders.get` receipts.
-
-Update the Kizlo WooCommerce plugin and run `kizlo generate` before using this API so your generated contract includes `woocommerce.kizlo.orders.list` and the shared order metadata.
-
-## Billing Tax IDs
-
-Billing addresses expose `taxId` on customers, carts, checkout responses, and orders. The field is always a string on output and defaults to `""` when it has not been set. Billing address inputs accept an optional `taxId`; shipping addresses have no native `taxId`, and Kizlo discards managed shipping copies independently of the hidden UI rule.
-
-```ts
-await kizlo.woocommerce.cart.updateAddress.call({
-  body: { billingAddress: { taxId: "GB123456789" } },
-})
-```
-
-Store administrators can make the field mandatory from **WooCommerce → Settings → Accounts & Privacy → Checkout → Require Tax ID at checkout**. It remains optional by default.
-
-The native value maps to the official registered `kizlo/tax-id` address field. For example, `{ billingAddress: { taxId: "GB123" } }` becomes `{ billing_address: { "kizlo/tax-id": "GB123" } }` on the Store API wire. Cart/customer-address updates and checkout confirm/retry omit the key when `taxId` is omitted, preserving the saved value. Send `taxId: ""` to clear it explicitly. WooCommerce owns sanitization and contextual requiredness.
-
-Raw introspection preserves `kizlo/tax-id` in both address schemas. Normalized billing `additionalFields` omits it from types and values: use the native property. Raw billing inputs using that key are rejected even when a duplicate equals `taxId`; there is no raw-only compatibility alias. Other registered and compatible unknown response extras retain their usual buckets.
-
-Registered billing extras retain their named enum and scalar types in reads, partial cart updates, and confirmation/retry inputs, including registrations with a scalar string index. Confirmation and retry require the registered answers and reject values outside their enums; partial cart updates allow omitted answers. These are compile-time guarantees from the consumer's registered contract. WooCommerce continues to validate against its live registry at runtime.
-
-Customer reads use the grouped `billing.additional_fields` adapter backed by public CheckoutFields helpers. Orders read their own snapshot, never the current profile. Storage remains `_wc_billing/kizlo/tax-id`, so existing saved values need no migration. Order admin edits set/replace/clear the order alone; profile edits affect later cart hydration. The retry validation/persistence bridge and shipping cleanup remain required on WooCommerce 11.0.1.
-
-Consumers should deploy the matching WooCommerce plugin and regenerate their contract after upgrading; the old per-field raw `billing.tax_id` response is removed. The native API remains `customer.billing.taxId` and `billingAddress.taxId`. This feature does not validate jurisdiction-specific identifiers or calculate tax exemptions.
-
-Storefront field definitions include SDK binding paths derived from the same address identity and native projection contract. For billing Tax ID, `bindings.billing` is `["taxId"]`; there is no shipping binding. See [checkout validation](./docs/checkout-validation.md) to attach server errors through the shared field bindings.
-
-## Checkout validation
-
-Update, confirm, and retry expose `CHECKOUT_VALIDATION_FAILED.data = { issues }`. Registered fields carry literal IDs and normalized SDK buckets for Kit or standalone consumers to match against loaded bindings. The browser entry retains schemas/types; the SDK resolver is removed. See [client handling and Kit requirements](./docs/checkout-validation.md) and the [breaking handler migration](./docs/checkout-validation-migration.md).
-
-## Protect a reviewed checkout total
-
-Pass optional `expectedTotal` when confirming checkout to protect the amount your shopper reviewed. Capture it with the cart you display, in minor units: `"1250"` means 12.50 in a currency with two decimal places. The input accepts digits-only strings, including `"0"`, and forwards them unchanged as WooCommerce's `expected_total`.
-
-```ts
-const reviewedTotal = String(cart.totals.total)
-
-const result = await kizlo.client.woocommerce.checkout.confirm({
-  body: { ...checkoutInput, expectedTotal: reviewedTotal },
+const client = createBrowserClient({
+  url: "https://cms.example.com",
+  endpoints: introspection,
 })
 
-if (!result.success && result.error.code === "CHECKOUT_TOTAL_MISMATCH") {
-  const { cart: updatedCart, expectedTotal, actualTotal } = result.error.data
-  // Display the available evidence and ask the shopper to review again.
-}
+const cart = deserializeCart(requireData(await client.woocommerce.store.cart.retrieve()))
 ```
 
-Upgrade `kizlo` to 0.26.1 or later alongside `@kizlo/woocommerce` so browser clients preserve the typed conflict. This protection requires [WooCommerce 11.1.0 or later](https://github.com/woocommerce/woocommerce/blob/11.1.0/plugins/woocommerce/src/StoreApi/Routes/V1/Checkout.php). An increased recalculated total returns `CHECKOUT_TOTAL_MISMATCH` with status 409 before order creation or payment; equal and decreased totals are allowed. Error data contains `cart: Cart | null` and optional minor-unit digit strings `expectedTotal` and `actualTotal`; missing or malformed evidence preserves the conflict. Omit the field for manual or express flows that cannot know the total up front, and on older WooCommerce versions that do not enforce it.
+For cart writes, supply a `cartSession` store to retain the signed `Cart-Token` returned by WooCommerce. For signed-in requests, supply `getToken`. See [direct clients](https://kizlo.io/docs/concepts/client) and [authentication](https://kizlo.io/docs/concepts/authentication).
 
-- Keep the reviewed amount until the shopper approves a new one. Confirmation performs no cart refresh, amount substitution, or automatic retry.
-- `checkout.retry` pays an existing order through a separate protocol and does not accept `expectedTotal`.
+## Present commerce data
 
-## Storefront settings
+This package exports pure schemas, serializers, and formatters such as `deserializeCart`, `deserializeCheckout`, `deserializeCustomer`, `deserializeOrder`, and `deserializeStorefront`. They convert native payloads into presentation models; call them explicitly after a successful response. The `woocommerce()` integration factory and application procedures are removed.
 
-`storefront.get` returns the store-wide settings a storefront renders with, so nothing has to be hardcoded:
+Direct requests use native names such as `billing_address`, `payment_method`, `additional_fields`, and `expected_total`. Checkout uses `client.woocommerce.store.checkout.create(...)`; read the current cart separately. Failures preserve native WordPress/WooCommerce codes, status, and evidence through `{ data, error, status, headers }`.
 
-- `address`: the countries the store sells and ships to, their states, the per-country field rules, and every checkout field including ones plugins register
-- `checkout`: guest checkout, coupons, tax display, shipping and local pickup
-- `pricing`: the currency format, plus how prices show tax
-- `catalog`: units, review rules and stock display
+## Authenticate shoppers
 
-A field's rules for a country are its default merged with that country's override, the way WooCommerce's Checkout block builds them:
+WordPress verifies the user token and lazily finds or creates a customer by verified email. Missing or unverified email remains a guest identity and cannot acquire an existing customer. Customer and order-history endpoints enforce ownership in WordPress; service credentials do not select a shopper.
 
-```ts
-const store = await kizlo.woocommerce.storefront.get.call()
+WooCommerce's guest-checkout setting controls anonymous checkout. Replace the former `allowGuest` application option with backend policy. Existing frontend guest cookies cannot establish a signed Store API session; see the [v1 migration](https://kizlo.io/docs/concepts/migration-v1) before cutover.
 
-const country = store.address.countries.find((entry) => entry.code === "AE")
-const postcode = { ...store.address.fields.find((field) => field.id === "postcode"), ...country?.locale.postcode }
-// { label: "Postal code", required: false, hidden: true, ... }
-```
+## Submit checkout fields
 
-`address.fields` is an array containing every core and registered address/contact/order definition. Each entry carries its original Woo `id`, `location`, labels, control `type`, `options`, `attributes`, boolean/JSON Schema `required` and `hidden`, and a value `schema` expressed as draft-07 JSON Schema. Woo shorthand conditions are wrapped into standard `properties`. Declarative validation and supported HTML constraints survive; PHP callbacks stay on the server.
+Send native checkout fields, including `expected_total` when protecting a shopper-reviewed amount. WooCommerce validates addresses, registered fields, payment, and the current total. Handle a 409 conflict by asking the shopper to review the returned evidence before resubmitting.
 
-```ts
-// Example normalized definition; no shopper values are included.
-{
-  id: "first_name", location: "address", label: "First name",
-  required: true, hidden: false, type: null,
-  attributes: { autocomplete: "given-name" }, schema: { type: "string" },
-  bindings: { billing: ["firstName"], shipping: ["firstName"] },
-  // optionalLabel, index, placeholder, options, autocomplete also accompany it.
-}
-```
+Billing Tax ID uses the registered `kizlo/tax-id` address key on the wire. The pure address serializers expose `taxId` and preserve omission versus an explicit empty value. Shipping has no Tax ID. See [additional checkout fields](https://kizlo.io/docs/concepts/additional-checkout-fields) for registered inputs and [validation bindings](./docs/checkout-validation.md) for presentation models.
 
-Address `bindings.billing` and `bindings.shipping` are relative to the address object. Contact/order `bindings.other` follow Checkout: email uses `["billingAddress", "email"]`, extras use `["additionalFields", id]`. Address extras use `["additionalFields", id]`; the complete ID is one literal segment, even if it contains dots or brackets. No separate `fieldLocations` is needed. Kizlo API values and write serialization remain unchanged.
+## Read storefront settings
 
-Upgrade the matching plugin and SDK together and regenerate the consumer contract. The field-map/location-list response is replaced by the field array. Kit's group resolvers transform these definitions into form metadata and complete validation schemas; applications decide where and how to render them. Cart-dependent plugin rules remain a separate integration concern; this response does not contain a field document or shopper/session data.
+`client.woocommerce.kizlo.storefront.retrieve()` returns public store settings and field definitions. Pass its result through `deserializeStorefront` for the presentation model, including address rules, currency formatting, guest-checkout policy, and local-pickup method metadata.
 
-`checkout.localPickup.methodIds` classifies shipping methods supporting local pickup, including plugin methods. An empty list is known empty; `null` means older or malformed producer metadata. See [checkout condition data](./docs/checkout-conditions.md) for the complete client document mapping and Kit handoff.
-
-The response is cached in WordPress per locale. Changing a WooCommerce setting clears it and sends the `settings.woocommerce.updated` webhook event; plugin activation/deactivation also invalidates it.
+See [checkout condition data](./docs/checkout-conditions.md) for field-document mapping. WordPress caches these public settings per locale and invalidates them when store settings or plugins change.
 
 ## License
 

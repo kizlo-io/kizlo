@@ -24,36 +24,26 @@ remove that field from its schema. Contact and order have separate registration 
 schemas, but share one flat checkout value object. Use storefront metadata for presentation and
 contextual visibility; those rules are evaluated by WooCommerce at runtime.
 
-After registration and generation, the SDK and Kit aliases resolve your field names and types:
+After registration, generate the client against that store. Native calls use wire fields directly:
 
 ```ts
-const checkout = await client.woocommerce.checkout.get.call()
-checkout.billingAddress.additionalFields["business/reference"] // string | undefined
-checkout.shippingAddress.additionalFields["business/reference"] // string | undefined
-checkout.additionalFields["marketing/opt-in"] // boolean | undefined
-checkout.additionalFields["delivery/slot"] // "" | "morning" | "afternoon" | undefined
+import { requireData } from "kizlo"
 
-await client.woocommerce.cart.updateAddress.call({
-  body: {
-    billingAddress: { additionalFields: { "business/reference": "PO-42" } },
-    shippingAddress: { additionalFields: { "business/reference": "SHIP-42" } },
-  },
+const checkout = requireData(await client.woocommerce.store.checkout.retrieve())
+checkout.billing_address["business/reference"]
+checkout.additional_fields["marketing/opt-in"]
+
+await client.woocommerce.store.cart.updateCustomer.create({
+  body: { billing_address: { "business/reference": "PO-42" } },
 })
-await client.woocommerce.checkout.update.call({
-  body: { additionalFields: { "marketing/opt-in": false, "delivery/slot": "" } },
+await client.woocommerce.store.checkout.update({
+  body: { additional_fields: { "marketing/opt-in": false, "delivery/slot": "" } },
 })
 ```
 
-The examples assume those fields were registered on your store. Update writes are partial. Omitted
-keys retain their existing values; `false` and an allowed empty string are explicit values. Confirm
-and retry accept optional core address fields, including billing email. Billing remains a required
-object; shipping is optional. Each supplied address requires `additionalFields` and its registered
-required answers, with select and checkbox types preserved. Omitted core fields produce no wire keys;
-explicit empty strings request clearing where WooCommerce permits it. This also applies to native
-`billingAddress.taxId`: omission preserves the saved value, and `taxId: ""` requests clearing.
-Extras cannot overwrite core wire properties. WooCommerce mirrors billing into shipping when a cart
-needs no shipping and a billing update omits the shipping address. Send an explicit shipping patch
-when preserving a separate address in that situation.
+These examples assume those fields exist on your store. Omit a field to preserve its saved value; `false` and permitted empty strings are explicit values. WooCommerce validates required answers and visibility against its live registry.
+
+Pure DTO formatters still expose `billingAddress.additionalFields` and related presentation buckets. Their serializers flatten those buckets for a native request. Billing tax ID remains a native presentation property; direct wire calls use `billing_address["kizlo/tax-id"]`.
 
 ## Customer and order reads
 

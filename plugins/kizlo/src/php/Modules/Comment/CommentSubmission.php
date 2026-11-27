@@ -6,22 +6,12 @@ use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Comments_Controller;
+use Kizlo\Modules\Auth\AuthModule;
+use Kizlo\Modules\Auth\Identity;
+use Kizlo\Modules\Auth\RequestMetadata;
+use Kizlo\Modules\Captcha\Captcha;
 
-/**
- * SDK comment-submission endpoint.
- *
- * The SDK reaches the Kizlo REST API authenticated as the admin via an
- * Application Password. Hitting POST /wp/v2/comments in that context bypasses
- * the public comment pipeline: moderation, flood checks, disallowed-list, and
- * spam filters all assume a real end-user request, and the row ends up with
- * the WP server's IP, an empty user-agent, and the admin as the author.
- *
- * This endpoint re-enters the native pipeline via wp_handle_comment_submission()
- * after temporarily swapping the request environment so the real client IP /
- * user-agent reach every downstream consumer (Akismet reads $_SERVER directly)
- * and the commenter is either a forwarded WP user or a guest — never the admin
- * that owns the App Password.
- */
+/** Submit browser comments through WordPress moderation, flood and spam checks. */
 class CommentSubmission
 {
     public function register(): void
@@ -31,6 +21,7 @@ class CommentSubmission
             // to WordPress. {@see CommentRoutes} for why core keeps the plain ID.
             'id'        => 'kizlo.comments',
             'operation' => 'create',
+            'access' => 'public',
             'method'    => 'POST',
             'route'     => '/comments',
             'summary'   => 'Submit a comment through the native pipeline',
@@ -55,11 +46,7 @@ class CommentSubmission
                         'description'       => 'The comment being replied to.',
                         'sanitize_callback' => 'absint',
                     ],
-                    'user_email' => [
-                        'type'              => 'string',
-                        'description'       => 'The signed-in commenter\'s email, forwarded as the authenticated identity. Matched to a WordPress user to record authorship; distinct from the guest-entered author_email. Omitted for a guest.',
-                        'sanitize_callback' => 'sanitize_email',
-                    ],
+                    'captcha_token' => ['type' => 'string', 'maxLength' => 16384],
                     'author_name' => [
                         'type'              => 'string',
                         'sanitize_callback' => 'sanitize_text_field',
@@ -72,22 +59,10 @@ class CommentSubmission
                         'type'              => 'string',
                         'sanitize_callback' => 'esc_url_raw',
                     ],
-                    'author_ip' => [
-                        'type'              => 'string',
-                        'required'          => true,
-                        'description'       => 'The end user\'s IP, forwarded so moderation and spam filters see the real client.',
-                        'validate_callback' => static fn($v) => is_string($v) && filter_var($v, FILTER_VALIDATE_IP) !== false,
-                        'sanitize_callback' => 'sanitize_text_field',
-                    ],
-                    'user_agent' => [
-                        'type'              => 'string',
-                        'required'          => true,
-                        'description'       => 'The end user\'s user agent, forwarded for the same reason.',
-                        'sanitize_callback' => 'sanitize_text_field',
-                    ],
                 ],
             ],
             'errors'    => [
+                'kizlo_captcha_required', 'kizlo_captcha_invalid', 'kizlo_captcha_unavailable', 'kizlo_forbidden_identity',
                 'comment_author_column_length',
                 'comment_author_email_column_length',
                 'comment_author_url_column_length',
@@ -113,6 +88,22 @@ class CommentSubmission
 
     public function submit(WP_REST_Request $request): WP_REST_Response | WP_Error
     {
+        $identity = AuthModule::identity($request);
+        if ($identity instanceof WP_Error) return $identity;
+        $author = false;
+        if ($identity instanceof Identity && $identity->emailVerified && $identity->email !== null) {
+            $author = get_user_by('email', $identity->email);
+            if ($author && (user_can($author, 'edit_posts') || user_can($author, 'manage_options'))) {
+                return new WP_Error('kizlo_forbidden_identity', 'This account cannot be selected by external email.', ['status' => 403]);
+            }
+        } elseif ($identity === null && !kizlo_is_application_password_authenticated() && is_user_logged_in()) {
+            $author = wp_get_current_user();
+        }
+        $verified = $identity instanceof Identity && $identity->emailVerified && $identity->email !== null;
+        if (!$author && !$verified && !(kizlo_is_application_password_authenticated() && current_user_can('manage_options'))) {
+            $captcha = Captcha::verify($request->get_param('captcha_token'));
+            if ($captcha instanceof WP_Error) return $captcha;
+        }
         $comment_data = [
             'comment_post_ID' => (int) $request->get_param('post_id'),
             'comment_parent'  => (int) $request->get_param('parent'),
@@ -122,19 +113,14 @@ class CommentSubmission
             'url'             => (string) $request->get_param('author_url'),
         ];
 
-        // user_email is the authenticated identity, a trusted signal distinct
-        // from the guest-entered author_email above. Only a resolved match is
-        // attributed to that account; an authenticated email with no match, and
-        // any guest author_email, fall through to guest author-email attribution.
-        $user_email = (string) $request->get_param('user_email');
-        $author     = $user_email !== '' ? get_user_by('email', $user_email) : false;
+        if ($verified) $comment_data['email'] = $identity->email;
 
         $orig_remote_addr = $_SERVER['REMOTE_ADDR']     ?? null;
         $orig_user_agent  = $_SERVER['HTTP_USER_AGENT'] ?? null;
         $orig_user_id     = get_current_user_id();
 
-        $_SERVER['REMOTE_ADDR']     = (string) $request->get_param('author_ip');
-        $_SERVER['HTTP_USER_AGENT'] = substr((string) $request->get_param('user_agent'), 0, 254);
+        $_SERVER['REMOTE_ADDR'] = RequestMetadata::ip();
+        $_SERVER['HTTP_USER_AGENT'] = substr((string) ($orig_user_agent ?? ''), 0, 254);
 
         wp_set_current_user($author ? (int) $author->ID : 0);
 
@@ -161,6 +147,7 @@ class CommentSubmission
             return $result;
         }
 
+        $request->set_param('context', 'view');
         $controller = new WP_REST_Comments_Controller();
         $response   = $controller->prepare_item_for_response($result, $request);
         $response->set_status(200);

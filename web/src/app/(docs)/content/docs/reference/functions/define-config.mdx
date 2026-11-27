@@ -4,8 +4,7 @@ description: Define a fully typed kizlo.config.ts for the CLI's dev and test wor
 ---
 
 `defineConfig` wraps your `kizlo.config.ts` so it is fully typed. The config lives at your project root (`.js` and
-`.mjs` work too). `kizlo init` writes it for you, and you edit it as your project grows. It configures where your
-Kizlo server lives and the local WordPress that `kizlo dev` and `kizlo test` provision.
+`.mjs` work too). It configures the generated output directory and the local WordPress that `kizlo dev` and `kizlo test` provision.
 
 ## Parameters
 
@@ -58,13 +57,13 @@ The same config object, unchanged. `defineConfig` is an identity function that e
 ## Examples
 
 Run local WordPress with `local: true`, which turns on both stacks with defaults (the install folder is
-fixed, so there's nothing else to set). `create`/`init` write this when you choose local WordPress:
+fixed, so there's nothing else to set). Set it explicitly:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
-  dir: "src/lib/kizlo",
+  dir: "src/lib/kizlo/generated",
   local: true,
 })
 ```
@@ -76,7 +75,7 @@ Reach for the object form to configure the stacks. Give each branch its own loca
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
-  dir: "src/lib/kizlo",
+  dir: "src/lib/kizlo/generated",
   local: { worktrees: true },
 })
 ```
@@ -89,7 +88,7 @@ support:
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
-  dir: "src/lib/kizlo",
+  dir: "src/lib/kizlo/generated",
   local: {
     dev: { version: "7.1.0" },
     test: { version: "6.8.2-php8.3-apache" },
@@ -105,21 +104,11 @@ import { defineConfig } from "kizlo/config"
 import { blogFixture } from "./fixtures/blog"
 
 export default defineConfig({
-  dir: "src/lib/kizlo",
-  alias: "@",
+  dir: "src/lib/kizlo/generated",
   local: {
     dev: { fixtures: [blogFixture] },
   },
 })
 ```
 
-Generate only the [introspection](/docs/concepts/introspection) for a package that ships procedures but no
-server, by setting `dir.introspection` and leaving `local` off:
-
-```ts title="kizlo.config.ts"
-import { defineConfig } from "kizlo/config"
-
-export default defineConfig({
-  dir: { introspection: "." },
-})
-```
+For tooling credentials and the output layout, see [CLI configuration](/docs/concepts/cli#configuration).

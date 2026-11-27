@@ -6,6 +6,7 @@ use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
 use WPCF7_ContactForm;
+use Kizlo\Modules\Captcha\Captcha;
 
 class Cf7Module
 {
@@ -24,6 +25,7 @@ class Cf7Module
         kizlo_register_route([
             'id'        => 'cf7.forms',
             'operation' => 'submit',
+            'access' => 'public',
             'method'    => 'POST',
             'route'     => kizlo_route('/cf7/:form_id'),
             'summary'   => 'Submit a Contact Form 7 form',
@@ -35,6 +37,7 @@ class Cf7Module
                 'type'                 => 'object',
                 'additionalProperties' => true,
                 'properties'           => [
+                    'captcha_token' => ['type' => 'string', 'required' => true, 'maxLength' => 16384],
                     'form_id' => [
                         'description'       => 'The ID of the Contact Form 7 form.',
                         'type'              => 'integer',
@@ -45,6 +48,7 @@ class Cf7Module
                 ],
             ],
             'errors'    => [
+                'kizlo_captcha_required', 'kizlo_captcha_invalid', 'kizlo_captcha_unavailable',
                 'cf7_form_not_found',
                 'cf7_not_active',
             ],
@@ -126,6 +130,8 @@ class Cf7Module
             );
         }
 
+        $captcha = Captcha::verify($request->get_param('captcha_token'));
+        if ($captcha instanceof WP_Error) return $captcha;
         $result = $this->submit_form($form, $this->extract_form_data($request));
 
         $cf7_status  = $result['status'] ?? 'unknown';
@@ -149,7 +155,7 @@ class Cf7Module
 
         $data = array_merge($body ?: [], $json ?: []);
 
-        unset($data['form_id']);
+        unset($data['form_id'], $data['captcha_token']);
 
         return $data;
     }
@@ -170,14 +176,11 @@ class Cf7Module
             '_wpcf7_container_post' => 0,
         ]);
 
-        add_filter('wpcf7_skip_spam_check', '__return_true');
-
-        $result = $form->submit();
-
-        $_POST = $original_post;
-        remove_filter('wpcf7_skip_spam_check', '__return_false');
-
-        return $result;
+        try {
+            return $form->submit();
+        } finally {
+            $_POST = $original_post;
+        }
     }
 
     /**

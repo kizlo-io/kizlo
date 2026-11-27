@@ -1,9 +1,15 @@
 ---
+import { deserializeSeo, requireData } from "kizlo"
 import { renderJsonLd, resolvePageHead } from "kizlo/astro/server"
 import Layout from "@/layouts/Layout.astro"
-import { client } from "@/lib/kizlo/server"
+import { client } from "@/lib/kizlo/client"
 
-const [{ items }, seo] = await Promise.all([client.posts.list.call({ query: { perPage: 10 } }), client.seo.homepage.call()])
+const [postsResult, seoResult] = await Promise.all([
+	client.kizlo.content.post.list({ query: { per_page: 10 } }),
+	client.kizlo.seo.homepage.retrieve(),
+])
+const items = requireData(postsResult)
+const seo = deserializeSeo(requireData(seoResult))
 
 const head = resolvePageHead(seo.head)
 const jsonLd = renderJsonLd(seo.schema)
@@ -21,7 +27,7 @@ const jsonLd = renderJsonLd(seo.schema)
 				<ul>
 					{items.map((post) => (
 						<li>
-							<a href={`/blog/${post.slug}`}>{post.title ?? "Untitled"}</a>
+							<a href={`/blog/${post.slug}`}>{post.title.rendered || "Untitled"}</a>
 						</li>
 					))}
 				</ul>

@@ -101,6 +101,14 @@ class SettingsNav
     private function systemPages(): array
     {
         return [
+            $this->page('system/auth', 'Authentication', '/system/auth', 'shield', [
+                $this->section('provider', 'Identity provider', 'Verify frontend user sessions directly in WordPress. Provider presets configure the same JWT verifier.', 'shield-check'),
+                $this->section('verification', 'Token verification', 'Configure the trusted issuer, signing keys, and token restrictions.', 'key'),
+                $this->section('claims', 'User claims', 'Map signed user claims. An unverified email does not identify an existing WordPress customer.', 'user'),
+            ]),
+            $this->page('system/captcha', 'CAPTCHA', '/system/captcha', 'shield-check', [
+                $this->section('verification', 'Submission verification', 'WordPress verifies CAPTCHA proofs for guest comments and contact forms. Configure a provider to enable these submissions. Secrets stay on the WordPress server.', 'shield-check'),
+            ]),
             $this->page('system/uploads', 'Uploads', '/system/uploads', 'upload-simple', [
                 $this->section('allowed-file-types', 'Allowed File Types', 'Let editors upload file types that WordPress blocks by default, such as SVG logos and ICO favicons. Add each type as a file extension and its matching MIME type. Uploaded SVGs are automatically sanitized to remove scripts and other unsafe content. Executable and script types are refused for security.', 'file-arrow-up'),
             ]),

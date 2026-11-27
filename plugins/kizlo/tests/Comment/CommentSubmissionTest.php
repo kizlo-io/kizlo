@@ -6,6 +6,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 use Kizlo\Modules\Comment\CommentSubmission;
 use Kizlo\Tests\TestCase;
+use Kizlo\Modules\Settings\Captcha\CaptchaSettings;
 
 class CommentSubmissionTest extends TestCase
 {
@@ -18,18 +19,23 @@ class CommentSubmissionTest extends TestCase
 
         $this->endpoint = new CommentSubmission();
         $this->postId   = self::factory()->post->create(['comment_status' => 'open']);
+        wp_set_current_user(0);
+        (new CaptchaSettings())->setData(['provider' => 'turnstile', 'secret' => 'test-secret'])->save();
+        add_filter('pre_http_request', static fn() => ['response' => ['code' => 200], 'body' => '{"success":true}']);
+
     }
 
-    public function test_user_email_matching_a_user_attributes_the_comment_to_that_user(): void
+    public function test_native_user_session_attributes_the_comment_to_that_user(): void
     {
         $userId = self::factory()->user->create(['role' => 'subscriber', 'user_email' => 'member@example.com']);
 
-        $comment = $this->submit(['user_email' => 'member@example.com', 'content' => 'From a signed-in member']);
+        wp_set_current_user($userId);
+        $comment = $this->submit(['user_email' => 'someone-else@example.com', 'content' => 'From a signed-in member']);
 
         $this->assertSame($userId, (int) $comment->user_id);
     }
 
-    public function test_an_authenticated_email_with_no_match_falls_back_to_author_email(): void
+    public function test_a_forged_identity_field_is_ignored(): void
     {
         $comment = $this->submit([
             'user_email'   => 'no-account@example.com',
@@ -60,6 +66,7 @@ class CommentSubmissionTest extends TestCase
     {
         $request = new WP_REST_Request('POST', '/' . KIZLO_API_NAMESPACE . '/comments');
         $request->set_param('post_id', $this->postId);
+        $request->set_param('captcha_token', 'test-token');
         $request->set_param('author_ip', '203.0.113.5');
         $request->set_param('user_agent', 'PHPUnit');
         foreach ($params as $key => $value) {

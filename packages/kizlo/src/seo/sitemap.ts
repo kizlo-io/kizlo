@@ -1,6 +1,15 @@
-import type { S2SClient } from "../kizlo"
+import type { PublicApiClient } from "../public-api"
+import { requireData } from "../wordpress/utils"
 import type { SitemapUrl } from "./schema"
-import { parseSitemapSlug, renderSitemapIndex, renderUrlSet, type SitemapIndexEntry, xmlResponse } from "./utils"
+import {
+	deserializeSitemaps,
+	deserializeSitemapUrls,
+	parseSitemapSlug,
+	renderSitemapIndex,
+	renderUrlSet,
+	type SitemapIndexEntry,
+	xmlResponse,
+} from "./utils"
 
 /**
  * Every generated sitemap is served from `/sitemaps`: the index at `/sitemaps/index.xml`
@@ -36,7 +45,7 @@ export interface CreateSitemapRouteOptions {
  * Mounting it at the right path is the caller's job; framework wrappers (e.g. the Next
  * integration) add mount assertions on top.
  */
-export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitemapRouteOptions) {
+export function createSitemapRoute(client: PublicApiClient, options?: CreateSitemapRouteOptions) {
 	const extra = options?.extra ?? []
 
 	return async function GET(request: Request): Promise<Response> {
@@ -45,9 +54,10 @@ export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitema
 		if (!slug) return notFound()
 
 		if (slug === SITEMAP_INDEX_SLUG) {
-			const { data } = await client.seo.sitemaps.index()
-			const entries = [...(data?.sitemaps ?? []), ...extra.map((item) => item.entry)]
-			return xmlResponse(renderSitemapIndex(entries, data?.origin ?? url.origin))
+			const data = requireData(await client.kizlo.seo.sitemaps.retrieve({ params: { type: "index" } }))
+			if (Array.isArray(data)) return notFound()
+			const entries = [...deserializeSitemaps(data.sitemaps), ...extra.map((item) => item.entry)]
+			return xmlResponse(renderSitemapIndex(entries, data.origin))
 		}
 
 		const parsed = parseSitemapSlug(slug)
@@ -56,22 +66,25 @@ export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitema
 		const custom = extra.find((item) => item.entry.key === parsed.key)
 		if (custom) {
 			if (parsed.page > custom.entry.pages) return notFound()
-			const { data } = await client.seo.sitemaps.index()
-			return xmlResponse(renderUrlSet(await custom.urls(data?.origin ?? url.origin, parsed.page)))
+			const data = requireData(await client.kizlo.seo.sitemaps.retrieve({ params: { type: "index" } }))
+			if (Array.isArray(data)) return notFound()
+			return xmlResponse(renderUrlSet(await custom.urls(data.origin, parsed.page)))
 		}
 
-		const { data: sitemaps } = await client.seo.sitemaps.list()
-		if (!sitemaps) return notFound()
+		const sitemaps = requireData(await client.kizlo.seo.sitemaps.list())
 
 		const entry = sitemaps.find((item) => item.key === parsed.key)
 		if (!entry || parsed.page > entry.pages) return notFound()
 
-		const { data } = await client.seo.urls(
-			entry.type === "author" ? { type: "author", page: parsed.page } : { type: entry.type, key: entry.key, page: parsed.page },
-		)
-		if (!data) return notFound()
+		const data =
+			entry.type === "author"
+				? requireData(await client.kizlo.seo.sitemaps.retrieve({ params: { type: "author" }, query: { page: parsed.page } }))
+				: requireData(
+						await client.kizlo.seo.sitemaps.listUrls({ params: { type: entry.type, key: entry.key }, query: { page: parsed.page } }),
+					)
+		if (!Array.isArray(data)) return notFound()
 
-		return xmlResponse(renderUrlSet(data))
+		return xmlResponse(renderUrlSet(deserializeSitemapUrls(data)))
 	}
 }
 

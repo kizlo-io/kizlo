@@ -2,7 +2,7 @@ import { arrayable, lenient, MediaImage, Metadata, NumberLike } from "@kizlo/sha
 import z from "zod/v4"
 import { Seo } from "../seo/schema"
 import { customFieldsSchema, IdentifierInput, ListMetadata, ListOrder } from "../shared/schema"
-import type { WP_CustomFields } from "../wordpress"
+import type { WP_CustomFields, WP_EndpointData } from "../wordpress"
 
 const WP_PAGE_STATUSES = ["publish", "future", "draft", "pending", "private", "trash"] as const
 const WP_PAGE_ORDER_BYES = [
@@ -34,7 +34,10 @@ export const PageAuthorRef = z.object({
 })
 export type PageAuthorRef = z.infer<typeof PageAuthorRef>
 
-export type PageCustomFields = WP_CustomFields<"kizlo.postTypes.page">
+type PublicPage = WP_EndpointData<"kizlo.content.page.retrieve">
+export type PageCustomFields = [PublicPage] extends [never]
+	? WP_CustomFields<"kizlo.postTypes.page">
+	: NonNullable<PublicPage["kizlo"]>["custom"]
 
 export const PageCustomFieldsSchema: z.ZodType<PageCustomFields, PageCustomFields> = customFieldsSchema<PageCustomFields>()
 
@@ -55,12 +58,12 @@ export const Page = z.object({
 	author: PageAuthorRef.nullable(),
 	featuredMedia: MediaImage.nullable(),
 	seo: Seo.nullable(),
-	custom: PageCustomFieldsSchema,
+	custom: PageCustomFieldsSchema.nullable(),
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	meta: Metadata,
 })
-export type Page = Omit<z.output<typeof Page>, "custom"> & { custom: PageCustomFields }
+export type Page = Omit<z.output<typeof Page>, "custom"> & { custom: PageCustomFields | null }
 
 // ====================================================
 // RETRIEVE

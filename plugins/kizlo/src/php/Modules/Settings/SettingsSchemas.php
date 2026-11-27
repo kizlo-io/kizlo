@@ -137,6 +137,8 @@ final class SettingsSchemas
             'description' => 'Every Kizlo settings section, as returned by GET /settings.',
             'properties'  => [
                 'site'             => ['$ref' => self::SITE, 'required' => true],
+                'auth'             => \Kizlo\Modules\Settings\Auth\AuthSettingsService::schema(true) + ['required' => true],
+                'captcha'          => \Kizlo\Modules\Settings\Captcha\CaptchaSettingsService::schema(true) + ['required' => true],
                 'brand'            => ['$ref' => self::BRAND, 'required' => true],
                 'identity'         => ['$ref' => self::IDENTITY, 'required' => true],
                 'authors'          => ['$ref' => self::AUTHORS, 'required' => true],

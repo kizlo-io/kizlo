@@ -19,9 +19,9 @@ By participating, you are expected to uphold it.
 
 ## Prerequisites
 
-- **Node** — `.nvmrc` pins Node 24 (`nvm use`); the minimum is 22.14
-- **pnpm** — `corepack enable` provides the pinned version; the minimum is 9.6
-- **Docker** — required to run the WordPress test stack
+- **Node**: `.nvmrc` pins Node 24 (`nvm use`); the minimum is 22.14
+- **pnpm**: `corepack enable` provides the pinned version; the minimum is 9.6
+- **Docker**: required to run the WordPress test stack
 - **PHP and Composer** are needed only for plugin work (`plugins/*`). With
   Composer on your `PATH`, `pnpm install` installs each plugin's dev
   dependencies (including `vendor/bin/phpunit`); without it, the plugin PHP
@@ -37,37 +37,36 @@ pnpm install
 ```
 
 No env is needed to build the packages or run the `kizlo dev` / `kizlo test`
-stacks. What reads env is the apps: `web/` (a live Kizlo server) and the
+stacks. What reads env is the apps: `web/` (the docs and public website) and the
 templates, when you build or run one.
 
 They all read **the root `.env`, and only that one**. Each app has a `withEnv`
 script that loads it through `dotenv-cli`, and its `build`, dev and `start`
 scripts run through that, so the WordPress connection is written once and
 `pnpm kizlo dev` keeps it current. Don't add a `.env` under `web/` or a
-template — nothing reads it, and a stale copy is how the connection silently
+template: nothing reads it, and a stale copy is how the connection silently
 drifts. The per-framework API URLs (`NEXT_PUBLIC_`, `PUBLIC_`, `VITE_`) live in
-that same file; the names differ, so they don't collide.
+that same file; the names differ, so they don't collide. Set the public WordPress URL to the CMS origin your browser can reach; `kizlo dev` writes the private local connection separately.
 
 ```bash
 cp web/.env.example .env   # then fill in the values, or let `kizlo dev` write them
 ```
 
-Each template keeps its own complete `.env.example`, because that file is what a
-scaffolded project starts from and a standalone project has no root to read.
+Each template keeps a complete `.env.example` for standalone projects. Copy its values into the root `.env` when running an example inside this monorepo.
 
 `web/` reads one optional variable beyond the connection: `NEXT_PUBLIC_GA_ID`,
 the Google Analytics measurement ID. Leave it unset and the site loads no
 analytics at all; the deployed one gets it from the Vercel project.
 
-CI doesn't build `web/` — the deployed site is built by Vercel on every PR.
+CI doesn't build `web/`: the deployed site is built by Vercel on every PR.
 
 ## Repository layout
 
 ```
 packages/   Published libraries (kizlo, @kizlo/*)
-plugins/    WordPress plugins (kizlo, kizlo-cf7, kizlo-woocommerce, kizlo-pos) — released by tag, not npm
+plugins/    WordPress plugins (kizlo, kizlo-cf7, kizlo-woocommerce, kizlo-pos): released by tag, not npm
 tooling/    Internal config: TypeScript bases, GitHub Actions, WordPress dev stack
-web/        The kizlo.io site (a live Kizlo server; deployed by Vercel, not published)
+web/        The kizlo.io site (direct CMS reads; deployed by Vercel, not published)
 ```
 
 This is a [Turborepo](https://turbo.build/) + pnpm workspace. Most commands run
@@ -97,21 +96,21 @@ also runs automatically on `postinstall`.
 
 Choose coverage by the behaviour or contract that changes:
 
-- **Package runtime behaviour** — colocate Vitest tests with the source as
+- **Package runtime behaviour**: colocate Vitest tests with the source as
   `*.test.ts` (or `*.test.tsx` where the package's `vitest.config.ts` includes
   TSX). Use fixtures for mapping and serialization regressions; use the seeded
   WordPress stack when the assertion depends on a real endpoint or persistence.
-- **Compile-time inference** — colocate `*.test-d.ts` with the source. Where
+- **Compile-time inference**: colocate `*.test-d.ts` with the source. Where
   Vitest type checking is enabled, verify that its configuration includes the
   file. Otherwise verify that the package's `tsconfig.json` includes it for
   `pnpm typecheck`; these files are not runtime Vitest tests. Include rejected
   assignments as well as valid inferred types.
-- **Generated and published declarations** — extend the generator tests and
+- **Generated and published declarations**: extend the generator tests and
   `packages/kizlo/src/wordpress/declaration-consumer.test.ts` when registry or
   declaration changes must resolve against a consumer's generated contract.
   The declaration-consumer suite reads built package declarations, so run
   `pnpm build` before it; source-only inference checks do not replace it.
-- **Plugin behaviour and contracts** — put PHPUnit tests under the affected
+- **Plugin behaviour and contracts**: put PHPUnit tests under the affected
   plugin's `tests/` directory, following its existing module subdirectories and
   `*Test.php` names. Add contract assertions in its Contract tests and persistence
   or validation assertions in the module tests. Run them through `pnpm kizlo test`
@@ -129,15 +128,15 @@ run the broader checks in [Commit messages & pull requests](#commit-messages--pu
 
 ## Local WordPress stacks
 
-Both stacks ship inside the `kizlo` CLI and run on Docker — no Local/Valet setup
+Both stacks ship inside the `kizlo` CLI and run on Docker: no Local/Valet setup
 needed. They are independent: `kizlo dev` (port 8080) is a long-lived working
 environment, and `kizlo test` (port 8889) is the seeded fixture stack the suites
 run against.
 
-### Dev stack — `kizlo dev`
+### Dev stack: `kizlo dev`
 
 `kizlo dev` keeps the whole WordPress install in `dev.path` (`wordpress/` here,
-git-ignored) — bind-mounted into the container so you can browse and edit every
+git-ignored): bind-mounted into the container so you can browse and edit every
 file live. Its `dev.plugins` `{ path }` entries also bind-mount this repo's plugins
 into `wp-content/plugins`, and the bare slugs install the wp.org dependencies.
 Build the plugin assets first, then start it:
@@ -155,10 +154,10 @@ pnpm kizlo dev reset  # wipe DB + install; the next `kizlo dev` rebuilds fresh
 (`KIZLO_LOCAL_WP_URL`/`USERNAME`/`APP_PASSWORD`), then stays in the foreground
 running the contract watcher. Run `stop` or `reset` from another terminal.
 
-### Test stack — `kizlo test`
+### Test stack: `kizlo test`
 
 The extension layers the test stack seeds are declared in the root
-`kizlo.config.ts` (`test.fixtures`). Seeding is driven explicitly by the CLI —
+`kizlo.config.ts` (`test.fixtures`). Seeding is driven explicitly by the CLI :
 `pnpm test` itself never boots or seeds. In this monorepo the CLI loads each
 extension's seed from its built `dist`, so build once first (`pnpm build`); a
 real consumer installs built packages and skips that step.
@@ -196,26 +195,25 @@ Two generated files are committed, one at the repository root and one under
 
 ```
 introspection.ts
-web/src/lib/kizlo/server/generated/introspection.ts
+web/src/lib/kizlo/generated/introspection.ts
 ```
 
-Both are **derived artifacts** (the typed WordPress contract produced from a
-WordPress), but they track **different** WordPress instances, because they serve
+Their corresponding `introspection.browser.ts` files are generated alongside them. These are **derived artifacts** (the typed WordPress contract produced from a
+WordPress instance), but they track **different** WordPress instances, because they serve
 different consumers:
 
 - **Root `introspection.ts`** is derived from the seeded test stack and is the
   CI-verified copy. Regenerate it whenever you change what the shared contract
   exposes: a plugin's Store API or REST schema, the introspection fixtures in
   `kizlo.config.ts`, or the pinned plugin versions those fixtures install.
-- **`web/src/lib/kizlo/server/generated/introspection.ts`** is derived from the
+- **`web/src/lib/kizlo/generated/introspection.ts`** is derived from the
   remote WordPress the site is built against (`cms.kizlo.io`). It therefore
   includes remote-only content the test stack never serves (for example the
   `integration` custom post type behind the `/integrations` catalog). Regenerate
-  it from remote whenever the site's contract moves — including after a
+  it from remote whenever the site's contract moves: including after a
   shared-schema change above, since CI does not check this copy.
 
-Never hand-edit either file. The `templates/*` copies are intentional empty
-stubs and stay out of this; leave them as they are.
+Never hand-edit either file. The `templates/*` examples re-export the root generated projections for repository development; deployed applications generate their own projections.
 
 Regenerate the root copy against the seeded stack:
 
@@ -231,7 +229,7 @@ Regenerate the web copy against remote (reads the `.env` connection, so
 `KIZLO_MODE=remote` points it at `cms.kizlo.io`):
 
 ```bash
-pnpm kizlo generate --dir web/src/lib/kizlo
+pnpm kizlo generate --dir web/src/lib/kizlo/generated
 ```
 
 `--test` points the generator at the WordPress that `pnpm kizlo test` left
@@ -245,7 +243,7 @@ change that moved the contract.
 ## Code style
 
 We use [Biome](https://biomejs.org/) for linting and formatting (config in
-`biome.json`) — tabs for indentation, and the project conventions it enforces.
+`biome.json`): tabs for indentation, and the project conventions it enforces.
 Run `pnpm check:fix` before committing. CI runs `biome ci .` and will fail on
 any unformatted or lint-flagged code.
 
@@ -283,7 +281,7 @@ Give the changeset **one line**: a single imperative sentence describing the
 user-visible effect. No essays, no internals, no bullet lists.
 
 > Changesets **ignores** `web`, `@kizlo/plugin-*`, and `@tooling/*` (see
-> `.changeset/config.json`). Adding a changeset for a plugin does nothing — use
+> `.changeset/config.json`). Adding a changeset for a plugin does nothing: use
 > changelogger below.
 
 ### WordPress plugins → changelogger
@@ -310,7 +308,7 @@ vendor/bin/changelogger add -f <slug> -s <significance> -t <type> -e "<entry>" -
 `deprecated`, `removed`, `fixed`, or `security`.
 
 This writes a small file to `plugins/<plugin>/changelog/`. Commit it with your
-change. **Do not hand-edit `CHANGELOG.md`** — it's generated from these fragments
+change. **Do not hand-edit `CHANGELOG.md`**: it's generated from these fragments
 at release time, when the fragments are compiled and the version is bumped across
 the plugin's PHP entry-point header, version define, `readme.txt`, and
 `package.json` (kept in sync by `scripts/check-versions.mjs`). Releasing is
@@ -423,7 +421,7 @@ reuse one issue's worktree for a different issue.
   description sections above.
 - Tool attribution is not required in commit messages, PR metadata, or
   repository files.
-- Make sure the following pass locally before opening a PR — they're the same
+- Make sure the following pass locally before opening a PR: they're the same
   checks CI runs:
 
   ```bash
@@ -449,17 +447,17 @@ that box deterministic, **keep every PR as a single commit**:
 - The branch carries exactly one commit. As the change evolves, amend it
   (`git commit --amend`) and re-push with `git push --force-with-lease`.
   Never stack incremental commits on a PR branch.
-- That commit's **body is the PR's overall-change summary** — what the code
+- That commit's **body is the PR's overall-change summary**: what the code
   does as a result, in a few short lines, not a log of steps taken. Keep it
   current so it always describes what the PR ends up doing.
 - With one commit, GitHub prefills the squash modal from it: the *Commit
   message* (subject) is the Conventional Commit subject (which equals the PR
   title), and the *Extended description* is that commit body. At merge the
-  reviewer just checks the diff and clicks "Squash and merge" — both fields are
+  reviewer just checks the diff and clicks "Squash and merge": both fields are
   already right, with no editing.
 
-Do not put the PR description into the commit body — it's written for reviewers
-and is too long for history. Do not leave more than one commit — the squash box
+Do not put the PR description into the commit body: it's written for reviewers
+and is too long for history. Do not leave more than one commit: the squash box
 then collapses to a bulleted list of commit subjects and loses the summary.
 
 Publish branches to `origin`. Rewriting history is limited to your own

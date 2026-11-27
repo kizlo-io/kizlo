@@ -10,7 +10,7 @@ import { lockPath } from "./lock"
 import { log } from "./logger"
 import { createWordPressRefresh, type StackWatch, startWatcher } from "./watch"
 
-const SKIPPED = "Watcher already running — skipping the contract watcher."
+const SKIPPED = "Watcher already running — skipping the introspection watcher."
 
 const CREDENTIALS: WordPressCredentials = { url: "https://wp.example", username: "admin", password: "secret" }
 
@@ -56,13 +56,6 @@ function standalone(cwd: string): ResolvedConfig {
 function config(cwd: string): ResolvedConfig {
 	return {
 		cwd,
-		server: {
-			dir: "src/server",
-			entry: "src/server/index.ts",
-			contractDir: "src/service",
-			contractPath: "src/service/contract.json",
-			barrelPath: "src/service/index.ts",
-		},
 		introspectionPath: "src/service/introspection.ts",
 		introspectionMetaPath: ".kizlo/introspection.meta.json",
 	}
@@ -250,7 +243,7 @@ describe("createWordPressRefresh", () => {
  */
 function unstartable(): string {
 	const cwd = workspace()
-	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: { introspection: "." } }\n`)
+	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: "." }\n`)
 	vi.stubEnv("KIZLO_MODE", "preview")
 	return cwd
 }
@@ -258,7 +251,7 @@ function unstartable(): string {
 /** A workspace with a config to generate but no reachable WordPress: the watcher runs alone, introspection skipped. */
 function unconnected(): string {
 	const cwd = workspace()
-	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: { introspection: "." } }\n`)
+	fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: "." }\n`)
 	for (const key of ["KIZLO_MODE", "KIZLO_WP_URL", "KIZLO_WP_USERNAME", "KIZLO_WP_APP_PASSWORD"]) {
 		vi.stubEnv(key, "")
 	}
@@ -274,14 +267,14 @@ describe("startWatcher", () => {
 		expect(fs.existsSync(lockPath(cwd))).toBe(false)
 	})
 
-	test("runs the contract watcher alone, skipping introspection, without a WordPress connection", async () => {
+	test("skips introspection refresh without a WordPress connection", async () => {
 		watchLog()
 		const cwd = unconnected()
 
 		const stop = await startWatcher(cwd)
 		try {
 			expect(stop).toBeDefined()
-			expect(lines("info").join("\n")).toContain("introspection skipped")
+			expect(lines("info").join("\n")).toContain("introspection refresh is unavailable")
 			// Nothing was fetched, so the introspection file was never written.
 			expect(fs.existsSync(path.join(cwd, "introspection.ts"))).toBe(false)
 		} finally {
@@ -330,7 +323,7 @@ describe("the state the MCP server reads", () => {
 	/** A workspace with a reachable WordPress, so the watcher resolves a connection and fetches. */
 	function connected(): string {
 		const cwd = workspace()
-		fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: { introspection: "." } }\n`)
+		fs.writeFileSync(path.join(cwd, "kizlo.config.ts"), `export default { dir: "." }\n`)
 		fs.writeFileSync(path.join(cwd, ".env"), "KIZLO_WP_URL=https://wp.example\nKIZLO_WP_USERNAME=admin\nKIZLO_WP_APP_PASSWORD=secret\n")
 		vi.stubEnv("KIZLO_MODE", "remote")
 		vi.stubGlobal("fetch", serving())
