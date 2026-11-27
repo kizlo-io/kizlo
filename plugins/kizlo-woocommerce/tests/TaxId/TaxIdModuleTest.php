@@ -38,6 +38,20 @@ class TaxIdModuleTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_store_preflight_does_not_require_or_mutate_a_customer(): void
+    {
+        $customer = WC()->customer;
+        WC()->customer = null;
+        try {
+            $response = new WP_REST_Response(['methods' => ['GET', 'POST']], 200);
+            $request = new WP_REST_Request('OPTIONS', '/wc/store/v1/cart/add-item');
+            $this->assertSame($response, $this->module->removeStoreApiShippingCopies($response, null, $request));
+            $this->assertNull(WC()->customer);
+        } finally {
+            WC()->customer = $customer;
+        }
+    }
+
     public function test_registers_a_sanitized_billing_address_field_that_is_optional_by_default(): void
     {
         $field = $this->checkoutFields->get_additional_fields()[TaxIdModule::FIELD_ID] ?? null;

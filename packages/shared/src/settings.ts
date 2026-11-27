@@ -411,7 +411,35 @@ export interface PostStatusDefinition {
 	protected: boolean
 }
 
+export interface AuthSettings {
+	provider: "disabled" | "clerk" | "kinde" | "custom"
+	issuer: string
+	key_source: "jwks" | "public_key"
+	jwks_url: string
+	public_key: string
+	algorithm: "RS256" | "ES256"
+	audience: string
+	authorized_parties: string[]
+	allowed_origins: string[]
+	clock_tolerance: number
+	subject_claim: string
+	email_claim: string
+	email_verified_claim: string
+	first_name_claim: string
+	last_name_claim: string
+	required_claims: { claim: string; operator: "present" | "equals" | "one_of" | "contains"; value?: unknown }[]
+}
+
+export interface CaptchaSettings {
+	provider: "disabled" | "recaptcha" | "turnstile" | "hcaptcha" | "friendly" | "arkose" | "altcha"
+	secret: string
+	sitekey: string
+	min_score: number
+}
+
 export interface Settings {
+	auth?: AuthSettings
+	captcha?: CaptchaSettings
 	site: SiteSettings
 	brand: BrandSettings
 	identity: IdentitySettings

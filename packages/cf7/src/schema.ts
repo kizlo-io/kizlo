@@ -1,7 +1,7 @@
 import z from "zod/v4"
 
 export const CaptchaInput = z.object({
-	captchaToken: z.string(),
+	captcha_token: z.string(),
 })
 export type CaptchaInput = z.infer<typeof CaptchaInput>
 

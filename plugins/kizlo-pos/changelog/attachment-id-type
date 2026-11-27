@@ -1,0 +1,4 @@
+Significance: patch
+Type: fixed
+
+Normalize product attachment IDs to integers before reading image URLs and metadata.

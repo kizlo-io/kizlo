@@ -28,7 +28,8 @@ class ManagedContent
      */
     public static function schemas(): array
     {
-        return self::$schemas ??= ManagedPostTypes::schemas() + ManagedTaxonomies::schemas();
+        return self::$schemas ??= ManagedPostTypes::schemas() + ManagedTaxonomies::schemas()
+            + \Kizlo\Modules\PostType\PublicContentApi::definitions()['schemas'];
     }
 
     /**
@@ -40,7 +41,7 @@ class ManagedContent
             return self::$routes;
         }
 
-        $routes = array_merge(ManagedPostTypes::routes(), ManagedTaxonomies::routes());
+        $routes = array_merge(ManagedPostTypes::routes(), ManagedTaxonomies::routes(), \Kizlo\Modules\PostType\PublicContentApi::definitions()['routes']);
 
         return self::$routes = array_map(
             static fn(array $route): array => OperationErrors::withShared($route),

@@ -16,6 +16,7 @@ class PostTypeModule
     public function register()
     {
         $this->post_type->register();
+        (new PublicContentApi())->register();
         $this->thumbnail_support->register();
     }
 }

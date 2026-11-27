@@ -23,17 +23,19 @@ Kizlo is an open-source framework for building content-driven applications with 
 
 ## Quick start
 
-Scaffold a new project with Kizlo already wired:
+Install Kizlo in your frontend:
 
 ```bash
-npx kizlo@latest create
+npm install kizlo
 ```
 
-Or add Kizlo to an existing project:
+Configure your WordPress connection and output directory, then generate the direct clients:
 
 ```bash
-npx kizlo@latest init
+npx kizlo generate
 ```
+
+WordPress owns authentication, permissions, cart, and checkout. The browser calls its final APIs using a public URL and optional user token. Service credentials stay on the server.
 
 See the [docs](https://kizlo.io/docs) for the full guide.
 

@@ -29,8 +29,6 @@ export function deserializeListMenuInput(input?: ListMenuInputOut): WPK_MenuItem
 			slug: listed(input?.slug),
 			tax_relation: input?.taxRelation,
 			search_columns: input?.searchColumns,
-			// A menu item is only published or nothing; the draft ones exist but are not menu entries.
-			status: ["publish"],
 		},
 	}
 }

@@ -8,7 +8,7 @@ export function deserializeCategory(data: WPK_Category | WPK_CategoryListItem): 
 		id: data.id,
 		name: data.name,
 		slug: data.slug,
-		url: data.kizlo.url,
+		url: data.link,
 		description: data.description.length > 0 ? data.description : null,
 		parent: data.parent > 0 ? data.parent : null,
 		postCount: data.count,

@@ -1,243 +1,76 @@
 ---
 title: Client
 icon: DeviceMobile
-description: Learn how the typed client gives you one callable surface for your whole API, typed end to end.
+description: Call WordPress directly from a browser or trusted server.
 ---
 
-The **client** is how you call your API. Every [procedure](/docs/concepts/integration#procedures) your
-[integrations](/docs/concepts/integration) expose (core WordPress, installed packages, your own) shows up on the
-client as a typed method under its namespace:
+## Browser client
 
-```ts
-const { data } = await client.posts.list({ query: { perPage: 10 } })
-const { data } = await client.woocommerce.products.list()
-const { data } = await client.featured.get({ params: { id: 42 } })
-```
-
-You never write the client. It mirrors your [server's procedure tree](/docs/concepts/integration): add a procedure and
-it appears; change a procedure's `output` and every call site updates with it.
-
-## Two clients, one surface
-
-Installation gives you **two** clients. They expose the same namespaces and call style. What differs is where
-they run and how they reach the server:
-
-- **Server client** (`@/lib/kizlo/server`) holds the real procedure tree in-process and calls your handlers directly,
-  with no HTTP. Use it in Server Components, route handlers, and server-to-server code.
-- **Browser client** (`@/lib/kizlo/client`) ships no server code and calls your API over HTTP, through the
-  route handler. Use it in Client Components and the browser.
-
-```ts title="src/lib/kizlo/server/index.ts"
-// the server client comes back from createKizlo, alongside the procedures and handler
-export const { procedures, client, handler } = createKizlo({ integrations: [nextjs()] })
-```
+Pass your WordPress URL and generated browser endpoints. Public reads also work during SSR with this credentials-free client.
 
 ```ts title="src/lib/kizlo/client.ts"
-import { createKizloClient } from "kizlo/nextjs"
-import { contract } from "./server/generated"
+import { createBrowserClient } from "kizlo/browser"
+import { introspection } from "./generated/introspection.browser"
 
-// the browser client is built from the generated contract
-export const client = createKizloClient(contract)
+export const client = createBrowserClient({
+  url: "https://cms.example.com",
+  endpoints: introspection,
+})
 ```
-
-<Callout>
-  Throughout the docs `client` is used generically. When it matters which one, the docs say *server client* or
-  *browser client*; in your code it's whichever of the two you imported.
-</Callout>
-
-### Reaching the browser client in React
-
-Importing `@/lib/kizlo/client` works in any Client Component. When you'd rather inject the client than import a
-singleton, `kizlo/react` ships a context for it: mount `KizloProvider` once with the browser client, and every
-component below it reads the same instance through `useKizloContext`.
-
-```tsx title="src/app/providers.tsx"
-"use client"
-
-import { KizloProvider } from "kizlo/react"
-import { client } from "@/lib/kizlo/client"
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  return <KizloProvider client={client}>{children}</KizloProvider>
-}
-```
-
-<Callout>
-  The `"use client"` there is doing real work. A Server Component can't pass the browser client down as a prop,
-  because props crossing the server boundary have to be serialisable and the client is a tree of functions. Import
-  it in the client module that mounts the provider.
-</Callout>
-
-```tsx title="src/app/latest-posts.tsx"
-"use client"
-
-import { useKizloContext } from "kizlo/react"
-
-export function LatestPosts() {
-  const { client } = useKizloContext()
-  // client.posts.list() here, typed from your procedures
-}
-```
-
-Server Components keep taking the client as a prop, because they can't read React context. See
-[`KizloProvider`](/docs/reference/functions/kizlo-provider) and
-[`useKizloContext`](/docs/reference/functions/use-kizlo-context).
-
-## Calling a procedure
-
-Every call returns the same **result** object, a discriminated union you check instead of a value that might
-throw:
 
 ```ts
-const result = await client.posts.get({ params: { identifier: "hello-world" } })
-
+const result = await client.kizlo.content.post.retrieve({ params: { identifier: "hello-world" } })
 if (result.error) {
-  // result.error is a typed KizloError; narrow on result.error.code
-  return
+  console.error(result.error.code, result.status)
+} else {
+  console.log(result.data.title.rendered)
 }
-
-result.data // ✅ fully typed from the procedure's `output`
 ```
 
-The argument mirrors the procedure's typed input (`params`, `query`, `body`, `headers`), autocompleted and
-checked against its schemas (see [Input & output](/docs/concepts/integration#input--output)).
+Results contain `data`, `error`, `status`, and response `headers`. Errors retain WordPress codes. Use `requireData(result)` from `kizlo` to throw an error from a route loader instead of branching.
 
-The result is `{ data, error, success }`:
+## Customer sessions
 
-- **On success**, `data` is your `output` and `error` is `null`.
-- **On failure**, `data` is `undefined` and `error` is a [`KizloError`](/docs/concepts/integration#errors)
-  whose `code` is typed to exactly the failures that procedure declares.
-
-Known errors are values, not exceptions, so you don't need `try/catch` for them.
-
-When you'd rather throw (a Server Component that should error its route, say), every method also has a
-**`.call()`** variant. It returns the data directly and throws the `KizloError` instead of returning it:
+Supply a fresh provider token for each request. Return `null` only when the visitor is signed out. A token getter failure and a rejected token remain errors.
 
 ```ts
-// returns data, throws KizloError on failure
-const post = await client.posts.get.call({ params: { identifier: "hello-world" } })
+const client = createBrowserClient({
+  url: "https://cms.example.com",
+  endpoints: introspection,
+  getToken: () => session.getToken(),
+  cartSession: {
+    get: () => sessionStorage.getItem("cart"),
+    set: (token) => token ? sessionStorage.setItem("cart", token) : sessionStorage.removeItem("cart"),
+  },
+})
 ```
 
-Same call, two ergonomics: `client.x()` for `{ data, error }` you branch on, `client.x.call()` for a value
-you `await` and let throw. Error codes stay typed end to end either way; see
-[Errors](/docs/concepts/integration#errors) for how a procedure declares them.
+Read `client.woocommerce.store.cart.retrieve()` once to obtain a signed Cart-Token before cart writes. Clear your stored cart token on logout or account switches. WordPress checks its owner on every request. Never share this storage between SSR visitors.
 
-## Cancel a call
+Configure [authentication and browser origins](/docs/concepts/authentication) in WordPress. Requests omit cookies; signed tokens carry the session.
 
-Pass an `AbortSignal` in the second argument on either client, including `.call()`:
+## Service client
 
-```ts
-const controller = new AbortController()
-const pending = client.posts.list({ query: {} }, { signal: controller.signal })
-controller.abort()
-const result = await pending
+Import service operations only from `kizlo/server`. Keep credentials in server environment variables, and use the full generated projection.
 
-// Callers own timeouts too.
-await client.posts.list.call({ query: {} }, { signal: AbortSignal.timeout(5_000) })
+```ts title="src/lib/kizlo/admin.ts"
+import { createServerClient } from "kizlo/server"
+import { introspection } from "./generated/introspection"
 
-// For a procedure with no input, pass undefined before the options.
-await client.woocommerce.products.list(undefined, { signal: AbortSignal.timeout(5_000) })
+export const admin = createServerClient({
+  endpoints: introspection,
+  credentials: {
+    url: process.env.KIZLO_WP_URL!,
+    username: process.env.KIZLO_WP_USERNAME!,
+    password: process.env.KIZLO_WP_APP_PASSWORD!,
+  },
+})
 ```
 
-The browser signal cancels its HTTP request. Direct server cancellation is cooperative: your procedure and
-middleware receive `signal` in their handler options and must observe it or forward it to async work.
-A browser abort does not guarantee that server work has stopped. For WordPress cancellation, pass the signal
-through the endpoint's [call options](/docs/reference/types/wp-call-options).
+The service client makes HTTP requests to WordPress. It does not impersonate a customer. Use visitor tokens for customer operations.
 
-## Scope on the client
+## Cancellation and React
 
-A procedure's [scope](/docs/concepts/integration#scope), set when you author it, decides how it shows up here:
+Pass `{ signal: AbortSignal.timeout(5000) }` as the second call argument. For an endpoint without input, pass `undefined` first.
 
-- **`internal`** is server-only. It's dropped from the browser client's types entirely and rejected at
-  runtime if you reach for it anyway, so it only ever appears on the server client. The built-in `seo`
-  procedures are `internal`.
-- **`api`** and **`remote`** appear on both clients. They differ in types over the wire: `api` returns plain
-  JSON, so a `Date` arrives as a `string`; `remote` deserializes back to your original types, so a `Date`
-  stays a `Date`. The client's return types match each case.
-
-```ts title="src/app/sitemap.ts"
-import { client } from "@/lib/kizlo/server"
-
-const { data } = await client.seo.sitemaps.index() // ✅ internal: fine on the server client
-```
-
-```ts title="src/app/widget.tsx"
-import { client } from "@/lib/kizlo/client"
-
-client.seo.sitemaps.index() // ❌ omitted from the browser client; rejected at runtime
-```
-
-You configure none of this on the client. The browser client reads each procedure's scope from the
-[contract](#the-contract) and dispatches accordingly. Authoring scope lives under
-[Scope](/docs/concepts/integration#scope); here it's just the behaviour you get.
-
-## The contract
-
-The server client can call handlers directly because it runs on the server and has the procedure tree. The browser
-can't: it has no access to your handlers, validation schemas, or WordPress credentials, and it shouldn't. So
-how is the browser client fully typed against a server it can't import?
-
-The **contract**: a plain JSON object generated from your exported `procedures`. It's the one piece both sides
-agree on, derived from the server's procedure tree.
-
-### Generated from your procedures
-
-The exported procedure tree is the only place your API is defined. The
-[`kizlo` CLI](/docs/concepts/cli#kizlo-generate) reads it and emits the contract into `server/generated/`:
-
-- **`contract.json`** is the contract itself. For every procedure it stores the endpoint configuration: the
-  `scope` and the `route` it's reached by (`method` + `path`), nested to mirror the procedure tree. No handlers, no
-  schemas, no secrets, just the call config the client needs to dispatch each request.
-- **`generated/index.ts`** is a small barrel that imports that JSON and registers your server's
-  `procedures` with Kizlo, so the client is typed end to end:
-
-  ```ts title="src/lib/kizlo/server/generated/index.ts"
-  import type { procedures } from ".."
-  import contractJson from "./contract.json"
-
-  export const contract = contractJson
-
-  declare module "kizlo" {
-    interface KizloProcedureRegistry {
-      procedures: typeof procedures
-    }
-  }
-  ```
-
-The JSON is the real artifact; the registration only layers types on top. At **build time** it gives
-`ActiveKizloClient` the full type of your procedure tree: every namespace, input, output, and error code flows into
-the browser client. At **runtime** it's just the small JSON object. The server code is never bundled, yet the
-client stays fully typed.
-
-Because the types come from that registration rather than from the `contract` value, anything can name them.
-`import type { ActiveKizloClient } from "kizlo"` types a React context, a shared hook, or a package that never
-receives the client itself.
-
-<Callout>
-  This is why you regenerate the contract when procedures change. `kizlo generate` does it once for builds and
-  CI; `kizlo dev` does it on every save in development, so the client stays typed against the latest server.
-  See [CLI](/docs/concepts/cli#kizlo-generate). Regenerate after upgrading Kizlo too: a barrel that registers
-  nothing leaves the client at `any`, and nothing reports it.
-</Callout>
-
-### A clean call surface
-
-Because the contract already knows each procedure's method and path, **you never pass them**. Calling your
-API reads like reaching into a nested object and invoking a function: no URLs, no HTTP verbs, no endpoint
-strings.
-
-```ts
-// the contract knows this is GET /featured/{id}, so you just call it
-const { data } = await client.featured.get({ params: { id: 42 } })
-```
-
-You hand the contract to `createKizloClient` and it becomes the client's routing table. The types don't come
-from that argument, they come from the registration above, so passing the contract is purely what makes each call
-dispatch. For each call, the client looks up the procedure in the contract and dispatches by its `scope`:
-
-- **`api`** sends a REST request to the procedure's `method` + `path`.
-- **`remote`** sends an RPC request.
-- **`internal`** is refused: it never leaves the client.
-
-The server client skips all of this. It has the real procedure tree in-process, so it never touches the contract or
-the network. Same surface, same types, a different path to the handler.
+React applications can pass the direct browser client to [`KizloProvider`](/docs/reference/functions/kizlo-provider) and read it with [`useKizloContext`](/docs/reference/functions/use-kizlo-context). Import the generated browser module in the TypeScript program to register the exact hook type.

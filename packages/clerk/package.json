@@ -2,7 +2,7 @@
 	"name": "@kizlo/clerk",
 	"version": "0.2.0",
 	"type": "module",
-	"description": "Clerk authentication adapter for Kizlo.",
+	"description": "Token supply helper for Clerk sessions and direct WordPress clients.",
 	"keywords": [
 		"wordpress",
 		"headless",
@@ -34,12 +34,6 @@
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
 			}
-		},
-		"./test": {
-			"import": {
-				"types": "./dist/test.d.ts",
-				"default": "./dist/test.js"
-			}
 		}
 	},
 	"files": [
@@ -57,16 +51,10 @@
 		"clean": "git clean -xdf .cache .turbo .kizlo .fallow dist node_modules"
 	},
 	"devDependencies": {
-		"@clerk/backend": "^3.17.1",
 		"@tooling/typescript": "workspace:*",
 		"@types/node": "catalog:",
-		"kizlo": "workspace:*",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
-	},
-	"peerDependencies": {
-		"@clerk/backend": ">=3.0.0",
-		"kizlo": ">=0.16.0"
 	}
 }

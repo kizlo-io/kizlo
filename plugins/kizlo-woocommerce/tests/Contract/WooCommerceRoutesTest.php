@@ -114,6 +114,17 @@ class WooCommerceRoutesTest extends TestCase
         }
     }
 
+    public function test_browser_checkout_contract_retains_native_conflict_and_authentication_errors(): void
+    {
+        $document = $this->document();
+        $operation = $document['apis']['woocommerce.store.checkout']['paths']['/checkout']['create'];
+        $this->assertSame('session', $operation['access']);
+        $this->assertContains('woocommerce_rest_checkout_total_mismatch', $operation['errors']);
+        $this->assertContains('kizlo_invalid_token', $operation['errors']);
+        $this->assertArrayHasKey('409', $operation['responses']);
+        $this->assertArrayHasKey('503', $operation['responses']);
+    }
+
     public function test_the_suite_boots_with_woocommerce_and_its_store_api(): void
     {
         $this->assertTrue(defined('KIZLO_WOOCOMMERCE_VERSION'));

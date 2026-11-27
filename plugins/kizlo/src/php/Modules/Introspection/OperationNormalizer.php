@@ -44,7 +44,7 @@ class OperationNormalizer
             'responses'       => self::responses($raw['responses'] ?? null),
         ];
 
-        foreach (['summary', 'description'] as $key) {
+        foreach (['summary', 'description', 'access'] as $key) {
             if (isset($raw[$key]) && $raw[$key] !== '') {
                 $operation[$key] = $raw[$key];
             }
@@ -68,7 +68,7 @@ class OperationNormalizer
     {
         $document = ['method' => $operation['method']];
 
-        foreach (['summary', 'description', 'deprecated'] as $key) {
+        foreach (['summary', 'description', 'deprecated', 'access'] as $key) {
             if (isset($operation[$key])) {
                 $document[$key] = $operation[$key];
             }

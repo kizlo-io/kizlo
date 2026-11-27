@@ -1,0 +1,4 @@
+Significance: major
+Type: changed
+
+Expose final public content, site, menu, preview and comment APIs with explicit access policies. Add provider-independent asymmetric JWT verification, Clerk/Kinde presets, exact-origin browser access, private-response caching rules and WordPress-owned CAPTCHA validation.

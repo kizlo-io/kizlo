@@ -10,17 +10,18 @@ of a generic record.
 
 ## Read fields from public models
 
-Posts, pages, categories, tags, and WooCommerce products expose configured values under `custom`:
+Read managed public content fields under `kizlo.custom`:
 
 ```ts
-const post = await client.posts.get.call({
+const { data: post, error } = await client.kizlo.content.post.retrieve({
   params: { identifier: "hello-world" },
 })
 
-post.custom.company_name // string
+if (error) throw error
+post.kizlo?.custom.company_name // string when the configured field exists
 ```
 
-The property is always an object. Content with no configured custom fields returns `custom: {}`.
+Unlocked content with no configured fields returns `custom: {}`. Password-protected public content hides its private envelope as `kizlo: null`.
 
 ## Read and write through WordPress
 
@@ -28,7 +29,7 @@ Managed post-type and taxonomy write endpoints accept a grouped `custom` object.
 WordPress are required when creating content. Update requests may include only the fields that changed.
 
 ```ts
-const response = await context.wordpress.kizlo.postTypes.post.create({
+const response = await admin.kizlo.postTypes.post.create({
   body: {
     title: "Hello world",
     custom: {
@@ -58,7 +59,7 @@ them separate from the API's own properties.
 Custom fields previously appeared beside standard properties in requests and responses.
 
 ```ts title="Before"
-await context.wordpress.kizlo.postTypes.post.create({
+await admin.kizlo.postTypes.post.create({
   body: {
     title: "Hello world",
     company_name: "Acme Ltd",
@@ -73,7 +74,7 @@ Move every custom field into `custom`. Raw managed WordPress responses place the
 public Kizlo models expose it directly.
 
 ```ts title="After"
-await context.wordpress.kizlo.postTypes.post.create({
+await admin.kizlo.postTypes.post.create({
   body: {
     title: "Hello world",
     custom: {
@@ -83,7 +84,7 @@ await context.wordpress.kizlo.postTypes.post.create({
 })
 
 response.data.kizlo.custom.company_name
-post.custom.company_name
+post.kizlo?.custom.company_name
 ```
 
 Regenerate `introspection.ts` after updating the Kizlo plugins or changing custom-field settings. See the

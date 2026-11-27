@@ -8,7 +8,10 @@ import { INTROSPECTION_FIXTURE } from "./introspection.fixture"
 import { WordPressTransport } from "./transport"
 
 /** Enough of `kizlo` to compile generated output against, without building the package. */
-const KIZLO_MODULE = `declare module "kizlo" {
+const KIZLO_MODULE = `declare module "kizlo/server" {
+ export function createServerClient<T extends object>(options: { endpoints: T; credentials: { url: string; username: string; password: string } }): import("kizlo").WP_Client<T>
+}
+declare module "kizlo" {
 	export interface WordPressTransportOptions { credentials: { url: string; username: string; password: string } }
 	export class WordPressTransport {
 		constructor(options: WordPressTransportOptions)
@@ -26,7 +29,6 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export type WP_CallArguments<I> = Record<string, never> extends I ? [input?: I, options?: WP_CallOptions] : [input: I, options?: WP_CallOptions]
 	export type WP_Client<T> = { [K in keyof T]: T[K] extends WP_Endpoint<infer I, infer R> ? (...args: WP_CallArguments<I>) => Promise<R> : WP_Client<T[K]> }
 	export function wpEndpoint<TInput, TResult>(definition: unknown): WP_Endpoint<TInput, TResult>
-	export function createKizlo(options: { integrations: readonly unknown[]; introspection: object }): { readonly wordpress: ActiveWordPressClient }
 	export interface WordPressClientRegistry {}
 	export interface WordPressEndpointRegistry {}
 	export interface WordPressCustomFieldsRegistry {}
@@ -40,7 +42,6 @@ const KIZLO_MODULE = `declare module "kizlo" {
 	export type WP_EndpointError<P extends WP_EndpointPath> = Exclude<WP_EndpointResult<P>["error"], null>
 	export type WP_CustomFieldsPath = Extract<keyof WordPressCustomFieldsRegistry, string>
 	export type WP_CustomFields<P extends WP_CustomFieldsPath> = WordPressCustomFieldsRegistry[P]
-	export function createProcedure(options: unknown, handler: (options: { context: { wordpress: ActiveWordPressClient } }) => unknown): unknown
 }
 `
 
@@ -65,8 +66,6 @@ const CLIENT_CALLS = `wordpress.postTypes.book.list({ query: { page: 1, status: 
 	wordpress.postTypes.book.list({ page: 1 })
 	// @ts-expect-error an object body where the route declares an array
 	wordpress.shipping.zoneLocations.update({ params: { zone_id: 1 }, body: { code: "US" } })
-	// Resolved through the registry augmentation, wherever the generated output carries it.
-	createProcedure({}, ({ context }) => context.wordpress.postTypes.book.list({ query: { page: 1 } }))
 `
 
 function compile(files: Record<string, string>): string[] {
@@ -353,9 +352,9 @@ describe("generateWordPressClient", () => {
 				"kizlo.d.ts": KIZLO_MODULE,
 				"wordpress.ts": client,
 				// The tree an app runs on is the whole description, so calls are checked against it once bound.
-				"usage.ts": `import { createProcedure, createKizlo } from "kizlo"
+				"usage.ts": `import { createServerClient } from "kizlo/server"
 				import { introspection } from "./wordpress"
-				const { wordpress } = createKizlo({ integrations: [], introspection })
+				const wordpress = createServerClient({ credentials: { url: "https://wp.example", username: "a", password: "b" }, endpoints: introspection })
 				${CLIENT_CALLS}`,
 			}),
 		).toEqual([])
@@ -368,7 +367,7 @@ describe("generateWordPressClient", () => {
 			compile({
 				"kizlo.d.ts": KIZLO_MODULE,
 				"wordpress.ts": client,
-				"usage.ts": `import { createProcedure } from "kizlo"
+				"usage.ts": `import type { WP_Client } from "kizlo"
 				import type { WordPressClient } from "./wordpress"
 				declare const wordpress: WordPressClient
 				${CLIENT_CALLS}`,

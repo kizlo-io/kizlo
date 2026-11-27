@@ -1,0 +1,4 @@
+Significance: major
+Type: changed
+
+Verify customer identity from signed sessions and verified email. Replace trusted frontend identity/guest headers with native Cart-Token proof, retain owner checks and guest-cart merging, serialize merges into each customer, and support direct browser cart and checkout with native error contracts.

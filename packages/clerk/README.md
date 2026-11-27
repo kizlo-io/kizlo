@@ -11,10 +11,10 @@
   </a>
 </p>
 
-<h3 align="center">Clerk Authentication Adapter</h3>
+<h3 align="center">Clerk Token Helper</h3>
 
 <p align="center">
-  Resolve Clerk sessions and synchronize users with WordPress
+  Supply Clerk session tokens to direct WordPress clients
 </p>
 
 <p align="center">
@@ -38,106 +38,31 @@
 pnpm add @kizlo/clerk
 ```
 
-## Setup
+## Supply the current token
 
-Kizlo keys a session on **email**, so this adapter maps a verified Clerk session
-to that identity. Webhook synchronization is optional.
+Configure the Clerk preset under **Kizlo → Settings → Authentication** in WordPress. Set your issuer, public verification keys, permitted browser origins, and the claims required by your application. Include email and its verification state in the token when enabling customer lookup.
 
-You pass in a configured Clerk backend client, so keys live where Clerk already
-reads them (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) and never on this
-adapter. Use your framework's `clerkClient`, or build one directly:
+Pass your Clerk session's `getToken` method to the direct browser client:
 
 ```ts
-import { clerk } from "@kizlo/clerk"
-import { createClerkClient } from "@clerk/backend"
+import { clerkToken } from "@kizlo/clerk"
+import { createBrowserClient } from "kizlo/browser"
+import { introspection } from "./generated/introspection.browser"
 
-const client = createClerkClient({
-	secretKey: process.env.CLERK_SECRET_KEY!,
-	publishableKey: process.env.CLERK_PUBLISHABLE_KEY!,
-	// jwtKey: process.env.CLERK_JWT_KEY, // optional: networkless session verification
-})
-
-const auth = clerk({ client })
-```
-
-In Next.js, hand it the app's client instead of building your own:
-
-```ts
-import { clerkClient } from "@clerk/nextjs/server"
-
-const auth = clerk({ client: await clerkClient() })
-```
-
-Register it like any other Kizlo integration; it contributes the `auth` adapter.
-`@clerk/backend` is a peer dependency, so it uses the version your app installs.
-
-### Email resolution
-
-The adapter uses the user's primary email address, even when Clerk has not
-verified it. For users without a primary email, pass `resolveEmail`:
-
-```ts
-clerk({
-	client,
-	resolveEmail(user) {
-		const phone = user.phoneNumbers[0]?.phoneNumber
-		if (!phone) throw new Error(`Missing identity for ${user.id}`)
-		return `${phone.replace(/\D/g, "")}@phone.example.com`
-	},
+const client = createBrowserClient({
+  url: "https://cms.example.com",
+  endpoints: introspection,
+  getToken: clerkToken(session),
 })
 ```
 
-`resolveEmail` runs only when the user has no primary email. If neither source
-returns an address, authentication and built-in webhook synchronization throw an
-error that names the missing option.
+Here `session` is the current Clerk session or hook result exposing `getToken()`. The helper obtains a fresh token for each request. It has no Clerk backend dependency, user synchronization, or webhook lifecycle.
 
-### Synchronize WordPress users
-
-Add a webhook signing secret to create, update, and delete the matching
-WordPress user when Clerk emits `user.created`, `user.updated`, or `user.deleted`:
-
-```ts
-const auth = clerk({
-	client,
-	webhooks: {
-		signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET!,
-	},
-})
-```
-
-In the Clerk Dashboard, create an endpoint at
-`https://your-app.example/api/kizlo/clerk/webhooks` and subscribe to those three
-events. Replace `/api/kizlo` if your Kizlo handler uses a different base path.
-
-The built-in handler links users by their stable Clerk ID. It creates a
-subscriber when no WordPress account has the same email, updates names and
-profile metadata, and permanently deletes the linked account and its content.
-Administrator and other privileged accounts are protected from updates and
-deletion.
-
-To process verified events yourself, provide `handler`. A custom handler replaces
-the built-in lifecycle behavior and receives every Clerk event:
-
-```ts
-clerk({
-	client,
-	webhooks: {
-		signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET!,
-		async handler(event, context) {
-			if (event.type === "user.created") {
-				context.logger.info("New Clerk user", event.data.id)
-			}
-			if (event.type === "session.created") {
-				context.logger.info("New Clerk session", event.data.id)
-			}
-		},
-	},
-})
-```
+WordPress verifies the JWT and lazily resolves a WooCommerce customer by verified email. Unverified or missing email remains a guest identity. No WordPress user ID or provider mapping is required in the session.
 
 ## Documentation
 
-See the [docs](https://kizlo.io/docs) for setup and usage.
+See [authentication](https://kizlo.io/docs/concepts/authentication) for provider configuration and the [v1 migration](https://kizlo.io/docs/concepts/migration-v1) for replacing the old `clerk()` integration.
 
 ## License
 

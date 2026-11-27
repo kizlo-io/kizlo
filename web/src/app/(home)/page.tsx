@@ -1,3 +1,4 @@
+import { deserializeSeo } from "kizlo"
 import { createPageMetadata } from "kizlo/nextjs/server"
 import type { Metadata } from "next"
 import Link from "next/link"
@@ -9,12 +10,15 @@ import { client } from "@/lib/kizlo/server"
 import { createMetadata } from "@/lib/metadata"
 import { appName, docsRoute, socials } from "@/lib/shared"
 
-const getHomeSeo = cache(() => client.seo.homepage())
+const getHomeSeo = cache(async () => {
+	const result = await client.kizlo.seo.homepage.retrieve()
+	return { ...result, data: result.data ? deserializeSeo(result.data) : null }
+})
 
 export async function generateMetadata(): Promise<Metadata> {
-	const { data, error } = await getHomeSeo()
+	const { data } = await getHomeSeo()
 
-	if (error) return createMetadata({ alternates: { canonical: "/" } })
+	if (!data) return createMetadata({ alternates: { canonical: "/" } })
 
 	return createPageMetadata(data.head)
 }
@@ -43,7 +47,7 @@ export default async function HomePage() {
 			</p>
 
 			<div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-				<Command command="npx kizlo create" />
+				<Command command="npm install kizlo" />
 
 				<Link
 					href={docsRoute}

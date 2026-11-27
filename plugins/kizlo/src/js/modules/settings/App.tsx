@@ -31,6 +31,8 @@ import { IdentitySettingsPage } from "./general/identity"
 import { SiteSettingsPage } from "./general/site"
 import { PostTypeSettingsPage } from "./post-type"
 import { CreatePostTypePage, CreateTaxonomyPage } from "./registration/create"
+import { AuthSettingsPage } from "./system/auth"
+import { CaptchaSettingsPage } from "./system/captcha"
 import { HeadlessSettingsPage } from "./system/headless"
 import { UploadsSettingsPage } from "./system/uploads"
 import { WebhookSettingsPage } from "./system/webhook"
@@ -59,6 +61,8 @@ export default function App() {
 				<Route path="/system/webhooks" element={<WebhookSettingsPage />} />
 				<Route path="/system/uploads" element={<UploadsSettingsPage />} />
 				<Route path="/system/headless" element={<HeadlessSettingsPage />} />
+				<Route path="/system/auth" element={<AuthSettingsPage />} />
+				<Route path="/system/captcha" element={<CaptchaSettingsPage />} />
 
 				<Route path="/preview" element={<ComponentGallery />} />
 

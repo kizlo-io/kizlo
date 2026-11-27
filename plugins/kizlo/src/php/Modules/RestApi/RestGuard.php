@@ -5,23 +5,7 @@ namespace Kizlo\Modules\RestApi;
 use WP_Error;
 use WP_REST_Request;
 
-/**
- * Request-aware REST API lockdown for the unverified-identity-header surface.
- *
- * Some routes act on an `X-Kizlo-User-Email` header trusted without
- * cryptographic verification — the WooCommerce Store API cart routes are the
- * case in point — so opening them to anonymous callers would let anyone act as
- * any user. The guard locks those routes to an administrator authenticated with
- * a WordPress Application Password, the boundary that makes the header safe.
- *
- * Nothing is protected by default. A route family opts in with
- * `kizlo_rest_route_requires_admin`; see {@see self::protectsRoute()}. Kizlo's
- * own `/kizlo/*` routes are not guarded here — each carries a
- * `permission_callback` (see {@see \Kizlo\Modules\Introspection\RouteRegistrar})
- * that enforces the administrator capability and returns the same
- * `kizlo_rest_unauthorized`/`kizlo_rest_forbidden` codes, while accepting any
- * WordPress authentication (cookie + nonce as well as Application Password).
- */
+/** Optional administrator Application Password boundary for explicitly opted-in route families. */
 class RestGuard
 {
     public function register(): void
@@ -62,9 +46,9 @@ class RestGuard
      * Nothing is guarded by default: every route defers to its own permission
      * callbacks, so the block editor, the admin dashboard, third-party plugins,
      * and Kizlo's own `/kizlo/*` routes keep authenticating their REST requests
-     * the way they always have. An integration opts a narrow route family in —
-     * the WooCommerce Store API does, so its unverified X-Kizlo-User-Email
-     * header stays behind the administrator Application Password boundary.
+     * the way they always have. An integration can opt a narrow route family in. Store API routes retain
+     * their native proof and ownership checks; external identities are verified
+     * by the authentication module.
      *
      * This is the single source of truth for the guard's route policy: the
      * introspection contract reads it too, so a described route advertises the

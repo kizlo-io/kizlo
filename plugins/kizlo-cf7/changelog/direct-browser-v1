@@ -1,0 +1,4 @@
+Significance: major
+Type: changed
+
+Expose final browser submission endpoints with required server-verified CAPTCHA tokens, native CF7 validation and spam checks. Remove reliance on frontend integration validation.

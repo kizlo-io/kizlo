@@ -4,7 +4,7 @@ import { defineCommand } from "citty"
 import { createTwoFilesPatch } from "diff"
 import type { WordPressCredentials } from "../../wordpress/types"
 import { resolveConfig } from "../daemon/config"
-import { generateIntrospectionSource, reportGenerationError } from "../daemon/generate"
+import { browserIntrospectionPath, generateIntrospectionSources, reportGenerationError } from "../daemon/generate"
 import { log } from "../daemon/logger"
 import { testWordPressCredentials } from "./_test-wordpress"
 
@@ -70,16 +70,19 @@ export const check = defineCommand({
 			}
 		}
 
-		let expected: string
+		let expected: { server: string; browser: string }
 		try {
-			expected = await generateIntrospectionSource(cwd, { credentials, strict: true })
+			expected = await generateIntrospectionSources(cwd, { credentials, strict: true })
 		} catch (error) {
 			reportGenerationError("Failed to check the generated WordPress introspection:", error)
 			process.exitCode = 1
 			return
 		}
 
-		const mismatches = findGeneratedFileMismatches(files, expected)
+		const mismatches = [
+			...findGeneratedFileMismatches(files, expected.server),
+			...findGeneratedFileMismatches(files.map(browserIntrospectionPath), expected.browser),
+		]
 		if (mismatches.length === 0) {
 			log.success("WordPress introspection is current")
 			return

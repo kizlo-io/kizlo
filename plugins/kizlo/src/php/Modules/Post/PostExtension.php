@@ -44,6 +44,11 @@ class PostExtension
 
         $data['kizlo']['custom'] = (object) $custom;
 
+        if ($post->post_password !== '' && !current_user_can('edit_post', $post->ID)
+            && !hash_equals($post->post_password, (string) $request->get_param('password'))) {
+            $data['kizlo'] = null;
+        }
+
         $response->set_data($data);
 
         return $response;

@@ -71,9 +71,7 @@ each branch its own pair:
 
 ```ts title="kizlo.config.ts"
 export default defineConfig({
-  worktrees: true,
-  dev: { local: true },
-  test: { local: true },
+  local: { worktrees: true },
 })
 ```
 
@@ -92,8 +90,7 @@ Both stacks boot current WordPress. Set `version` to hold one still, or to run a
 
 ```ts title="kizlo.config.ts"
 export default defineConfig({
-  dev: { local: true, version: "7.1.0" },
-  test: { local: true, version: "6.8.2" },
+  local: { dev: { version: "7.1.0" }, test: { version: "6.8.2" } },
 })
 ```
 
@@ -130,12 +127,12 @@ export const blogFixture = defineFixture({
   plugins: ["wordpress-seo"], // wp.org slug, zip URL, or a local { path }
   async seed(ctx) {
     // ctx.service is the typed WP client; ctx.adminId / ctx.userId are seeded users
-    const post = await ctx.service.posts.create({
+    const post = await ctx.service.post<{ id: number }>("posts", { body: {
       slug: "hello-world-test",
       title: "Hello World Test",
       status: "publish",
       author: ctx.adminId,
-    })
+    } })
     if (post.error) throw post.error
 
     return { postId: post.data.id } // a live handle a test reads back, not a snapshot
@@ -151,8 +148,7 @@ import { defineConfig } from "kizlo/config"
 import { blogFixture } from "./fixtures/blog"
 
 export default defineConfig({
-  dev: { local: true, fixtures: [blogFixture] },
-  test: { local: true, fixtures: [blogFixture] },
+  local: { dev: { fixtures: [blogFixture] } },
 })
 ```
 
@@ -162,85 +158,29 @@ Some setup the REST API can't express, like pretty permalinks or an option flag.
 `kizlo/test` and call it inside `seed` to run any wp-cli command against WordPress.
 
 <Callout>
-  An [integration package](/docs/concepts/integration) can export a fixture beside its integration factory. The
+  An [integration package](/docs/concepts/integration) can export a fixture beside its presentation helpers. The
   fixture stays a separate config value: drop it into `dev.fixtures` or `test.fixtures` to install the plugin
-  and seed what the integration's procedures expect.
+  and seed what the API expects.
 </Callout>
 
-## The development loop
+## Test the direct API
 
-You build against local WordPress like a site you installed yourself: it persists and stays editable (see the
-table above).
-
-What keeps that loop tight is [`kizlo dev`](/docs/concepts/cli#kizlo-dev): edit a
-[procedure](/docs/concepts/integration) and it regenerates the typed [contract](/docs/concepts/client) before you
-call it; change content in `wp-admin` and your app reads it on the next request. Nothing to restart to stay in
-sync.
-
-## Writing tests
-
-Tests run against test WordPress, so they exercise real WordPress responses instead of guesses about them. You
-can hit a procedure at two levels.
-
-### Server-side
-
-Call the procedure directly and get its data back, or its typed error thrown, the quickest check of what a
-procedure *does*. `getKizloTestInstance` wires an instance from the seeded credentials and the
-[adapter](/docs/concepts/adapter) mocks:
+Use `getTestCredentials` from `kizlo/test` after the CLI has seeded WordPress. Public browser requests require only its URL:
 
 ```ts title="post.test.ts"
-import { beforeAll, expect, test } from "vitest"
-import { getKizloTestInstance, type KizloTestInstance } from "kizlo/test"
+import { expect, test } from "vitest"
+import { createBrowserClient } from "kizlo/browser"
+import { getTestCredentials } from "kizlo/test"
+import { introspection } from "./src/lib/kizlo/generated/introspection.browser"
 
-let kizlo: KizloTestInstance
-beforeAll(() => { kizlo = getKizloTestInstance() })
-
-test("reads a seeded post by slug", async () => {
-  const post = await kizlo.client.posts.get.call({ params: { identifier: "hello-world-test" } })
-  expect(post.slug).toBe("hello-world-test")
+const client = createBrowserClient({ url: getTestCredentials().url, endpoints: introspection })
+test("reads a seeded public post", async () => {
+  const result = await client.kizlo.content.post.retrieve({ params: { identifier: "hello-world-test" } })
+  expect(result.error).toBeNull()
+  expect(result.data?.slug).toBe("hello-world-test")
 })
 ```
 
-### End-to-end
+For administrative fixture operations, use the artifact's admin Application Password through `createServerClient`. For customer permission tests, configure local asymmetric test keys and sign real JWTs. Forged identity headers and test-only validation bypasses do not prove the auth boundary.
 
-Go through the real [client](/docs/concepts/client) and get back the `{ success }` envelope your frontend sees.
-This catches what a direct call can't: serialization, and rules like internal procedures never leaving the
-server. `getKizloClientTestInstance` wraps a test instance with that client:
-
-```ts title="post.e2e.test.ts"
-import { beforeAll, expect, test } from "vitest"
-import { getKizloClientTestInstance, getKizloTestInstance, type KizloClientTestInstance } from "kizlo/test"
-
-let instance: KizloClientTestInstance
-beforeAll(async () => { instance = await getKizloClientTestInstance(getKizloTestInstance()) })
-
-test("reads a seeded post over the client", async () => {
-  const result = await instance.client.posts.get({ params: { identifier: "hello-world-test" } })
-  expect(result.success).toBe(true)
-  if (result.success) expect(result.data.slug).toBe("hello-world-test")
-})
-```
-
-Reach for WordPress only when a test depends on how WordPress actually responds. Pure logic, like a schema or a
-procedure's branching, runs on its own with no WordPress and no Docker, and those fast tests are what make the
-WordPress-backed ones worth trusting.
-
-<Callout type="info">
-  Even then, mocks live only at the *edges*. Identity, geo, captcha, and logging come through
-  [adapters](/docs/concepts/adapter), and each ships a mock so a test can pin a known user without a real
-  provider. WordPress itself is never mocked.
-</Callout>
-
-When a provider integration bundles an adapter, append an adapter-only test integration to replace it. Integration
-adapters resolve left to right, so the last concrete value wins:
-
-```ts title="provider.test.ts"
-const testAdapters = createIntegration({
-  id: "test-adapters",
-  adapters: { auth: authMock({ mockUserId: 1 }) },
-})
-
-const kizlo = getKizloTestInstance({
-  integrations: [provider(), testAdapters],
-})
-```
+Pure formatters and transport parsing can be tested without Docker. Real cart, checkout, ownership, and CORS tests must call the running WordPress API.

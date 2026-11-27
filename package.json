@@ -18,8 +18,6 @@
 	"scripts": {
 		"build": "turbo run build",
 		"kizlo": "node packages/kizlo/dist/cli/index.js",
-		"kizlo:create": "node packages/kizlo/dist/cli/index.js create --source ./templates",
-		"kizlo:init": "node packages/kizlo/dist/cli/index.js init --source ./templates",
 		"dev": "turbo watch dev --continue",
 		"kill": "taskkill /f /im node.exe",
 		"clean:workspaces": "turbo run clean",
@@ -32,7 +30,7 @@
 		"worktree:sweep": "node scripts/sweep-worktrees.mjs",
 		"postinstall": "pnpm lint:ws && node scripts/postinstall.mjs",
 		"typecheck": "turbo run typecheck",
-		"changeset:version": "changeset version && node scripts/stamp-template-version.mjs && biome format --write templates/*/template.json",
+		"changeset:version": "changeset version",
 		"test": "turbo run test --filter \"./packages/*\" --filter @kizlo/plugin-kizlo --filter @kizlo/plugin-pos",
 		"test:only": "turbo run test --filter",
 		"test:watch": "vitest",

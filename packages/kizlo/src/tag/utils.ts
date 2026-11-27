@@ -8,7 +8,7 @@ export function deserializeTag(data: WPK_Tag | WPK_TagListItem): Tag {
 		id: data.id,
 		name: data.name,
 		slug: data.slug,
-		url: data.kizlo.url,
+		url: data.link,
 		description: data.description.length > 0 ? data.description : null,
 		postCount: data.count,
 		// List responses carry no resolved SEO block; only a single fetch does.

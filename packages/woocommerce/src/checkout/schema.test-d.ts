@@ -1,7 +1,4 @@
-import type { InferIntegrationProcedures, InferProcedureError, InferProcedureInput, ResultClient } from "kizlo"
 import { expectTypeOf } from "vitest"
-import type { Cart } from "../cart/schema"
-import type { woocommerce } from "../index"
 import type {
 	Checkout,
 	CheckoutBillingAddressInput,
@@ -10,24 +7,11 @@ import type {
 	RetryCheckoutInput,
 } from "./schema"
 
-type Procedures = InferIntegrationProcedures<[ReturnType<typeof woocommerce>]>
-type Confirm = Procedures["woocommerce"]["checkout"]["confirm"]
-type Error = Extract<InferProcedureError<Confirm>, { code: "CHECKOUT_TOTAL_MISMATCH" }>
-type Client = ResultClient<Procedures>
-type Result = Awaited<ReturnType<Client["woocommerce"]["checkout"]["confirm"]>>
-
 expectTypeOf<ConfirmCheckoutInput["expectedTotal"]>().toEqualTypeOf<string | undefined>()
 expectTypeOf<Checkout>().not.toHaveProperty("cart")
 declare const checkout: Checkout
 // @ts-expect-error Cart is a separate resource.
 checkout.cart
-expectTypeOf<InferProcedureInput<Confirm>["body"]["expectedTotal"]>().toEqualTypeOf<string | undefined>()
-expectTypeOf<Error["status"]>().toEqualTypeOf<number>()
-expectTypeOf<Error["data"]["expectedTotal"]>().toEqualTypeOf<string | undefined>()
-expectTypeOf<Error["data"]["actualTotal"]>().toEqualTypeOf<string | undefined>()
-expectTypeOf<Error["data"]["cart"]>().toMatchTypeOf<Cart | null>()
-expectTypeOf<Extract<NonNullable<Result["error"]>, { code: "CHECKOUT_TOTAL_MISMATCH" }>>().toEqualTypeOf<Error>()
-
 const valid: ConfirmCheckoutInput["expectedTotal"] = "0"
 // @ts-expect-error The transport accepts minor-unit strings, never numbers.
 const numeric: ConfirmCheckoutInput["expectedTotal"] = 1250
@@ -39,8 +23,8 @@ const billing: CheckoutBillingAddressInput = { additionalFields: {} }
 const shipping: CheckoutShippingAddressInput = { city: "London", additionalFields: {} }
 const partialConfirm: ConfirmCheckoutInput = { billingAddress: billing, shippingAddress: shipping, paymentMethod: "bacs" }
 const partialRetry: RetryCheckoutInput = { billingAddress: billing, paymentMethod: "bacs", orderId: 42, key: "key" }
-const inferredConfirm: InferProcedureInput<Confirm>["body"] = partialConfirm
-const inferredRetry: InferProcedureInput<Procedures["woocommerce"]["checkout"]["retry"]>["body"] = partialRetry
+const inferredConfirm: ConfirmCheckoutInput = partialConfirm
+const inferredRetry: RetryCheckoutInput = partialRetry
 expectTypeOf<ConfirmCheckoutInput["billingAddress"]["taxId"]>().toEqualTypeOf<string | undefined>()
 expectTypeOf<ConfirmCheckoutInput["billingAddress"]["email"]>().toEqualTypeOf<string | undefined>()
 // @ts-expect-error billing remains required

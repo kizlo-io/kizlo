@@ -69,7 +69,7 @@ const introspectionFixtures = [
 const WORDPRESS_VERSION = "7.1.0-apache"
 
 export default defineConfig({
-	dir: { introspection: "." },
+	dir: ".",
 	local: {
 		worktrees: true,
 		dev: { enable: true, version: WORDPRESS_VERSION, fixtures: introspectionFixtures },

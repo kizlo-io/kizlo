@@ -1,5 +1,2 @@
-import { createKizlo } from "kizlo"
-import { tanstackStart } from "kizlo/tanstack-start/server"
-import { introspection } from "./generated"
-
-export const { procedures, client, wordpress, handler } = createKizlo({ integrations: [tanstackStart()], introspection })
+// Public SSR reads use the same APIs and credentials-free client as the browser.
+export { client } from "../client"

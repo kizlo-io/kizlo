@@ -7,8 +7,8 @@ import type { WP_CustomFields } from "./wordpress"
 
 describe("site-typed custom fields", () => {
 	it("preserves the generated field names and values on public content models", () => {
-		expectTypeOf<Post["custom"]>().toEqualTypeOf<{ company_name: string }>()
-		expectTypeOf<Page["custom"]>().toEqualTypeOf<{ featured: boolean }>()
+		expectTypeOf<NonNullable<Post["custom"]>>().toEqualTypeOf<{ company_name: string }>()
+		expectTypeOf<NonNullable<Page["custom"]>>().toEqualTypeOf<{ featured: boolean }>()
 		expectTypeOf<Category["custom"]>().toEqualTypeOf<{ blurb: string }>()
 		expectTypeOf<Tag["custom"]>().toEqualTypeOf<{ rank: number | null }>()
 	})

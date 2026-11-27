@@ -1,0 +1,93 @@
+---
+// This page builds to HTML and JavaScript and can be hosted independently of Astro's server.
+export const prerender = true
+---
+<!doctype html>
+<html lang="en">
+ <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>Direct storefront</title></head>
+ <body>
+  <main>
+   <h1>Direct storefront</h1>
+   <p id="status" role="status">Loading products…</p>
+   <ul id="products"></ul>
+   <h2>Cart</h2>
+   <p id="cart">Your cart is empty.</p>
+   <h2>Checkout</h2>
+   <form id="checkout">
+    <label>First name <input name="first_name" autocomplete="given-name" required /></label>
+    <label>Last name <input name="last_name" autocomplete="family-name" required /></label>
+    <label>Email <input name="email" type="email" autocomplete="email" required /></label>
+    <label>Address <input name="address_1" autocomplete="address-line1" required /></label>
+    <label>City <input name="city" autocomplete="address-level2" required /></label>
+    <label>State or province <input name="state" autocomplete="address-level1" /></label>
+    <label>Postal code <input name="postcode" autocomplete="postal-code" required /></label>
+    <label>Country code <input name="country" autocomplete="country" maxlength="2" required /></label>
+    <label>Payment method <select name="payment_method" required></select></label>
+    <button type="submit">Place order</button>
+   </form>
+  </main>
+  <script>
+   import { createBrowserClient } from "kizlo/browser"
+   import { requireData } from "kizlo"
+   import { introspection } from "@/lib/kizlo/generated/introspection.browser"
+
+   const url = import.meta.env.PUBLIC_KIZLO_WP_URL ?? ""
+   const sessionKey = `kizlo-cart:${url}`
+   const client = createBrowserClient({ url, endpoints: introspection, cartSession: {
+    get: () => sessionStorage.getItem(sessionKey),
+    set: (token) => token ? sessionStorage.setItem(sessionKey, token) : sessionStorage.removeItem(sessionKey),
+   } })
+   const status = document.querySelector<HTMLParagraphElement>("#status")!
+   const products = document.querySelector<HTMLUListElement>("#products")!
+   const cartText = document.querySelector<HTMLParagraphElement>("#cart")!
+   const checkout = document.querySelector<HTMLFormElement>("#checkout")!
+   const methods = checkout.querySelector<HTMLSelectElement>("select")!
+   let total: string | undefined
+   async function refreshCart() {
+    const cart = requireData(await client.woocommerce.store.cart.retrieve())
+    total = cart.totals.total_price
+    cartText.textContent = `${cart.items_count} items, ${cart.totals.currency_code} ${(Number(total) / 10 ** cart.totals.currency_minor_unit).toFixed(cart.totals.currency_minor_unit)}`
+    methods.replaceChildren(...cart.payment_methods.map((method) => new Option(method, method)))
+   }
+   function failed(error: unknown) { status.textContent = error instanceof Error ? error.message : "Request failed. Please try again." }
+   async function load() {
+    await refreshCart()
+    const entries = requireData(await client.woocommerce.store.products.list({ query: { per_page: 10 } }))
+    for (const product of entries) {
+     if (!product.is_purchasable || product.type !== "simple" || !product.is_in_stock) continue
+     const item = document.createElement("li")
+     const button = document.createElement("button")
+     button.textContent = `Add ${product.name}`
+     button.addEventListener("click", async () => {
+      button.disabled = true
+      try { requireData(await client.woocommerce.store.cart.addItem.create({ body: { id: product.id, quantity: 1 } })); await refreshCart(); status.textContent = "Added to cart." }
+      catch (error) { failed(error) }
+      finally { button.disabled = false }
+     })
+     item.append(button); products.append(item)
+    }
+    status.textContent = "Ready."
+   }
+   checkout.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const button = checkout.querySelector<HTMLButtonElement>("button")!
+    button.disabled = true
+    const fields = new FormData(checkout)
+    const value = (name: string) => String(fields.get(name) ?? "")
+    try {
+     const billing_address = { first_name: value("first_name"), last_name: value("last_name"), email: value("email"), address_1: value("address_1"), address_2: "", city: value("city"), state: value("state"), postcode: value("postcode"), country: value("country"), company: "", phone: "" }
+     const result = requireData(await client.woocommerce.store.checkout.create({ body: { billing_address, shipping_address: billing_address, payment_method: value("payment_method"), expected_total: total } }))
+     status.textContent = `Order ${result.order_id}: ${result.status}`
+     await refreshCart()
+    } catch (error) { failed(error) }
+    finally { button.disabled = false }
+   })
+   load().catch(failed)
+  </script>
+  <style>
+   main { max-width: 42rem; margin: 3rem auto; padding: 0 1rem; font-family: system-ui; }
+   label { display: grid; gap: .25rem; margin: 1rem 0; }
+   input, select, button { font: inherit; padding: .5rem; }
+  </style>
+ </body>
+</html>

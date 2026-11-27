@@ -3,13 +3,7 @@ title: createEventHandler
 description: Handle a WordPress webhook event inside an integration.
 ---
 
-`createEventHandler` builds a handler that runs when WordPress emits a webhook event: a post published, a term
-deleted, or a custom event from your own plugin. Put the result in an
-[integration](/docs/reference/functions/create-integration)'s `events` array. Kizlo dispatches each incoming
-event to every handler that matches.
-
-Handlers run server-side. By default, failures are logged and the request succeeds. Required handlers can
-opt into failed acknowledgements so the sender retries. All matching handlers are awaited.
+Import `createEventHandler` from `kizlo/server` and pass the result in `createWebhookHandler({ secret, events })`. All matching handlers are awaited. Optional failures are logged; required failures reject acknowledgement for retry.
 
 ## Parameters
 
@@ -38,18 +32,18 @@ it to receive every built-in WordPress event instead. Each entry:
 - **`event`**: the `{ type, data }` payload, or `null` when the request carries no recognized event. With
   `events` declared, `event` is narrowed to your union, so switching on `event.type` types `event.data`. Without
   it, `event` is the built-in event shape.
-- **`context`**: a [`ProcedureContext`](/docs/reference/types/procedure-context).
+- **`context`**: `WebhookContext`, containing `request`, response `headers`, and an error logger.
 
 ## Returns
 
-An `EventHandler`. List it in an integration's `events` array.
+An `EventHandler`. List it in `createWebhookHandler`'s `events` array.
 
 ## Examples
 
 Handle built-in events by switching on `event.type`. Each case narrows `event.data`:
 
 ```ts title="src/lib/kizlo/server/cache/index.ts"
-import { createEventHandler } from "kizlo"
+import { createEventHandler } from "kizlo/server"
 
 export const onContentChange = createEventHandler(async (event, context) => {
   if (!event) return
@@ -59,7 +53,7 @@ export const onContentChange = createEventHandler(async (event, context) => {
       await revalidatePath(`/posts/${event.data.post_id}`)
       break
     case "term.deleted": // event.data → { term_id, taxonomy, post_types, count }
-      context.logger.info("term removed", { id: event.data.term_id })
+      context.logger.error("term removed", { id: event.data.term_id })
       break
   }
 })
@@ -69,14 +63,14 @@ Handle a custom event by declaring its type and `data` schema first, so the hand
 Your WordPress plugin emits it with [`kizlo_emit_event`](/docs/php/functions/emit-event):
 
 ```ts
-import { createEventHandler } from "kizlo"
+import { createEventHandler } from "kizlo/server"
 import { z } from "zod"
 
 export const onReview = createEventHandler(
   [{ types: ["review.created"], data: z.object({ review_id: z.number(), rating: z.number() }) }],
   async (event, context) => {
     if (event?.type !== "review.created") return
-    context.logger.info("new review", { rating: event.data.rating }) // data is typed
+    context.logger.error("new review", { rating: event.data.rating }) // data is typed
   },
 )
 ```

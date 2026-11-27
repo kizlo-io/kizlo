@@ -42,12 +42,13 @@ class OrderModule
     public function register(): void
     {
         add_filter('woocommerce_rest_prepare_shop_order_object', [$this, 'prepareOrderCallback'], PHP_INT_MAX, 2);
-        add_filter('rest_post_dispatch', [$this, 'extendStoreOrderItems'], 10, 3);
+        add_filter('rest_request_after_callbacks', [$this, 'extendStoreOrderItems'], 10, 3);
         add_action('woocommerce_new_order_item', [$this, 'rememberOrderItemProductIds'], 10, 2);
 
         kizlo_register_route([
             'id'        => 'woocommerce.kizlo.orders',
             'operation' => 'list',
+            'access'    => 'authenticated',
             'method'    => 'GET',
             'route'     => '/woocommerce/orders',
             'summary'   => 'The authenticated customer’s order history',

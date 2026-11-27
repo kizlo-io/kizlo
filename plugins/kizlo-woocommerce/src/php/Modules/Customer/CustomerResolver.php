@@ -4,9 +4,28 @@ namespace Kizlo\WooCommerce\Modules\Customer;
 
 use WP_Error;
 use WP_User;
+use WP_REST_Request;
+use Kizlo\Modules\Auth\AuthModule;
+use Kizlo\Modules\Auth\Identity;
 
 final class CustomerResolver
 {
+    /** An unverified external account can shop as a guest, never as an email-linked customer. */
+    public static function forRequest(WP_REST_Request $request): int|WP_Error|null
+    {
+        $identity = AuthModule::identity($request);
+        if ($identity instanceof WP_Error) return $identity;
+        if ($identity instanceof Identity) {
+            if (!$identity->emailVerified || $identity->email === null) return null;
+            return self::resolve($identity->email);
+        }
+
+        // Service credentials authorize administration; they do not select a customer's cart.
+        if (kizlo_is_application_password_authenticated()) return null;
+        $user = wp_get_current_user();
+        return $user->exists() ? self::resolvableUserId($user) : null;
+    }
+
     /**
      * Resolve an email to a WordPress user id, creating a customer account when
      * none exists. The resolve-or-create runs under a per-email lock so
@@ -17,7 +36,7 @@ final class CustomerResolver
     {
         $email = trim($email);
         if (! is_email($email)) {
-            return new WP_Error('kizlo_invalid_identity', 'X-Kizlo-User-Email does not identify a valid headless customer.', ['status' => 401]);
+            return new WP_Error('kizlo_invalid_identity', 'A verified customer email is required.', ['status' => 401]);
         }
 
         $existing = get_user_by('email', $email);
@@ -91,7 +110,7 @@ final class CustomerResolver
     {
         $resolvable = (bool) apply_filters(
             'kizlo_woocommerce_resolvable_cart_user',
-            ! user_can($user, 'edit_posts'),
+            ! user_can($user, 'edit_posts') && !user_can($user, 'manage_options') && !user_can($user, 'manage_woocommerce'),
             $user
         );
 

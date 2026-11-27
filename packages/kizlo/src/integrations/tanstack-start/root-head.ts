@@ -1,6 +1,7 @@
 import { resolveIcons } from "../../brand/icons"
 import { WEB_MANIFEST_ROUTE } from "../../brand/manifest"
-import type { S2SClient } from "../../kizlo"
+import type { PublicApiClient } from "../../public-api"
+import { requireData } from "../../wordpress/utils"
 import type { LinkDescriptor, MetaDescriptor, RouteHead } from "./metadata"
 
 /**
@@ -10,8 +11,8 @@ import type { LinkDescriptor, MetaDescriptor, RouteHead } from "./metadata"
  * template calls it through a server function in the root route's loader and feeds the result to `head`.
  * Per-page SEO (title, Open Graph, canonical) is layered on by {@link resolvePageHead} in child routes.
  */
-export async function resolveRootHead(client: S2SClient<[]>): Promise<RouteHead> {
-	const settings = await client.settings.get.call()
+export async function resolveRootHead(client: PublicApiClient): Promise<RouteHead> {
+	const settings = requireData(await client.kizlo.site.retrieve())
 	const { icon, appleTouch } = resolveIcons(settings.brand)
 
 	const meta: MetaDescriptor[] = []

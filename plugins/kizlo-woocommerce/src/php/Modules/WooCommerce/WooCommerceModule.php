@@ -6,26 +6,47 @@ use Kizlo\WooCommerce\Modules\Cart\CartMerger;
 use WP_Error;
 use WP_HTTP_Response;
 use WP_REST_Request;
+use WeakMap;
 
 /** Bootstraps the request-scoped headless WooCommerce session adapter. */
 class WooCommerceModule
 {
-    private bool $trustedAdminAuth = false;
-    private ?int $headlessRequestId = null;
-    private ?int $initializingRequestId = null;
-    private ?int $initializedRequestId = null;
+    private ?WP_REST_Request $headlessRequest = null;
+    private ?WP_REST_Request $initializingRequest = null;
+    private ?WP_REST_Request $initializedRequest = null;
+    /** @var WeakMap<WP_REST_Request, int> */
+    private WeakMap $nativeUsers;
+
+    public function __construct()
+    {
+        $this->nativeUsers = new WeakMap();
+    }
 
     public function register(): void
     {
         WooCommerceSchemas::register();
+        add_action('rest_api_init', static function (): void {
+            // Store API's CORS callback can exit on preflight before our exact-origin policy runs.
+            global $wp_filter;
+            foreach ($wp_filter['rest_pre_serve_request']->callbacks ?? [] as $priority => $callbacks) {
+                foreach ($callbacks as $callback) {
+                    $function = $callback['function'];
+                    if (is_array($function) && is_object($function[0])
+                        && get_class($function[0]) === 'Automattic\\WooCommerce\\StoreApi\\Authentication'
+                        && $function[1] === 'send_cors_headers') {
+                        remove_filter('rest_pre_serve_request', $function, $priority);
+                    }
+                }
+            }
+        }, PHP_INT_MAX);
+
 
         add_filter('kizlo_rest_route_requires_admin', [$this, 'requiresKizloAdmin'], 10, 2);
-        add_filter('woocommerce_session_handler', [$this, 'maybeUseHeadlessSession']);
+        add_filter('woocommerce_session_handler', [$this, 'maybeUseHeadlessSession'], PHP_INT_MAX);
         add_filter('woocommerce_persistent_cart_enabled', [$this, 'maybeDisablePersistentCart']);
-        add_filter('woocommerce_store_api_disable_nonce_check', [$this, 'maybeDisableNonceCheck']);
-        add_filter('rest_post_dispatch', [$this, 'addCartTokenHeader'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this, 'maybeSwitchStoreApiUser'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this, 'maybeApplyGeoDefaults'], 30, 3);
+        add_filter('rest_request_after_callbacks', [$this, 'restoreNativeUser'], PHP_INT_MAX, 3);
 
         // Global (not headless-request-scoped) so an off-session gateway
         // webhook/IPN that completes payment can still reach the owning cart.
@@ -33,15 +54,11 @@ class WooCommerceModule
         add_action('woocommerce_order_status_changed', [$this, 'clearCartForPaidOrder'], 10, 4);
     }
 
-    /**
-     * Guard Kizlo's headless surface (the whole Store API) and defer every
-     * other WooCommerce route to WooCommerce's own capability checks, so the
-     * admin dashboard's cookie-authenticated REST calls are not blocked.
-     */
+    /** Store API and WooCommerce administration retain their own route permissions. */
     public function requiresKizloAdmin(bool $required, WP_REST_Request $request): bool
     {
         $route = $request->get_route();
-        if (str_starts_with($route, '/wc/store/')) return true;
+        if (str_starts_with($route, '/wc/store/')) return false;
         if ($this->isWooCommerceRoute($route)) return false;
 
         return $required;
@@ -49,18 +66,12 @@ class WooCommerceModule
 
     public function maybeUseHeadlessSession(string $default): string
     {
-        return $this->headlessRequestId !== null ? SessionHandler::class : $default;
+        return $this->headlessRequest !== null ? SessionHandler::class : $default;
     }
 
     public function maybeDisablePersistentCart(bool $enabled): bool
     {
-        return $this->headlessRequestId !== null ? false : $enabled;
-    }
-
-    public function maybeDisableNonceCheck(bool $disabled): bool
-    {
-        if ($disabled) return true;
-        return $this->headlessRequestId !== null && $this->trustedAdminAuth;
+        return $this->headlessRequest !== null ? false : $enabled;
     }
 
     /**
@@ -137,16 +148,7 @@ class WooCommerceModule
         wp_cache_delete($key, 'wc_session_id');
     }
 
-    /**
-     * Validate and initialize only cart, checkout and order Store API requests,
-     * before WooCommerce checks route permissions. The object id makes repeated
-     * filter passes for one request harmless.
-     *
-     * WordPress has already run rest_authentication_errors at this point, so
-     * Kizlo's global guard has verified the App Password administrator. Store
-     * API permission callbacks now see the resolved customer and can authorize
-     * registered orders against the identity in X-Kizlo-User-Email.
-     */
+    /** Resolve identity and cart proof before native Store API permissions run. */
     public function maybeSwitchStoreApiUser(mixed $response, mixed $handler, mixed $request): mixed
     {
         if (is_wp_error($response)) return $response;
@@ -155,25 +157,51 @@ class WooCommerceModule
         $route = $request->get_route();
         if (! $this->isHeadlessStoreRoute($route)) return $response;
 
-        $requestId = spl_object_id($request);
-        if ($this->initializedRequestId === $requestId || $this->initializingRequestId === $requestId) {
+        if (!in_array($request->get_method(), ['GET', 'HEAD', 'OPTIONS'], true)
+            && !$request->get_header('Cart-Token') && !$request->get_header('Nonce')) {
+            return new WP_Error('woocommerce_rest_missing_nonce', 'A Cart-Token or Store API nonce is required.', ['status' => 401]);
+        }
+
+        $currentRequest = $request;
+        if ($this->initializedRequest === $currentRequest || $this->initializingRequest === $currentRequest) {
             return $response;
         }
 
-        $this->headlessRequestId = $requestId;
+        $this->headlessRequest = $currentRequest;
 
         $allowTransition = $this->isTransitionRoute($route);
         $identity        = SessionHandler::resolveIdentity($request, $allowTransition);
         if ($identity instanceof WP_Error) return $identity;
+        $activeSession = WC()->session;
+        if ($this->initializedRequest !== null && $activeSession instanceof SessionHandler) {
+            $owner = $identity['user_id'] === null ? $identity['guest_token'] : (string) $identity['user_id'];
+            if ($owner !== null && $owner !== $activeSession->get_customer_id()) {
+                return new WP_Error('kizlo_conflicting_identity', 'A REST batch cannot switch cart owners.', ['status' => 401]);
+            }
+            if ($identity['user_id'] === null && $activeSession->get_resolved_user_id() !== null) {
+                return new WP_Error('kizlo_conflicting_identity', 'A customer session requires its verified identity.', ['status' => 401]);
+            }
+        }
+        if (str_starts_with($route, '/wc/store/v1/checkout') && $request->get_method() === 'POST') {
+            if ($request->get_param('create_account')) {
+                return new WP_Error('kizlo_verified_account_required', 'Create and verify your account with the configured identity provider.', ['status' => 403]);
+            }
+            if ($identity['user_id'] === null && WC()->checkout()->is_registration_required()) {
+                return new WP_Error('kizlo_verified_account_required', 'A verified customer account is required for checkout.', ['status' => 403]);
+            }
+        }
 
+
+        $this->nativeUsers[$request] = get_current_user_id();
         SessionHandler::prepareIdentity($identity);
-        $this->initializingRequestId = $requestId;
+        $this->initializingRequest = $currentRequest;
 
         try {
             $guestToken = $identity['guest_token'];
             if ($identity['user_id'] !== null && $guestToken !== null) {
                 $initialized = CartMerger::merge(
                     $guestToken,
+                    $identity['user_id'],
                     fn(): true|WP_Error => $this->initializeCustomer($request)
                 );
             } else {
@@ -182,11 +210,17 @@ class WooCommerceModule
 
             if ($initialized instanceof WP_Error) return $initialized;
 
-            $this->initializedRequestId = $requestId;
+            $this->initializedRequest = $currentRequest;
             return $response;
         } finally {
-            $this->initializingRequestId = null;
+            $this->initializingRequest = null;
         }
+    }
+
+    public function restoreNativeUser(mixed $response, mixed $handler, WP_REST_Request $request): mixed
+    {
+        if (isset($this->nativeUsers[$request])) wp_set_current_user($this->nativeUsers[$request]);
+        return $response;
     }
 
     /** Apply customer geo defaults only after other pre-callback validation succeeds. */
@@ -194,28 +228,9 @@ class WooCommerceModule
     {
         if (is_wp_error($response)) return $response;
         if (! $request instanceof WP_REST_Request) return $response;
-        if ($this->initializedRequestId !== spl_object_id($request)) return $response;
+        if ($this->initializedRequest !== $request) return $response;
 
         $this->applyGeoDefaults($request);
-
-        return $response;
-    }
-
-    /** Surface the guest token only for successful headless Store API responses. */
-    public function addCartTokenHeader(mixed $response, mixed $server, mixed $request): mixed
-    {
-        if (! $response instanceof WP_HTTP_Response) return $response;
-        if (! $request instanceof WP_REST_Request) return $response;
-        if (! $this->isHeadlessStoreRoute($request->get_route())) return $response;
-        if ($response->get_status() >= 400) return $response;
-
-        $session = WC()->session;
-        if (! $session instanceof SessionHandler) return $response;
-
-        $guestToken = $session->get_guest_token();
-        if (SessionHandler::isValidGuestToken($guestToken) && $session->get_resolved_user_id() === null) {
-            $response->header(SessionHandler::HEADER_GUEST_TOKEN, $guestToken);
-        }
 
         return $response;
     }
@@ -223,11 +238,6 @@ class WooCommerceModule
     private function initializeCustomer(WP_REST_Request $request): true|WP_Error
     {
         if (! function_exists('wc_load_cart')) return true;
-
-        // Capture proof before changing current_user from the Application
-        // Password administrator to the resolved customer.
-        $this->trustedAdminAuth = kizlo_is_application_password_authenticated()
-            && current_user_can('manage_options');
 
         WC()->initialize_session();
 
@@ -263,12 +273,13 @@ class WooCommerceModule
             return;
         }
 
-        $country = strtoupper(trim((string) $request->get_header(SessionHandler::HEADER_GEO_COUNTRY)));
+        $ip = \Kizlo\Modules\Auth\RequestMetadata::ip();
+        if ($ip === '') return;
+        $location = \WC_Geolocation::geolocate_ip($ip);
+        $country = strtoupper((string) ($location['country'] ?? ''));
         if (! preg_match('/^[A-Z]{2}$/', $country)) return;
 
-        $state    = strtoupper(trim((string) $request->get_header(SessionHandler::HEADER_GEO_STATE)));
-        $postcode = trim((string) $request->get_header(SessionHandler::HEADER_GEO_POSTCODE));
-        $city     = trim((string) $request->get_header(SessionHandler::HEADER_GEO_CITY));
+        $state = strtoupper((string) ($location['state'] ?? ''));
 
         $customer->set_billing_country($country);
         $customer->set_shipping_country($country);
@@ -276,15 +287,6 @@ class WooCommerceModule
             $customer->set_billing_state($state);
             $customer->set_shipping_state($state);
         }
-        if ($postcode !== '') {
-            $customer->set_billing_postcode($postcode);
-            $customer->set_shipping_postcode($postcode);
-        }
-        if ($city !== '') {
-            $customer->set_billing_city($city);
-            $customer->set_shipping_city($city);
-        }
-
         $customer->save();
         $session->set('kizlo_geo_applied', true);
     }

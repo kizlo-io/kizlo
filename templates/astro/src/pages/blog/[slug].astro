@@ -1,22 +1,23 @@
 ---
+import { deserializeSeo } from "kizlo"
 import { renderJsonLd, resolvePageHead } from "kizlo/astro/server"
 import Layout from "@/layouts/Layout.astro"
-import { client } from "@/lib/kizlo/server"
+import { client } from "@/lib/kizlo/client"
 
 const { slug } = Astro.params
-const { data } = await client.posts.get({ params: { identifier: slug ?? "" } })
+const { data } = await client.kizlo.content.post.retrieve({ params: { identifier: slug ?? "" } })
 
 if (!data) {
 	return new Response(null, { status: 404 })
 }
 
-const head = data.seo ? resolvePageHead(data.seo.head) : undefined
-const jsonLd = data.seo ? renderJsonLd(data.seo.schema) : undefined
+const head = data.kizlo?.seo ? resolvePageHead(deserializeSeo(data.kizlo.seo).head) : undefined
+const jsonLd = data.kizlo?.seo ? renderJsonLd(deserializeSeo(data.kizlo.seo).schema) : undefined
 ---
 
 <Layout head={head} jsonLd={jsonLd}>
 	<article style="max-width: 720px; margin: 0 auto; padding: 4rem 1.5rem;">
-		<h1>{data.title ?? "Untitled"}</h1>
-		<div set:html={data.content ?? ""} />
+		<h1>{data.title.rendered || "Untitled"}</h1>
+		<div set:html={data.content.rendered || ""} />
 	</article>
 </Layout>

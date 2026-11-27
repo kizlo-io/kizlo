@@ -1,5 +1,7 @@
-import type { S2SClient } from "../kizlo"
+import type { PublicApiClient } from "../public-api"
 import type { Settings } from "../settings/service.interface"
+import type { WP_EndpointData } from "../wordpress/types"
+import { requireData } from "../wordpress/utils"
 import { type ManifestIcon, resolveIcons } from "./icons"
 
 // ====================================================
@@ -21,8 +23,8 @@ export interface WebManifest {
 	icons: ManifestIcon[]
 }
 
-export function buildWebManifest(settings: Settings): WebManifest {
-	const org = settings.identity.type === "organization" ? settings.identity.organization : null
+export function buildWebManifest(settings: WP_EndpointData<"kizlo.site.retrieve"> & { identity?: Settings["identity"] }): WebManifest {
+	const org = settings.identity?.type === "organization" ? settings.identity.organization : null
 
 	const manifest: WebManifest = {
 		id: "/",
@@ -40,9 +42,9 @@ export function buildWebManifest(settings: Settings): WebManifest {
 	return manifest
 }
 
-export function createManifestRoute(client: S2SClient<[]>) {
+export function createManifestRoute(client: PublicApiClient) {
 	return async function GET(_request: Request): Promise<Response> {
-		const settings = await client.settings.get.call()
+		const settings = requireData(await client.kizlo.site.retrieve())
 
 		return new Response(JSON.stringify(buildWebManifest(settings)), {
 			headers: {

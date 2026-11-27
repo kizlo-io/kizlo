@@ -71,6 +71,12 @@ class SettingsModule
         $this->crawling->register();
         $this->uploads->register();
         $this->headless->register();
+        (new PublicSettings())->register();
+        (new \Kizlo\Modules\Settings\Captcha\CaptchaSettingsService())->register();
+        (new \Kizlo\Modules\Captcha\Challenge())->register();
+        add_action('kizlo_captcha_expire', static function (string $key): void {
+            if (str_starts_with($key, 'kizlo_altcha_')) delete_option($key);
+        });
 
         $this->registerRestRoutes();
     }
@@ -118,6 +124,8 @@ class SettingsModule
 
         $response = [
             'site'             => $this->site->toResponse($settings->site),
+            'auth'             => \Kizlo\Modules\Settings\Auth\AuthSettings::load()->getData(),
+            'captcha'          => \Kizlo\Modules\Settings\Captcha\CaptchaSettings::load()->getData(),
             'brand'            => $this->brand->toResponse($settings->brand),
             'identity'         => $this->identity->toResponse($settings->identity),
             'authors'          => $this->authors->toResponse($settings->authors),

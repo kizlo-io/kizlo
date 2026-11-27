@@ -5,13 +5,13 @@ import type { Post } from "./schema"
 import type { WPK_Post, WPK_PostListItem } from "./types"
 
 export function deserializePost(data: WPK_Post | WPK_PostListItem, options?: { preview?: boolean }): Post {
-	const locked = data.password.length > 0
+	const locked = data.kizlo === null
 	const kizlo = data.kizlo
 	const title = data.title.rendered
 
 	return {
 		id: data.id,
-		url: kizlo.url,
+		url: kizlo?.url ?? data.link,
 		// WordPress posts are not hierarchical, so the REST response carries no parent.
 		parent: null,
 		title: title.length > 0 ? title : null,
@@ -20,13 +20,13 @@ export function deserializePost(data: WPK_Post | WPK_PostListItem, options?: { p
 		protected: locked,
 		preview: options?.preview ?? false,
 		status: publicPostStatus(data.status),
-		featuredMedia: kizlo.featured_media ?? null,
+		featuredMedia: kizlo?.featured_media ?? null,
 		commentsEnabled: data.comment_status === "open",
 		slug: data.slug,
 		sticky: data.sticky,
-		tags: kizlo.tags ?? [],
-		categories: kizlo.categories ?? [],
-		author: kizlo.author
+		tags: kizlo?.tags ?? [],
+		categories: kizlo?.categories ?? [],
+		author: kizlo?.author
 			? {
 					id: kizlo.author.id,
 					name: kizlo.author.name,
@@ -36,8 +36,8 @@ export function deserializePost(data: WPK_Post | WPK_PostListItem, options?: { p
 			: null,
 		format: data.format,
 		// List responses carry no resolved SEO block; only a single fetch does.
-		seo: "seo" in kizlo ? deserializeSeo(kizlo.seo) : null,
-		custom: kizlo.custom,
+		seo: kizlo && "seo" in kizlo ? deserializeSeo(kizlo.seo) : null,
+		custom: kizlo?.custom ?? null,
 		createdAt: timestampFromWpGmt(data.date_gmt) ?? timestampFromWpGmt(data.modified_gmt) ?? 0,
 		updatedAt: timestampFromWpGmt(data.modified_gmt) ?? 0,
 		meta: stringifiedMetaRecord(data.meta),

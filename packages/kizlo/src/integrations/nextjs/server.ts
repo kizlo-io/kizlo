@@ -1,5 +1,4 @@
 export * from "./api"
-export * from "./integration"
 export * from "./manifest"
 export * from "./metadata"
 export * from "./revalidate"

@@ -1,0 +1,43 @@
+---
+title: Authentication
+icon: ShieldCheck
+description: Verify provider sessions in WordPress and resolve customers by verified email.
+---
+
+## Configure WordPress
+
+Open **Kizlo settings → System → Authentication**. Choose Clerk, Kinde, or Custom JWT. Presets configure one verifier; the Custom selection exposes all supported fields.
+
+Set the trusted issuer, HTTPS JWKS URL or PEM public key, allowed asymmetric algorithm, audience where required, and authorized parties. Set allowed frontend origins separately, including each development origin's exact scheme and port. Wildcards and credentialed cookie CORS are unsupported.
+
+Map the subject, email, email-verification, and optional name claims. Nested paths use dot notation. Additional claim rules support presence, equality, allowed values, and required scopes. Only the boolean `true` counts as verified email.
+
+## Clerk
+
+Use your instance issuer and its `/.well-known/jwks.json` endpoint with RS256. Configure the frontend's authorized parties. The Clerk preset requires a session ID and rejects pending sessions.
+
+Add `email` and `email_verified` custom claims to your session token using Clerk's documented primary-email and primary-email-verification shortcodes. Supply Clerk's current session token through `getToken`; `@kizlo/clerk` also exports `clerkToken(session)` for that callback.
+
+See [Clerk session claims](https://clerk.com/docs/guides/sessions/customize-session-tokens) and [claim shortcodes](https://clerk.com/docs/guides/sessions/jwt-templates). Do not add a WordPress user ID to the session.
+
+## Kinde and custom providers
+
+Use a signed user access token intended for your WordPress API audience. Configure your issuer's JWKS endpoint and map the actual email and verification claims emitted by that token profile. Add the necessary provider-side claims or scopes first; an ID token is not a substitute for an API access token.
+
+Custom supports RS256 or ES256 with public keys. Opaque tokens, encrypted tokens, symmetric signing secrets, and arbitrary verification code are unsupported. Follow [Kinde token verification](https://docs.kinde.com/build/tokens/verifying-json-web-tokens/) for the issuer's token profile.
+
+## Customer linking and recovery
+
+A valid token with verified email finds or lazily creates a WooCommerce customer. Login does not depend on a provider webhook or a stored provider-to-WordPress mapping. Privileged WordPress accounts cannot be selected as customers through an external email claim.
+
+A valid token with missing or unverified email stays a guest for permitted shopping. The store's native guest-checkout policy still applies. Invalid, expired, or supplied-but-unverifiable tokens fail; key-service outages return 503.
+
+Changing the verified email can select a different local customer. Handle email changes and account recovery explicitly with your support or authenticated account-update workflow; the API does not guess the old account. Clear client cart storage on logout and account switches.
+
+## CAPTCHA
+
+Configure provider credentials under **System → CAPTCHA**. Keep the secret in WordPress; your frontend renders the provider's widget with its public site key and submits the resulting `captcha_token`.
+
+Guest comments and CF7 submissions verify CAPTCHA in WordPress before normal validation and spam checks. Verified-user behavior is endpoint-specific. A missing or unavailable verifier rejects submissions.
+
+For self-contained ALTCHA v1 widgets, use `/wp-json/kizlo/v1/captcha/challenge` as the challenge URL. WordPress issues expiring proofs and rejects replay. Sentinel/Cloud server signatures and ALTCHA v2 proofs are not supported by this verifier. See [ALTCHA server integration](https://altcha.org/docs/integration/server/) for the different token profiles.

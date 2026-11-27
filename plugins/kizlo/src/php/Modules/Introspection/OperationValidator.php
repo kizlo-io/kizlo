@@ -33,6 +33,11 @@ class OperationValidator
             'operation' => (string) $operation['operation'],
         ];
 
+        if (isset($operation['access']) && !in_array($operation['access'], \Kizlo\Modules\Auth\RoutePermissions::ACCESS, true)) {
+            $this->diagnostics->error($location + ['keyword' => 'access'], 'Unknown route access policy.');
+            return null;
+        }
+
         if (!Spec::isValidApiId($operation['api_id'])) {
             $this->diagnostics->error($location + ['keyword' => 'id'], sprintf('"%s" is not a valid API ID.', (string) $operation['api_id']));
             return null;

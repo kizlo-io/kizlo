@@ -5,7 +5,7 @@ description: Serve the generated XML sitemap index and its collection pages from
 
 `createSitemapRoute` builds a `Request` to `Response` handler that serves your sitemap: the index at
 `/sitemaps/index.xml` and every collection page under it. It reads the sitemaps from your WordPress content through
-the server-to-server `client` returned by [`createKizlo`](/docs/reference/functions/create-kizlo). Mount the
+a direct public client. Mount the
 returned handler on a route under `/sitemaps`.
 
 <Callout>
@@ -21,7 +21,7 @@ createSitemapRoute(client, options?)
 
 ### `client`
 
-The server-to-server `client` from [`createKizlo`](/docs/reference/functions/create-kizlo). The handler calls
+The direct public client. The handler calls
 `client.seo` to list the sitemaps and resolve each page's URLs.
 
 ### `options.extra`

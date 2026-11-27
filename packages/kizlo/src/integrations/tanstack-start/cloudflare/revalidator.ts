@@ -1,6 +1,5 @@
 import z from "zod/v4"
 import { KizloError } from "../../../shared/error"
-import { createIntegration } from "../../../shared/integration"
 import { createEventHandler } from "../../../webhook"
 import {
 	POST_EVENT_TYPES,
@@ -32,6 +31,8 @@ export type RevalidationSettingsEvent<K extends SettingsEventType> = {
 	data: K extends (typeof SETTINGS_INDEXED_EVENT_TYPES)[number] ? { key: string } : null
 }
 export interface RevalidatorOptions {
+	/** Public origin whose cache this signed webhook may invalidate. */
+	origin?: string
 	postTypes?: Record<string, RevalidationPostRule>
 	taxonomies?: Record<string, RevalidationTaxonomyRule>
 	settings?: "purge" | { [K in SettingsEventType]?: (event: RevalidationSettingsEvent<K>) => readonly string[] }
@@ -46,6 +47,7 @@ const rule = z
 const rules = z.record(z.string().regex(/^[a-zA-Z0-9_-]+$/), rule)
 const optionsSchema = z
 	.object({
+		origin: z.url().optional(),
 		postTypes: rules.optional(),
 		taxonomies: rules.optional(),
 		settings: z
@@ -165,7 +167,8 @@ export function revalidator(options: RevalidatorOptions = {}) {
 		const purge = purgeSettings && SETTINGS_EVENT_TYPES.includes(event.type as SettingsEventType)
 		if (!purge && !selected.length) return
 		const active = getCacheContext()
-		const expected = new URL(context.config.baseUrl ?? "").origin
+		if (!options.origin) throw new KizloError("UNPROCESSABLE_CONTENT", { message: "Configure the revalidation origin." })
+		const expected = new URL(options.origin).origin
 		if (active.url.origin !== expected || !context.request || new URL(context.request.url).origin !== expected) {
 			throw new KizloError("UNPROCESSABLE_CONTENT", {
 				message: "Revalidation webhook must use the configured public origin and cache-owning Worker entrypoint.",
@@ -180,5 +183,5 @@ export function revalidator(options: RevalidatorOptions = {}) {
 			throw error
 		}
 	})
-	return createIntegration({ id: "revalidator", events: [{ ...handler, failureMode: "retry" as const }] })
+	return { ...handler, failureMode: "retry" as const }
 }

@@ -51,11 +51,13 @@ class PermissionErrorTest extends IntrospectionTestCase
     // THE SWEEP
     // ============================================================
 
-    public function test_no_kizlo_route_declares_a_code_only_a_permission_check_raises(): void
+    public function test_no_administrator_route_declares_a_code_only_a_permission_check_raises(): void
     {
         $swept = 0;
 
         foreach ($this->kizloOperations() as $where => $operation) {
+            // Public content reads explicitly run native permissions before preparing the response.
+            if (($operation['access'] ?? 'admin') !== 'admin') continue;
             $controller = $this->controllerFor($this->apiIdOf($where));
 
             if ($controller === null) {
@@ -275,6 +277,10 @@ class PermissionErrorTest extends IntrospectionTestCase
      */
     private function controllerFor(string $apiId): ?WP_REST_Controller
     {
+        if ($apiId === 'kizlo.menu-items') return new \WP_REST_Menu_Items_Controller('nav_menu_item');
+        if (str_starts_with($apiId, 'kizlo.content.')) {
+            return CoreControllers::forPostType(substr($apiId, strlen('kizlo.content.')));
+        }
         if (str_starts_with($apiId, 'kizlo.post-types.')) {
             return CoreControllers::forPostType(substr($apiId, strlen('kizlo.post-types.')));
         }

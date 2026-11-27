@@ -33,29 +33,4 @@ The same object, typed `as const`. Assign it to a constant and pass it to a proc
 need to refer to it. At runtime Kizlo turns it into the callable `errors` map your handler receives (see
 [createThrowableErrorMap](/docs/reference/functions/create-throwable-error-map)).
 
-## Examples
-
-Define a map once, including a typed `data` payload and an override of a built-in error's copy:
-
-```ts title="src/lib/kizlo/server/post/error.ts"
-import { defineErrorMap } from "kizlo"
-import { z } from "zod"
-
-export const POST_ERRORS = defineErrorMap({
-  POST_NOT_FOUND: { status: 404, message: "Post not found" },
-  FORBIDDEN: { message: "You can't edit this post" }, // override a common error's message
-  POST_RATE_LIMITED: { status: 429, data: z.object({ retryAfter: z.number() }) }, // typed payload
-})
-```
-
-Pass it to every procedure that shares those codes:
-
-```ts
-createProcedure(
-  { scope: "api", method: "GET", path: "/posts/{id}", /* …schemas… */ errors: POST_ERRORS },
-  async ({ errors }) => {
-    throw errors.POST_NOT_FOUND()
-    // throw errors.POST_RATE_LIMITED({ data: { retryAfter: 30 } }) // data is required and typed
-  },
-)
-```
+See [server utilities](/docs/concepts/adapter) for explicit use in your own application functions.

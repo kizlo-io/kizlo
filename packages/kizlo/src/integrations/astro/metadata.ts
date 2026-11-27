@@ -1,8 +1,9 @@
 import type { IconDescriptor } from "../../brand/icons"
 import { resolveIcons } from "../../brand/icons"
 import { WEB_MANIFEST_ROUTE } from "../../brand/manifest"
-import type { S2SClient } from "../../kizlo"
+import type { PublicApiClient } from "../../public-api"
 import type { SeoHead } from "../../seo/schema"
+import { requireData } from "../../wordpress/utils"
 
 export { renderJsonLd } from "../../seo/utils"
 
@@ -54,8 +55,8 @@ export interface PageHead {
 }
 
 /** Resolve the root brand/site head from WordPress settings (icons, manifest, theme color, base URL). */
-export async function resolveRootHead(client: S2SClient<[]>): Promise<RootHead> {
-	const settings = await client.settings.get.call()
+export async function resolveRootHead(client: PublicApiClient): Promise<RootHead> {
+	const settings = requireData(await client.kizlo.site.retrieve())
 	const { icon, appleTouch } = resolveIcons(settings.brand)
 
 	const light = settings.brand.theme_color

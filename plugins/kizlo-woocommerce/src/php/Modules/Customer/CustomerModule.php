@@ -22,11 +22,11 @@ class CustomerModule
     public function register(): void
     {
         add_filter('woocommerce_rest_prepare_customer', [$this, 'prepareCustomerCallback'], PHP_INT_MAX, 2);
-        add_filter('kizlo_rest_route_requires_admin', [$this, 'requiresKizloAdmin'], 10, 2);
 
         kizlo_register_route([
             'id'        => 'woocommerce.kizlo.customers',
             'operation' => 'retrieve',
+            'access'    => 'authenticated',
             'method'    => 'GET',
             'route'     => '/woocommerce/customers',
             'summary'   => 'Resolve or create the authenticated customer',
@@ -42,15 +42,11 @@ class CustomerModule
         ]);
     }
 
-    public function requiresKizloAdmin(bool $required, WP_REST_Request $request): bool
-    {
-        return $required || rtrim($request->get_route(), '/') === '/kizlo/v1/woocommerce/customers';
-    }
-
     public function retrieve(WP_REST_Request $request): WP_REST_Response|WP_Error
     {
-        $userId = CustomerResolver::resolve((string) $request->get_header(SessionHandler::HEADER_USER_EMAIL));
+        $userId = CustomerResolver::forRequest($request);
         if ($userId instanceof WP_Error) return $userId;
+        if ($userId === null) return new WP_Error('kizlo_invalid_identity', 'A verified customer email is required.', ['status' => 401]);
 
         // Select identity and response context ourselves, never from caller parameters.
         $customerRequest = new WP_REST_Request('GET');

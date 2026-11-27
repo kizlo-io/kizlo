@@ -10,7 +10,7 @@ import { watchReload } from "../daemon/reload"
 import { type StackWatch, startWatcher } from "../daemon/watch"
 import { createMcpState, resolveMcpPort, startMcp } from "../mcp"
 import { ownerStatus } from "../process-owner"
-import { DEFAULT_ENV_KEYS, ensureGitignored, envGroups, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
+import { DEV_ENV_GROUPS, ensureGitignored, groupDefault, mergeEnv, pickStackPort, withSpinner } from "../utils"
 import { bootstrapDev, type DevStackInfo } from "../wp/dev"
 import { createStack, type DockerStack, dockerHint, dockerStatus, stackStatus } from "../wp/docker"
 import { exportDev } from "../wp/export"
@@ -80,12 +80,7 @@ function readEnvValue(content: string, key: string): string | undefined {
 	return value || undefined
 }
 
-/**
- * The Kizlo backend URL from `.env` — the one key ending in `KIZLO_BASE_URL` (`KIZLO_BASE_URL`,
- * or a framework-prefixed `NEXT_PUBLIC_KIZLO_BASE_URL`). It's the handler mount the plugin delivers
- * webhook events to; its origin is the site's canonical URL. User-managed (init writes it), so dev
- * only reads it. Undefined before `kizlo init` has populated `.env`.
- */
+/** Optional standalone webhook backend URL. Existing framework-prefixed names remain readable. */
 function readBaseUrl(content: string): string | undefined {
 	const value = content.match(/^\s*[A-Z_]*KIZLO_BASE_URL\s*=\s*(.*)$/m)?.[1]?.trim()
 	return value || undefined
@@ -118,7 +113,7 @@ function updateWpEnv(cfg: ResolvedDevConfig, info: DevStackInfo): { siteSecret: 
 			KIZLO_MODE: "local",
 		},
 		new Set(WP_ENV_KEYS),
-		envGroups(DEFAULT_ENV_KEYS),
+		DEV_ENV_GROUPS,
 	)
 	writeFileSync(envPath, content)
 	return { siteSecret, baseUrl: readBaseUrl(existing) }
@@ -137,7 +132,7 @@ export function syncLocalUrl(configDir: string, url: string): boolean {
 	if (!existsSync(envPath)) return false
 	const existing = readFileSync(envPath, "utf8")
 	if (readEnvValue(existing, "KIZLO_LOCAL_WP_URL") === url) return false
-	const { content } = mergeEnv(existing, { KIZLO_LOCAL_WP_URL: url }, new Set(["KIZLO_LOCAL_WP_URL"]), envGroups(DEFAULT_ENV_KEYS))
+	const { content } = mergeEnv(existing, { KIZLO_LOCAL_WP_URL: url }, new Set(["KIZLO_LOCAL_WP_URL"]), DEV_ENV_GROUPS)
 	writeFileSync(envPath, content)
 	return true
 }

@@ -1,29 +1,9 @@
 ---
 title: Cloudflare
-description: Use TanStack Start on Cloudflare with native request context and opt-in CDN caching.
+description: Use optional Workers caching with a direct WordPress frontend.
 ---
 
-Start with the [React quickstart](/docs/quickstarts/tanstack-start/react).
-Use Cloudflare's [Start deployment setup](https://developers.cloudflare.com/workers/framework-guides/web-apps/tanstack-start/)
-for the Vite plugin, Worker configuration and bindings. WordPress can run on any host.
-
-## Register the integrations
-
-```ts title="src/lib/kizlo/server/index.ts"
-import { createKizlo } from "kizlo"
-import { cloudflare } from "kizlo/tanstack-start/cloudflare"
-import { tanstackStart } from "kizlo/tanstack-start/react/server"
-import { introspection } from "./generated"
-
-export const { client, handler } = createKizlo({
-  integrations: [tanstackStart(), cloudflare()],
-  introspection,
-})
-```
-
-`tanstackStart()` maps `VITE_KIZLO_BASE_URL` and WordPress environment variables, and uses Start's
-native request context and cookie helpers. `cloudflare()` adds trusted Cloudflare connection metadata.
-Neither installs an application data cache or requires a second async-storage scope.
+Start with the [React quickstart](/docs/quickstarts/tanstack-start/react) and your framework's native Worker deployment. WordPress remains the API server.
 
 ## Forward Worker bindings
 
@@ -46,38 +26,6 @@ declare module "@tanstack/react-router" {
   }
 }
 ```
-
-To expose bindings to Kizlo procedures, augment `ProcedureContext`:
-
-```ts title="src/kizlo-env.d.ts"
-import "kizlo"
-
-declare module "kizlo" {
-  interface ProcedureContext {
-    env: Env
-    executionCtx: ExecutionContext
-  }
-}
-```
-
-Direct server calls read the active Start request. Outside a Start request, no ambient request values
-are supplied. Core HTTP handlers accept explicit platform values and work without async storage;
-custom runtimes can supply a `requestContext` adapter through `createIntegration()`.
-
-## Mount the API
-
-```ts title="src/routes/api.kizlo.$.ts"
-import { createFileRoute } from "@tanstack/react-router"
-import { createApiHandlers } from "kizlo/tanstack-start/server"
-import { handler } from "@/lib/kizlo/server"
-
-export const Route = createFileRoute("/api/kizlo/$")({
-  server: { handlers: createApiHandlers(handler) },
-})
-```
-
-Kizlo's API responses use `Cache-Control: private, no-store`. Framework route parameters are not
-platform context. Authorize private resources inside their server handlers.
 
 ## Opt pages into CDN caching
 

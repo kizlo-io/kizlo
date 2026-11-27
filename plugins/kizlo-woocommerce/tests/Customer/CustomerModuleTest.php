@@ -59,7 +59,7 @@ class CustomerModuleTest extends TestCase
 
         $repeated = $this->retrieve($email)->get_data();
         $cartRequest = new WP_REST_Request('GET', '/wc/store/v1/cart');
-        $cartRequest->set_header(SessionHandler::HEADER_USER_EMAIL, strtoupper($email));
+        $this->signRequest($cartRequest, strtoupper($email));
         $identity = SessionHandler::resolveIdentity($cartRequest, true);
         $this->assertSame($data['id'], $repeated['id']);
         $this->assertSame($data['id'], $identity['user_id']);
@@ -108,19 +108,17 @@ class CustomerModuleTest extends TestCase
         }
     }
 
-    public function test_authentication_rejects_before_provisioning_including_trailing_slash(): void
+    public function test_missing_or_unverified_identity_cannot_provision_from_caller_parameters(): void
     {
-        $subscriber = self::factory()->user->create(['role' => 'subscriber']);
-        foreach ([[0, false, 401], [$this->adminId, false, 401], [$subscriber, true, 403]] as [$id, $appPassword, $status]) {
-            wp_set_current_user($id);
-            unset($GLOBALS['wp_rest_application_password_uuid']);
-            if ($appPassword) $GLOBALS['wp_rest_application_password_uuid'] = 'test-application-password';
-            foreach (['', '/'] as $suffix) {
-                $email = 'rejected@example.com';
-                $response = rest_do_request($this->request($email, $suffix));
-                $this->assertSame($suffix === '/' ? 404 : $status, $response->get_status());
-                $this->assertFalse(get_user_by('email', $email));
-            }
+        wp_set_current_user(0);
+        unset($GLOBALS['wp_rest_application_password_uuid']);
+        foreach ([false, true] as $signed) {
+            $request = new WP_REST_Request('GET', '/kizlo/v1/woocommerce/customers');
+            $request->set_query_params(['email' => 'rejected@example.com']);
+            if ($signed) $this->signRequest($request, 'rejected@example.com', false);
+            $response = rest_do_request($request);
+            $this->assertSame(401, $response->get_status());
+            $this->assertFalse(get_user_by('email', 'rejected@example.com'));
         }
     }
 
@@ -183,16 +181,16 @@ class CustomerModuleTest extends TestCase
     public function test_creates_distinct_random_passwords_and_stores_only_hashes(): void
     {
         $passwords = [];
-        $observe = static function (string $password) use (&$passwords): string {
-            $passwords[] = $password;
-            return $password;
+        $observe = static function (array $data, bool $update, ?int $id, array $userdata) use (&$passwords): array {
+            $passwords[] = $userdata['user_pass'];
+            return $data;
         };
-        add_filter('random_password', $observe);
+        add_filter('wp_pre_insert_user_data', $observe, 10, 4);
         try {
             $first = CustomerResolver::resolve('password-one@example.com');
             $second = CustomerResolver::resolve('password-two@example.com');
         } finally {
-            remove_filter('random_password', $observe);
+            remove_filter('wp_pre_insert_user_data', $observe);
         }
         $this->assertCount(2, $passwords);
         $this->assertSame(24, strlen($passwords[0]));
@@ -217,7 +215,7 @@ class CustomerModuleTest extends TestCase
     private function request(string $email, string $suffix = ''): WP_REST_Request
     {
         $request = new WP_REST_Request('GET', '/kizlo/v1/woocommerce/customers' . $suffix);
-        if ($email !== '') $request->set_header(SessionHandler::HEADER_USER_EMAIL, $email);
+        if ($email !== '') $this->signRequest($request, $email);
         return $request;
     }
 

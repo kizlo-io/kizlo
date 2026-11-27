@@ -40,7 +40,6 @@ class WooCommerceModuleTest extends TestCase
         add_filter('rest_request_before_callbacks', [$this->guard, 'requireAdmin'], 0, 3);
         add_filter('kizlo_rest_route_requires_admin', [$this->module, 'requiresKizloAdmin'], 10, 2);
         add_filter('woocommerce_session_handler', [$this->module, 'maybeUseHeadlessSession']);
-        add_filter('woocommerce_store_api_disable_nonce_check', [$this->module, 'maybeDisableNonceCheck']);
         add_filter('rest_request_before_callbacks', [$this->module, 'maybeSwitchStoreApiUser'], 10, 3);
         add_filter('rest_request_before_callbacks', [$this->module, 'maybeApplyGeoDefaults'], 30, 3);
 
@@ -60,7 +59,6 @@ class WooCommerceModuleTest extends TestCase
         remove_filter('rest_request_before_callbacks', [$this->guard, 'requireAdmin'], 0);
         remove_filter('kizlo_rest_route_requires_admin', [$this->module, 'requiresKizloAdmin'], 10);
         remove_filter('woocommerce_session_handler', [$this->module, 'maybeUseHeadlessSession']);
-        remove_filter('woocommerce_store_api_disable_nonce_check', [$this->module, 'maybeDisableNonceCheck']);
         remove_filter('rest_request_before_callbacks', [$this->module, 'maybeSwitchStoreApiUser'], 10);
         remove_filter('rest_request_before_callbacks', [$this->module, 'maybeApplyGeoDefaults'], 30);
         SessionHandler::clearPreparedIdentity();
@@ -95,7 +93,7 @@ class WooCommerceModuleTest extends TestCase
         ]);
     }
 
-    public function test_route_policy_guards_the_store_api_and_defers_other_woocommerce_routes(): void
+    public function test_route_policy_defers_to_native_store_api_permissions(): void
     {
         foreach ([
             '/wc/store/v1/cart',
@@ -105,7 +103,7 @@ class WooCommerceModuleTest extends TestCase
             '/wc/store/v1/products',
             '/wc/store/v1/product-collection-data',
         ] as $route) {
-            $this->assertTrue($this->module->requiresKizloAdmin(true, new WP_REST_Request('GET', $route)), $route);
+            $this->assertFalse($this->module->requiresKizloAdmin(true, new WP_REST_Request('GET', $route)), $route);
         }
 
         foreach ([
@@ -133,7 +131,7 @@ class WooCommerceModuleTest extends TestCase
     public function test_store_api_permissions_and_callback_see_the_resolved_customer_once(): void
     {
         $request = $this->request('/wc/store/v1/cart/kizlo-auth-test', [
-            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
+            'test-identity-email' => $this->customerEmail,
         ]);
         $this->authenticateAs($this->adminId, true);
 
@@ -144,20 +142,21 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame($this->customerId, $this->permissionUser);
         $this->assertSame($this->customerId, $first->get_data()['user_id']);
         $this->assertSame($session, WC()->session);
-        $this->assertTrue(apply_filters('woocommerce_store_api_disable_nonce_check', false));
+        $this->assertFalse(apply_filters('woocommerce_store_api_disable_nonce_check', false));
     }
 
     public function test_failed_pre_callback_validation_does_not_apply_customer_geo_defaults(): void
     {
         $this->clearCustomerAddress();
         $request = $this->request('/wc/store/v1/checkout/42', [
-            SessionHandler::HEADER_USER_EMAIL   => $this->customerEmail,
+            'test-identity-email'   => $this->customerEmail,
             SessionHandler::HEADER_GEO_COUNTRY  => 'US',
             SessionHandler::HEADER_GEO_STATE    => 'CA',
             SessionHandler::HEADER_GEO_POSTCODE => '90210',
             SessionHandler::HEADER_GEO_CITY     => 'Los Angeles',
         ]);
         $request->set_method('POST');
+        $request->set_header('Cart-Token', \Automattic\WooCommerce\StoreApi\Utilities\CartTokenUtils::get_cart_token((string) $this->customerId));
         $this->authenticateAs($this->adminId, true);
 
         $this->module->maybeSwitchStoreApiUser(null, null, $request);
@@ -178,17 +177,18 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame('', $customer->get_shipping_country());
     }
 
-    public function test_successful_pre_callback_validation_applies_customer_geo_defaults(): void
+    public function test_forged_geo_headers_cannot_set_customer_address(): void
     {
         $this->clearCustomerAddress();
         $request = $this->request('/wc/store/v1/checkout/42', [
-            SessionHandler::HEADER_USER_EMAIL   => $this->customerEmail,
+            'test-identity-email'   => $this->customerEmail,
             SessionHandler::HEADER_GEO_COUNTRY  => 'US',
             SessionHandler::HEADER_GEO_STATE    => 'CA',
             SessionHandler::HEADER_GEO_POSTCODE => '90210',
             SessionHandler::HEADER_GEO_CITY     => 'Los Angeles',
         ]);
         $request->set_method('POST');
+        $request->set_header('Cart-Token', \Automattic\WooCommerce\StoreApi\Utilities\CartTokenUtils::get_cart_token((string) $this->customerId));
         $this->authenticateAs($this->adminId, true);
 
         $this->module->maybeSwitchStoreApiUser(null, null, $request);
@@ -202,11 +202,8 @@ class WooCommerceModuleTest extends TestCase
         $this->assertSame($response, $this->module->maybeApplyGeoDefaults($response, null, $request));
 
         $customer = WC()->customer;
-        $this->assertSame('US', $customer->get_billing_country());
-        $this->assertSame('CA', $customer->get_billing_state());
-        $this->assertSame('90210', $customer->get_billing_postcode());
-        $this->assertSame('Los Angeles', $customer->get_billing_city());
-        $this->assertSame('US', $customer->get_shipping_country());
+        $this->assertSame('', $customer->get_billing_postcode());
+        $this->assertSame('', $customer->get_billing_city());
     }
 
     /** @dataProvider provide_cart_transition_routes */
@@ -247,8 +244,8 @@ class WooCommerceModuleTest extends TestCase
 
         $this->resetWooCommerce();
         $request = $this->request($route, [
-            SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
-            SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
+            'test-identity-email'  => $this->customerEmail,
+            'test-cart-session' => self::GUEST_TOKEN,
         ]);
         $this->authenticateAs($this->adminId, true);
 
@@ -268,8 +265,8 @@ class WooCommerceModuleTest extends TestCase
         )));
 
         $retry = $this->dispatch($route, $this->adminId, true, [
-            SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
-            SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
+            'test-identity-email'  => $this->customerEmail,
+            'test-cart-session' => self::GUEST_TOKEN,
         ]);
         $this->assertSame(200, $retry->get_status());
         $this->assertSame($expected, array_column(WC()->cart->get_cart(), 'quantity', 'product_id'));
@@ -287,7 +284,7 @@ class WooCommerceModuleTest extends TestCase
     public function test_catalog_routes_ignore_identity_headers_and_do_not_initialize_a_session(): void
     {
         $response = $this->dispatch('/wc/store/v1/kizlo-public-test', $this->adminId, true, [
-            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
+            'test-identity-email' => $this->customerEmail,
         ]);
 
         $this->assertSame(200, $response->get_status());
@@ -296,64 +293,51 @@ class WooCommerceModuleTest extends TestCase
         $this->assertNull(WC()->session);
     }
 
-    public function test_catalog_routes_reject_callers_without_an_application_password(): void
+    public function test_catalog_reads_and_verified_customers_need_no_application_password(): void
     {
-        $response = $this->dispatch('/wc/store/v1/kizlo-public-test', 0, false, [
-            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
-        ]);
-
-        $this->assertSame(401, $response->get_status());
-        $this->assertNull($this->permissionUser);
+        $response = $this->dispatch('/wc/store/v1/kizlo-public-test', 0, false);
+        $this->assertSame(200, $response->get_status());
         $this->assertNull(WC()->session);
+        $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', 0, false, ['test-identity-email' => $this->customerEmail]);
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame($this->customerId, $this->permissionUser);
     }
 
-    public function test_missing_application_password_authentication_rejects_before_session_initialization(): void
+    public function test_unsigned_legacy_identity_headers_are_rejected_before_session_initialization(): void
     {
-        $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', 0, false, [
-            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
-        ]);
-
-        $this->assertSame(401, $response->get_status());
-        $this->assertNull($this->permissionUser);
-        $this->assertNull(WC()->session);
-    }
-
-    public function test_cookie_authenticated_administrator_is_still_rejected(): void
-    {
-        $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', $this->adminId, false, [
-            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
-        ]);
-
+        $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', 0, false, [SessionHandler::HEADER_USER_EMAIL => $this->customerEmail]);
         $this->assertSame(401, $response->get_status());
         $this->assertNull(WC()->session);
     }
 
-    public function test_application_password_non_administrator_is_rejected_with_403(): void
+    public function test_a_native_privileged_user_cannot_become_a_headless_customer(): void
     {
-        $subscriberId = self::factory()->user->create(['role' => 'subscriber']);
-        $response     = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', $subscriberId, true, [
-            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
-        ]);
-
+        $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', $this->adminId, false);
         $this->assertSame(403, $response->get_status());
         $this->assertNull(WC()->session);
+    }
+
+    public function test_service_authentication_does_not_select_a_customer(): void
+    {
+        $response = $this->dispatch('/wc/store/v1/cart/kizlo-auth-test', $this->customerId, true);
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame(0, $this->permissionUser);
     }
 
     public function test_malformed_email_and_privileged_identities_are_rejected(): void
     {
         $malformed = SessionHandler::resolveIdentity(
-            $this->request('/wc/store/v1/cart', [SessionHandler::HEADER_USER_EMAIL => 'not-an-email']),
+            $this->request('/wc/store/v1/cart', ['test-identity-email' => 'not-an-email']),
             true
         );
         $privileged = SessionHandler::resolveIdentity(
             $this->request('/wc/store/v1/cart', [
-                SessionHandler::HEADER_USER_EMAIL => (string) get_userdata($this->adminId)->user_email,
+                'test-identity-email' => (string) get_userdata($this->adminId)->user_email,
             ]),
             true
         );
 
-        $this->assertInstanceOf(WP_Error::class, $malformed);
-        $this->assertSame('kizlo_invalid_identity', $malformed->get_error_code());
+        $this->assertSame(['user_id' => null, 'guest_token' => null], $malformed);
         $this->assertInstanceOf(WP_Error::class, $privileged);
         $this->assertSame('kizlo_forbidden_identity', $privileged->get_error_code());
     }
@@ -362,8 +346,8 @@ class WooCommerceModuleTest extends TestCase
     {
         $identity = SessionHandler::resolveIdentity(
             $this->request('/wc/store/v1/cart', [
-                SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
-                SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
+                'test-identity-email'  => $this->customerEmail,
+                'test-cart-session' => self::GUEST_TOKEN,
             ]),
             true
         );
@@ -376,7 +360,7 @@ class WooCommerceModuleTest extends TestCase
         $this->assertFalse(get_user_by('email', 'new-shopper@example.com'));
 
         $identity = SessionHandler::resolveIdentity(
-            $this->request('/wc/store/v1/cart', [SessionHandler::HEADER_USER_EMAIL => 'new-shopper@example.com']),
+            $this->request('/wc/store/v1/cart', ['test-identity-email' => 'new-shopper@example.com']),
             true
         );
 
@@ -389,8 +373,8 @@ class WooCommerceModuleTest extends TestCase
     {
         $identity = SessionHandler::resolveIdentity(
             $this->request('/wc/store/v1/order/1', [
-                SessionHandler::HEADER_USER_EMAIL  => $this->customerEmail,
-                SessionHandler::HEADER_GUEST_TOKEN => self::GUEST_TOKEN,
+                'test-identity-email'  => $this->customerEmail,
+                'test-cart-session' => self::GUEST_TOKEN,
             ]),
             false
         );
@@ -436,7 +420,7 @@ class WooCommerceModuleTest extends TestCase
     public function test_checkout_order_processed_stamps_the_owning_session_key(): void
     {
         $request = $this->request('/wc/store/v1/checkout', [
-            SessionHandler::HEADER_USER_EMAIL => $this->customerEmail,
+            'test-identity-email' => $this->customerEmail,
         ]);
         $this->authenticateAs($this->adminId, true);
         $this->module->maybeSwitchStoreApiUser(null, null, $request);
@@ -604,7 +588,11 @@ class WooCommerceModuleTest extends TestCase
     private function request(string $route, array $headers = []): WP_REST_Request
     {
         $request = new WP_REST_Request('GET', $route);
-        foreach ($headers as $name => $value) $request->set_header($name, $value);
+        foreach ($headers as $name => $value) {
+            if ($name === 'test-identity-email') $this->signRequest($request, $value);
+            elseif ($name === 'test-cart-session') $request->set_header('Cart-Token', \Automattic\WooCommerce\StoreApi\Utilities\CartTokenUtils::get_cart_token($value));
+            else $request->set_header($name, $value);
+        }
         return $request;
     }
 

@@ -1,9 +1,10 @@
 {
 	"extends": "@tooling/typescript/build.json",
-	"include": ["src/**/*", "*.ts"],
+	"include": ["src/**/*", "*.ts", "../../introspection.ts", "../../introspection.browser.ts"],
 	"compilerOptions": {
 		"paths": {
-			"kizlo": ["${configDir}/src/index.ts"]
+			"kizlo": ["${configDir}/src/index.ts"],
+			"kizlo/browser": ["${configDir}/src/browser.ts"]
 		}
 	}
 }

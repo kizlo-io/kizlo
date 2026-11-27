@@ -9,6 +9,8 @@
 		"additional-checkout-fields",
 		"client",
 		"adapter",
-		"development-and-testing"
+		"development-and-testing",
+		"authentication",
+		"migration-v1"
 	]
 }

@@ -1,7 +1,5 @@
 import { cloudflareConnInfo } from "../../adapters/cloudflare-connection"
 import type { GeoAdapter } from "../../adapters/geo"
-import { FRAMEWORK_INTEGRATION_ORDER } from "../../shared/constants"
-import { createIntegration } from "../../shared/integration"
 import { applyCloudflareHeaders, type CloudflareCacheBinding } from "./cloudflare/cache"
 import { getStartRequestContext } from "./request-context"
 
@@ -20,11 +18,6 @@ export function geoCloudflare(): GeoAdapter {
 			return cloudflareConnInfo((request ?? getStartRequestContext()?.request)?.headers)
 		},
 	}
-}
-
-/** Add Cloudflare connection metadata; caching remains an explicit response policy. */
-export function cloudflare() {
-	return createIntegration({ id: "cloudflare", order: FRAMEWORK_INTEGRATION_ORDER, adapters: { geo: geoCloudflare() } })
 }
 
 /** Forward native Worker values to Start, default to no caching and encode explicit cache tags. */

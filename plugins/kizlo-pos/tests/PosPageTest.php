@@ -251,13 +251,14 @@ final class PosPageTest extends WP_UnitTestCase
         $this->assertSame(KIZLO_POS_VERSION, Extensions::booted()['kizlo-pos']);
     }
 
-    public function test_cookie_nonce_permissions_do_not_relax_the_core_or_headless_guards(): void
+    public function test_cookie_nonce_permissions_preserve_admin_routes_and_store_api_native_permissions(): void
     {
         wp_set_current_user(self::factory()->user->create(['role' => 'shop_manager']));
         $this->assertTrue(Permissions::access());
         (new \Kizlo\WooCommerce\Modules\WooCommerce\WooCommerceModule())->register();
         $guard = new RestGuard();
-        $this->assertSame('kizlo_rest_unauthorized', $guard->requireAdmin(null, null, new WP_REST_Request('GET', '/wc/store/v1/cart'))->get_error_code());
+        $this->assertNull($guard->requireAdmin(null, null, new WP_REST_Request('GET', '/wc/store/v1/cart')));
+        $this->assertFalse(RestGuard::protectsRoute(new WP_REST_Request('GET', '/wc/store/v1/cart')));
         $this->assertFalse(RestGuard::protectsRoute(new WP_REST_Request('GET', '/kizlo-pos/v1/products')));
         $request = new WP_REST_Request('GET', '/kizlo/v1/settings');
         $response = rest_get_server()->dispatch($request);

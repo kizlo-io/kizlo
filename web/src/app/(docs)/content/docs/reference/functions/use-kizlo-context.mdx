@@ -10,7 +10,7 @@ gets the client.
 ## Returns
 
 `{ client }`, where `client` is the browser client the provider was given, typed as `ActiveKizloClient`. Every
-namespace, input, output, and error code your procedures declare is on it, the same as
+namespace, input, output, and error code your generated browser endpoints declare is on it, the same as
 [`createKizloClient`](/docs/reference/functions/create-kizlo-client) returns.
 
 The hook hands back an object rather than the client itself, so a second value can join the context later without
@@ -29,11 +29,11 @@ export function SearchBox({ onResults }: { onResults: (titles: string[]) => void
   const { client } = useKizloContext()
 
   async function search(term: string) {
-    const { data, error } = await client.posts.list({ query: { search: term } })
+    const { data, error } = await client.kizlo.content.post.list({ query: { search: term } })
 
     if (error) return
 
-    onResults(data.items.map((post) => post.title ?? "Untitled"))
+    onResults(data.map((post) => post.title.rendered || "Untitled"))
   }
 
   return <input onChange={(event) => search(event.target.value)} />

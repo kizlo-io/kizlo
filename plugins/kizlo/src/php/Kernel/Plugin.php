@@ -42,6 +42,7 @@ class Plugin
         ExtensionModule::class,
         AdminModule::class,
         SettingsModule::class,
+        \Kizlo\Modules\Auth\AuthModule::class,
         HeadlessModule::class,
         HeadlessTheme::class,
         PreviewModule::class,

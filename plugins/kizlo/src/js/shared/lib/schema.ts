@@ -1,4 +1,4 @@
-import type { Settings as ApiSettings, CustomFieldDefinition, SettingsConstants } from "@kizlo/shared"
+import type { Settings as ApiSettings, AuthSettings, CaptchaSettings, CustomFieldDefinition, SettingsConstants } from "@kizlo/shared"
 import z from "zod"
 import type { NavBlock } from "./types"
 
@@ -638,6 +638,8 @@ export type HeadlessSettingsInput = z.input<typeof HeadlessSettingsSchema>
 export type HeadlessSettingsOutput = z.output<typeof HeadlessSettingsSchema>
 
 export interface SettingsMap {
+	auth: AuthSettings
+	captcha: CaptchaSettings
 	site: SiteSettingsSchemaOutput
 	brand: BrandSettingsSchemaOutput
 	identity: IdentitySettingsOutput

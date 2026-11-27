@@ -869,7 +869,7 @@ class CoreRouteTest extends IntrospectionTestCase
             $this->boot();
             $errors = $this->document()['apis']['kizloUnknownErrors']['paths']['/kizlo-unknown-errors']['list']['errors'];
 
-            $this->assertSame(OperationErrors::NATIVE, $errors);
+            $this->assertSame(array_merge(['kizlo_auth_unavailable', 'kizlo_invalid_token'], OperationErrors::NATIVE), $errors);
         } finally {
             remove_action('rest_api_init', [$controller, 'register_routes']);
         }

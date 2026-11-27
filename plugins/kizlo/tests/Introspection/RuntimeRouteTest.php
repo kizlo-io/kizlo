@@ -183,7 +183,7 @@ class RuntimeRouteTest extends IntrospectionTestCase
         sort($expected, SORT_STRING);
 
         $this->assertSame($expected, $operation['errors']);
-        $this->assertSame(['201', '400', '401', '403'], array_map('strval', array_keys($operation['responses'])));
+        $this->assertSame(['201', '400', '401', '403', '503'], array_map('strval', array_keys($operation['responses'])));
         $this->assertSame('kizlo.error', $operation['responses'][401]['body']['$ref']);
         $this->assertSame('kizlo.error', $operation['responses'][403]['body']['$ref']);
     }

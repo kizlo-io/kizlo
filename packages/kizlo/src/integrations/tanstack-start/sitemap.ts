@@ -1,4 +1,4 @@
-import type { S2SClient } from "../../kizlo"
+import type { PublicApiClient } from "../../public-api"
 import {
 	type CreateSitemapRouteOptions,
 	createSitemapRedirectRoute as createCoreSitemapRedirectRoute,
@@ -11,7 +11,7 @@ import type { ServerRoute } from "./utils"
  * slug from the request URL's last segment (`/sitemaps/posts.xml` → `posts.xml`), so forwarding the raw
  * request needs no `params` plumbing.
  */
-export function createSitemapRoute(client: S2SClient<[]>, options?: CreateSitemapRouteOptions): ServerRoute {
+export function createSitemapRoute(client: PublicApiClient, options?: CreateSitemapRouteOptions): ServerRoute {
 	const handler = createCoreSitemapRoute(client, options)
 	return (context) => handler(context.request)
 }

@@ -1,22 +1,7 @@
 import type { Fixture } from "./test"
 
-/**
- * Where Kizlo generates, and what it watches. A string is the home directory Kizlo owns the layout
- * under: sources in `<dir>/server`, and the generated files (`contract.json`, the barrel, and
- * `introspection.ts`) under `<dir>/server/generated`. The object form sets each path on its own. Omit
- * `server` and there are no sources to watch and no contract is built, so only the introspection is
- * generated (the shape a package that ships procedures but no server takes).
- */
-export type KizloDir =
-	| string
-	| {
-			/** Server sources (extensions and procedures). Watched by `kizlo dev`; its presence is what builds a contract. */
-			server?: string
-			/** Where `contract.json` and the generated barrel are written. Defaults to `generated/` under `server`. */
-			contract?: string
-			/** Where the generated `introspection.ts` is written. Defaults to `generated/` under `server`. */
-			introspection?: string
-	  }
+/** Directory receiving introspection.ts and introspection.browser.ts. */
+export type KizloDir = string
 
 export interface KizloDevConfig {
 	/**
@@ -149,19 +134,11 @@ export interface KizloMcpConfig {
 }
 
 export interface KizloGlobalConfig {
-	/**
-	 * Where Kizlo generates, and what it watches. A string names the home directory Kizlo owns the
-	 * layout under; the object form sets the server, contract, and introspection paths independently.
-	 * @default 'src/lib/kizlo' (or 'lib/kizlo' without a src dir)
-	 */
+	/** Output directory for the browser and service endpoint definitions. */
 	dir?: KizloDir
 
-	/**
-	 * Import alias prefix for generated imports (e.g. `@`). Recorded by `kizlo init`
-	 * from your `--alias` flag or its prompt, so later runs reuse it instead of asking
-	 * again; an empty string (`""`) is the recorded choice to use relative imports.
-	 */
-	alias?: string
+	/** Service credentials used only by generation and local tooling. */
+	wordpress?: import("./wordpress/types").WordPressCredentials
 
 	/**
 	 * Local Docker WordPress, off unless set. `true` enables both the dev and test stacks with defaults;

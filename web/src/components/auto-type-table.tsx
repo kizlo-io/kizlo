@@ -6,7 +6,7 @@ import { source } from "@/lib/source"
 
 const generator = createGenerator({
 	cache: createFileSystemGeneratorCache(".next/fumadocs-typescript"),
-	// Resolve types from the kizlo package so cross-package imports (@kizlo/*, @orpc/*) link up.
+	// Resolve types from the kizlo package so cross-package imports (@kizlo/*) link up.
 	tsconfigPath: "../packages/kizlo/tsconfig.json",
 })
 

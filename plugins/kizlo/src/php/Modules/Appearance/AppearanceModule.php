@@ -18,6 +18,7 @@ class AppearanceModule
 
     public function register(): void
     {
+        add_action('init', static fn() => (new PublicMenus())->register());
         add_filter('rest_prepare_nav_menu_item', [$this, 'prepareMenuItemCallback'], PHP_INT_MAX, 2);
 
         // See CommentModule::register(): the menu routes are described from the

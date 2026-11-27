@@ -8,7 +8,7 @@ use Kizlo\WooCommerce\Modules\WooCommerce\SessionHandler;
 /**
  * Merge one guest cart into an authenticated customer's cart exactly once.
  *
- * The current request must already resolve to a user (X-Kizlo-User-Email).
+ * The current request must already resolve to a verified customer.
  * Each guest item is re-added through the Store API CartController so stock,
  * price, and validation rules re-run; the guest session row is deleted only
  * after the customer cart is confirmed persisted.
@@ -27,7 +27,7 @@ final class CartMerger
      *
      * @param callable(): (true|WP_Error) $initialize
      */
-    public static function merge(string $guestToken, callable $initialize): true|WP_Error
+    public static function merge(string $guestToken, int $customerId, callable $initialize): true|WP_Error
     {
         self::$mergeErrors = [];
 
@@ -39,13 +39,15 @@ final class CartMerger
             );
         }
 
-        $lockName = self::lockName($guestToken);
-        if (! self::acquireLock($lockName)) {
-            return new WP_Error(
-                'kizlo_cart_merge_lock_unavailable',
-                'The guest cart is already being merged. Retry the request.',
-                ['status' => 503]
-            );
+        if ($customerId <= 0) return new WP_Error('kizlo_user_required', 'A resolved customer is required.', ['status' => 401]);
+        $locks = [];
+        // Serialize different guest transitions before loading the same customer's saved cart.
+        foreach ([self::lockName('customer:' . $customerId), self::lockName($guestToken)] as $lockName) {
+            if (!self::acquireLock($lockName)) {
+                foreach (array_reverse($locks) as $held) self::releaseLock($held);
+                return new WP_Error('kizlo_cart_merge_lock_unavailable', 'The cart is already being merged. Retry the request.', ['status' => 503]);
+            }
+            $locks[] = $lockName;
         }
 
         try {
@@ -61,7 +63,7 @@ final class CartMerger
                 );
             }
 
-            if ($session->get_resolved_user_id() === null) {
+            if ($session->get_resolved_user_id() !== $customerId) {
                 return new WP_Error(
                     'kizlo_user_required',
                     'A resolved user identity is required to merge a guest cart.',
@@ -115,7 +117,7 @@ final class CartMerger
 
             return true;
         } finally {
-            self::releaseLock($lockName);
+            foreach (array_reverse($locks) as $held) self::releaseLock($held);
         }
     }
 

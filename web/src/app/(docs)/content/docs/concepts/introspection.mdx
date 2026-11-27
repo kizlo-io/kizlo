@@ -4,38 +4,13 @@ icon: TreeStructure
 description: Generate and call the WordPress endpoints described by your active plugins.
 ---
 
-The generated **introspection** types the routes published by the plugins active on your WordPress site: the
-`WP_*` types and an `endpoints` descriptor map, built from `GET /kizlo/v1/introspect`. It carries no request
-logic. The callable **client** is assembled from it, and you reach it through `context.wordpress` in a
-procedure, event handler, fixture, or other server-side Kizlo code.
+One authenticated WordPress introspection document generates two endpoint projections. The full `introspection.ts` describes service operations; `introspection.browser.ts` contains explicitly exposed routes and their referenced schemas. Browser visibility never replaces runtime permissions.
 
 ## Generate the introspection
 
-`kizlo init` and `kizlo create` write a stub at `<dir>/server/generated/introspection.ts`. The first generation
-replaces it with endpoints fetched from `GET /kizlo/v1/introspect` on your configured WordPress site.
+Run `kizlo generate` after changing plugins or route declarations. Set `dir: "src/lib/kizlo/generated"` to write both files directly into that directory. `kizlo dev` polls for schema changes; `kizlo check` verifies both files without writing.
 
-| Command | When it writes `introspection.ts` |
-| --- | --- |
-| `kizlo generate` | Once, before a build or typecheck |
-| `kizlo dev` | On startup and whenever the WordPress introspection document changes |
-
-For the default `dir: "src/lib/kizlo"`, the file lives at
-`src/lib/kizlo/server/generated/introspection.ts`. A package without a Kizlo server can set
-[`dir: { introspection }`](/docs/concepts/cli#configuration) and receives `<introspection>/introspection.ts`
-instead.
-
-<Callout>
-  Commit `introspection.ts`. It gives builds and teammates the same WordPress contract without requiring a live
-  site during installation. The `.kizlo/introspection.meta.json` cache stays local and is regenerated as needed.
-</Callout>
-
-## What the stub means
-
-The stub marks the endpoint tree as `any` so a new project compiles before it has connected to WordPress. It
-does not mean that WordPress has no routes, and it does not provide endpoint definitions at runtime.
-
-Run `kizlo generate` before relying on endpoint completion or checking a production build. The generated file
-replaces `any` with the routes, inputs, results, and error codes published by the active site.
+Commit both generated files. Keep `.kizlo/introspection.meta.json` local. Missing generation produces a setup error rather than a permissive `any` client.
 
 ## Read the endpoint tree
 
@@ -53,12 +28,12 @@ query string, and `body` is sent as the payload. An endpoint only declares the p
 required when something inside it is; an endpoint that requires nothing can be called without an argument.
 
 ```ts
-const response = await context.wordpress.kizlo.postTypes.post.retrieve({
+const response = await client.kizlo.postTypes.post.retrieve({
   params: { identifier: "hello-world" },
 })
 
 if (response.error) {
-  context.logger.error(response.error.message)
+  console.error(response.error.message)
   throw response.error
 }
 
@@ -77,7 +52,7 @@ The call resolves to a failure instead of throwing, carrying the `rest_no_route`
 endpoint's error union. Nothing is sent, so the check you write for any failed request covers it.
 
 ```ts
-const response = await context.wordpress.kizlo.postTypes.post.list()
+const response = await client.kizlo.postTypes.post.list()
 
 // response.error.code
 // "rest_no_route"
@@ -87,7 +62,7 @@ const response = await context.wordpress.kizlo.postTypes.post.list()
 // Run `kizlo generate` against the WordPress you are connecting to.
 ```
 
-To branch before calling, ask the client what it carries: `"woocommerce" in context.wordpress`.
+To branch before calling, ask the client what it carries: `"woocommerce" in client`.
 
 ## Override one call
 
@@ -97,7 +72,7 @@ definition or transport defaults.
 ```ts
 const controller = new AbortController()
 
-await context.wordpress.kizlo.postTypes.post.retrieve(
+await client.kizlo.postTypes.post.retrieve(
   { params: { identifier: "42" } },
   {
     headers: { "X-Request-Source": "featured" },

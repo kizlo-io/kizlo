@@ -16,6 +16,8 @@ const REPO_ROOT = resolve(HERE, "../..")
 const WORKSPACE_ALIASES: Record<string, string> = {
 	"kizlo/test-harness": resolve(REPO_ROOT, "packages/kizlo/src/test/harness.ts"),
 	"kizlo/test": resolve(REPO_ROOT, "packages/kizlo/src/test/index.ts"),
+	"kizlo/browser": resolve(REPO_ROOT, "packages/kizlo/src/browser.ts"),
+	"kizlo/server": resolve(REPO_ROOT, "packages/kizlo/src/server.ts"),
 	kizlo: resolve(REPO_ROOT, "packages/kizlo/src/index.ts"),
 	"@kizlo/shared": resolve(REPO_ROOT, "packages/shared/src/index.ts"),
 }

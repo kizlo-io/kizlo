@@ -7,31 +7,9 @@ use WC_Customer;
 use WP_Error;
 use WP_REST_Request;
 use Kizlo\WooCommerce\Modules\Customer\CustomerResolver;
+use Automattic\WooCommerce\StoreApi\Utilities\CartTokenUtils;
 
-/**
- * WooCommerce session handler for Kizlo's server-to-server Store API calls.
- *
- * Identity is resolved and validated from the matched REST request before
- * WooCommerce initializes, then consumed here, so an invalid or conflicting
- * header can never silently fall back to a new guest cart:
- *
- *   - X-Kizlo-User-Email  → the signed-in user's email (sole identity)
- *   - X-Kizlo-Guest-Token → an existing "t_" guest session (returning guest)
- *   - neither             → a new "t_{random}" token, exposed via response header
- *
- * Email is the sole identity: the SDK's auth adapter is email-keyed and a
- * logged-in email may not yet have a WordPress account (e.g. the Clerk driver),
- * so a matching account is created on demand and the same email always lands on
- * the same wp_woocommerce_sessions row, which is what makes carts sync across
- * devices.
- *
- * Session keys must satisfy WC_Session_Handler::is_secure_customer_id() — that
- * method is hard-coded to accept only numeric IDs or "t_"-prefixed tokens, so
- * those are the shapes used to stay compatible with WC's native save path.
- *
- * The trust boundary is the WordPress REST API authentication (Application
- * Password) enforced by Kizlo's guard; this handler performs no auth itself.
- */
+/** Request-scoped carts selected by a verified customer and native signed Cart-Token. */
 class SessionHandler extends WC_Session_Handler
 {
     public const HEADER_USER_EMAIL  = 'X-Kizlo-User-Email';
@@ -75,42 +53,39 @@ class SessionHandler extends WC_Session_Handler
         add_action('shutdown', [$this, 'save_data'], 20);
     }
 
-    /**
-     * Resolve and validate the request identity before WooCommerce initializes.
-     * A valid email resolves to its account or creates a customer on demand; an
-     * unresolvable email, a malformed guest token, or a user-plus-guest pairing
-     * outside a transition is rejected rather than downgraded to a guest.
-     *
-     * @return array{user_id: ?int, guest_token: ?string}|WP_Error
-     */
+    /** @return array{user_id: ?int, guest_token: ?string}|WP_Error */
     public static function resolveIdentity(WP_REST_Request $request, bool $allowTransition): array|WP_Error
     {
-        $userId = null;
+        // These unsigned headers belonged to the removed application-server boundary.
+        if ($request->get_header(self::HEADER_USER_EMAIL) || $request->get_header(self::HEADER_GUEST_TOKEN)) {
+            return self::invalidIdentity('Legacy identity headers');
+        }
+        $userId = CustomerResolver::forRequest($request);
+        if ($userId instanceof WP_Error) return $userId;
 
-        $email = trim((string) $request->get_header(self::HEADER_USER_EMAIL));
-        if ($email !== '') {
-            $resolved = CustomerResolver::resolve($email);
-            if ($resolved instanceof WP_Error) return $resolved;
-            $userId = $resolved;
+        $token = trim((string) $request->get_header('Cart-Token'));
+        $guestToken = null;
+        if ($token !== '') {
+            if (strlen($token) > 4096 || !CartTokenUtils::validate_cart_token($token)) {
+                return self::invalidIdentity('Cart-Token');
+            }
+            $payload = CartTokenUtils::get_cart_token_payload($token);
+            $owner = $payload['user_id'] ?? null;
+            if (($payload['iss'] ?? null) !== 'store-api' || !is_string($owner)) {
+                return self::invalidIdentity('Cart-Token');
+            }
+            if (self::isValidGuestToken($owner)) {
+                $guestToken = $owner;
+            } elseif ($userId === null || $owner !== (string) $userId) {
+                return self::invalidIdentity('Cart-Token owner');
+            }
         }
 
-        $guestToken = trim((string) $request->get_header(self::HEADER_GUEST_TOKEN));
-        if ($guestToken !== '' && ! self::isValidGuestToken($guestToken)) {
-            return self::invalidIdentity(self::HEADER_GUEST_TOKEN);
+        if ($userId !== null && $guestToken !== null && !$allowTransition) {
+            return new WP_Error('kizlo_conflicting_identity', 'A guest cart can only be merged on cart or checkout routes.', ['status' => 401]);
         }
 
-        if ($userId !== null && $guestToken !== '' && ! $allowTransition) {
-            return new WP_Error(
-                'kizlo_conflicting_identity',
-                'User and guest identities may only be combined for cart or checkout transitions.',
-                ['status' => 401]
-            );
-        }
-
-        return [
-            'user_id'     => $userId,
-            'guest_token' => $guestToken !== '' ? $guestToken : null,
-        ];
+        return ['user_id' => $userId, 'guest_token' => $guestToken];
     }
 
     /** @param array{user_id: ?int, guest_token: ?string} $identity */
@@ -154,7 +129,7 @@ class SessionHandler extends WC_Session_Handler
         return $this->guest_token;
     }
 
-    /** Cookies are disabled for this handler; Kizlo owns the signed cookie. */
+    /** Browser clients retain the native Cart-Token instead of a WordPress cookie. */
     public function set_customer_session_cookie($set)
     {
         // no-op

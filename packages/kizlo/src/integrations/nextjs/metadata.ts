@@ -2,14 +2,16 @@ import type { Metadata, Viewport } from "next"
 import type { IconDescriptor } from "../../brand/icons"
 import { resolveIcons } from "../../brand/icons"
 import { WEB_MANIFEST_ROUTE } from "../../brand/manifest"
-import type { S2SClient } from "../../kizlo"
+import type { PublicApiClient } from "../../public-api"
 import type { SeoHead } from "../../seo/schema"
+import { deserializeSeo } from "../../seo/utils"
+import { requireData } from "../../wordpress/utils"
 
 export { renderJsonLd } from "../../seo/utils"
 
-export function createRootMetadata(client: S2SClient<[]>) {
+export function createRootMetadata(client: PublicApiClient) {
 	return async function generateMetadata(): Promise<Metadata> {
-		const settings = await client.settings.get.call()
+		const settings = requireData(await client.kizlo.site.retrieve())
 		const { icon, appleTouch } = resolveIcons(settings.brand)
 
 		const metadata: Metadata = {
@@ -33,9 +35,9 @@ export function createRootMetadata(client: S2SClient<[]>) {
  * which only applies once the site is installed as an app. When a dark variant
  * is set, both are emitted with `prefers-color-scheme` media queries.
  */
-export function createRootViewport(client: S2SClient<[]>) {
+export function createRootViewport(client: PublicApiClient) {
 	return async function generateViewport(): Promise<Viewport> {
-		const { brand } = await client.settings.get.call()
+		const { brand } = requireData(await client.kizlo.site.retrieve())
 		const light = brand.theme_color
 		const dark = brand.theme_color_dark
 
@@ -56,9 +58,9 @@ function toNextIcon(icon: IconDescriptor): IconDescriptor {
  * A factory (rather than the inline call the `create` template shows) so `init` can wire it into
  * an existing home page as a single `export const generateMetadata = createHomeMetadata(client)`.
  */
-export function createHomeMetadata(client: S2SClient<[]>) {
+export function createHomeMetadata(client: PublicApiClient) {
 	return async function generateMetadata(): Promise<Metadata> {
-		const { head } = await client.seo.homepage.call()
+		const { head } = deserializeSeo(requireData(await client.kizlo.seo.homepage.retrieve()))
 		return createPageMetadata(head)
 	}
 }

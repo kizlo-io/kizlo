@@ -33,6 +33,18 @@
 		"kizlo": "./dist/cli/index.js"
 	},
 	"exports": {
+		"./browser": {
+			"import": {
+				"types": "./dist/browser.d.ts",
+				"default": "./dist/browser.js"
+			}
+		},
+		"./server": {
+			"import": {
+				"types": "./dist/server.d.ts",
+				"default": "./dist/server.js"
+			}
+		},
 		"./package.json": "./package.json",
 		".": {
 			"import": {
@@ -134,20 +146,12 @@
 		"@clack/prompts": "^1.5.1",
 		"@kizlo/shared": "workspace:*",
 		"@modelcontextprotocol/sdk": "^1.29.0",
-		"@orpc/client": "^1.14.3",
-		"@orpc/contract": "^1.14.3",
-		"@orpc/openapi": "^1.14.3",
-		"@orpc/openapi-client": "^1.14.3",
-		"@orpc/server": "^1.14.3",
 		"chokidar": "^5.0.0",
 		"citty": "^0.1.6",
 		"consola": "^3.2.3",
 		"cookie": "^2.0.1",
 		"diff": "^8.0.4",
-		"get-port": "^7.2.0",
-		"giget": "^3.0.0",
 		"jiti": "^2.7.0",
-		"magicast": "^0.5.3",
 		"minisearch": "^7.2.0",
 		"package-manager-detector": "^1.8.0",
 		"zod": "catalog:"

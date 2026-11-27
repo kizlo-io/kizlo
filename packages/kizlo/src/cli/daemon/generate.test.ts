@@ -1,7 +1,6 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
 import { MIN_PLUGIN_VERSION, pluginUpdateMessage } from "@kizlo/shared"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import type { IntrospectionDocument } from "../../wordpress/introspection"
@@ -9,18 +8,13 @@ import { INTROSPECTION_FIXTURE } from "../../wordpress/introspection.fixture"
 import { assertGeneratedClientCompiles, GeneratedClientTypeError } from "../../wordpress/typecheck"
 import type { ResolvedConfig } from "./config"
 import {
-	CONTRACT_BARREL,
 	generateIntrospectionOnce,
 	generateIntrospectionSource,
 	generateOnce,
-	INTROSPECTION_STUB,
-	LegacyRouterExportError,
 	PartialContractError,
 	reportGenerationError,
 } from "./generate"
 import { log } from "./logger"
-
-const here = path.dirname(fileURLToPath(import.meta.url))
 
 /**
  * Compiling the fixture is {@link assertGeneratedClientCompiles}'s own suite's job, and doing it
@@ -39,13 +33,6 @@ function refused(): GeneratedClientTypeError {
 function config(cwd: string): ResolvedConfig {
 	return {
 		cwd,
-		server: {
-			dir: "src/kizlo/server",
-			entry: "src/kizlo/server/index.ts",
-			contractDir: "src/kizlo/server/generated",
-			contractPath: "src/kizlo/server/generated/contract.json",
-			barrelPath: "src/kizlo/server/generated/index.ts",
-		},
 		introspectionPath: "src/kizlo/server/generated/introspection.ts",
 		introspectionMetaPath: ".kizlo/introspection.meta.json",
 	}
@@ -84,13 +71,6 @@ function project(): ResolvedConfig {
 	return config(cwd)
 }
 
-function writeServer(cfg: ResolvedConfig, source: string): void {
-	if (!cfg.server) throw new Error("writeServer needs a server-backed config")
-	const entry = path.join(cfg.cwd, cfg.server.entry)
-	fs.mkdirSync(path.dirname(entry), { recursive: true })
-	fs.writeFileSync(entry, source)
-}
-
 function responder(...responses: Response[]): typeof globalThis.fetch {
 	const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
 	for (const response of responses) fetch.mockResolvedValueOnce(response)
@@ -126,61 +106,23 @@ function watchLog(): void {
 }
 
 describe("generateOnce", () => {
-	test("reads procedures and writes a barrel typed from that export", async () => {
+	test("generates both endpoint projections without importing an application entry", async () => {
 		const cfg = project()
-		const kizloModule = path.resolve(here, "../../kizlo.ts")
-		writeServer(cfg, `import { createKizlo } from ${JSON.stringify(kizloModule)}\nexport const { procedures } = createKizlo()\n`)
-
-		await expect(generateOnce(cfg, { fetch: responder(modified()) })).resolves.toMatchObject({ contract: "built" })
-		const server = cfg.server as NonNullable<ResolvedConfig["server"]>
-		expect(JSON.parse(fs.readFileSync(path.join(cfg.cwd, server.contractPath), "utf8"))).toHaveProperty("posts")
-		expect(fs.readFileSync(path.join(cfg.cwd, server.barrelPath), "utf8")).toBe(CONTRACT_BARREL)
-		expect(CONTRACT_BARREL).toContain('import type { procedures } from ".."')
-		// The contract is registered, not cast onto: the cast asserted that the committed JSON and the
-		// exported tree agreed instead of establishing it.
-		expect(CONTRACT_BARREL).not.toContain("as unknown as")
-		expect(CONTRACT_BARREL).toContain('declare module "kizlo" {\n\tinterface KizloProcedureRegistry {\n\t\tprocedures: typeof procedures')
-		// The barrel re-exports from the introspection artifact, not the old wordpress.ts.
-		expect(CONTRACT_BARREL).toContain('from "./introspection"')
-		expect(CONTRACT_BARREL).toContain('export { introspection, type WordPressClient } from "./introspection"')
+		fs.mkdirSync(path.join(cfg.cwd, "src/server"), { recursive: true })
+		fs.writeFileSync(path.join(cfg.cwd, "src/server/index.ts"), 'throw new Error("Application entry must not be imported")')
+		await expect(generateOnce(cfg, { fetch: responder(modified()) })).resolves.toEqual({ introspection: "generated" })
+		expect(fs.readFileSync(path.join(cfg.cwd, cfg.introspectionPath), "utf8")).toContain("WP_AcmeBook")
+		expect(fs.existsSync(path.join(cfg.cwd, cfg.introspectionPath.replace(/\.ts$/, ".browser.ts")))).toBe(true)
+		expect(fs.existsSync(path.join(cfg.cwd, "src/server/contract.json"))).toBe(false)
 	})
 
-	test("writes an introspection stub that exports the named tree", () => {
-		expect(INTROSPECTION_STUB).toContain("export const introspection = {} as any")
-		expect(INTROSPECTION_STUB).toContain("export type WordPressClient = WP_Client<typeof introspection>")
-		expect(INTROSPECTION_STUB).toContain("introspection: typeof introspection")
-	})
-
-	test("generates the introspection alone when no server is configured", async () => {
-		const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kizlo-generate-"))
-		seedEnv(cwd)
-		const cfg = standalone(cwd)
-
-		await expect(generateOnce(cfg, { fetch: responder(modified()) })).resolves.toMatchObject({ contract: "none" })
-		expect(fs.readFileSync(path.join(cwd, cfg.introspectionPath), "utf8")).toContain("WP_AcmeBook")
-	})
-
-	test("gives a targeted migration error for a legacy router export", async () => {
+	test("can skip a refresh without creating permissive stub definitions", async () => {
 		const cfg = project()
-		writeServer(cfg, "export const router = {}\n")
-
-		await expect(generateOnce(cfg)).rejects.toThrow(LegacyRouterExportError)
-		await expect(generateOnce(cfg)).rejects.toThrow(/exports `router`.*Rename that export to `procedures`/)
-	})
-
-	test("skips introspection but still builds the contract when told to", async () => {
-		const cfg = project()
-		const kizloModule = path.resolve(here, "../../kizlo.ts")
-		writeServer(cfg, `import { createKizlo } from ${JSON.stringify(kizloModule)}\nexport const { procedures } = createKizlo()\n`)
-		const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-
-		const result = await generateOnce(cfg, { skipIntrospection: true, fetch: fetch as unknown as typeof globalThis.fetch })
-
-		expect(result).toEqual({ introspection: "skipped", contract: "built" })
+		const fetch = vi.fn()
+		expect(await generateOnce(cfg, { skipIntrospection: true, fetch: fetch as unknown as typeof globalThis.fetch })).toEqual({
+			introspection: "skipped",
+		})
 		expect(fetch).not.toHaveBeenCalled()
-		const server = cfg.server as NonNullable<ResolvedConfig["server"]>
-		expect(fs.existsSync(path.join(cfg.cwd, server.contractPath))).toBe(true)
-		// The introspection file is left as it was — skipping never writes it.
 		expect(fs.existsSync(path.join(cfg.cwd, cfg.introspectionPath))).toBe(false)
 	})
 })

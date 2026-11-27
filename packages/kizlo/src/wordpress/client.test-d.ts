@@ -1,6 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest"
+import { introspection } from "../../../../introspection"
 import type { EmailService } from "../email/service"
-import { createKizlo } from "../kizlo"
+import { createServerClient } from "../server"
 import type { SettingsService } from "../settings/service"
 import { createWordPressClient, wpEndpoint } from "./endpoint"
 import type { WordPressTransport } from "./transport"
@@ -471,17 +472,16 @@ describe("services bound to the generated client", () => {
 	})
 })
 
-describe("createKizlo WordPress access", () => {
-	const server = createKizlo()
-	const { wordpress } = server
-
+describe("direct server WordPress access", () => {
+	const wordpress = createServerClient({
+		credentials: { url: "https://wp.example", username: "admin", password: "secret" },
+		endpoints: introspection,
+	})
 	it("retains generated endpoint inference", async () => {
 		expectTypeOf(await wordpress.comments.retrieve({ params: { id: 7 } })).toEqualTypeOf<WP_EndpointResult<"comments.retrieve">>()
 		// @ts-expect-error a generated numeric ID rejects strings
 		wordpress.comments.retrieve({ params: { id: "7" } })
-		// @ts-expect-error the internal context is no longer a public API
-		server.context
-		// @ts-expect-error the configured client is read-only
-		server.wordpress = wordpress
+		// @ts-expect-error the former integration server is removed
+		wordpress.context
 	})
 })

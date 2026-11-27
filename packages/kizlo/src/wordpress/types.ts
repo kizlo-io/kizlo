@@ -1,6 +1,5 @@
 import type { SearchParamsLike } from "@kizlo/shared"
 import type { WP_Error } from "./error"
-import type { WordPressTransport } from "./transport"
 
 /**
  * One endpoint as data: its definition, plus the two types the call site needs. Both extra members
@@ -28,8 +27,7 @@ export interface WP_Endpoint<TInput, TResult> extends WP_EndpointDefinition {
 export type WP_CallOptions = Pick<WP_RequestInput, "signal" | "headers" | "searchParams">
 
 /**
- * The callable shape of an endpoint tree: every definition leaf becomes the request it runs. `any`
- * passes through so the stub tree a project carries before its first generation stays callable.
+ * The callable shape of a generated endpoint tree: every definition becomes its typed request.
  */
 export type WP_Client<T> = {
 	[K in keyof T]: IsAny<T[K]> extends true
@@ -47,11 +45,14 @@ export type WP_Client<T> = {
 type WP_CallArguments<TInput> =
 	Record<string, never> extends TInput ? [input?: TInput, options?: WP_CallOptions] : [input: TInput, options?: WP_CallOptions]
 
-/** True only for `any` — the shape every path has before a project has generated its client. */
+/** Detect an explicitly untyped input without erasing typed endpoint definitions. */
 type IsAny<T> = 0 extends 1 & T ? true : false
 
 /** Generated WordPress endpoint trees augment this registry in the project that owns them. */
 export interface WordPressClientRegistry {}
+
+/** The explicitly public endpoint projection used by browser hooks. */
+export interface BrowserClientRegistry {}
 
 /** Generated WordPress modules augment this flat registry with every raw operation they expose. */
 export interface WordPressEndpointRegistry {}
@@ -67,25 +68,17 @@ export type WP_Schema<TName extends string, TFallback = unknown> = TName extends
 	? WordPressSchemaRegistry[TName]
 	: TFallback
 
-/**
- * The WordPress client this project compiles against: its generated endpoints bound to the
- * transport, or the bare transport. The stub written before the first generation registers `any`,
- * so a freshly scaffolded project compiles against endpoints it has not described yet.
- */
+/** The generated service endpoint tree. Missing generation is a setup error. */
 export type ActiveWordPressClient = WordPressClientRegistry extends { introspection: infer TEndpoints extends object }
-	? WP_Client<TEndpoints> & WordPressTransport
-	: WordPressTransport
+	? WP_Client<TEndpoints>
+	: { readonly ERROR_Import_introspection_after_running_kizlo_generate: never }
 
 /** Every raw WordPress operation path generated for the active project. */
 export type WP_EndpointPath = keyof WordPressEndpointRegistry extends never ? string : Extract<keyof WordPressEndpointRegistry, string>
 
-/**
- * Resolve a generated registry entry. The empty-registry branch keeps the package declarations
- * usable before a project writes its first generated module; the generated stub adds the same
- * permissive fallback explicitly.
- */
+/** Missing generation cannot supply endpoint input or response types. */
 type WP_EndpointAtPath<TPath extends WP_EndpointPath> = keyof WordPressEndpointRegistry extends never
-	? any
+	? never
 	: TPath extends keyof WordPressEndpointRegistry
 		? WordPressEndpointRegistry[TPath]
 		: never

@@ -17,7 +17,7 @@ import type { ActiveKizloClient } from "./client"
  * locale, a session or app-wide configuration can join it without changing a signature.
  */
 export type KizloContextValue = {
-	/** The app's browser Kizlo client, typed from the procedures that app registered. */
+	/** The app's browser Kizlo client, typed from its generated browser endpoints. */
 	client: ActiveKizloClient
 }
 
@@ -25,7 +25,7 @@ const KizloContext = createContext<KizloContextValue | null>(null)
 
 export type KizloProviderProps = {
 	children: ReactNode
-	/** The app's browser Kizlo client, the callable procedure tree. */
+	/** The app's browser Kizlo client, the direct API client. */
 	client: ActiveKizloClient
 }
 
@@ -45,8 +45,6 @@ export type KizloProviderProps = {
  * ```
  */
 export function KizloProvider({ children, client }: KizloProviderProps) {
-	// `ActiveKizloClient` is `any` until the app registers its procedures, so a missing client is not a type error there, and
-	// the context value below is an object either way. Nothing downstream would catch it before the first procedure call.
 	if (!client) {
 		throw new Error("<KizloProvider client={client}> needs the browser client `createKizloClient` returned.")
 	}
@@ -58,7 +56,7 @@ export function KizloProvider({ children, client }: KizloProviderProps) {
 }
 
 /**
- * Reads the context, whose `client` is typed from the procedures the app registered, so a call the contract does not
+ * Reads the context, whose `client` is typed from its generated browser endpoints, so a call the generated API does not
  * carry is a compile error rather than a runtime surprise.
  *
  * @example

@@ -24,9 +24,7 @@ on the client itself, so its identity survives re-renders of the surrounding tre
 Import the client in the same client module that mounts the provider. A Server Component cannot hand it down as a
 prop: props crossing the server boundary have to be serialisable, and the client is a tree of functions.
 
-Mounting without a client throws. `ActiveKizloClient` falls back to `any` in a project whose barrel registers
-nothing, so a missing client is not always a type error, and it would otherwise surface as a `TypeError` inside
-the first request.
+Import the generated browser module to register the exact client type. Missing generation cannot make the hook callable on `any`.
 
 ### `children`
 

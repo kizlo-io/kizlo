@@ -1,49 +1,9 @@
-import path from "node:path"
-import { FSWatcher } from "chokidar"
 import { IntrospectionFetchError } from "../../wordpress/fetch-introspection"
 import type { McpState } from "../mcp/state"
 import { type ResolvedConfig, resolveConfig, resolveWatchCredentials } from "./config"
 import { type GenerateWordPressOptions, generateIntrospectionOnce, generateOnce, reportGenerationError } from "./generate"
 import { acquire, lockPath, release } from "./lock"
 import { log } from "./logger"
-
-function debounce<T extends (...args: never[]) => Promise<void>>(fn: T, delay: number): T {
-	let timer: NodeJS.Timeout
-	return ((...args) => {
-		clearTimeout(timer)
-		timer = setTimeout(() => void fn(...args), delay)
-	}) as T
-}
-
-async function regenerate(cfg: ResolvedConfig, options: GenerateWordPressOptions): Promise<void> {
-	try {
-		const result = await generateOnce(cfg, options)
-		if (result.contract === "built") log.success("Contract updated")
-		else if (result.contract === "empty" && cfg.server) log.warn(`No Kizlo server found in ${cfg.server.entry}`)
-	} catch (error) {
-		reportGenerationError("Failed to update the Kizlo contract:", error)
-	}
-}
-
-/** Watches the server directory and regenerates the contract on change. Only called when a server is present. */
-async function watch(
-	cfg: ResolvedConfig,
-	server: NonNullable<ResolvedConfig["server"]>,
-	options: GenerateWordPressOptions,
-): Promise<FSWatcher> {
-	const watcher = new FSWatcher({
-		persistent: true,
-		ignoreInitial: true,
-		ignored: path.resolve(cfg.cwd, server.contractDir),
-	})
-
-	const onChange = debounce(() => regenerate(cfg, options), 300)
-
-	watcher.add(path.resolve(cfg.cwd, server.dir))
-	watcher.on("all", () => void onChange())
-
-	return watcher
-}
 
 /**
  * Report the introspection poll's pass. It carries the last failure it reported, because most of what
@@ -138,12 +98,7 @@ function endOnStoppedStack(stack: StackWatch, now: () => number = Date.now): Sta
 	}
 }
 
-/**
- * One pass of the introspection poll: refetch and rewrite `introspection.ts` when WordPress has changed.
- * A server-backed app and a package that ships only procedures both take this same pass, since each has
- * exactly one introspection to keep current; the plugin's PHP changing is picked up either way. The
- * contract is not refreshed here; the file watcher rebuilds it on a server source change.
- */
+/** Refresh both endpoint projections and give MCP the same WordPress document. */
 export function createWordPressRefresh(cfg: ResolvedConfig, options: GenerateWordPressOptions, stack?: StackWatch): () => Promise<void> {
 	const guard = stack ? endOnStoppedStack(stack) : undefined
 	const introspection = reportGeneration(guard)
@@ -180,7 +135,7 @@ export async function startWatcher(
 ): Promise<(() => void) | undefined> {
 	const lock = lockPath(cwd)
 	if (!(await acquire(lock))) {
-		log.info("Watcher already running — skipping the contract watcher.")
+		log.info("Watcher already running — skipping the introspection watcher.")
 		return undefined
 	}
 
@@ -193,17 +148,17 @@ export async function startWatcher(
 	try {
 		const cfg = await resolveConfig(cwd, { dir: opts?.dir })
 		if (!cfg) {
-			log.info("skipping the contract generation.")
+			log.info("skipping the introspection generation.")
 			return undefined
 		}
 
 		// Credentials come from the environment and cannot change while the dev server runs, so they are
 		// resolved once here rather than on every regeneration. Without a reachable WordPress — no enabled
-		// local stack, or incomplete connection envs — introspection is skipped and the contract watcher
+		// local stack, or incomplete connection envs — introspection is skipped and the introspection watcher
 		// runs alone, rather than failing to fetch from a WordPress that is not there.
 		const credentials = await resolveWatchCredentials(cwd)
 		const options: GenerateWordPressOptions = credentials ? { credentials } : { skipIntrospection: true }
-		if (!credentials) log.info("No WordPress connection configured; running the contract watcher only, introspection skipped.")
+		if (!credentials) log.info("No WordPress connection configured; introspection refresh is unavailable.")
 
 		// The MCP server holds no copies, so this is where both of the things it serves are kept current.
 		// Credentials are written on every start, reload included, because a `.env` change is exactly when
@@ -223,15 +178,11 @@ export async function startWatcher(
 
 		try {
 			const result = await generateOnce(cfg, options)
-			if (result.contract === "built") log.success("Contract generated")
-			else if (result.contract === "empty" && cfg.server) log.warn(`No Kizlo server found in ${cfg.server.entry}`)
-			else if (result.introspection === "generated") log.success("WordPress introspection generated")
+			if (result.introspection === "generated") log.success("WordPress introspection generated")
 		} catch (error) {
-			reportGenerationError("Failed to generate the Kizlo contract:", error)
+			reportGenerationError("Failed to generate the WordPress introspection:", error)
 		}
 
-		// Only a server has sources worth watching; a package with just the introspection rides the poll below.
-		const watcher = cfg.server ? await watch(cfg, cfg.server, options) : undefined
 		// The introspection poll needs a live connection; with none, there is nothing to refresh.
 		const wordpressRefresh = credentials ? refreshWordPress(cfg, options, opts?.stack) : undefined
 		let stopped = false
@@ -241,7 +192,6 @@ export async function startWatcher(
 			stopped = true
 			release(lock)
 			if (wordpressRefresh) clearInterval(wordpressRefresh)
-			void watcher?.close()
 		}
 	} finally {
 		if (!handedOver) release(lock)

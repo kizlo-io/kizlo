@@ -1,161 +1,25 @@
 ---
 title: CLI
 icon: Terminal
-description: Learn how the kizlo CLI scaffolds a project, generates the typed contract, and runs your tests.
+description: Generate direct endpoint clients and run local WordPress, fixtures, tests, and MCP.
 ---
 
-The **`kizlo` CLI** is the tool you run alongside your project. It **scaffolds** Kizlo into a new or existing
-app, **generates the contract** that types your [client](/docs/concepts/client) against your
-[server](/docs/concepts/integration), runs **local WordPress** you can build against, and **runs
-your tests** against a real, disposable WordPress.
-
-It ships with the `kizlo` package, so there's nothing extra to install. Reach for it through your package
-runner:
-
-```package-install
-npx kizlo <command>
-```
-
-## The commands
-
-A handful of commands cover the whole workflow, from first scaffold to a green test run:
-
-| Command | What it does |
+| Command | Purpose |
 | --- | --- |
-| [`kizlo create`](#kizlo-create) | Scaffold a new project with Kizlo already wired |
-| [`kizlo init`](#kizlo-init) | Set up Kizlo in the current project |
-| [`kizlo check`](#kizlo-check) | Verify generated files without changing them |
-| [`kizlo generate`](#kizlo-generate) | Generate the contract once for builds and CI |
-| [`kizlo dev`](#kizlo-dev) | Watch and regenerate the contract as you edit, and run local WordPress. Bare starts it; `stop`, `reset`, `--export` |
-| [`kizlo test`](#kizlo-test) | Boot local WordPress, seed it, and run your tests (`stop`, `reset`) |
-
-Every command reads [`kizlo.config.ts`](#configuration) to find where your server lives and how your test
-environment is set up.
-
-## `kizlo create`
-
-`create` scaffolds a **new project** with Kizlo already wired. Reach for it when you're starting from
-scratch rather than adding to an app you already have. Give it a template and a directory name:
-
-```package-install
-npx kizlo@latest create nextjs my-app
-```
-
-Both arguments are optional (`kizlo create [template] [project-name]`); `create` prompts for whichever you
-leave off, and the template auto-selects while `nextjs` is the only one. It creates `my-app/`, lays down a
-fully wired project for that template, and runs the same WordPress credential prompts as
-[`init`](#kizlo-init). When it finishes, `cd my-app`, install dependencies, and make your first call. The
-[Next.js quickstart](/docs/quickstarts/nextjs) walks it end to end.
-
-## `kizlo init`
-
-`init` sets Kizlo up in an existing project. It detects your framework, package manager, `src` directory, and
-import alias, then scaffolds the server, client, route handler, and config, prompting for your WordPress
-credentials along the way and writing them to `.env`.
-
-```package-install
-npx kizlo@latest init
-```
-
-It's the recommended path through the [Installation](/docs/installation) guide, which walks the prompts in
-detail. Past the defaults, a few flags tune the run:
-
-| Flag | Effect |
-| --- | --- |
-| `--yes`, `-y` | Skip the prompts and scaffold with defaults (non-interactive, for CI) |
-| `--force`, `-f` | Overwrite existing `.env` values and the server entry without asking |
-| `--preset <id>` | Force a setup preset (`base`, `nextjs`) instead of auto-detecting |
-| `--alias <prefix>` | Set the import alias for generated imports (e.g. `@`); blank for relative |
-
-### Backend URL
-
-The plugin delivers webhook events to your Kizlo backend, so `init` records where it's reachable. A detected
-framework mounts the handler at a known path (`/api/kizlo` for Next.js), so `init` asks one question: your
-app's public URL. It derives the backend from it and writes it to `NEXT_PUBLIC_KIZLO_BASE_URL`.
-
-The **base** preset has no known mount, so `init` asks two URLs: your public **site URL** (what the plugin
-points back at) and the **backend URL** where you've mounted the handler (written to `KIZLO_BASE_URL`).
-
-The generated `client.ts` routes to that backend. Same-origin deploys default to the page origin; a backend on
-a different origin is inlined into `createKizloClient(contract, { url })`. Swap that for your bundler's own
-public env var (e.g. `import.meta.env.VITE_KIZLO_BASE_URL`) to set it per environment.
-
-## `kizlo check`
-
-`check` compares the configured `introspection.ts` with the contract published by WordPress. It exits non-zero
-and prints a unified diff when the committed introspection is stale. It never changes the file.
-
-```package-install
-npx kizlo check
-```
-
-Use `--test` after `kizlo test` to check against the WordPress stack built from `test.fixtures`. This makes the
-same command useful locally and in CI:
-
-```bash
-npx kizlo test
-npx kizlo check --test
-```
-
-Pass `--dir <path>` when the Kizlo server lives somewhere other than the configured `dir`. If the check fails,
-the message prints the matching `kizlo generate` command.
+| `kizlo generate` | Write browser and server endpoint projections |
+| `kizlo check` | Compare both generated files with WordPress without writing |
+| `kizlo dev` | Run local WordPress and poll its introspection |
+| `kizlo test` | Seed test WordPress and run your test command |
 
 ## `kizlo generate`
 
-`generate` builds the [contract](/docs/concepts/client) **once** and exits. It's the command for builds and
-CI. Run it before you typecheck or bundle, so `server/generated/` exists and is current when the client
-imports it.
+Set `dir` in `kizlo.config.ts`, then run `npx kizlo generate`. It writes `introspection.ts` and `introspection.browser.ts` directly into that directory. Generation reads WordPress; it never imports an application server.
 
-```package-install
-npx kizlo generate
-```
+Use `--test` for the seeded test stack, `--dir <path>` to override the output directory, and `--strict` to refuse a partial contract. An invalid contract leaves existing output untouched. Warnings describe weakened metadata; exclusions describe missing operations or schemas.
 
-Your configured server entry must export `procedures`. `generate` reads that procedure tree and writes a JSON
-contract whose generated barrel is typed as `typeof procedures`:
+## `kizlo check`
 
-```ts title="src/lib/kizlo/server/index.ts"
-export const { procedures, client, wordpress, handler } = createKizlo({ integrations: [nextjs()] })
-```
-
-<Callout type="warn">
-  A legacy `router` export is not used as a fallback. Rename it to `procedures`; the CLI reports this migration
-  directly instead of saying that no Kizlo server was found.
-</Callout>
-
-It exits non-zero if it can't find a Kizlo server in your entry file or if generation fails, so a stale or
-broken contract fails the build rather than slipping through. It accepts `--dir` to point at a Kizlo
-directory other than the one in `kizlo.config.ts`, `--test` to generate from WordPress left running by
-`kizlo test`, and `--strict` to [refuse a partial
-contract](#when-a-plugins-routes-cant-be-published).
-
-<Callout>
-  Wire `kizlo generate` into your `build` script (e.g. `"build": "kizlo generate && next build"`) so the
-  contract is always regenerated as part of every production build.
-</Callout>
-
-### When a plugin's routes can't be published
-
-One plugin's broken declaration doesn't take the rest of the contract down with it. WordPress publishes
-everything that passed validation and reports what it had to drop, and `generate` writes that subset. Your
-routes keep regenerating while the broken plugin gets fixed.
-
-Every exclusion is printed with the schema or route it landed on, then a count of what's missing from the
-generated introspection. Warnings are separate: a warning means a declaration lost a constraint, and the type it
-produces is still correct.
-
-Pass `--strict` to refuse a partial contract instead:
-
-```package-install
-npx kizlo generate --strict
-```
-
-Strict generation prints the same diagnostics, exits non-zero, and leaves the introspection already on disk
-untouched, so a build never replaces a complete introspection with one that's quietly short of routes. Reach
-for it in CI, where a missing route typechecks clean and ships the gap. It governs the introspection only, since
-`contract.json` is built from your own procedures and has no third-party contributors.
-
-`kizlo dev` is always partial. A watcher that refused to write would leave you working against a client that
-can't be regenerated until someone else's plugin is fixed.
+Run `npx kizlo check` in CI to compare both projections without modifying them. `--test` checks the running fixture stack. Regenerate when it reports a mismatch.
 
 ## `kizlo dev`
 
@@ -234,10 +98,7 @@ are separate from database engine compatibility. See the [phpMyAdmin import docu
 
 ### Enabling local WordPress
 
-`kizlo create` and `kizlo init` offer to set up local WordPress during onboarding. Choose it and they
-provision the `.kizlo/local` install, write the connection to `.env`, and set
-[`local`](#configuration) with its `dev` and `test` stacks in `kizlo.config.ts` for you. There's no
-folder to pick: the install location is fixed.
+Enable `local` in `kizlo.config.ts`, then run `npx kizlo dev`. The CLI provisions the gitignored `.kizlo/local` install and writes local service credentials for tooling.
 
 <Callout>
   `local` is committed, so a teammate who clones the repo gets local WordPress on their first `kizlo dev`
@@ -336,15 +197,13 @@ The difference between `stop` and `reset` is the database volume: `stop` keeps i
 
 ## Configuration
 
-`kizlo.config.ts` lives at your project root (`.js` and `.mjs` work too). `init` writes it for you; you edit
-it as your project grows. Define it with `defineConfig` for a fully typed config:
+`kizlo.config.ts` lives at your project root (`.js` and `.mjs` work too). Create it manually at your project root. Define it with `defineConfig` for a fully typed config:
 
 ```ts title="kizlo.config.ts"
 import { defineConfig } from "kizlo/config"
 
 export default defineConfig({
-  dir: "src/lib/kizlo",
-  alias: "@",
+  dir: "src/lib/kizlo/generated",
   local: {
     dev: {
       version: "latest",
@@ -359,15 +218,12 @@ export default defineConfig({
 })
 ```
 
-Everything about generation lives under `dir`; everything about the local stacks lives under `local`. `dir`
-takes a string (the home directory Kizlo owns) or an object that sets `server`, `contract`, and
-`introspection` paths on their own. Omit `server` and there are no sources to watch and no contract, only the
-generated [introspection](/docs/concepts/introspection).
+`dir` selects the generated output directory directly. Explicit `wordpress: { url, username, password }` settings or private `KIZLO_WP_URL`, `KIZLO_WP_USERNAME`, and `KIZLO_WP_APP_PASSWORD` environment values connect remote tooling. `KIZLO_MODE=local` selects the corresponding `KIZLO_LOCAL_WP_*` values.
 
 | Field | Used by | Meaning |
 | --- | --- | --- |
-| `dir` | all | Kizlo's home directory, where the CLI finds `server/` and writes `generated/`. Defaults to `src/lib/kizlo` (or `lib/kizlo` without a `src/` directory). Pass an object (`{ server, contract, introspection }`) to set each path on its own |
-| `alias` | `init` | Import-alias prefix for generated imports, e.g. `@`. Blank means relative imports |
+| `dir` | generation | Output directory for both projections |
+| `wordpress` | tooling | Explicit service credentials, never browser configuration |
 | `local` | `dev`, `test` | Local Docker WordPress, off unless set. `true` enables both stacks with defaults; the object form enables and configures them |
 | `local.name` | `dev`, `test` | Base name for the Docker projects (`<name>-dev`, `<name>-test`). Defaults to the sanitized `package.json` name, then the config dir basename |
 | `local.worktrees` | `dev`, `test` | Append the checked-out branch to `name`, so each branch gets its own Docker projects (`<name>-<branch>-dev`). Off unless set. Turn it on when you keep several checkouts of one project, typically [git worktrees](/docs/concepts/development-and-testing#one-stack-per-branch), so their WordPress and database stop being shared |

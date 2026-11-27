@@ -1,15 +1,21 @@
+import { deserializeSeo, requireData } from "kizlo"
 import { createPageMetadata, renderJsonLd } from "kizlo/nextjs/server"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { client } from "@/lib/kizlo/server"
+import { client } from "@/lib/kizlo/client"
 
 export async function generateMetadata(): Promise<Metadata> {
-	const { head } = await client.seo.homepage.call()
+	const { head } = deserializeSeo(requireData(await client.kizlo.seo.homepage.retrieve()))
 	return createPageMetadata(head)
 }
 
 export default async function Home() {
-	const [{ items }, { schema }] = await Promise.all([client.posts.list.call({ query: { perPage: 10 } }), client.seo.homepage.call()])
+	const [postsResult, seoResult] = await Promise.all([
+		client.kizlo.content.post.list({ query: { per_page: 10 } }),
+		client.kizlo.seo.homepage.retrieve(),
+	])
+	const items = requireData(postsResult)
+	const { schema } = deserializeSeo(requireData(seoResult))
 
 	const jsonLd = renderJsonLd(schema)
 
@@ -26,7 +32,7 @@ export default async function Home() {
 				<ul>
 					{items.map((post) => (
 						<li key={post.id}>
-							<Link href={`/blog/${post.slug}`}>{post.title ?? "Untitled"}</Link>
+							<Link href={`/blog/${post.slug}`}>{post.title.rendered || "Untitled"}</Link>
 						</li>
 					))}
 				</ul>
